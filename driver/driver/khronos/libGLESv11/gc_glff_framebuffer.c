@@ -42,7 +42,9 @@
 #      include <private/ui/android_natives_priv.h>
 #   endif
 
-#   include <gc_gralloc_priv.h>
+#if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+#      include <gc_gralloc_priv.h>
+#   endif
 #endif
 
 #define _GC_OBJ_ZONE glvZONE_TRACE
@@ -1305,10 +1307,6 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
                         glmERROR(GL_INVALID_VALUE);
                         break;
                     }
-
-                    /* Set shared lock.*/
-                    gcmVERIFY_OK(gcoSURF_SetSharedLock(mipmap,
-                        context->texture.textureList->sharedLock));
 
                     /* Force dirty flag. */
                     dirty = gcvTRUE;

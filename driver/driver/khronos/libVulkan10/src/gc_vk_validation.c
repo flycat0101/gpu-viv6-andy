@@ -765,7 +765,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateMemory(VkDevice device, const VkM
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (!pAllocateInfo || pAllocateInfo->sType != VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO || pAllocateInfo->pNext)
+    if (!pAllocateInfo || pAllocateInfo->sType != VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
     {
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
@@ -1337,7 +1337,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
     }
-    if (!pPropertyCount || !pProperties)
+    if (!pPropertyCount)
     {
         result = __VK_ERROR_INVALID_POINTER;
         goto vk_Exit;
@@ -2803,6 +2803,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorPool(VkDevice device, VkDesc
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkDescriptorPool *dsp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorPool *, descriptorPool);
     VkResult result = VK_SUCCESS;
+    uint32_t i = 0;
 
     __VK_LOG_API("(tid=%d): vkDestroyDescriptorPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorPool, pAllocator);
 
@@ -2816,6 +2817,26 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorPool(VkDevice device, VkDesc
     {
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
+    }
+
+    if (dsp)
+    {
+        __vkDescriptorSet *descSet;
+        for (i = 0; i < dsp->maxSets; i++)
+        {
+            __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, &dsp->pDescSets[i]);
+            descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
+            if (descSet)
+            {
+                if (descSet->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_DESCRIPTORSET))
+                {
+                    result = __VK_ERROR_INVALID_HANDLE;
+                    goto vk_Exit;
+                }
+
+                __vk_RemoveObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject*)descSet);
+            }
+        }
     }
 
     __vk_RemoveObject(devCtx, __VK_OBJECT_DESCRIPTOR_POOL, (__vkObject*)dsp);
@@ -2832,6 +2853,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetDescriptorPool(VkDevice device, VkDe
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkDescriptorPool *dsp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorPool *, descriptorPool);
     VkResult result = VK_SUCCESS;
+    uint32_t i = 0;
 
     __VK_LOG_API("(tid=%d): vkResetDescriptorPool(%p, 0x%llx, %x)", gcoOS_GetCurrentThreadID(), device, descriptorPool, flags);
 
@@ -2845,6 +2867,27 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetDescriptorPool(VkDevice device, VkDe
     {
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
+    }
+
+    /* Loop through the command pool's command buffers */
+    if (dsp)
+    {
+        __vkDescriptorSet *descSet;
+        for (i = 0; i < dsp->maxSets; i++)
+        {
+            __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, &dsp->pDescSets[i]);
+            descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
+            if (descSet)
+            {
+                if (descSet->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_DESCRIPTORSET))
+                {
+                    result = __VK_ERROR_INVALID_HANDLE;
+                    goto vk_Exit;
+                }
+
+                __vk_RemoveObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject*)descSet);
+            }
+        }
     }
 
     result = __vk_ResetDescriptorPool(device, descriptorPool, flags);
@@ -2883,7 +2926,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateDescriptorSets(VkDevice device, c
     {
         for (i = 0; i < pAllocateInfo->descriptorSetCount; i++)
         {
-            des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]);
+            __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+            des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
             __vk_InsertObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject*)des);
         }
     }
@@ -3691,7 +3735,8 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindDescriptorSets(VkCommandBuffer command
     }
     for (i = 0; i < setCount; i++)
     {
-        des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]);
+        __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+        des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
         if (!des || des->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_DESCRIPTORSET))
         {
             result = __VK_ERROR_INVALID_HANDLE;
@@ -5407,6 +5452,158 @@ vk_Exit:
     __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", __VK_PTRVALUE(pSwapchains), __vkiGetResultString(result));
 
     return result;
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFeatures2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2KHR* pFeatures)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFeatures2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFeatures);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE || pFeatures->sType != VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+    if (!pFeatures)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceFeatures2KHR(physicalDevice, pFeatures);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties2KHR* pProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pProperties);
+
+    if (!pProperties)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceProperties2KHR(physicalDevice, pProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties2KHR(VkPhysicalDevice physicalDevice, VkFormat format, VkFormatProperties2KHR* pFormatProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFormatProperties2KHR(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, pFormatProperties);
+
+    if (!pFormatProperties)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceFormatProperties2KHR(physicalDevice, format, pFormatProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2KHR*  pImageFormatInfo, VkImageFormatProperties2KHR* pImageFormatProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceImageFormatProperties2KHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pImageFormatInfo, pImageFormatProperties);
+
+    if (!pImageFormatProperties)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetPhysicalDeviceImageFormatProperties2KHR(physicalDevice, pImageFormatInfo, pImageFormatProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+
+    return result;
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2KHR* pQueueFamilyProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceQueueFamilyProperties2KHR(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, *pQueueFamilyPropertyCount, pQueueFamilyProperties);
+
+    if (!pQueueFamilyProperties)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceQueueFamilyProperties2KHR(physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties2KHR* pMemoryProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceMemoryProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pMemoryProperties);
+
+    if (!pMemoryProperties)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceMemoryProperties2KHR(physicalDevice, pMemoryProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2KHR* pFormatInfo, uint32_t* pPropertyCount, VkSparseImageFormatProperties2KHR* pProperties)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSparseImageFormatProperties2KHR(%p, %p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFormatInfo, *pPropertyCount, pProperties);
+
+    if (!pPropertyCount)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_GetPhysicalDeviceSparseImageFormatProperties2KHR(physicalDevice, pFormatInfo, pPropertyCount, pProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __vkiGetResultString(result));
+}
+
+VKAPI_ATTR void VKAPI_CALL __valid_TrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlagsKHR flags)
+{
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkTrimCommandPoolKHR(%p, %p, %d)", gcoOS_GetCurrentThreadID(), device, commandPool, flags);
+    if (!commandPool)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+    __vk_TrimCommandPoolKHR(device, commandPool, flags);
+
+vk_Exit:
+    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)

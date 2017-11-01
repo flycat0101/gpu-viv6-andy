@@ -405,14 +405,12 @@ veglQueryWaylandBuffer(
     gcoSURF * Surface
     );
 
-#ifdef USE_VIV_WAYLAND
 struct wl_buffer *
 veglCreateWaylandBufferFromImage(
     VEGLThreadData Thread,
     VEGLDisplay Dpy,
     VEGLImage Image
     );
-#  endif
 #endif
 
 #ifdef __cplusplus

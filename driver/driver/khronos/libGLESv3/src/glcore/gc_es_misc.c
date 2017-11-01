@@ -544,7 +544,7 @@ GLvoid GL_APIENTRY __gles_Flush(__GLcontext *gc)
 {
     __GL_HEADER();
 
-    (*gc->dp.flush)(gc);
+    (*gc->dp.flush)(gc, gcvFALSE);
 
     __GL_FOOTER();
 }
@@ -779,7 +779,7 @@ GLenum GL_APIENTRY __gles_ClientWaitSync(__GLcontext *gc, GLsync sync, GLbitfiel
 
     if (flags & GL_SYNC_FLUSH_COMMANDS_BIT)
     {
-        (*gc->dp.flush)(gc);
+        (*gc->dp.flush)(gc, gcvFALSE);
     }
 
     /* Call dp function to wait sync */

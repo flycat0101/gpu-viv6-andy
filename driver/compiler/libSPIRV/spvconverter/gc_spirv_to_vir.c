@@ -104,6 +104,7 @@
 #define SPV_ID_TYPE_IMAGE_ACCESS_QULIFIER(id) (spv->idDescriptor[id].u.type.u.image.qualifier)
 #define SPV_ID_TYPE_ARRAY_BASE_TYPE_ID(id) (spv->idDescriptor[id].u.type.u.array.baseTypeId)
 #define SPV_ID_TYPE_ARRAY_LENGTH(id) (spv->idDescriptor[id].u.type.u.array.length)
+#define SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(id) (spv->idDescriptor[id].u.type.u.array.sampledImageType)
 
 #define SPV_ID_TYPE_IS_FLOAT(id) (spv->idDescriptor[id].u.type.typeFlags.isFloat)
 #define SPV_ID_TYPE_IS_INTEGER(id) (spv->idDescriptor[id].u.type.typeFlags.isInteger)
@@ -133,6 +134,7 @@
 #define SPV_ID_SYM_OFFSET_VALUE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.baseOffset)
 #define SPV_ID_SYM_VECTOR_OFFSET_TYPE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.vectorIndexType)
 #define SPV_ID_SYM_VECTOR_OFFSET_VALUE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.vectorIndex)
+#define SPV_ID_SYM_NO_NEED_WSHIFT(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.noNeedWShift)
 #define SPV_ID_SYM_MAPPING_ARRAY_SYM(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.arraySym)
 #define SPV_ID_SYM_ARRAY_STRIDE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.arrayStride)
 #define SPV_ID_SYM_MATRIX_STRIDE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.matrixStride)
@@ -152,6 +154,7 @@
 #define SPV_ID_SYM_PARAM_TO_FUNC(id) (spv->idDescriptor[id].u.sym.paramToFunc)
 #define SPV_ID_SYM_PER_PATCH(id) (spv->idDescriptor[id].u.sym.isPerPatch)
 #define SPV_ID_SYM_PER_VERTEX(id) (spv->idDescriptor[id].u.sym.isPerVertex)
+#define SPV_ID_SYM_ATTACHMENT_FLAG(id) (spv->idDescriptor[id].u.sym.attachmentFlag)
 #define SPV_ID_SYM_STORAGE_CLASS(id) (spv->idDescriptor[id].u.sym.storageClass)
 
 #define SPV_ID_VIR_TYPE_ID(id) (spv->idDescriptor[id].virTypeId)
@@ -445,6 +448,7 @@ typedef struct
     gctINT location;
     gctINT binding;
     gctINT descriptorSet;
+    gctINT inputAttachmentIndex;
     gctINT arrayStride;
     gctINT matrixStride;
     gctINT offset;
@@ -1477,7 +1481,7 @@ static VIR_SymId __SpvGenerateVectorDynamicIndexSym(gcSPV spv, VIR_Shader *virSh
     return symId;
 }
 
-static VSC_ErrCode __SpvReplaceBuiltInName(gcSPV spv, VIR_Shader * virShader, SpvId resultId, gctINT memberIndex)
+static VSC_ErrCode __SpvReplaceBuiltInName(gcSPV spv, VIR_Shader * virShader, VIR_StorageClass virStorageClass, SpvId resultId, gctINT memberIndex)
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     SpvCovDecorator *dec = spv->decorationList;
@@ -1518,6 +1522,13 @@ static VSC_ErrCode __SpvReplaceBuiltInName(gcSPV spv, VIR_Shader * virShader, Sp
 
     name = SpvBuiltInName[builtIn];
 
+    if (spv->shaderStage == VSC_SHADER_STAGE_GS &&
+        builtIn == SpvBuiltInPrimitiveId &&
+        virStorageClass == VIR_STORAGE_INPUT)
+    {
+        name = "gl_PrimitiveIDIn";
+    }
+
     if (!SPV_IS_EMPTY_STRING(name) && gcoOS_StrCmp(name, orgName) != gcvSTATUS_OK)
     {
         VIR_Shader_AddString(virShader, name, &nameId);
@@ -1547,6 +1558,53 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     switch(symSpv->spvStorage)
     {
     case SpvStorageClassPushConstant:
+        /* For a push-constant, if it is an array, we need to set the arraystride. */
+        if (VIR_Type_isArray(VIR_Symbol_GetType(sym)))
+        {
+            VIR_Type        *pType = VIR_Symbol_GetType(sym);
+            VIR_Type        *pBaseType = pType;
+            VIR_SymIdList   *pFields = gcvNULL;
+            VIR_Symbol      *pLastFieldSym = gcvNULL;
+            VIR_Type        *pLastFieldType = gcvNULL;
+            gctUINT         arrayLength = 1, offset = 0;
+            gctINT          arrayStride = 0;
+
+            while (VIR_Type_isArray(pBaseType))
+            {
+                pBaseType = VIR_Shader_GetTypeFromId(virShader, VIR_Type_GetBaseTypeId(pBaseType));
+            }
+
+            pFields = VIR_Type_GetFields(pBaseType);
+            gcmASSERT(pFields);
+
+            pLastFieldSym = VIR_Shader_GetSymFromId(virShader, pFields->ids[pFields->count - 1]);
+            pLastFieldType = VIR_Symbol_GetType(pLastFieldSym);
+
+            pBaseType = pLastFieldType;
+            while (VIR_Type_isArray(pBaseType))
+            {
+                arrayLength *= VIR_Type_GetArrayLength(pBaseType);
+                pBaseType = VIR_Shader_GetTypeFromId(virShader, VIR_Type_GetBaseTypeId(pBaseType));
+            }
+
+            /* Calculate the offset of the last field. */
+            offset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pLastFieldSym));
+
+            /* Calculate the size of the last field. */
+            VIR_Type_CalcByteOffset(virShader,
+                                    pBaseType,
+                                    VIR_Type_isArray(pLastFieldType),
+                                    VIR_Symbol_GetLayoutQualifier(pLastFieldSym),
+                                    offset,
+                                    0,
+                                    &arrayStride,
+                                    gcvNULL,
+                                    gcvNULL);
+
+            VIR_Type_SetArrayStride(pType, offset + arrayStride * arrayLength);
+        }
+        /* According to spec, a push-constant uses a std430 layout. */
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_STD430);
     case SpvStorageClassUniformConstant:
     case SpvStorageClassUniform:
     case SpvStorageClassAtomicCounter:
@@ -1584,6 +1642,7 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         VIR_Symbol_SetLocation(sym,  symSpv->location);
         VIR_Symbol_SetBinding(sym,  symSpv->binding);
         VIR_Symbol_SetDescriptorSet(sym, symSpv->descriptorSet);
+        VIR_Symbol_SetInputAttIndex(sym, symSpv->inputAttachmentIndex);
         VIR_Symbol_SetFlag(sym, symFlag);
         if (VIR_Symbol_isUniform(sym) ||
             VIR_Symbol_isSampler(sym) ||
@@ -1633,7 +1692,88 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         break;
     }
 
+    if (symSpv->builtIn)
+    {
+        VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_SKIP_NAME_CHECK);
+    }
+
     return virErrCode;
+}
+
+static VIR_Swizzle
+__ConvVectorIndexToSwizzle(
+    IN  VIR_TypeId          typeId,
+    IN  gctUINT             vectorIndex,
+    IN  gctBOOL             needWShift
+    )
+{
+    VIR_Swizzle             swizzle = VIR_SWIZZLE_XXXX;
+    gctUINT                 compCount = VIR_GetTypeComponents(typeId);
+
+    if (needWShift)
+    {
+        swizzle = __SpvConstIndexToVIRSwizzle(vectorIndex);
+    }
+    else
+    {
+        switch (vectorIndex)
+        {
+        case 0:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_XXXX;
+                break;
+            case 2:
+                swizzle = VIR_SWIZZLE_XYYY;
+                break;
+            case 3:
+                swizzle = VIR_SWIZZLE_XYZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_XYZW;
+                break;
+            }
+            break;
+
+        case 1:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_YYYY;
+                break;
+            case 2:
+                swizzle = VIR_SWIZZLE_YZZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_YZWW;
+                break;
+            }
+            break;
+
+        case 2:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_ZZZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_ZWWW;
+                break;
+            break;
+            }
+
+        case 3:
+            swizzle = VIR_SWIZZLE_WWWW;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    return swizzle;
 }
 
 static void
@@ -1707,7 +1847,7 @@ __SetAccessChainOffsetToOperand(
                 break;
 
             case VIR_SYM_CONST:
-                swizzle = __SpvConstIndexToVIRSwizzle(vecOffset);
+                swizzle = __ConvVectorIndexToSwizzle(SPV_ID_VIR_TYPE_ID(ResultId), vecOffset, !SPV_ID_SYM_NO_NEED_WSHIFT(ResultId));
 
                 if (VIR_Operand_isLvalue(Operand))
                 {
@@ -2261,110 +2401,215 @@ static VSC_ErrCode __SpvAddSharedSymbol(
     return VSC_ERR_NONE;
 }
 
-static VIR_LayoutQual __SpvImageFormatToLayoutQual(SpvImageFormat format)
+static VIR_ImageFormat __SpvVkFormat2VirImageFormat(VkFormat vkformat)
 {
-    VIR_LayoutQual layout = VIR_LAYQUAL_NONE;
+    VIR_ImageFormat imageFormat = VIR_IMAGE_FORMAT_NONE;
+
+    switch (vkformat)
+    {
+    /* FLOAT */
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA32F;
+        break;
+
+    case VK_FORMAT_R32G32_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_RG32F;
+        break;
+
+    case VK_FORMAT_R32_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_R32F;
+        break;
+
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA16F;
+        break;
+
+    case VK_FORMAT_R16G16_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_RG16F;
+        break;
+
+    case VK_FORMAT_R16_SFLOAT:
+        imageFormat = VIR_IMAGE_FORMAT_R16F;
+        break;
+
+    /* Vulkan driver uses the same HW format for these image formats. */
+    case VK_FORMAT_B8G8R8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA8;
+        break;
+
+    case VK_FORMAT_R8G8_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG8;
+        break;
+
+    case VK_FORMAT_R8_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG8;
+        break;
+
+    case VK_FORMAT_R8G8B8A8_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA8_SNORM;
+        break;
+
+    /* SINT */
+    case VK_FORMAT_R32G32B32A32_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA32I;
+        break;
+
+    case VK_FORMAT_R32G32_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG32I;
+        break;
+
+    case VK_FORMAT_R32_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_R32I;
+        break;
+
+    case VK_FORMAT_R16G16B16A16_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA16I;
+        break;
+
+    case VK_FORMAT_R16G16_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG16I;
+        break;
+
+    case VK_FORMAT_R16_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_R16I;
+        break;
+
+    case VK_FORMAT_R8G8B8A8_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA8I;
+        break;
+
+    case VK_FORMAT_R8G8_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG8I;
+        break;
+
+    case VK_FORMAT_R8_SINT:
+        imageFormat = VIR_IMAGE_FORMAT_R8I;
+        break;
+
+    /* UINT */
+    case VK_FORMAT_R32G32B32A32_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA32UI;
+        break;
+
+    case VK_FORMAT_R32G32_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG32UI;
+        break;
+
+    case VK_FORMAT_R32_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_R32UI;
+        break;
+
+    case VK_FORMAT_R16G16B16A16_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA16UI;
+        break;
+
+    case VK_FORMAT_R16G16_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG16UI;
+        break;
+
+    case VK_FORMAT_R16_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_R16UI;
+        break;
+
+    case VK_FORMAT_R8G8B8A8_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA8UI;
+        break;
+
+    case VK_FORMAT_R8G8_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_RG8UI;
+        break;
+
+    case VK_FORMAT_R8_UINT:
+        imageFormat = VIR_IMAGE_FORMAT_R8UI;
+        break;
+
+    /* PACK */
+    case VK_FORMAT_R5G6B5_UNORM_PACK16:
+        imageFormat = VIR_IMAGE_FORMAT_R5G6B5_UNORM_PACK16;
+        break;
+
+    case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+        imageFormat = VIR_IMAGE_FORMAT_ABGR8_UNORM_PACK32;
+        break;
+
+    case VK_FORMAT_A8B8G8R8_UINT_PACK32:
+        imageFormat = VIR_IMAGE_FORMAT_ABGR8UI_PACK32;
+        break;
+
+    case VK_FORMAT_A8B8G8R8_SINT_PACK32:
+        imageFormat = VIR_IMAGE_FORMAT_ABGR8I_PACK32;
+        break;
+
+    /* Vulkan driver uses the same HW format for these image formats. */
+    case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+        imageFormat = VIR_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return imageFormat;
+}
+
+static VIR_ImageFormat __SpvImageFormatToVirImageFormat(SpvImageFormat format)
+{
+    VIR_ImageFormat imageFormat = VIR_IMAGE_FORMAT_NONE;
 
     switch (format)
     {
-    case SpvImageFormatUnknown:         layout = VIR_LAYQUAL_IMAGE_FORMAT_NONE; break;
-    case SpvImageFormatRgba32f:         layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F; break;
-    case SpvImageFormatRgba16f:         layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16F; break;
-    case SpvImageFormatR32f:            layout = VIR_LAYQUAL_IMAGE_FORMAT_R32F; break;
-    case SpvImageFormatRgba8:           layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8; break;
-    case SpvImageFormatRgba8Snorm:      layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8_SNORM; break;
-    case SpvImageFormatRgba32i:         layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I; break;
-    case SpvImageFormatRgba16i:         layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16I; break;
-    case SpvImageFormatRgba8i:          layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8I; break;
-    case SpvImageFormatR32i:            layout = VIR_LAYQUAL_IMAGE_FORMAT_R32I; break;
-    case SpvImageFormatRgba32ui:        layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI; break;
-    case SpvImageFormatRgba16ui:        layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16UI; break;
-    case SpvImageFormatRgba8ui:         layout = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8UI; break;
-    case SpvImageFormatR32ui:           layout = VIR_LAYQUAL_IMAGE_FORMAT_R32UI; break;
+    case SpvImageFormatUnknown:         imageFormat = VIR_IMAGE_FORMAT_NONE; break;
+    case SpvImageFormatRgba32f:         imageFormat = VIR_IMAGE_FORMAT_RGBA32F; break;
+    case SpvImageFormatRgba16f:         imageFormat = VIR_IMAGE_FORMAT_RGBA16F; break;
+    case SpvImageFormatRg16f:           imageFormat = VIR_IMAGE_FORMAT_RG16F; break;
+    case SpvImageFormatR32f:            imageFormat = VIR_IMAGE_FORMAT_R32F; break;
+    case SpvImageFormatRgba8:           imageFormat = VIR_IMAGE_FORMAT_RGBA8; break;
+    case SpvImageFormatRgba8Snorm:      imageFormat = VIR_IMAGE_FORMAT_RGBA8_SNORM; break;
+    case SpvImageFormatRgba32i:         imageFormat = VIR_IMAGE_FORMAT_RGBA32I; break;
+    case SpvImageFormatRgba16i:         imageFormat = VIR_IMAGE_FORMAT_RGBA16I; break;
+    case SpvImageFormatRgba8i:          imageFormat = VIR_IMAGE_FORMAT_RGBA8I; break;
+    case SpvImageFormatR32i:            imageFormat = VIR_IMAGE_FORMAT_R32I; break;
+    case SpvImageFormatRgba32ui:        imageFormat = VIR_IMAGE_FORMAT_RGBA32UI; break;
+    case SpvImageFormatRgba16ui:        imageFormat = VIR_IMAGE_FORMAT_RGBA16UI; break;
+    case SpvImageFormatRgba8ui:         imageFormat = VIR_IMAGE_FORMAT_RGBA8UI; break;
+    case SpvImageFormatR32ui:           imageFormat = VIR_IMAGE_FORMAT_R32UI; break;
+    case SpvImageFormatRg32i:           imageFormat = VIR_IMAGE_FORMAT_RG32I; break;
+    case SpvImageFormatRg16ui:          imageFormat = VIR_IMAGE_FORMAT_RG16UI; break;
+    case SpvImageFormatRg16i:           imageFormat = VIR_IMAGE_FORMAT_RG16I; break;
+    case SpvImageFormatRg32f:           imageFormat = VIR_IMAGE_FORMAT_RG32F; break;
+    case SpvImageFormatR16f:            imageFormat = VIR_IMAGE_FORMAT_R16F; break;
+    case SpvImageFormatRg8i:            imageFormat = VIR_IMAGE_FORMAT_RG8I; break;
+    case SpvImageFormatR16i:            imageFormat = VIR_IMAGE_FORMAT_R16I; break;
+    case SpvImageFormatR8i:             imageFormat = VIR_IMAGE_FORMAT_R8I; break;
+    case SpvImageFormatRgba16:          imageFormat = VIR_IMAGE_FORMAT_RGBA16F; break;
+    case SpvImageFormatRg16:            imageFormat = VIR_IMAGE_FORMAT_RG16F; break;
+    case SpvImageFormatRg8:             imageFormat = VIR_IMAGE_FORMAT_RG8; break;
+    case SpvImageFormatR16:             imageFormat = VIR_IMAGE_FORMAT_R16F; break;
+    case SpvImageFormatR8:              imageFormat = VIR_IMAGE_FORMAT_R8; break;
+    case SpvImageFormatRg32ui:          imageFormat = VIR_IMAGE_FORMAT_RG32UI; break;
+    case SpvImageFormatRg8ui:           imageFormat = VIR_IMAGE_FORMAT_RG8UI; break;
+    case SpvImageFormatR16ui:           imageFormat = VIR_IMAGE_FORMAT_RG16UI; break;
+    case SpvImageFormatR8ui:            imageFormat = VIR_IMAGE_FORMAT_R8UI; break;
 
-    case SpvImageFormatRg32i:
-    case SpvImageFormatRg16i:
-    case SpvImageFormatRg8i:
-    case SpvImageFormatR16i:
-    case SpvImageFormatR8i:
-    case SpvImageFormatRg32f:
-    case SpvImageFormatRg16f:
     case SpvImageFormatR11fG11fB10f:
-    case SpvImageFormatR16f:
-    case SpvImageFormatRgba16:
     case SpvImageFormatRgb10A2:
-    case SpvImageFormatRg16:
-    case SpvImageFormatRg8:
-    case SpvImageFormatR16:
-    case SpvImageFormatR8:
     case SpvImageFormatRgba16Snorm:
     case SpvImageFormatRg16Snorm:
     case SpvImageFormatRg8Snorm:
     case SpvImageFormatR16Snorm:
     case SpvImageFormatR8Snorm:
     case SpvImageFormatRgb10a2ui:
-    case SpvImageFormatRg32ui:
-    case SpvImageFormatRg16ui:
-    case SpvImageFormatRg8ui:
-    case SpvImageFormatR16ui:
-    case SpvImageFormatR8ui: layout = VIR_LAYQUAL_IMAGE_FORMAT_NONE; break;
+        gcmASSERT(gcvFALSE);
+        imageFormat = VIR_IMAGE_FORMAT_NONE;
+        break;
 
     default: break;
     }
 
-    return layout;
-}
-
-static SpvImageFormat __SpvVkFormat2SpvImageFormat(VkFormat vkformat)
-{
-    SpvImageFormat spvformat = SpvImageFormatUnknown;
-
-    switch (vkformat)
-    {
-    case VK_FORMAT_R32G32B32A32_SFLOAT:                 spvformat = SpvImageFormatRgba32f; break;
-    case VK_FORMAT_R16G16B16A16_SFLOAT:                 spvformat = SpvImageFormatRgba16f; break;
-    case VK_FORMAT_R32_SFLOAT:                          spvformat = SpvImageFormatR32f; break;
-    case VK_FORMAT_R8G8B8A8_UNORM:                      spvformat = SpvImageFormatRgba8; break;
-    case VK_FORMAT_R8G8B8A8_SNORM:                      spvformat = SpvImageFormatRgba8Snorm; break;
-    case VK_FORMAT_R32G32_SFLOAT:                       spvformat = SpvImageFormatRg32f; break;
-    case VK_FORMAT_R16G16_SFLOAT:                       spvformat = SpvImageFormatRg16f; break;
-    case VK_FORMAT_B10G11R11_UFLOAT_PACK32:             spvformat = SpvImageFormatR11fG11fB10f; break;
-    case VK_FORMAT_R16_SFLOAT:                          spvformat = SpvImageFormatR16f; break;
-    case VK_FORMAT_R16G16B16A16_UNORM:                  spvformat = SpvImageFormatRgba16; break;
-    case VK_FORMAT_A2R10G10B10_UNORM_PACK32:            spvformat = SpvImageFormatRgb10A2; break;
-    case VK_FORMAT_R16G16_UNORM:                        spvformat = SpvImageFormatRg16; break;
-    case VK_FORMAT_R8G8_UNORM:                          spvformat = SpvImageFormatRg8; break;
-    case VK_FORMAT_R16_UNORM:                           spvformat = SpvImageFormatR16; break;
-    case VK_FORMAT_R8_UNORM:                            spvformat = SpvImageFormatR8; break;
-    case VK_FORMAT_R16G16B16A16_SNORM:                  spvformat = SpvImageFormatRgba16Snorm; break;
-    case VK_FORMAT_R16G16_SNORM:                        spvformat = SpvImageFormatRg16Snorm; break;
-    case VK_FORMAT_R8G8_SNORM:                          spvformat = SpvImageFormatRg8Snorm; break;
-    case VK_FORMAT_R16_SNORM:                           spvformat = SpvImageFormatR16Snorm; break;
-    case VK_FORMAT_R8_SNORM:                            spvformat = SpvImageFormatR8Snorm; break;
-    case VK_FORMAT_R32G32B32A32_SINT:                   spvformat = SpvImageFormatRgba32i; break;
-    case VK_FORMAT_R16G16B16A16_SINT:                   spvformat = SpvImageFormatRgba16i; break;
-    case VK_FORMAT_R8G8B8A8_SINT:                       spvformat = SpvImageFormatRgba8i; break;
-    case VK_FORMAT_R32_SINT:                            spvformat = SpvImageFormatR32i; break;
-    case VK_FORMAT_R32G32_SINT:                         spvformat = SpvImageFormatRg32i; break;
-    case VK_FORMAT_R16G16_SINT:                         spvformat = SpvImageFormatRg16i; break;
-    case VK_FORMAT_R8G8_SINT:                           spvformat = SpvImageFormatRg8i; break;
-    case VK_FORMAT_R16_SINT:                            spvformat = SpvImageFormatR16i; break;
-    case VK_FORMAT_R8_SINT:                             spvformat = SpvImageFormatR8i; break;
-    case VK_FORMAT_R32G32B32A32_UINT:                   spvformat = SpvImageFormatRgba32ui; break;
-    case VK_FORMAT_R16G16B16A16_UINT:                   spvformat = SpvImageFormatRgba16ui; break;
-    case VK_FORMAT_R8G8B8A8_UINT:                       spvformat = SpvImageFormatRgba8ui; break;
-    case VK_FORMAT_R32_UINT:                            spvformat = SpvImageFormatR32ui; break;
-    case VK_FORMAT_A2R10G10B10_UINT_PACK32:             spvformat = SpvImageFormatRgb10a2ui; break;
-    case VK_FORMAT_R32G32_UINT:                         spvformat = SpvImageFormatRg32ui; break;
-    case VK_FORMAT_R16G16_UINT:                         spvformat = SpvImageFormatRg16ui; break;
-    case VK_FORMAT_R8G8_UINT:                           spvformat = SpvImageFormatRg8ui; break;
-    case VK_FORMAT_R16_UINT:                            spvformat = SpvImageFormatR16ui; break;
-    case VK_FORMAT_R8_UINT:                             spvformat = SpvImageFormatR8ui; break;
-    default:
-        break;
-    }
-
-    return spvformat;
+    return imageFormat;
 }
 
 static VIR_SymId __SpvAddIdSymbol(
@@ -2383,10 +2628,15 @@ static VIR_SymId __SpvAddIdSymbol(
     VIR_SymId symId;
     VIR_Symbol * sym;
     VIR_Type * virType;
+    VIR_TypeId virTypeId = VIR_INVALID_ID;
     VSC_ErrCode errCode;
     gctBOOL setLocation = gcvTRUE;
     gctBOOL setSkipNameCheckFlag = gcvFALSE;
+    gctBOOL treatSubPassAsSampler = gcvFALSE;
+    SpvAttachmentDesc* attachmentDesc = gcvNULL;
+    Spv_AttachmentFlag attachmentFlag = SPV_ATTACHMENTFLAG_NONE;
 
+    /* Get the type id. */
     while (SPV_ID_TYPE_IS_POINTER(type))
     {
         type = SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(type);
@@ -2399,6 +2649,44 @@ static VIR_SymId __SpvAddIdSymbol(
         baseTypeId = SPV_ID_TYPE_ARRAY_BASE_TYPE_ID(baseTypeId);
     }
 
+    /* Get attachmentDesc. */
+    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId))
+    {
+        if ((SPV_ID_TYPE_IMAGE_DIM(baseTypeId) == SpvDimSubpassData) &&
+            (spv->renderpassInfo != gcvNULL))
+        {
+            SpvCovDecorator        *dec = spv->decorationList;
+            gctUINT                 target = id;
+            gctINT                  memberIndex = ~0U;
+            gctINT                  subpassAttachmentIndex = -1;
+            gctINT                  inputAttachmentIndex = -1;
+            SpvRenderPassInfo      *renderPass = spv->renderpassInfo;
+
+            /* Find the match decoration by using target and member index.*/
+            SPV_GET_DECORATOR(dec, target, memberIndex);
+
+            if (dec != gcvNULL)
+            {
+                subpassAttachmentIndex = dec->decorationData.inputAttachmentIndex;
+            }
+
+            if ((renderPass->subPassInfoCount > 0) &&
+                (subpassAttachmentIndex >= 0) &&
+                (subpassAttachmentIndex <= (gctINT)renderPass->subPassInfoCount))
+            {
+                inputAttachmentIndex = renderPass->subPassInfo[spv->subPass].input_attachment_index[subpassAttachmentIndex];
+            }
+
+            if (inputAttachmentIndex >= 0 && inputAttachmentIndex < (gctINT)renderPass->attachmentCount)
+            {
+                attachmentDesc = &renderPass->attachments[inputAttachmentIndex];
+                treatSubPassAsSampler = (attachmentDesc->attachmentFlag & SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER) ? gcvTRUE : gcvFALSE;
+                attachmentFlag = attachmentDesc->attachmentFlag;
+            }
+        }
+    }
+
+    /* Create the name string. */
     if (name != gcvNULL)
     {
         VIR_Shader_AddString(virShader, name, &nameId);
@@ -2415,12 +2703,24 @@ static VIR_SymId __SpvAddIdSymbol(
         nameId = SPV_ID_VIR_NAME_ID(id);
     }
 
-    if (SPV_ID_TYPE_IS_POINTER(type))
+    /* If we treat this input attachment as a sampler, get the sampler type. */
+    if (treatSubPassAsSampler)
     {
-        virType = SPV_ID_TYPE_VIR_TYPE(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(type));
+        if (SPV_ID_TYPE_IS_ARRAY(type))
+        {
+            virTypeId = SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(type);
+        }
+        else
+        {
+            virTypeId = SPV_ID_TYPE_IMAGE_SAMPLER_IMAGE_TYPE(type);
+        }
+        virType = VIR_Shader_GetTypeFromId(virShader, virTypeId);
+
+        virSymbolKind = VIR_SYM_SAMPLER;
     }
     else
     {
+        virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(type);
         virType = SPV_ID_TYPE_VIR_TYPE(type);
     }
 
@@ -2454,6 +2754,10 @@ static VIR_SymId __SpvAddIdSymbol(
     {
         VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_SKIP_NAME_CHECK);
     }
+    if (treatSubPassAsSampler)
+    {
+        VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER);
+    }
 
     /* duplicated variable already has location information */
     if (setLocation)
@@ -2462,44 +2766,15 @@ static VIR_SymId __SpvAddIdSymbol(
     }
 
     /* The image format is saved in the base type id. */
-    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId))
+    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId) & !treatSubPassAsSampler)
     {
-        if ((SPV_ID_TYPE_IMAGE_DIM(baseTypeId) == SpvDimSubpassData) &&
-            (spv->renderpassInfo != gcvNULL))
+        if (attachmentDesc != gcvNULL)
         {
-            SpvCovDecorator        *dec = spv->decorationList;
-            gctUINT                 target = id;
-            gctINT                  memberIndex = ~0U;
-            gctINT                  subpassAttachmentIndex = -1;
-            gctINT                  inputAttachmentIndex = -1;
-            SpvImageFormat          subpassImageFormat = SPV_ID_TYPE_IMAGE_FORMAT(baseTypeId); /* get default image format */
-            SpvRenderPassInfo      *renderPass = spv->renderpassInfo;
-
-            /* Find the match decoration by using target and member index.*/
-            SPV_GET_DECORATOR(dec, target, memberIndex);
-
-            if (dec != gcvNULL)
-            {
-                subpassAttachmentIndex = dec->decorationData.inputAttachmentIndex;
-            }
-
-            if ((renderPass->subPassInfoCount > 0) &&
-                (subpassAttachmentIndex >= 0) &&
-                (subpassAttachmentIndex <= (gctINT)renderPass->subPassInfoCount))
-            {
-                inputAttachmentIndex = renderPass->subPassInfo[spv->subPass].input_attachment_index[subpassAttachmentIndex];
-            }
-
-            if (inputAttachmentIndex >= 0 && inputAttachmentIndex < (gctINT)renderPass->attachmentCount)
-            {
-                subpassImageFormat = __SpvVkFormat2SpvImageFormat(renderPass->attachments[inputAttachmentIndex].format);
-            }
-
-            VIR_Symbol_SetLayoutQualifier(sym, __SpvImageFormatToLayoutQual(subpassImageFormat));
+            VIR_Symbol_SetImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
         }
         else
         {
-            VIR_Symbol_SetLayoutQualifier(sym, __SpvImageFormatToLayoutQual(SPV_ID_TYPE_IMAGE_FORMAT(baseTypeId)));
+            VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(baseTypeId)));
         }
     }
 
@@ -2507,10 +2782,13 @@ static VIR_SymId __SpvAddIdSymbol(
 
     /* record symID, so we could get sym from id */
     SPV_SET_IDDESCRIPTOR_SYM(spv, id, symId);
-    SPV_SET_IDDESCRIPTOR_TYPE(spv, id, SPV_ID_TYPE_VIR_TYPE_ID(type));
+    SPV_SET_IDDESCRIPTOR_TYPE(spv, id, virTypeId);
     SPV_SET_IDDESCRIPTOR_SPV_TYPE(spv, id, type);
     SPV_ID_TYPE(id) = SPV_ID_TYPE_SYMBOL;
     SPV_ID_SYM_IS_FUNC_PARAM(id) = gcvFALSE;
+
+    /* Set attachment flag. */
+    SPV_ID_SYM_ATTACHMENT_FLAG(id) = attachmentFlag;
 
     if (compilerGen)
     {
@@ -2731,10 +3009,11 @@ static VSC_ErrCode __SpvConvDecoratorToVIR(
                 symSpv->builtIn = gcvTRUE;
                 break;
             case SpvBuiltInPrimitiveId:
-                if (spv->shaderStage == VSC_SHADER_STAGE_GS)
+                if (spv->shaderStage == VSC_SHADER_STAGE_GS && symSpv->virStorageClass == VIR_STORAGE_INPUT)
                 {
                     VIR_Shader_SetFlag(virShader, VIR_SHFLAG_HAS_PRIMITIVEID);
                 }
+                symSpv->builtIn = gcvTRUE;
                 break;
 
             case SpvBuiltInSampleId:
@@ -3682,7 +3961,7 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                 gctBOOL    isFieldUnSize = SPV_ID_TYPE_HAS_UNSIZEDARRAY(spv->operands[i]);
                 gctBOOL    setSkipNameCheckFlag = gcvFALSE;
 
-                __SpvReplaceBuiltInName(spv, virShader, spv->resultId, i);
+                __SpvReplaceBuiltInName(spv, virShader, VIR_STORAGE_UNKNOWN, spv->resultId, i);
 
                 fieldNameId = SPV_ID_FIELD_VIR_NAME_ID(spv->resultId, i);
                 SPV_ID_TYPE_STRUCT_MEMBER(spv->resultId, i) = spv->operands[i];
@@ -3796,6 +4075,33 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
             else
             {
                 SPV_ID_TYPE_ARRAY_LENGTH(spv->resultId) = arrayLength;
+            }
+
+            if (SPV_ID_TYPE_IS_IMAGE(spv->operands[0]) &&
+                SPV_ID_TYPE_IMAGE_SAMPLER_IMAGE_TYPE(spv->operands[0]) != VIR_TYPE_UNKNOWN)
+            {
+                VIR_TypeId samplerTypeId = SPV_ID_TYPE_IMAGE_SAMPLER_IMAGE_TYPE(spv->operands[0]);
+
+                VIR_Shader_AddArrayType(virShader,
+                                        samplerTypeId,
+                                        arrayLength,
+                                        arrayStride,
+                                        &samplerTypeId);
+
+                SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(spv->resultId) = samplerTypeId;
+            }
+            else if (SPV_ID_TYPE_IS_ARRAY(spv->operands[0]) &&
+                     SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(spv->operands[0]) != VIR_TYPE_UNKNOWN)
+            {
+                VIR_TypeId samplerTypeId = SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(spv->operands[0]);
+
+                VIR_Shader_AddArrayType(virShader,
+                                        samplerTypeId,
+                                        arrayLength,
+                                        arrayStride,
+                                        &samplerTypeId);
+
+                SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(spv->resultId) = samplerTypeId;
             }
 
             break;
@@ -4125,7 +4431,7 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
     __SpvConvDecoratorToVIR(spv, virShader, &symSpv, baseTypeId, -1, gcvNULL);
 
     /* we only check non-member decoration here, member decoration already checked in type struct */
-    __SpvReplaceBuiltInName(spv, virShader, spv->resultId, -1);
+    __SpvReplaceBuiltInName(spv, virShader, symSpv.virStorageClass, spv->resultId, -1);
 
     if ((spv->shaderStage == VSC_SHADER_STAGE_HS) ||
         (spv->shaderStage == VSC_SHADER_STAGE_DS) ||
@@ -5251,6 +5557,7 @@ static VSC_ErrCode __SpvSetSampledImage(gcSPV spv, VIR_Shader * virShader, SpvId
     else
     {
         gcmASSERT(SPV_ID_SYM_OFFSET_TYPE(SPV_ID_SYM_SAMPLEDIMAGE_IMAGE(spvOperand)) == VIR_SYM_VARIABLE);
+        gcmASSERT(gcvFALSE);
         VIR_Symbol_SetImgIdxRange(SPV_ID_VIR_SYM(spvOperand), -1);
     }
 
@@ -5267,6 +5574,7 @@ static VSC_ErrCode __SpvSetSampledImage(gcSPV spv, VIR_Shader * virShader, SpvId
     else
     {
         gcmASSERT(SPV_ID_SYM_OFFSET_TYPE(SPV_ID_SYM_SAMPLEDIMAGE_SAMPLER(spvOperand)) == VIR_SYM_VARIABLE);
+        gcmASSERT(gcvFALSE);
         VIR_Symbol_SetSamplerIdxRange(SPV_ID_VIR_SYM(spvOperand), -1);
     }
 
@@ -5352,7 +5660,9 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
             VIR_Swizzle virSwizzle;
             VIR_Operand *srcOpnd = parmOpnd->args[i-2];
 
-            if (spv->opCode == SpvOpImageFetch && i >= 4)
+            if ((i >= 4 && (spv->opCode == SpvOpImageRead || spv->opCode == SpvOpImageFetch))
+                ||
+                (i >= 5 && spv->opCode == SpvOpImageWrite))
             {
                 __SpvDecodeImageOperand(
                     spv,
@@ -5370,7 +5680,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
             virSwizzle = __SpvID2Swizzle(spv, spv->operands[i]);
             if ((i == 3) &&
                 (spv->opCode == SpvOpImageRead) &&
-                (VIR_TypeId_isSubPass(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[2]))))
+                (VIR_TypeId_isImageSubPassData(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[2]))))
             {
                 /* handle subpass */
                 VIR_Operand_SetSwizzle(srcOpnd, virSwizzle);
@@ -7232,7 +7542,10 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
     gctUINT setId = 0;
     gctUINT instId = 0;
 
-    if (spv->opCode == SpvOpImageRead && VIR_TypeId_isSubPass(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[0])))
+    if (spv->opCode == SpvOpImageRead &&
+        (VIR_TypeId_isImageSubPassData(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[0]))
+         ||
+         (SPV_ID_SYM_ATTACHMENT_FLAG(spv->operands[0]) & SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER)))
     {
         /* add current fragment location with coordinate */
         VIR_Instruction * virInst;
@@ -7268,7 +7581,7 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
         /* transform vec4 to ivec2 */
         VIR_Function_AddInstruction(
             spv->virFunction,
-            VIR_OP_CONV,
+            VIR_OP_CONVERT,
             virTypeId,
             &virInst
             );
@@ -7362,6 +7675,14 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
         }
 
         spv->internalSym = dstCoordSym;
+    }
+
+    /* Generate TEXLD for this kind of image. */
+    if (SPV_ID_SYM_ATTACHMENT_FLAG(spv->operands[0]) & SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER)
+    {
+        spv->opCode = SpvOpImageSampleImplicitLod;
+        virErrCode = __SpvEmitImageSample(spv, virShader);
+        return virErrCode;
     }
 
     /* Copy operands to begin at 2 */
@@ -7625,6 +7946,32 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         mixedOperandSize++;
     }
 
+    /* If this sample is an image, the Coordinate is an integer operand, we need to use TEXLD_U. */
+    if (SPV_ID_SYM_ATTACHMENT_FLAG(spv->operands[0]) & SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER)
+    {
+        switch (virOpcode)
+        {
+        case VIR_OP_TEXLD:
+            virOpcode = VIR_OP_TEXLD_U;
+            break;
+
+        default:
+            break;
+        }
+    }
+    if (SPV_ID_SYM_ATTACHMENT_FLAG(spv->operands[0]) & SPV_ATTACHMENTFLAG_MULTI_SAMPLE)
+    {
+        switch (virOpcode)
+        {
+        case VIR_OP_TEXLD_U:
+            virOpcode = VIR_OP_TEXLD;
+            break;
+
+        default:
+            break;
+        }
+    }
+
     /* Check if there is any optional modifier, lod/bias. */
     hasOptionalImageOperand = (spv->operandSize > mixedOperandSize);
 
@@ -7674,6 +8021,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             switch (virOpcode)
             {
                 case VIR_OP_TEXLD:
+                case VIR_OP_TEXLD_U:
                     virOpcode = VIR_OP_TEXLDPCF;
                     break;
 
@@ -7733,7 +8081,24 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         {
             operand = VIR_Inst_GetSource(virInst, virOpIndex);
         }
+
         spvOperand = spv->operands[i];
+
+        if ((i == 1) &&
+            (SPV_ID_SYM_ATTACHMENT_FLAG(spv->operands[0]) & SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER))
+        {
+            /* handle subpass */
+            VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spvOperand));
+            VIR_Operand_SetSym(operand, spv->internalSym);
+            VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+            VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+            VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+            virOpIndex++;
+            continue;
+        }
+
         VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spvOperand));
@@ -8268,9 +8633,9 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         if (virOpcode == VIR_OP_ATTR_LD)
         {
             VIR_SymbolKind  blockIndexType = SPV_ID_SYM_BLOCK_OFFSET_TYPE(spvOperand);
-            gctUINT         blockOffset = SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand);
+            gctUINT         blockOffset = (SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand);
             VIR_SymbolKind  baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(spvOperand);
-            gctUINT         baseOffset = SPV_ID_SYM_OFFSET_VALUE(spvOperand);
+            gctUINT         baseOffset = (SPV_ID_SYM_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_OFFSET_VALUE(spvOperand);
 
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
@@ -8311,10 +8676,10 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             if (baseOffsetType == VIR_SYM_VARIABLE)
             {
                 VIR_Symbol *baseOffsetSym = gcvNULL;
-            if (isWorkGroup)
-            {
-                __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
-                    baseOffsetSym = VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId);
+                if (isWorkGroup)
+                {
+                    __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
+                        baseOffsetSym = VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId);
                 }
                 else
                 {
@@ -8328,18 +8693,18 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             else if (baseOffsetType == VIR_SYM_CONST)
             {
                 if (isWorkGroup)
-            {
+                {
                     /* for workgroup, we need add group offset */
                     __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
-                VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+                    VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
                     VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
-            }
+                }
                 else
-            {
-                VIR_ScalarConstVal constVal;
-                constVal.uValue = baseOffset;
-                VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
+                {
+                    VIR_ScalarConstVal constVal;
+                    constVal.uValue = baseOffset;
+                    VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
                 }
                 VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
@@ -8356,7 +8721,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         {
             VIR_Swizzle     swizzle = VIR_Swizzle_GetChannel(virSwizzle, 0);
             VIR_SymbolKind  baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(spvOperand);
-            gctUINT         baseOffset = SPV_ID_SYM_OFFSET_VALUE(spvOperand);
+            gctUINT         baseOffset = (SPV_ID_SYM_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_OFFSET_VALUE(spvOperand);
 
             swizzle = swizzle << 2 | swizzle << 4 | swizzle << 6;
 
@@ -8390,14 +8755,14 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
 
             if (baseOffsetType == VIR_SYM_VARIABLE)
             {
-            if (isWorkGroup)
-            {
-                __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
-                VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
-            }
+                if (isWorkGroup)
+                {
+                    __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
+                    VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
+                }
                 else
-            {
-                VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, baseOffset));
+                {
+                    VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, baseOffset));
                 }
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
@@ -8414,9 +8779,9 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                 }
                 else
                 {
-                VIR_ScalarConstVal constVal;
-                constVal.uValue = baseOffset;
-                VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
+                    VIR_ScalarConstVal constVal;
+                    constVal.uValue = baseOffset;
+                    VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
                 }
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
             }
@@ -8653,9 +9018,9 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         if (virOpcode == VIR_OP_ATTR_ST)
         {
             VIR_SymbolKind  blockIndexType = SPV_ID_SYM_BLOCK_OFFSET_TYPE(spvOperand);
-            gctUINT         blockOffset = SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand);
+            gctUINT         blockOffset = (SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_BLOCK_OFFSET_VALUE(spvOperand);
             VIR_SymbolKind baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(spvOperand);
-            gctUINT baseOffset = SPV_ID_SYM_OFFSET_VALUE(spvOperand);
+            gctUINT baseOffset = (SPV_ID_SYM_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_OFFSET_VALUE(spvOperand);
             VIR_Swizzle swizzle = virSwizzle;
 
             /* ATTR_ST  Output, InvocationIndex, offset, value */
@@ -8743,7 +9108,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         else if (useLoadToAccessBlock)
         {
             VIR_SymbolKind baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(spvOperand);
-            gctUINT baseOffset = SPV_ID_SYM_OFFSET_VALUE(spvOperand);
+            gctUINT baseOffset = (SPV_ID_SYM_OFFSET_VALUE(spvOperand) == VIR_INVALID_ID) ? 0 : SPV_ID_SYM_OFFSET_VALUE(spvOperand);
             VIR_Swizzle swizzle = VIR_Swizzle_GetChannel(virSwizzle, 0);
 
             swizzle = swizzle << 2 | swizzle << 4 | swizzle << 6;
@@ -8798,11 +9163,11 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
 
             if (baseOffsetType == VIR_SYM_VARIABLE)
             {
-            if (isWorkGroup)
-            {
+                if (isWorkGroup)
+                {
                     /* for workgroup, we need add group offset */
-                __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
-                VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
+                    __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
+                    VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
                 }
                 else
                 {
@@ -8815,18 +9180,18 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             else
             {
                 if (isWorkGroup)
-            {
+                {
                     /* for workgroup, we need add group offset */
                     __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
-                VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+                    VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
                     VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
-            }
-            else
-            {
-                VIR_ScalarConstVal constVal;
-                constVal.uValue = baseOffset;
-                VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
+                }
+                else
+                {
+                    VIR_ScalarConstVal constVal;
+                    constVal.uValue = baseOffset;
+                    VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
                 }
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
             }
@@ -10953,14 +11318,15 @@ static VSC_ErrCode __SpvAddBuiltinVariable(gcSPV spv, VIR_Shader * virShader)
 
     if (spv->shaderStage == VSC_SHADER_STAGE_PS)
     {
-        VIR_Shader_AddString(virShader, "gl_FragCoord", &nameId);
+        /* For BE, we use gl_Position to replace gl_FragCoord. */
+        VIR_Shader_AddString(virShader, "gl_Position", &nameId);
 
         VIR_Shader_AddSymbol(
             virShader,
             VIR_SYM_VARIABLE,
             nameId,
             VIR_Shader_GetTypeFromId(virShader, VIR_TYPE_FLOAT_X4),
-            VIR_STORAGE_GLOBAL,
+            VIR_STORAGE_INPUT,
             &symId);
 
         sym = VIR_Shader_GetSymFromId(virShader, symId);
@@ -11985,7 +12351,7 @@ void * gcSPV_CreateSPV(
     gceSTATUS status = gcvSTATUS_OK;
     gcSPV spv = gcvNULL;
     VkPipelineShaderStageCreateInfo * vkStageInfo = (VkPipelineShaderStageCreateInfo*)info->stageInfo;
-    SpvRenderPassInfo *renderpassInfo = (SpvRenderPassInfo *)info->renderpassInfo;
+    SpvRenderPassInfo *renderpassInfo = info->renderpassInfo;
 
     gcmHEADER();
 

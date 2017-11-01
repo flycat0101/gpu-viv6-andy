@@ -896,5 +896,33 @@ extern GLvoid GLAPIENTRY __glim_FramebufferRenderbufferEXT(__GLcontext *gc,  GLe
 extern GLvoid GLAPIENTRY __glim_GetFramebufferAttachmentParameterivEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum pname, GLint *params);
 extern GLvoid GLAPIENTRY __glim_GenerateMipmapEXT(__GLcontext *gc,  GLenum target);
 extern GLvoid GLAPIENTRY __glim_BlitFramebufferEXT(__GLcontext *gc,  GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,GLbitfield mask, GLenum filter);
+extern GLvoid GLAPIENTRY __glim_BindFragDataLocation(__GLcontext *gc,  GLuint program, GLuint colorNumber, const GLchar *name);
+extern GLvoid GLAPIENTRY __glim_ClampColor(__GLcontext *gc, GLenum target, GLenum clamp);
+extern GLvoid GLAPIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLenum mode);
+extern GLvoid GLAPIENTRY __glim_EndConditionalRender(__GLcontext *gc);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI1i(__GLcontext *gc, GLuint index, GLint x);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI2i(__GLcontext *gc, GLuint index, GLint x, GLint y);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI3i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z);
 
+extern GLvoid GLAPIENTRY __glim_VertexAttribI1ui(__GLcontext *gc, GLuint index, GLuint x);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI2ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI3ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z);
+
+extern GLvoid GLAPIENTRY __glim_VertexAttribI1iv(__GLcontext *gc, GLuint index, const GLint *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI2iv(__GLcontext *gc, GLuint index, const GLint *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI3iv(__GLcontext *gc, GLuint index, const GLint *v);
+
+extern GLvoid GLAPIENTRY __glim_VertexAttribI1uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI2uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI4bv(__GLcontext *gc, GLuint index, const GLbyte *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI4sv(__GLcontext *gc, GLuint index, const GLshort *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI4ubv(__GLcontext *gc, GLuint index, const GLubyte *v);
+extern GLvoid GLAPIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const GLushort *v);
+extern GLvoid GLAPIENTRY __glim_FramebufferTexture1D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+extern GLvoid GLAPIENTRY __glim_FramebufferTexture3D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);
+extern GLvoid GLAPIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index);
+extern GLvoid GLAPIENTRY __glim_GetActiveUniformName(__GLcontext *gc, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName);
+extern GLvoid GLAPIENTRY __glim_MultiDrawArrays(__GLcontext *gc, GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount);
+extern GLvoid GLAPIENTRY __glim_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount);
 #endif /* __gc_es_protos_h__ */

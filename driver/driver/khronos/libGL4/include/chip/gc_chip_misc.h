@@ -20,13 +20,6 @@ extern "C" {
 
 typedef struct __GLchipDrawableRec
 {
-    gctSIZE_T width;
-    gctSIZE_T height;
-
-    gcoSURF rtSurface;
-    gcoSURF depthSurface;
-    gcoSURF stencilSurface;
-
     __GLchipStencilOpt *stencilOpt;
 } __GLchipDrawable;
 
@@ -34,9 +27,9 @@ typedef struct __GLchipXfbHeaderRec
 {
     gcsSURF_NODE headerNode;
     gctPOINTER   headerLocked;
-}__GLchipXfbHeader;
+} __GLchipXfbHeader;
 
-
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
 typedef struct _glsSwapInfo {
     /* Swap surface. */
     gcoSURF swapSurface;
@@ -80,7 +73,7 @@ struct __glsCHIPBUFFERCREATE
     gcePOOL poolType;
     gceSURF_TYPE surfType;
 
-#if defined(USE_LENDIAN)
+#ifdef __GL_LITTLE_ENDIAN
     union {
         struct {
             GLuint targetIndex  : 16;
@@ -152,6 +145,7 @@ typedef struct _glsCHIPDRAWABLE
 typedef glsCHIPDRAWABLE glsCHIPREADABLE;
 typedef glsCHIPDRAWABLE * glsCHIPDRAWABLE_PTR;
 typedef glsCHIPREADABLE * glsCHIPREADABLE_PTR;
+#endif
 
 typedef struct __GLchipQueryHeaderRec
 {
@@ -296,6 +290,11 @@ __glChipBlendBarrier(
     __GLcontext *gc
     );
 
+extern GLboolean
+gcChipCheckRecompileEnable(
+    __GLcontext *gc,
+    gceSURF_FORMAT format
+    );
 
 #ifdef __cplusplus
 }

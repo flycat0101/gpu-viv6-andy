@@ -17,166 +17,9 @@
 
 #define _GC_OBJ_ZONE            gcvZONE_CL
 
-#define _USE_CL_HARDWARE_       0
-
-/******************************************************************************\
-|********************************* Structures *********************************|
-\******************************************************************************/
-
-/* All OCL functions use the same hardware (different from tls's current hardware)
-   to avoid state contamination with other APIs.
- */
-
-/* gcoCL object. */
-struct _gcoCL
-{
-    /* Object. */
-    gcsOBJECT                   object;
-
-    gcoOS                       os;
-    gcoHAL                      hal;
-
-    /* Hardware object for this CL 3D engine */
-    gcoHARDWARE                 hardware;
-
-    /* Mutex for hardware. */
-    gctPOINTER                  mutex;
-};
-
-gcoCL   _gCL = gcvNULL;
-
-
-/******************************************************************************\
-|*********************************** Macros ***********************************|
-\******************************************************************************/
-
-#if _USE_CL_HARDWARE_
-#define gcmSWITCHHARDWAREVAR \
-    gcsTLS_PTR _tls; \
-    gcoHARDWARE _currentHardware; \
-    gceAPI _currentApi;
-
-#define gcmSWITCHHARDWARE() \
-{ \
-    _currentApi = gcvAPI_OPENCL; \
-    gcmVERIFY_OK(gcoOS_GetTLS(&_tls)); \
-    _currentHardware = _tls->currentHardware; \
-    gcmVERIFY_OK(gcoHARDWARE_GetAPI(_currentHardware, &_currentApi, gcvNULL)); \
-    gcmASSERT(_gCL->hardware); \
-    if (_currentApi != gcvAPI_OPENCL) \
-    { \
-        gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, _gCL->mutex, gcvINFINITE)); \
-        _tls->currentHardware = _gCL->hardware; \
-    } \
-}
-
-#define gcmRESTOREHARDWARE() \
-{ \
-    if (_tls && _currentApi != gcvAPI_OPENCL) \
-    { \
-        _tls->currentHardware = _currentHardware; \
-        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, _gCL->mutex)); \
-    } \
-}
-#else
-#define gcmSWITCHHARDWAREVAR
-#define gcmSWITCHHARDWARE()
-#define gcmRESTOREHARDWARE()
-#endif
-
 /******************************************************************************\
 |******************************* gcoCL API Code *******************************|
 \******************************************************************************/
-
-/*******************************************************************************
-**
-**  gcoCL_Construct
-**
-**  Contruct a new gcoCL object.
-**
-**  OUTPUT:
-**
-**      gcoCL * CLObj
-**          Pointer to a variable receiving the gcoCL object pointer.
-*/
-gceSTATUS
-gcoCL_Construct(
-    OUT gcoCL * CLObj
-    )
-{
-    gcoCL       clObj = gcvNULL;
-    gceSTATUS   status;
-    gctPOINTER  pointer = gcvNULL;
-
-    gcmHEADER();
-
-    /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(CLObj != gcvNULL);
-
-    /* Allocate the gco3D object. */
-    gcmONERROR(
-        gcoOS_Allocate(gcvNULL,
-                       gcmSIZEOF(struct _gcoCL),
-                       &pointer));
-
-    clObj = pointer;
-
-    /* Initialize the gcoCL object. */
-    clObj->object.type = gcvOBJ_CL;
-
-#if _USE_CL_HARDWARE_
-    gcmONERROR(gcoOS_Construct(gcvNULL, &clObj->os));
-    gcmONERROR(gcoHAL_Construct(gcvNULL, clObj->os, &clObj->hal));
-
-        /* Set the hardware type. */
-    gcmONERROR(gcoHAL_SetHardwareType(clObj->hal, gcvHARDWARE_3D));
-
-    /* Construct hardware object for this engine */
-    gcmONERROR(gcoHARDWARE_Construct(clObj->hal, gcvFALSE,  gcvFALSE, &clObj->hardware));
-
-    gcmONERROR(gcoHARDWARE_SetFenceEnabled(clObj->hardware, gcvTRUE);
-
-    /* Switch to the 3D pipe. */
-    gcmONERROR(gcoHARDWARE_SelectPipe(clObj->hardware, gcvPIPE_3D, gcvNULL));
-
-    /* Set API to OpenCL. */
-    gcmVERIFY_OK(gcoHARDWARE_SetAPI(clObj->hardware, gcvAPI_OPENCL));
-
-    /* Set rounding mode */
-    if (gcoHARDWARE_IsFeatureAvailable(clObj->hardware, gcvFEATURE_SHADER_HAS_RTNE))
-    {
-        gcmVERIFY_OK(gcoHARDWARE_SetRTNERounding(clObj->hardware, gcvTRUE));
-    }
-
-    gcmONERROR(gcoHARDWARE_InvalidateCache(clObj->hardware));
-
-    /* Create thread lock signal. */
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &clObj->mutex));
-#else
-    clObj->os       = gcvNULL;
-    clObj->hal      = gcvNULL;
-    clObj->hardware = gcvNULL;
-    clObj->mutex    = gcvNULL;
-#endif
-
-    /* Return pointer to the gcoCL object. */
-    *CLObj = clObj;
-
-    /* Success. */
-    gcmFOOTER_ARG("*Engine=0x%x", *CLObj);
-    return gcvSTATUS_OK;
-
-OnError:
-    if (clObj != gcvNULL)
-    {
-        /* Unroll. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, clObj));
-    }
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
 
 /*******************************************************************************
 **
@@ -235,14 +78,6 @@ gcoCL_InitializeHardware()
     return gcvSTATUS_OK;
 
 OnError:
-#if _USE_CL_HARDWARE_
-    if (_gCL != gcvNULL)
-    {
-        /* Unroll. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, _gCL));
-    }
-#endif
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -355,15 +190,12 @@ gcoCL_AllocateMemory(
     IN  gctUINT32           Flag
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
     gctUINT alignBytes = 128;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
-
-    /*gcmSWITCHHARDWARE();*/
 
     /* Allocate extra 64 bytes to avoid cache overflow */
     bytes = gcmALIGN(*Bytes + 64, 64);
@@ -400,6 +232,13 @@ gcoCL_AllocateMemory(
                                 (gctUINT32 *) Physical,
                                 Logical));
 
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmONERROR(gcoHARDWARE_LockEx(node, gcvENGINE_BLT,
+                                      gcvNULL, gcvNULL));
+    }
+
     /* Return allocated number of bytes. */
     *Bytes = bytes;
 
@@ -408,16 +247,12 @@ gcoCL_AllocateMemory(
     }
 #endif
 
-    /*gcmRESTOREHARDWARE();*/
-
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
                   *Bytes, *Physical, *Logical, *Node);
     return gcvSTATUS_OK;
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     if(node != gcvNULL)
     {
@@ -461,13 +296,10 @@ gcoCL_FreeMemory(
     IN gcsSURF_NODE_PTR     Node
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Physical=0x%x Logical=0x%x Bytes=%u Node=0x%x",
                   Physical, Logical, Bytes, Node);
-
-    /*gcmSWITCHHARDWARE();*/
 
 #if USE_NEW_MEMORY_ALLOCATION
     gcmONERROR(gcoOS_FreeContiguous(gcvNULL,
@@ -482,6 +314,12 @@ gcoCL_FreeMemory(
         gcmONERROR(gcoHARDWARE_Unlock(Node,
                                       gcvSURF_INDEX));
 
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+        {
+            gcmONERROR(gcoHARDWARE_UnlockEx(Node, gcvENGINE_BLT, gcvSURF_INDEX));
+        }
+
         /* Create an event to free the video memory. */
         gcmONERROR(gcsSURF_NODE_Destroy(Node));
 
@@ -491,7 +329,6 @@ gcoCL_FreeMemory(
 #endif
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
 
     /* Return the status. */
     gcmFOOTER();
@@ -549,7 +386,16 @@ gcoCL_WrapUserMemory(
         surf->hardwareAddresses[i] = gcvINVALID_ADDRESS;
     }
 
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &(surf->sharedMutex)));
+
     gcmONERROR(gcoHARDWARE_Lock(surf, Physical, gcvNULL));
+
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmONERROR(gcoHARDWARE_LockEx(surf, gcvENGINE_BLT,
+                                      gcvNULL, gcvNULL));
+    }
 
     *Node = surf;
 
@@ -594,13 +440,10 @@ gcoCL_FlushMemory(
     IN gctSIZE_T            Bytes
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%zu",
                   Node, Logical, Bytes);
-
-    /*gcmSWITCHHARDWARE();*/
 
     if (Node /*&& Node->pool == gcvPOOL_VIRTUAL*/)
     {
@@ -616,8 +459,6 @@ gcoCL_FlushMemory(
     }
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -652,13 +493,10 @@ gcoCL_InvalidateMemoryCache(
     IN gctSIZE_T            Bytes
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%zu",
                   Node, Logical, Bytes);
-
-    /*gcmSWITCHHARDWARE();*/
 
     if (Node /*&& Node->pool == gcvPOOL_VIRTUAL*/)
     {
@@ -674,8 +512,6 @@ gcoCL_InvalidateMemoryCache(
     }
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -719,14 +555,12 @@ gcoCL_ShareMemoryWithStream(
     OUT gcsSURF_NODE_PTR *  Node
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("Stream=0x%x", Stream);
+    gcmVERIFY_ARGUMENT(Bytes != 0);
 
-    /*gcmSWITCHHARDWARE();*/
-
-    gcmONERROR(gcoSTREAM_Size(Stream, Bytes));
+    *Bytes = gcoSTREAM_GetSize(Stream);
     gcmONERROR(gcoSTREAM_Node(Stream, Node));
 
     /* Lock the cl buffer. */
@@ -734,7 +568,11 @@ gcoCL_ShareMemoryWithStream(
                                 (gctUINT32 *) Physical,
                                 Logical));
 
-    /*gcmRESTOREHARDWARE();*/
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmONERROR(gcoHARDWARE_LockEx(*Node, gcvENGINE_BLT, gcvNULL, gcvNULL));
+    }
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
@@ -742,8 +580,6 @@ gcoCL_ShareMemoryWithStream(
     return gcvSTATUS_OK;
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -787,12 +623,9 @@ gcoCL_ShareMemoryWithBufObj(
     OUT gcsSURF_NODE_PTR *  Node
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("BufObj=0x%x", BufObj);
-
-    /*gcmSWITCHHARDWARE();*/
 
     gcmONERROR(gcoBUFOBJ_GetSize(BufObj, Bytes));
     gcmONERROR(gcoBUFOBJ_GetNode(BufObj, Node));
@@ -802,7 +635,11 @@ gcoCL_ShareMemoryWithBufObj(
                                 (gctUINT32 *) Physical,
                                 Logical));
 
-    /*gcmRESTOREHARDWARE();*/
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmONERROR(gcoHARDWARE_LockEx(*Node, gcvENGINE_BLT, gcvNULL, gcvNULL));
+    }
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
@@ -810,8 +647,6 @@ gcoCL_ShareMemoryWithBufObj(
     return gcvSTATUS_OK;
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -833,19 +668,19 @@ gcoCL_UnshareMemory(
     IN gcsSURF_NODE_PTR     Node
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Node=0x%x", Node);
 
-    /*gcmSWITCHHARDWARE();*/
-
     /* Unlock the index buffer. */
-    status = gcoHARDWARE_Unlock(Node, gcvSURF_INDEX);
+    gcmVERIFY_OK(gcoHARDWARE_Unlock(Node, gcvSURF_INDEX));
 
-    /*gcmRESTOREHARDWARE();*/
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmVERIFY_OK(gcoHARDWARE_UnlockEx(Node, gcvENGINE_BLT, gcvSURF_INDEX));
+    }
 
-    /* Return the status. */
     gcmFOOTER();
     return status;
 }
@@ -871,13 +706,10 @@ gcoCL_FlushSurface(
     IN gcoSURF              Surface
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER srcMemory[3] = {gcvNULL};
 
     gcmHEADER_ARG("Surface=0x%x", Surface);
-
-    /*gcmSWITCHHARDWARE();*/
 
     if (Surface /*&& Surface->node.pool == gcvPOOL_VIRTUAL*/)
     {
@@ -897,8 +729,6 @@ gcoCL_FlushSurface(
         }
     }
 
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -911,16 +741,11 @@ gcoCL_LockSurface(
     OUT gctPOINTER * Memory
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
-    /*gcmSWITCHHARDWARE();*/
-
     status = gcoSURF_Lock(Surface, Address, Memory);
-
-    /*gcmRESTOREHARDWARE();*/
 
     /* Return the status. */
     gcmFOOTER();
@@ -933,16 +758,11 @@ gcoCL_UnlockSurface(
     IN gctPOINTER Memory
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
-    /*gcmSWITCHHARDWARE();*/
-
     status = gcoSURF_Unlock(Surface, Memory);
-
-    /*gcmRESTOREHARDWARE();*/
 
     /* Return the status. */
     gcmFOOTER();
@@ -1019,7 +839,6 @@ gcoCL_CreateTexture(
     OUT gctUINT *           SurfSliceSize
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
     gcoTEXTURE texture = gcvNULL;
     gcoSURF surface = gcvNULL;
@@ -1028,8 +847,6 @@ gcoCL_CreateTexture(
                   "Stride=%u Slice=%u Format=%u EndianHint=%u",
                   Width, Height, Depth, Memory,
                   Stride, Slice, Format, EndianHint);
-
-    /*gcmSWITCHHARDWARE();*/
 
     gcmASSERT(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_LINEAR));
 
@@ -1168,15 +985,12 @@ gcoCL_CreateTexture(
     *Texture = texture;
     *Surface = surface;
 
-    /*gcmRESTOREHARDWARE();*/
-
     /* Success. */
     gcmFOOTER_ARG("*Texture=0x%x *Surface=0x%x *Physical=0x%x *Logical=0x%x",
                   *Texture, *Surface, *Physical, *Logical);
     return gcvSTATUS_OK;
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
 
     if (surface != gcvNULL)
     {
@@ -1214,18 +1028,13 @@ gcoCL_DestroyTexture(
     IN gcoSURF    Surface
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Texture=0x%x", Texture);
 
-    /*gcmSWITCHHARDWARE();*/
-
     gcoTEXTURE_Destroy(Texture);
 
     gcoSURF_Destroy(Surface);
-
-    /*gcmRESTOREHARDWARE();*/
 
     /* Return the status. */
     gcmFOOTER();
@@ -1241,14 +1050,11 @@ gcoCL_SetupTexture(
     gceTEXTURE_FILTER       FilterMode
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
     gcsTEXTURE info = {0};
     gcoHARDWARE Hardware = gcvNULL;
 
     gcmHEADER_ARG("Texture=0x%x", Texture);
-
-    /*gcmSWITCHHARDWARE();*/
 
     info.s = info.t = info.r = AddressMode;
     info.magFilter = info.minFilter = FilterMode;
@@ -1300,7 +1106,6 @@ gcoCL_SetupTexture(
     }
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
 
     /* Return the status. */
     gcmFOOTER();
@@ -1524,6 +1329,7 @@ gcoCL_QueryDeviceInfo(
                     (chipModel == gcv3000 && chipRevision == 0x5450) ||
                     (chipModel == gcv2000 && chipRevision == 0x5108) ||
                     (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                    (chipModel == gcv3000 && chipRevision == 0x5451) ||
                     (chipModel == gcv5000));
     if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) &&
        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) &&
@@ -1573,10 +1379,11 @@ gcoCL_QueryDeviceInfo(
 
     DeviceInfo->multiWGPack  = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_MULTI_WG_PACK);
 
+    DeviceInfo->asyncBLT = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT);
+
     status = gcvSTATUS_OK;
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }
@@ -1720,12 +1527,9 @@ gcoCL_Commit(
     IN gctBOOL Stall
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("Stall=%d", Stall);
-
-    /*gcmSWITCHHARDWARE();*/
 
     /* Commit the command buffer to hardware. */
     gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
@@ -1737,8 +1541,6 @@ gcoCL_Commit(
     }
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     /* Return status. */
     gcmFOOTER();
     return status;
@@ -1749,12 +1551,9 @@ gcoCL_Flush(
     IN gctBOOL      Stall
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("Stall=%d", Stall);
-
-    /*gcmSWITCHHARDWARE();*/
 
     /* Flush the current pipe. */
     gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
@@ -1762,8 +1561,6 @@ gcoCL_Flush(
     gcmONERROR(gcoCL_Commit(Stall));
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
-
     gcmFOOTER();
     return status;
 }
@@ -1793,16 +1590,11 @@ gcoCL_CreateSignal(
     OUT gctSIGNAL * Signal
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS   status;
 
     gcmHEADER_ARG("ManualReset=%u Signal=0x%x", ManualReset, Signal);
 
-    /*gcmSWITCHHARDWARE();*/
-
     status = gcoOS_CreateSignal(gcvNULL, ManualReset, Signal);
-
-    /*gcmRESTOREHARDWARE();*/
 
     gcmFOOTER();
     return status;
@@ -1828,16 +1620,11 @@ gcoCL_DestroySignal(
     IN gctSIGNAL Signal
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS   status;
 
     gcmHEADER_ARG("Signal=0x%x", Signal);
 
-    /*gcmSWITCHHARDWARE();*/
-
     status = gcoOS_DestroySignal(gcvNULL, Signal);
-
-    /*gcmRESTOREHARDWARE();*/
 
     gcmFOOTER();
     return status;
@@ -1850,7 +1637,6 @@ gcoCL_SubmitSignal(
     IN gceENGINE    Engine
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS       status = gcvSTATUS_OK;
 #if COMMAND_PROCESSOR_VERSION > 1
     gcsTASK_SIGNAL_PTR signal;
@@ -1860,7 +1646,6 @@ gcoCL_SubmitSignal(
 
     gcmHEADER_ARG("Signal=0x%x Process=0x%x", Signal, Process);
 
-    /*gcmSWITCHHARDWARE();*/
     /* Sometime we disable BLT engine */
     if (Signal == gcvNULL)
     {
@@ -1904,7 +1689,6 @@ gcoCL_SubmitSignal(
 #endif
 
 OnError:
-    /*gcmRESTOREHARDWARE();*/
 
     gcmFOOTER();
     return status;
@@ -1935,16 +1719,11 @@ gcoCL_WaitSignal(
     IN gctUINT32 Wait
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS   status;
 
     gcmHEADER_ARG("Signal=0x%x Wait=%u", Signal, Wait);
 
-    /*gcmSWITCHHARDWARE();*/
-
     status = gcoOS_WaitSignal(gcvNULL, Signal, Wait);
-
-    /*gcmRESTOREHARDWARE();*/
 
     gcmFOOTER();
     return status;
@@ -1970,7 +1749,6 @@ gcoCL_SetSignal(
     IN gctSIGNAL Signal
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS   status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Signal=0x%x", Signal);
@@ -1992,38 +1770,24 @@ gcoCL_SetSignal(
 **
 **  INPUT:
 **
-**      gctSIZE_T StateBufferSize
-**          The number of bytes in the 'StateBuffer'.
-**
-**      gctPOINTER StateBuffer
-**          Pointer to the states that make up the shader program.
-**
-**      gcsHINT_PTR Hints
-**          Pointer to a gcsHINT structure that contains information required
-**          when loading the shader states.
+**      gcsPROGRAM_STATE ProgramState
+**          Program state.
 */
 gceSTATUS
 gcoCL_LoadKernel(
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
+    IN gcsPROGRAM_STATE ProgramState
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
     gcmHEADER_ARG("StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
-                  StateBufferSize, StateBuffer, Hints);
-
-    /*gcmSWITCHHARDWARE();*/
+                  ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
     /* Load kernel states. */
     status = gcLoadKernel(gcvNULL,
-                          StateBufferSize,
-                          StateBuffer,
-                          Hints);
-
-    /*gcmRESTOREHARDWARE();*/
+                          ProgramState.stateBufferSize,
+                          ProgramState.stateBuffer,
+                          ProgramState.hints);
 
     /* Return the status. */
     gcmFOOTER();
@@ -2035,23 +1799,6 @@ gcoCL_InvokeThreadWalker(
     IN gcsTHREAD_WALKER_INFO_PTR Info
     )
 {
-#if _USE_CL_HARDWARE_
-    gcmSWITCHHARDWAREVAR
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Info=0x%x", Info);
-
-    gcmSWITCHHARDWARE();
-
-    /* Route to hardware. */
-    status = gcoHARDWARE_InvokeThreadWalkerCL(gcvNULL, Info);
-
-    gcmRESTOREHARDWARE();
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-#else
     gceSTATUS status;
     gceAPI currentApi;
 
@@ -2079,12 +1826,10 @@ gcoCL_InvokeThreadWalker(
     /* Return the status. */
     gcmFOOTER();
     return status;
-#endif
 }
 
 gceSTATUS
 gcoCL_InvokeKernel(
-    IN gcSHADER            Kernel,
     IN gctUINT             WorkDim,
     IN size_t              GlobalWorkOffset[3],
     IN size_t              GlobalScale[3],
@@ -2097,7 +1842,7 @@ gcoCL_InvokeKernel(
     gcsTHREAD_WALKER_INFO   info;
     gceSTATUS               status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Kernel=0x%x WorkDim=%d", Kernel, WorkDim);
+    gcmHEADER_ARG("WorkDim=%d", WorkDim);
 
     gcoOS_ZeroMemory(&info, gcmSIZEOF(gcsTHREAD_WALKER_INFO));
 
@@ -2161,7 +1906,13 @@ gcoCL_MemIsFenceBack(
     IN gceFENCE_TYPE WaitType
     )
 {
-    return gcoHARDWARE_IsFenceBack(gcvNULL, Node->fenceCtx, Engine, WaitType);
+    gctBOOL ret;
+
+    gcoOS_AcquireMutex(gcvNULL, Node->sharedMutex, gcvINFINITE);
+    ret = gcoHARDWARE_IsFenceBack(gcvNULL, Node->fenceCtx, Engine, WaitType);
+    gcoOS_ReleaseMutex(gcvNULL, Node->sharedMutex);
+
+    return ret;
 }
 
 gceSTATUS
@@ -2174,6 +1925,12 @@ gcoCL_MemWaitAndGetFence(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("Node=0x%x", Node);
+
+    if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     if (Node)
     {
@@ -2211,7 +1968,8 @@ gcoCL_ChooseBltEngine(
 {
     if (node)
     {
-        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT))
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+            gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
         {
             if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_FE_FENCE_FIX))
             {
@@ -2219,6 +1977,7 @@ gcoCL_ChooseBltEngine(
             }
             else
             {
+                gcoOS_AcquireMutex(gcvNULL, node->sharedMutex, gcvINFINITE);
                 if (!gcoHARDWARE_IsFenceBack(gcvNULL, node->fenceCtx, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL))
                 {
                     *engine = gcvENGINE_RENDER;
@@ -2227,6 +1986,7 @@ gcoCL_ChooseBltEngine(
                 {
                     *engine = gcvENGINE_BLT;
                 }
+                gcoOS_ReleaseMutex(gcvNULL, node->sharedMutex);
             }
         }
         else

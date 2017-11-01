@@ -50,7 +50,8 @@ typedef struct _gckGALDEVICE
     gctPOINTER          externalLogical;
     gckVIDMEM           externalVidMem;
     gckVIDMEM           contiguousVidMem;
-    gctPOINTER          contiguousBase;
+    gctPHYS_ADDR_T      contiguousBase;
+    gctPOINTER          contiguousLogical;
     gctPHYS_ADDR        contiguousPhysical;
     gctSIZE_T           contiguousSize;
     gctBOOL             contiguousMapped;

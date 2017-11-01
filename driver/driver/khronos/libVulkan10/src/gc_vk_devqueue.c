@@ -503,7 +503,7 @@ static VkResult __vki_QueueInitialize(
     /*
     ** Flush all cache as we don't use event to asynchronizedly unlock/free memory
     */
-    __VK_ONERROR((*devCtx->chipFuncs->flushCache)((VkDevice)devCtx, VK_NULL_HANDLE, &flushCacheSize));
+    __VK_ONERROR((*devCtx->chipFuncs->flushCache)((VkDevice)devCtx, VK_NULL_HANDLE, &flushCacheSize, ~0));
     info->reservedUserSize = flushCacheSize * sizeof(uint32_t);
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
@@ -676,7 +676,7 @@ VkResult __vk_QueueCommit(
 
         flushCacheCommand = (gctUINT32_PTR)((gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
                           + commandBuffer->offset + alignedBytes);
-        __VK_ONERROR((*devCtx->chipFuncs->flushCache)((VkDevice)devCtx, &flushCacheCommand, &flushCacheSize));
+        __VK_ONERROR((*devCtx->chipFuncs->flushCache)((VkDevice)devCtx, &flushCacheCommand, &flushCacheSize, ~0));
 
         commandBuffer->offset += alignedBytes + flushCacheSize* sizeof(uint32_t);
 

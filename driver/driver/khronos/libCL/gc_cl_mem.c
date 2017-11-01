@@ -208,23 +208,6 @@ clfReleaseMemObject(
     {
         gcmASSERT(MemObj->mapCount == 0);
 
-        if (MemObj->waitEvent.event)
-        {
-            clsBufferWaitEvent_PTR  tempWaitEvent        = &MemObj->waitEvent;
-            clsBufferWaitEvent_PTR  tempNextWaitEvent    = gcvNULL;
-            /* header node */
-            clfReleaseEvent(tempWaitEvent->event);
-            tempWaitEvent = tempWaitEvent->next;
-
-            while(tempWaitEvent)
-            {
-                tempNextWaitEvent = tempWaitEvent->next;
-                clfReleaseEvent(tempWaitEvent->event);
-                gcoOS_Free(gcvNULL, tempWaitEvent);
-                tempWaitEvent = tempNextWaitEvent;
-            }
-        }
-
         if (MemObj->type == CL_MEM_OBJECT_BUFFER)
         {
             if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
@@ -260,10 +243,6 @@ clfReleaseMemObject(
                                      MemObj->u.buffer.allocatedSize,
                                      MemObj->u.buffer.node);
                 }
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
 
                 /* Invoke and free callbacks */
                 memObjCallback = MemObj->memObjCallback;
@@ -305,10 +284,6 @@ clfReleaseMemObject(
 
                 gcoCL_DestroyTexture(MemObj->u.image.texture,
                                      MemObj->u.image.surface);
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
 
                 MemObj->u.image.texture = gcvNULL;
                 MemObj->u.image.surface = gcvNULL;
@@ -363,8 +338,6 @@ clfExecuteHWCopy(
     clsMem_PTR  srcBuffer = gcvNULL;
     clsMem_PTR  dstBuffer = gcvNULL;
     size_t size = 0;
-    gctBOOL locked0 = gcvFALSE;
-    gctBOOL locked1 = gcvFALSE;
     gcsSURF_NODE_PTR node0 = gcvNULL;
     gcsSURF_NODE_PTR node1 = gcvNULL;
     gceENGINE engine = gcvENGINE_RENDER;
@@ -403,20 +376,50 @@ clfExecuteHWCopy(
                 writeBuffer  = &Command->u.writeBuffer;
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
-                /*src address */
-                if(dstBuffer->tmpNode == gcvNULL)
-                {
-                     gctUINT         bytes = dstBuffer->u.buffer.allocatedSize;
-                     gctPHYS_ADDR    physical = 0;
 
-                     gcmONERROR(gcoCL_AllocateMemory(&bytes,
-                                        &physical,
-                                        &logical,
-                                        &dstBuffer->tmpNode,
-                                        0));
+                /*src address */
+                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+                {
+                    gctPHYS_ADDR physical = 0;
+                    gctUINT   bytes = dstBuffer->u.buffer.allocatedSize;
+
+                    if(dstBuffer->tmpNode)
+                    {
+                        gctUINT32 physical;
+
+                        gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
+                        gcoCL_FreeMemory((gctPHYS_ADDR)(gctUINTPTR_T) physical,
+                                         (gctPOINTER)dstBuffer->tmpNode->logical,
+                                         dstBuffer->u.buffer.allocatedSize,
+                                         dstBuffer->tmpNode
+                                         );
+
+                        dstBuffer->tmpNode = gcvNULL;
+                    }
+
+                    gcmONERROR(gcoCL_AllocateMemory(&bytes,
+                                                    &physical,
+                                                    &logical,
+                                                    &dstBuffer->tmpNode,
+                                                    0));
+                }
+                else
+                {
+                    if(dstBuffer->tmpNode == gcvNULL)
+                    {
+                        gctUINT         bytes = dstBuffer->u.buffer.allocatedSize;
+                        gctPHYS_ADDR    physical = 0;
+
+                        gcmONERROR(gcoCL_AllocateMemory(&bytes,
+                                                        &physical,
+                                                        &logical,
+                                                        &dstBuffer->tmpNode,
+                                                        0));
+                    }
+
+                    gcoCL_MemWaitAndGetFence(dstBuffer->tmpNode, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_READ);
                 }
 
-                gcoCL_MemWaitAndGetFence(dstBuffer->tmpNode, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_READ);
                 /*Src address */
                 gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&srcPhysical,gcvNULL, gcvNULL, gcvNULL);
                 logical = dstBuffer->tmpNode->logical;
@@ -438,11 +441,6 @@ clfExecuteHWCopy(
                 node1 = dstBuffer->tmpNode;
                 gcoCL_MemWaitAndGetFence(node0, engine, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
                 gcoCL_MemWaitAndGetFence(node1, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_READ);
-
-                gcmONERROR(gcsSURF_NODE_Lock(node0, engine, gcvNULL, gcvNULL));
-                locked0 = gcvTRUE;
-                gcmONERROR(gcsSURF_NODE_Lock(node1, engine, gcvNULL, gcvNULL));
-                locked1 = gcvTRUE;
             }
             break;
 
@@ -468,12 +466,6 @@ clfExecuteHWCopy(
                 node1 = dstBuffer->u.buffer.node;
                 gcoCL_MemWaitAndGetFence(node0, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
                 gcoCL_MemWaitAndGetFence(node1, engine, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_WRITE);
-
-                gcmONERROR(gcsSURF_NODE_Lock(node0, engine, gcvNULL, gcvNULL));
-                locked0 = gcvTRUE;
-                gcmONERROR(gcsSURF_NODE_Lock(node1, engine, gcvNULL, gcvNULL));
-                locked1 = gcvTRUE;
-
             }
             break;
 
@@ -487,16 +479,6 @@ OnError:
     if (node)
     {
         gcoCL_FreeMemory(gcvNULL, gcvNULL, 0, node);
-    }
-
-    if (locked0)
-    {
-        gcsSURF_NODE_Unlock(node0,engine);
-    }
-
-    if (locked1)
-    {
-        gcsSURF_NODE_Unlock(node1,engine);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -533,10 +515,6 @@ clfExecuteCommandReadBuffer(
         {
             hwCopy = gcvFALSE;
         }
-        else if (readBuffer->blockingRead)
-        {
-            gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
-        }
     }
 
     /* HwCopy failed*/
@@ -545,11 +523,16 @@ clfExecuteCommandReadBuffer(
         EVENT_SET_CPU_RUNNING(Command);
 
         src = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + readBuffer->offset);
-#if !cldFSL_OPT
-        /* CPU to wait fence back*/
-        gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
-#endif
 
+        /* CPU to wait fence back*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+        {
+            gcoCL_Flush(gcvTRUE);
+        }
+        else
+        {
+            gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
+        }
         gcoCL_InvalidateMemoryCache(buffer->u.buffer.node, src, readBuffer->cb);
 
         gcoOS_MemCopy(readBuffer->ptr, src, readBuffer->cb);
@@ -602,14 +585,22 @@ clfExecuteCommandReadBufferRect(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_READ_BUFFER_RECT, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
 
     readBufferRect  = &Command->u.readBufferRect;
     buffer          = readBufferRect->buffer;
+
+    /* Flush GPU cache and wait for GPU finish before CPU operations */
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
+
     bufferOrigin    = readBufferRect->bufferOrigin;
     hostOrigin      = readBufferRect->hostOrigin;
     region          = readBufferRect->region;
@@ -704,27 +695,33 @@ clfExecuteCommandWriteBuffer(
 
     if(!hwCopy)
     {
-#if !cldFSL_OPT
-    /*Waiting fence back before write */
-     gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
+        /*Waiting fence back before write */
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+        {
+            gcoCL_Flush(gcvTRUE);
+        }
+        else
+        {
+            gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
+        }
 
-    cb          = writeBuffer->cb;
-    ptr         = writeBuffer->ptr;
-    offset      = writeBuffer->offset;
-    logicalAddress = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + offset);
+        EVENT_SET_CPU_RUNNING(Command);
 
-    gcoOS_MemCopy(logicalAddress, ptr, cb);
+        cb          = writeBuffer->cb;
+        ptr         = writeBuffer->ptr;
+        offset      = writeBuffer->offset;
+        logicalAddress = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + offset);
 
-    gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
+        gcoOS_MemCopy(logicalAddress, ptr, cb);
 
-    gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
-                   gcmPTR2INT( buffer->u.buffer.physical),
-                   buffer->u.buffer.logical,
-                   0,
-                   cb);
+        gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
+
+        gcmDUMP_BUFFER(gcvNULL,
+                       "memory",
+                       gcmPTR2INT( buffer->u.buffer.physical),
+                       buffer->u.buffer.logical,
+                       0,
+                       cb);
     }
     status = CL_SUCCESS;
 
@@ -758,14 +755,21 @@ clfExecuteCommandFillBuffer(
 
     clmASSERT(Command->type == clvCOMMAND_FILL_BUFFER, CL_INVALID_VALUE);
 
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
-
     fillBuffer   = &Command->u.fillBuffer;
     buffer       = fillBuffer->buffer;
+
+    /* Flush GPU cache and wait for GPU finish before CPU operations */
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
+
     size         = fillBuffer->size;
     pattern      = fillBuffer->pattern;
     offset       = fillBuffer->offset;
@@ -823,10 +827,10 @@ clfExecuteCommandWriteBufferRect(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_WRITE_BUFFER_RECT, CL_INVALID_VALUE);
-#if !cldFSL_OPT
+
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
+
     EVENT_SET_CPU_RUNNING(Command);
 
     writeBufferRect = &Command->u.writeBufferRect;
@@ -894,7 +898,6 @@ clfExecuteCommandCopyBuffer(
     gctINT          status = gcvSTATUS_OK;
     size_t          src, dst;
     gctBOOL         hwCopy = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
-    gctBOOL         block = gcvFALSE;
     gcmHEADER_ARG("Command=0x%x", Command);
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
@@ -911,20 +914,20 @@ clfExecuteCommandCopyBuffer(
         {
             hwCopy = gcvFALSE;
         }
-        else if (block)
-        {
-            /* only need wait one buffer */
-            gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_READ);
-        }
     }
 
     if (!hwCopy)
     {
-#if !cldFSL_OPT
-        /* Flush GPU cache and wait for GPU finish before CPU operations */
-        gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
-        gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
-#endif
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+        {
+            gcoCL_Flush(gcvTRUE);
+        }
+        else
+        {
+            /* Flush GPU cache and wait for GPU finish before CPU operations */
+            gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+            gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+        }
 
         EVENT_SET_CPU_RUNNING(Command);
 
@@ -983,15 +986,23 @@ clfExecuteCommandCopyBufferRect(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_COPY_BUFFER_RECT, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
-
     copyBufferRect  = &Command->u.copyBufferRect;
     srcBuffer       = copyBufferRect->srcBuffer;
     dstBuffer       = copyBufferRect->dstBuffer;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait fence for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
+
     srcOrigin       = copyBufferRect->srcOrigin;
     dstOrigin       = copyBufferRect->dstOrigin;
     region          = copyBufferRect->region;
@@ -1068,10 +1079,9 @@ clfReadImage(
 
     clmASSERT(Command->type == clvCOMMAND_READ_IMAGE, CL_INVALID_VALUE);
 
-#if !cldFSL_OPT
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
+
     readImage   = &Command->u.readImage;
     image       = readImage->image;
     xoff        = readImage->origin[0];
@@ -1160,10 +1170,10 @@ clfWriteImage(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_WRITE_IMAGE, CL_INVALID_VALUE);
-#if !cldFSL_OPT
+
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
+
     writeImage     = &Command->u.writeImage;
     image          = writeImage->image;
     xoff           = writeImage->origin[0];
@@ -1254,14 +1264,20 @@ clfExecuteCommandFillImage(
 
     clmASSERT(Command->type == clvCOMMAND_FILL_IMAGE, CL_INVALID_VALUE);
 
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
-
     fillImage     = &Command->u.fillImage;
     image          = fillImage->image;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(image->u.image.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
+    }
+    EVENT_SET_CPU_RUNNING(Command);
+
     ptr            = fillImage->fillColorPtr;
     stride         = image->u.image.textureStride;
     slice          = image->u.image.textureSlicePitch;
@@ -1343,14 +1359,22 @@ clfExecuteCommandCopyImage(
 
     clmASSERT(Command->type == clvCOMMAND_COPY_IMAGE, CL_INVALID_VALUE);
 
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-
-    EVENT_SET_CPU_RUNNING(Command);
-
     copyImage   = &Command->u.copyImage;
     srcImage    = copyImage->srcImage;
     dstImage    = copyImage->dstImage;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(srcImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(dstImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+    }
+    EVENT_SET_CPU_RUNNING(Command);
+
     sxoff       = copyImage->srcOrigin[0];
     syoff       = copyImage->srcOrigin[1];
     szoff       = copyImage->srcOrigin[2];
@@ -1432,10 +1456,21 @@ clfExecuteCommandCopyImageToBuffer(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_COPY_IMAGE_TO_BUFFER, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
+    copyImageToBuffer = &Command->u.copyImageToBuffer;
+    srcImage          = copyImageToBuffer->srcImage;
+    dstBuffer         = copyImageToBuffer->dstBuffer;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(srcImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+    }
+
     EVENT_SET_CPU_RUNNING(Command);
 
     copyImageToBuffer = &Command->u.copyImageToBuffer;
@@ -1524,15 +1559,23 @@ clfExecuteCommandCopyBufferToImage(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_COPY_BUFFER_TO_IMAGE, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
 
     copyBufferToImage = &Command->u.copyBufferToImage;
     srcBuffer         = copyBufferToImage->srcBuffer;
     dstImage          = copyBufferToImage->dstImage;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(dstImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+    }
+    EVENT_SET_CPU_RUNNING(Command);
+
     width             = copyBufferToImage->region[0];
     height            = copyBufferToImage->region[1] > 0 ?
                         copyBufferToImage->region[1] :
@@ -1628,14 +1671,22 @@ clfExecuteCommandMapBuffer(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_MAP_BUFFER, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
 
     mapBuffer   = &Command->u.mapBuffer;
     buffer      = mapBuffer->buffer;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID,  gcvFENCE_TYPE_ALL);
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
+
     mapFlags    = mapBuffer->mapFlags;
     cb          = mapBuffer->cb;
     mappedPtr   = mapBuffer->mappedPtr;
@@ -1702,6 +1753,22 @@ clfExecuteCommandMapBuffer(
             );
     }
 
+#if gcdDUMP
+    if(mapFlags & CL_MAP_READ)
+    {
+        gctPOINTER src;
+
+        src = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + mapBuffer->offset);
+
+        gcmDUMP_BUFFER(gcvNULL,
+                        "verify",
+                        gcmPTR2INT(buffer->u.buffer.physical) + mapBuffer->offset,
+                        src,
+                        0,
+                        mapBuffer->cb);
+    }
+#endif
+
     status = CL_SUCCESS;
 
 OnError:
@@ -1724,14 +1791,22 @@ clfExecuteCommandMapImage(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
 
     clmASSERT(Command->type == clvCOMMAND_MAP_IMAGE, CL_INVALID_VALUE);
-#if !cldFSL_OPT
-    /* Flush GPU cache and wait for GPU finish before CPU operations */
-    gcmONERROR(gcoCL_Flush(gcvTRUE));
-#endif
-    EVENT_SET_CPU_RUNNING(Command);
 
     mapImage    = &Command->u.mapImage;
     image       = mapImage->image;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+    {
+        gcoCL_Flush(gcvTRUE);
+    }
+    else
+    {
+        /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(image->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID,  gcvFENCE_TYPE_ALL);
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
+
     mapFlags    = mapImage->mapFlags;
     image->mapFlag = mapFlags;
     clfRetainMemObject(image);
@@ -1881,6 +1956,14 @@ clfExecuteCommandUnmapMemObject(
             }
            /* TODO - if mapped for write, need to flush memory. */
             /*gcoCL_FlushMemory(memObj->u.buffer.node, memObj->u.buffer.logical, cb);*/
+#if gcdDUMP
+            gcmDUMP_BUFFER(gcvNULL,
+                            "memory",
+                            gcmPTR2INT( memObj->u.buffer.physical),
+                            memObj->u.buffer.logical,
+                            0,
+                            memObj->u.buffer.size);
+#endif
         }
         else if (memObj->type == CL_MEM_OBJECT_IMAGE2D ||
                  memObj->type == CL_MEM_OBJECT_IMAGE3D ||
@@ -3431,7 +3514,7 @@ clCreateImage(
         }
 
         if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < slicePitch * ImageDepth))
+            (ImageSlicePitch < rowPitch * ImageHeight))
         {
             gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004062: (clCreateImage) invalid ImageSlicePitch (%d).\n",ImageSlicePitch);
@@ -3600,6 +3683,7 @@ clCreateImage(
     imageHeader->tiling             = image->u.image.tiling;
     imageHeader->physical           = gcmPTR2INT32(image->u.image.texturePhysical);
     imageHeader->imageType          = ImageDesc->image_type;
+    imageHeader->elementSize        = image->u.image.elementSize;
 
     if (ErrcodeRet)
     {
@@ -4205,7 +4289,7 @@ clGetSupportedImageFormats(
         {CL_R,      CL_SIGNED_INT16},
         /*{CL_R,      CL_UNSIGNED_INT16},*/
         /*{CL_R,      CL_SIGNED_INT32},*/
-        /*{CL_R,      CL_UNSIGNED_INT32},*/
+        {CL_R,      CL_UNSIGNED_INT32},
         /*{CL_R,      CL_HALF_FLOAT},*/
         {CL_R,      CL_FLOAT}
     };

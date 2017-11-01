@@ -26,12 +26,7 @@ void _VGProgramCtor(gcoOS os, _VGProgram *program)
 {
     gcmHEADER_ARG("os=0x%x program=0x%x", os, program);
 
-    program->statesSize         = 0;
-    program->states             = gcvNULL;
-    program->hints              = gcvNULL;
-
-    gcoOS_ZeroMemory(&program->vertexShader, sizeof(_VGShader));
-    gcoOS_ZeroMemory(&program->fragmentShader, sizeof(_VGShader));
+    gcoOS_ZeroMemory(&program, sizeof(_VGProgram));
 
     gcmFOOTER_NO();
 }
@@ -60,16 +55,7 @@ void _VGProgramDtor(gcoOS os, _VGProgram *program)
         gcmVERIFY_OK(gcmOS_SAFE_FREE(os, program->fragmentShader.compileLog));
     }
 
-    if (program->states)
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(os, program->states));
-    }
-
-    if (program->hints != gcvNULL)
-    {
-        gcmVERIFY_OK(gcHINTS_Destroy(program->hints));
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(os, program->hints));
-    }
+    gcFreeProgramState(program->programState);
 
     gcmFOOTER_NO();
 }

@@ -228,17 +228,6 @@ _GenExp_E_10Code(
     );
 
 
-static gceSTATUS
-_GenBuiltinVectorCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand,
-    IN cltBUILT_IN_GEN_CODE_FUNC_PTR genCode
-    );
-
 #if gcdDEBUG
 static gctBOOL
 _IsBuiltinDataTypeInfoSorted(
@@ -1515,16 +1504,18 @@ IN clsNAME *KernelFunc
                                               CodeGenerator,
                                               addressSpace));
 
+          /* we don't generate lshift, but mul instead. Then we can change it to mad, which is
+            needed for pattern match for generating imod for private memory base address */
           gcmONERROR(clGenScaledIndexOperand(Compiler,
                                              KernelFunc->lineNo,
                                              KernelFunc->stringNo,
                                              workItem,
                                              cloCOMPILER_GetPrivateMemoryNeeded(Compiler),
-                                             gcvTRUE,
-                                             rOperand1));
+                                             gcvFALSE,
+                                             rOperand2));
           if (gcmIS_ERROR(status)) return status;
 
-          clsROPERAND_InitializeReg(rOperand2,
+          clsROPERAND_InitializeReg(rOperand1,
                                     _cldUnnamedVariableRegs(clvBUILTIN_PRIVATE_ADDRESS_SPACE));
           clsIOPERAND_Initialize(Compiler, addressOffset, clmGenCodeDataType(T_UINT), cldPrivateMemoryAddressRegIndex);
           gcmONERROR(clGenArithmeticExprCode(Compiler,
@@ -4800,8 +4791,8 @@ extern clsBUILTIN_FUNCTION    MathBuiltinFunctions[];
 
 /* Do allocate of the local variables instead of defining them as arrays to avoid potential
    overrun of run time stack */
-static gceSTATUS
-_GenBuiltinVectorCode(
+gceSTATUS
+clGenBuiltinVectorCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
     IN cloIR_POLYNARY_EXPR PolynaryExpr,
@@ -5257,13 +5248,13 @@ IN gctBOOL DoInlineCheck
       Parameters->needROperand &&
       clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) {
    /* special handling for vector case */
-        return _GenBuiltinVectorCode(Compiler,
-                                     CodeGenerator,
-                                     PolynaryExpr,
-                                     OperandCount,
-                                     OperandsParameters,
-                                     IOperand,
-                                     genCode);
+        return clGenBuiltinVectorCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand,
+                                      genCode);
    }
    return (*genCode)(Compiler,
                      CodeGenerator,

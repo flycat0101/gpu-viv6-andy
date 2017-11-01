@@ -102,11 +102,11 @@ struct _gcOPT_CODE
     gcOPT_CODE                  callee;
 
     /* Flags for data flow construction. */
-    gctBOOL                     backwardJump;
-    gctBOOL                     handled;
+    gctBOOL                     backwardJump : 2;
+    gctBOOL                     handled      : 2;
 
     /* the index to Loadtime Expression array */
-    gctINT                      ltcArrayIdx;
+    gctINT                      ltcArrayIdx  : 20;
 
     /* Temp define info for label. */
     gcOPT_TEMP_DEFINE           tempDefine;
@@ -129,27 +129,28 @@ struct _gcOPT_CODE
 struct _gcOPT_TEMP
 {
     /* In-use flag. */
-    gctBOOL                     inUse;
+    gctBOOL                     inUse       : 2;
 
     /* Is-global flag. */
-    gctBOOL                     isGlobal;
+    gctBOOL                     isGlobal    : 2;
 
     /* True if the register is used as an index. */
-    gctBOOL                     isIndex;
+    gctBOOL                     isIndex     : 2;
+
+    gctBOOL                     setFunction : 2;
 
     /* Usage flags for the temporary register. */
-    gctUINT8                    usage;
+    gctUINT                     usage       : 8;
 
     /* Precision */
-    gcSHADER_PRECISION          precision;
+    gcSHADER_PRECISION          precision   : 4;
 
     /* Data format for the temporary register. */
-    gctINT                      format;     /* -1: unknown, -2: union. */
+    gctINT                      format      : 12;     /* -1: unknown, -2: union. */
 
     /**/
     gcVARIABLE                  arrayVariable;
 
-    gctBOOL                     setFunction;
     /*
     ** 1) Pointer to the function if it is used as a function argument.
     ** 2) Pointer to the function if it is used as a local temp register.
@@ -529,6 +530,15 @@ gcOpt_ChangeCodeToNOP(
 
 gctBOOL
 gcOpt_UpdateIndex(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_FUNCTION   Function,
+    IN gctINT*          TempIndexMappingArray,
+    IN gctINT*          CurrentTempIndex,
+    OUT gctUINT32 *     IndexPtr
+    );
+
+gctBOOL
+gcOpt_UpdateIndexed(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_FUNCTION   Function,
     IN gctINT*          TempIndexMappingArray,

@@ -302,11 +302,11 @@ typedef struct __GLvertexStreamMachineRec {
 
 /* glmaterial (in_begin/end) emulation structure */
 typedef struct __GLTnlAccumMachineRec{
-    GLuint firstVertexIndex;                          /* Index of The first tnled vertex */
-    GLuint vertexCount;                          /* Total vertex count tnled (start from firstVertexIndex(included))*/
+    GLuint firstVertexIndex;                        /* Index of The first tnled vertex */
+    GLuint vertexCount;                             /* Total vertex count tnled (start from firstVertexIndex(included))*/
     GLuint preVertexIndex;                          /* Index of The last tnled vertex */
-    GLvoid (APIENTRY *glimEnd) (GLvoid);           /* To save current glEnd entry */
-}__GLTnlAccumMachine;
+    GLvoid (APIENTRY *glimEnd)(__GLcontext* gc);    /* To save current glEnd entry */
+} __GLTnlAccumMachine;
 
 
 extern GLuint edgeFlagInputMask[];

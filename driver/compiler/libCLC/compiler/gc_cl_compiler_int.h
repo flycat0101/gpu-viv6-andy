@@ -47,6 +47,10 @@ cloGetDefaultLanguageVersion(
 /* Maximum number of parameter chain variables in an intrinsic ASM call */
 #define cldMaxParamChains   5
 
+/* Prefix for a struct name */
+#define cldSTRUCT_NAME_PREFIX  "struct$"
+#define cldUNION_NAME_PREFIX  "union$"
+
 gceSTATUS
 cloCOMPILER_Lock(
     IN cloCOMPILER Compiler
@@ -205,6 +209,11 @@ cloCOMPILER_OptimizationEnabled(
 
 gctBOOL
 cloCOMPILER_IsBasicTypePacked(
+IN cloCOMPILER Compiler
+);
+
+gctBOOL
+cloCOMPILER_IsLongUlongPatch(
 IN cloCOMPILER Compiler
 );
 

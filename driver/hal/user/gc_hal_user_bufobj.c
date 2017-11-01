@@ -75,7 +75,7 @@ gceSTATUS
 gcoBUFOBJ_GetFence(
     IN gcoBUFOBJ BufObj,
     IN gceFENCE_TYPE Type
-)
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("BufObj=0x%x Type=%d", BufObj, Type);
@@ -93,7 +93,7 @@ gceSTATUS
 gcoBUFOBJ_WaitFence(
     IN gcoBUFOBJ BufObj,
     IN gceFENCE_TYPE Type
-)
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("BufObj=0x%x Type=%d", BufObj, Type);
@@ -219,8 +219,6 @@ gcoBUFOBJ_Construct(
     /* Return pointer to the gcoBUFOBJ object. */
     *BufObj = bufobj;
 
-    gcmPROFILE_GC(GLBUFOBJ_OBJECT, 1);
-
     /* Success. */
     gcmFOOTER_ARG("*BufObj=0x%x", *BufObj);
     return gcvSTATUS_OK;
@@ -255,8 +253,6 @@ gcoBUFOBJ_Destroy(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);
-
-    gcmPROFILE_GC(GLBUFOBJ_OBJECT, -1);
 
     /* Free the bufobj buffer. */
     gcmVERIFY_OK(gcoBUFOBJ_Free(BufObj));
@@ -460,15 +456,11 @@ gcoBUFOBJ_Free(
     )
 {
     gceSTATUS status;
-    gctUINT bytes;
 
     gcmHEADER_ARG("BufObj=0x%x", BufObj);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);
-
-    gcmSAFECASTSIZET(bytes, BufObj->bytes);
-    gcmPROFILE_GC(GLBUFOBJ_OBJECT_BYTES, -1 * bytes);
 
     /* Do we have a buffer allocated? */
     if (BufObj->memory.pool != gcvPOOL_UNKNOWN)
@@ -595,10 +587,11 @@ static gceSTATUS _gpuUpload(
 
     gcmONERROR(gcoBUFOBJ_GetFence(BufObj, gcvFENCE_TYPE_WRITE));
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, blitEngine, gcvHWSLOT_BLT_SRC, srcMemory.u.normal.node, 0);
 
     gcoHARDWARE_SetHWSlot(gcvNULL, blitEngine, gcvHWSLOT_BLT_DST, BufObj->memory.u.normal.node, 0);
-
+#endif
 OnError:
     if (srcLocked)
     {
@@ -687,7 +680,7 @@ gcoBUFOBJ_Upload (
     )
 {
     gceSTATUS status;
-    gctUINT alignment, bytes;
+    gctUINT alignment;
     gcePOOL memoryPool;
     gctBOOL dynamic;
     gctBOOL allocate;
@@ -949,9 +942,6 @@ gcoBUFOBJ_Upload (
         }
     }
 
-    gcmSAFECASTSIZET(bytes, Bytes);
-    gcmPROFILE_GC(GLBUFOBJ_OBJECT_BYTES, bytes);
-
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1149,7 +1139,6 @@ gcoBUFOBJ_IndexBind (
 {
     gceSTATUS status;
     gctUINT32 address;
-    gctBOOL indexLocked;
     gctUINT32 endAddress;
     gctUINT32 bufSize;
 
@@ -1158,42 +1147,22 @@ gcoBUFOBJ_IndexBind (
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Index, gcvOBJ_BUFOBJ);
 
-    /* Is locked? */
-    indexLocked = gcvFALSE;
-
     /* Lock the bufobj buffer. */
-    gcmONERROR(gcoHARDWARE_Lock(&Index->memory, &address, gcvNULL));
+    gcmGETHARDWAREADDRESS(Index->memory, address);
     gcmSAFECASTSIZET(bufSize,Index->memory.size);
 
-    indexLocked = gcvTRUE;
     endAddress = address + bufSize  - 1;
 
     /* Add offset */
     address += Offset;
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
-
+#endif
     /* Program index */
     gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, endAddress, Type, (Count * 3)));
 
-    /* Unlock the bufobj buffer. */
-    if (indexLocked)
-    {
-        /* Unlock the bufobj buffer. */
-        gcmONERROR(gcoHARDWARE_Unlock(&Index->memory, Index->surfType));
-    }
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
 OnError:
-
-    if (indexLocked)
-    {
-        /* Unlock the bufobj buffer. */
-        gcmVERIFY_OK(gcoHARDWARE_Unlock(&Index->memory, Index->surfType));
-    }
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -1640,6 +1609,7 @@ gcoBUFOBJ_Dump(
 
 gceSTATUS gcoBUFOBJ_Construct(
     IN gcoHAL Hal,
+    IN gceBUFOBJ_TYPE Type,
     OUT gcoBUFOBJ * BufObj
     )
 {
@@ -1705,7 +1675,8 @@ gceSTATUS
 gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset
+    IN gctUINT32 Offset,
+    IN gctSIZE_T Count
     )
 {
     return gcvSTATUS_OK;
@@ -1715,6 +1686,7 @@ gceSTATUS
 gcoBUFOBJ_IndexGetRange(
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
+    IN gctUINT32 Offset,
     IN gctUINT32 Count,
     OUT gctUINT32 * MinimumIndex,
     OUT gctUINT32 * MaximumIndex
@@ -1778,6 +1750,59 @@ gcoBUFOBJ_Dump(
 {
     return;
 }
+
+gceSTATUS
+gcoBUFOBJ_GetFence(
+    IN gcoBUFOBJ BufObj,
+    IN gceFENCE_TYPE Type
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoBUFOBJ_GetSize(
+    IN gcoBUFOBJ BufObj,
+    OUT gctSIZE_T_PTR Size
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoBUFOBJ_IsFenceEnabled(
+    IN gcoBUFOBJ BufObj
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoBUFOBJ_WaitFence(
+    IN gcoBUFOBJ BufObj,
+    IN gceFENCE_TYPE Type
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoCLHardware_Construct(
+    void
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoBUFOBJ_GetNode(
+    IN gcoBUFOBJ BufObj,
+    OUT gcsSURF_NODE_PTR * Node
+    )
+{
+    return gcvSTATUS_OK;
+}
+
 
 #endif /* gcdNULL_DRIVER < 2 */
 #endif /* gcdENABLE_3D */

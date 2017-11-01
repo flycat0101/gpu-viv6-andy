@@ -1392,7 +1392,7 @@ VkResult halti2_helper_convertHwTxDesc(
         hwTxDesc[partIdx].sRGB = (hwTxFmtInfo->hwFormat >> TX_FORMAT_SRGB_SHIFT) & 0x1;
         hwTxDesc[partIdx].fast_filter = ((hwTxFmtInfo->hwFormat >> TX_FORMAT_FAST_FILTER_SHIFT) & 0x1)
                                       && (viewType != VK_IMAGE_VIEW_TYPE_3D) && (viewType != VK_IMAGE_VIEW_TYPE_2D_ARRAY);
-        hwTxDesc[partIdx].sampleStencil = (aspectFlag & VK_IMAGE_ASPECT_STENCIL_BIT);
+        hwTxDesc[partIdx].sampleStencil = (aspectFlag & VK_IMAGE_ASPECT_STENCIL_BIT) ? VK_TRUE : VK_FALSE;
         hwTxDesc[partIdx].msaaImage =  msaaImage;
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 

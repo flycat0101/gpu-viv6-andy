@@ -341,11 +341,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *d)
     if (vxoReference_IsValidAndSpecific((vx_reference)(*d), VX_TYPE_DELAY) && ((*d)->type == VX_TYPE_PYRAMID) && ((*d)->pyramidTable != NULL))
     {
         vx_delay delay = *d;
-        vx_int32 i;
-        vx_int32 numLevels = ((vx_pyramid)delay->refTable[0])->levelCount;
+        vx_size i;
+        vx_size numLevels = ((vx_pyramid)delay->refTable[0])->levelCount;
         /* release pyramid delays */
         for (i = 0; i < numLevels; ++i)
             vxoReference_Release((vx_reference *)&(delay->pyramidTable[i]), VX_TYPE_DELAY, VX_REF_EXTERNAL);
+        vxFree((*d)->pyramidTable);
     }
 
     return vxoReference_Release((vx_reference_ptr)d, VX_TYPE_DELAY, VX_REF_EXTERNAL);
@@ -429,7 +430,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAgeDelay(vx_delay delay)
     if (delay->type == VX_TYPE_PYRAMID && delay->pyramidTable != NULL)
     {
         /* age pyramid levels*/
-        vx_uint32 numLevels = ((vx_pyramid)delay->refTable[0])->levelCount;
+        vx_size numLevels = ((vx_pyramid)delay->refTable[0])->levelCount;
         for (index = 0; index < numLevels; ++index)
             vxAgeDelay(delay->pyramidTable[index]);
     }

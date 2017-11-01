@@ -2086,6 +2086,77 @@ _CheckErrorAsFuncCall(
         return gcvSTATUS_OK;
     }
 
+    if (Compiler->shaderType == slvSHADER_TYPE_TCS &&
+        gcoOS_StrNCmp(PolynaryExpr->funcName->symbol, "barrier", 7) == gcvSTATUS_OK)
+    {
+        if (!slsSLINK_LIST_IsEmpty(&Compiler->context.switchScope))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "in tessellation control shaders, barrier cannot be put in control flow."));
+
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+        else
+        {
+            slsNAME_SPACE* nameSpace = Compiler->context.currentSpace;
+
+            while (nameSpace)
+            {
+                if (nameSpace->nameSpaceType == slvNAME_SPACE_TYPE_SELECT_SET ||
+                    nameSpace->nameSpaceType == slvNAME_SPACE_TYPE_LOOP_SET)
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    slvREPORT_ERROR,
+                                                    "in tessellation control shaders, barrier cannot be put in control flow."));
+
+                    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                    gcmFOOTER();
+                    return status;
+                }
+
+                if (nameSpace->nameSpaceType == slvNAME_SPACE_TYPE_FUNCTION)
+                {
+                    if (nameSpace->nameSpaceFlags & sleNAME_SPACE_FLAGS_RETURN_INSERTED)
+                    {
+                        gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "in tessellation control shaders, barrier cannot be put after return."));
+
+                        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                        gcmFOOTER();
+                        return status;
+                    }
+                    if (gcoOS_StrNCmp(nameSpace->spaceName, "main", 4) != gcvSTATUS_OK)
+                    {
+                        gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "in tessellation control shaders, barrier cannot be put in functions other than main."));
+
+                        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                        gcmFOOTER();
+                        return status;
+                    }
+                    break;
+                }
+
+                nameSpace = nameSpace->parent;
+            }
+        }
+    }
+
     if (PolynaryExpr->operands == gcvNULL)
     {
         operandCount = 0;
@@ -4134,7 +4205,7 @@ slParseFuncDefinitionBegin(
     {
         status = sloCOMPILER_CreateNameSpace(Compiler,
                                              FuncName->symbol,
-                                             slvNAME_SPACE_FUNCTION,
+                                             slvNAME_SPACE_TYPE_FUNCTION,
                                              &nameSpace);
 
         if (gcmIS_ERROR(status))
@@ -9021,7 +9092,7 @@ _ParseFuncCallExprAsExpr(
     status = sloCOMPILER_CreateNameSpace(
                                    Compiler,
                                    gcvNULL,
-                                   slvNAME_SPACE_FUNCTION,
+                                   slvNAME_SPACE_TYPE_FUNCTION,
                                    &nameSpace);
 
     if(gcmIS_ERROR(status)) {
@@ -9383,7 +9454,7 @@ slParseFuncHeader(
 
     status = sloCOMPILER_CreateNameSpace(Compiler,
                                          Identifier->u.identifier,
-                                         slvNAME_SPACE_FUNCTION,
+                                         slvNAME_SPACE_TYPE_FUNCTION,
                                          &name->u.funcInfo.localSpace);
 
     if (gcmIS_ERROR(status))
@@ -9619,11 +9690,10 @@ slParseCompoundStatementBegin(
     gcmHEADER_ARG("Compiler=0x%x",
                   Compiler);
 
-    status = sloCOMPILER_CreateNameSpace(
-                                        Compiler,
-                                        gcvNULL,
-                                        slvNAME_SPACE_STATE_SET,
-                                        &nameSpace);
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         gcvNULL,
+                                         slvNAME_SPACE_TYPE_STATE_SET,
+                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
     {
@@ -9663,6 +9733,66 @@ slParseCompoundStatementEnd(
                                 Compiler,
                                 slvDUMP_PARSER,
                                 "</COMPOUND_STATEMENT>"));
+
+    gcmFOOTER_ARG("<return>=0x%x", Set);
+    return Set;
+}
+
+void
+slParseSelectStatementBegin(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS       status;
+    slsNAME_SPACE * nameSpace = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x",
+                  Compiler);
+
+    status = sloCOMPILER_CreateNameSpace(
+                                        Compiler,
+                                        gcvNULL,
+                                        slvNAME_SPACE_TYPE_SELECT_SET,
+                                        &nameSpace);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_NO();
+        return;
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_PARSER,
+                                "<SELECT_STATEMENT>"));
+    gcmFOOTER_NO();
+}
+
+sloIR_SET
+slParseSelectStatementEnd(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * StartToken,
+    IN sloIR_SET Set
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x StartToken=0x%x Set=0x%x",
+                  Compiler, StartToken, Set);
+
+    sloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
+
+    if (Set == gcvNULL)
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    Set->base.lineNo    = sloCOMPILER_GetCurrentLineNo(Compiler);
+    Set->base.stringNo  = sloCOMPILER_GetCurrentStringNo(Compiler);
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_PARSER,
+                                "</SELECT_STATEMENT>"));
 
     gcmFOOTER_ARG("<return>=0x%x", Set);
     return Set;
@@ -10885,11 +11015,10 @@ slParseWhileStatementBegin(
     gcmHEADER_ARG("Compiler=0x%x",
                   Compiler);
 
-    status = sloCOMPILER_CreateNameSpace(
-                                        Compiler,
-                                        gcvNULL,
-                                        slvNAME_SPACE_STATE_SET,
-                                        &nameSpace);
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         gcvNULL,
+                                         slvNAME_SPACE_TYPE_LOOP_SET,
+                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
     {
@@ -11055,11 +11184,10 @@ slParseForStatementBegin(
     gcmHEADER_ARG("Compiler=0x%x",
                   Compiler);
 
-    status = sloCOMPILER_CreateNameSpace(
-                                        Compiler,
-                                        gcvNULL,
-                                        slvNAME_SPACE_STATE_SET,
-                                        &nameSpace);
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         gcvNULL,
+                                         slvNAME_SPACE_TYPE_LOOP_SET,
+                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
     {
@@ -11275,6 +11403,16 @@ slParseJumpStatement(
     {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
+    }
+
+    if(Type == slvRETURN)
+    {
+        slsNAME_SPACE* nameSpace = sloCOMPILER_GetCurrentFunctionSpace(Compiler);
+
+        if (nameSpace)
+        {
+            nameSpace->nameSpaceFlags |= sleNAME_SPACE_FLAGS_RETURN_INSERTED;
+        }
     }
 
     status = sloIR_JUMP_Construct(
@@ -13528,7 +13666,7 @@ slParseStructDeclBegin(
 
     status = sloCOMPILER_CreateNameSpace(Compiler,
                                          Identifier ? Identifier->u.identifier : gcvNULL,
-                                         slvNAME_SPACE_STRUCT,
+                                         slvNAME_SPACE_TYPE_STRUCT,
                                          &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -13641,11 +13779,10 @@ slParseStructReDeclBegin(
         return;
     }
 
-    status = sloCOMPILER_CreateNameSpace(
-                                        Compiler,
-                                        gcvNULL,
-                                        slvNAME_SPACE_STRUCT,
-                                        &nameSpace);
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         gcvNULL,
+                                         slvNAME_SPACE_TYPE_STRUCT,
+                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
     {
@@ -14294,7 +14431,7 @@ slParseInterfaceBlockDeclBegin(
 
     status = sloCOMPILER_CreateAuxGlobalNameSpace(Compiler,
                                                   BlockName->u.identifier,
-                                                  slvNAME_SPACE_IO_BLOCK,
+                                                  slvNAME_SPACE_TYPE_IO_BLOCK,
                                                   &nameSpace);
     if (gcmIS_ERROR(status))  { gcmFOOTER_NO(); return; }
 

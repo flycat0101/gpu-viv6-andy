@@ -128,6 +128,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetCommandPool(
     return VK_SUCCESS;
 }
 
+VKAPI_ATTR void VKAPI_CALL __vk_TrimCommandPoolKHR(
+    VkDevice device,
+    VkCommandPool commandPool,
+    VkCommandPoolTrimFlagsKHR flags
+    )
+{
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateCommandBuffers(
     VkDevice device,
     const VkCommandBufferAllocateInfo* pAllocateInfo,
@@ -1000,8 +1008,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             __vkCommandBuffer *cmd = (__vkCommandBuffer *)pSubmits[isub].pCommandBuffers[icmd];
             __vkCmdExecuteCommandsInfo *exeInfo = cmd->executeList;
             __vkStateBuffer *stateBuffer = cmd->stateBufferList;
-            uint32_t stateBufCount = cmd->lastStateBufferIndex;
+            uint32_t stateBufCount = 0;
             uint32_t icommits = 0;
+
+            /* before queue submit */
+            (*cmd->devCtx->chipFuncs->BeginSubmitCmdBuf)(pSubmits[isub].pCommandBuffers[icmd]);
+            stateBufCount = cmd->lastStateBufferIndex;
 
             if (cmd->state != __VK_CMDBUF_STATE_EXECUTABLE)
                 continue;
@@ -1341,6 +1353,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
 
     __vki_CmdResolveSubPass(commandBuffer);
+
+    (*cmd->devCtx->chipFuncs->EndRenderPass)(commandBuffer);
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
 
@@ -1697,7 +1711,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBindDescriptorSets(
     {
         uint32_t setIdx = i + firstSet;
         uint32_t dynamicDescriptorCount = plt->descSetLayout[setIdx]->dynamicDescriptorCount;
-        __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]);
+        __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+        __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
 
         __VK_ASSERT(setIdx < __VK_MAX_DESCRIPTOR_SETS);
         bindDescInfo->descSets[setIdx] = descSet;

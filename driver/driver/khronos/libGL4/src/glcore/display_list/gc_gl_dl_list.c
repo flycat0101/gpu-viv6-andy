@@ -341,7 +341,9 @@ GLvoid APIENTRY __glim_NewList(__GLcontext *gc, GLuint list, GLenum mode)
 
     if (gc->dlist.arena == NULL)
     {
-        if (!(gc->dlist.arena = __glNewArena(gc)))
+        gc->dlist.arena = __glNewArena(gc);
+
+        if (!gc->dlist.arena)
         {
             __glSetError(gc, GL_OUT_OF_MEMORY);
             return;

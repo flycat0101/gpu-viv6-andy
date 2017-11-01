@@ -14,7 +14,6 @@
 #ifdef OPENGL40
 #include "gc_es_context.h"
 #include "gc_gl_api_inline.c"
-#include "gc_gl_debug.h"
 
 extern GLuint fmtIndex2InputIndex[];
 
@@ -26,8 +25,6 @@ extern GLuint fmtIndex2InputIndex[];
 __GL_INLINE GLvoid __glVertex2fv(__GLcontext *gc, GLfloat *v)
 {
     GLfloat *current;
-//    __GL_SETUP();
-
 
     gc->input.vertexFormat |= __GL_V2F_BIT;
 
@@ -113,7 +110,6 @@ __GL_INLINE GLvoid __glVertex2fv(__GLcontext *gc, GLfloat *v)
 __GL_INLINE GLvoid __glVertex3fv(__GLcontext *gc, GLfloat *v)
 {
     GLfloat *current;
-//    __GL_SETUP();
 
     gc->input.vertexFormat |= __GL_V3F_BIT;
 
@@ -202,7 +198,6 @@ __GL_INLINE GLvoid __glVertex4fv(__GLcontext *gc, GLfloat *v)
 {
     GLuint *current;
     GLuint *iv = (GLuint *)v;
-//    __GL_SETUP();
 
     gc->input.vertexFormat |= __GL_V4F_BIT;
 
@@ -289,7 +284,6 @@ __GL_INLINE GLvoid __glVertex4fv(__GLcontext *gc, GLfloat *v)
 #else
 __GL_INLINE GLvoid __glVertex4fv(__GLcontext *gc, GLfloat *v)
 {
-    __GL_SETUP();
 //    GLfloat *current;
 
     gc->input.vertexFormat |= __GL_V4F_BIT;
@@ -379,13 +373,7 @@ __GL_INLINE GLvoid __glVertex4fv(__GLcontext *gc, GLfloat *v)
 
 GLvoid APIENTRY __glim_Vertex2f(__GLcontext *gc, GLfloat x, GLfloat y)
 {
-
     GLfloat fv[2];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2f", DT_GLfloat, x, DT_GLfloat, y, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -394,22 +382,12 @@ GLvoid APIENTRY __glim_Vertex2f(__GLcontext *gc, GLfloat x, GLfloat y)
 
 GLvoid APIENTRY __glim_Vertex2fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2fv",DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glVertex2fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Vertex2d(__GLcontext *gc, GLdouble x, GLdouble y)
 {
     GLfloat fv[2];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2d", DT_GLdouble, x, DT_GLdouble, y, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -420,12 +398,6 @@ GLvoid APIENTRY __glim_Vertex2dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[2];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2dv", DT_GLdouble_ptr, v, DT_GLnull);
-#endif
-
-
     fv[0] = v[0];
     fv[1] = v[1];
     __glVertex2fv( gc, fv );
@@ -434,12 +406,6 @@ GLvoid APIENTRY __glim_Vertex2dv(__GLcontext *gc, const GLdouble *v)
 GLvoid APIENTRY __glim_Vertex2i(__GLcontext *gc, GLint x, GLint y)
 {
     GLfloat fv[2];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2i", DT_GLint, x, DT_GLint, y, DT_GLnull);
-#endif
-
 
     fv[0] = x;
     fv[1] = y;
@@ -450,12 +416,6 @@ GLvoid APIENTRY __glim_Vertex2iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[2];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
-
-
     fv[0] = v[0];
     fv[1] = v[1];
     __glVertex2fv( gc, fv );
@@ -464,12 +424,6 @@ GLvoid APIENTRY __glim_Vertex2iv(__GLcontext *gc, const GLint *v)
 GLvoid APIENTRY __glim_Vertex2s(__GLcontext *gc, GLshort x, GLshort y)
 {
     GLfloat fv[2];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2s", DT_GLshort, x, DT_GLshort, y, DT_GLnull);
-#endif
-
 
     fv[0] = x;
     fv[1] = y;
@@ -480,11 +434,6 @@ GLvoid APIENTRY __glim_Vertex2sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[2];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex2sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     __glVertex2fv( gc, fv );
@@ -494,12 +443,6 @@ GLvoid APIENTRY __glim_Vertex3f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3f", DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLnull);
-#endif
-
-
     fv[0] = x;
     fv[1] = y;
     fv[2] = z;
@@ -508,23 +451,12 @@ GLvoid APIENTRY __glim_Vertex3f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 
 GLvoid APIENTRY __glim_Vertex3fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3fv", DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glVertex3fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Vertex3d(__GLcontext *gc, GLdouble x, GLdouble y, GLdouble z)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3d", DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLnull);
-#endif
-
 
     fv[0] = x;
     fv[1] = y;
@@ -536,12 +468,6 @@ GLvoid APIENTRY __glim_Vertex3dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3dv", DT_GLdouble_ptr, v, DT_GLnull);
-#endif
-
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -551,11 +477,6 @@ GLvoid APIENTRY __glim_Vertex3dv(__GLcontext *gc, const GLdouble *v)
 GLvoid APIENTRY __glim_Vertex3i(__GLcontext *gc, GLint x, GLint y, GLint z)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3i", DT_GLint, x, DT_GLint, y, DT_GLint, z, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -567,11 +488,6 @@ GLvoid APIENTRY __glim_Vertex3iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -581,11 +497,6 @@ GLvoid APIENTRY __glim_Vertex3iv(__GLcontext *gc, const GLint *v)
 GLvoid APIENTRY __glim_Vertex3s(__GLcontext *gc, GLshort x, GLshort y, GLshort z)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3s", DT_GLshort, x, DT_GLshort, y, DT_GLshort, z, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -597,11 +508,6 @@ GLvoid APIENTRY __glim_Vertex3sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex3sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -612,11 +518,6 @@ GLvoid APIENTRY __glim_Vertex4f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4f", DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLfloat, w, DT_GLnull);
-#endif
-
     fv[0] = x;
     fv[1] = y;
     fv[2] = z;
@@ -626,22 +527,12 @@ GLvoid APIENTRY __glim_Vertex4f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 
 GLvoid APIENTRY __glim_Vertex4fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4fv", DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glVertex4fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Vertex4d(__GLcontext *gc, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4d", DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLdouble, w, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -654,11 +545,6 @@ GLvoid APIENTRY __glim_Vertex4dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4dv", DT_GLdouble_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -669,11 +555,6 @@ GLvoid APIENTRY __glim_Vertex4dv(__GLcontext *gc, const GLdouble *v)
 GLvoid APIENTRY __glim_Vertex4i(__GLcontext *gc, GLint x, GLint y, GLint z, GLint w)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4i", DT_GLint, x, DT_GLint, y, DT_GLint, z, DT_GLint, w, DT_GLnull);
-#endif
 
     fv[0] = x;
     fv[1] = y;
@@ -686,11 +567,6 @@ GLvoid APIENTRY __glim_Vertex4iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -702,11 +578,6 @@ GLvoid APIENTRY __glim_Vertex4s(__GLcontext *gc, GLshort x, GLshort y, GLshort z
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4s",DT_GLshort, x, DT_GLshort, y, DT_GLshort, z, DT_GLshort, w, DT_GLnull);
-#endif
-
     fv[0] = x;
     fv[1] = y;
     fv[2] = z;
@@ -717,11 +588,6 @@ GLvoid APIENTRY __glim_Vertex4s(__GLcontext *gc, GLshort x, GLshort y, GLshort z
 GLvoid APIENTRY __glim_Vertex4sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Vertex4sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
 
     fv[0] = v[0];
     fv[1] = v[1];

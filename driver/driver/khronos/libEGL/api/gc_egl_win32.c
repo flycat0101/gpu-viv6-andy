@@ -2057,7 +2057,7 @@ _SyncToPixmap(
 
 static struct eglPlatform win32Platform =
 {
-    EGL_PLATFORM_X11_KHR,
+    EGL_PLATFORM_WIN32_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,

@@ -1126,7 +1126,7 @@ expression_statement :
 
 selection_statement :
 	T_IF '(' expression ')'
-        { slParseCompoundStatementBegin(Compiler); }
+        { slParseSelectStatementBegin(Compiler); }
     selection_rest_statement
 		{ $$ = slParseSelectionStatement(Compiler, &$1, $3, $6); }
 	| T_SWITCH '(' integer_expression ')' switch_body
@@ -1161,13 +1161,13 @@ switch_body :
 selection_rest_statement :
 	statement
     T_ELSE
-        { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
-          slParseCompoundStatementBegin(Compiler); }
+        { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
+          slParseSelectStatementBegin(Compiler); }
     statement
-        { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
+        { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
 		  $$ = slParseSelectionRestStatement(Compiler, $1, $4); }
 	| statement						%prec T_IF
-        { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
+        { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
 		  $$ = slParseSelectionRestStatement(Compiler, $1, gcvNULL); }
 	;
 

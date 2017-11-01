@@ -53,6 +53,12 @@ typedef struct __vkDescriptorResourceRegionRec
     uint32_t sampler;      /* size in bytes */
 }__vkDescriptorResourceRegion;
 
+typedef struct __vkDescriptorSetEntryRec
+{
+    VkDescriptorSet descSet;
+    VkBool32 isUsed;
+}__vkDescriptorSetEntry;
+
 typedef struct __vkDescriptorPoolRec
 {
     __vkObject obj; /* Must be the first field */
@@ -67,8 +73,7 @@ typedef struct __vkDescriptorPoolRec
     __vkDescriptorResourceRegion  size;     /* total size of pDescriptorView and pSampler */
     __vkDescriptorResourceRegion  cur;      /* current available point */
 
-    VkDescriptorSet descSetList;
-
+    __vkDescriptorSetEntry *pDescSets;
 } __vkDescriptorPool;
 
 typedef struct __vkDescriptorSetLayoutBindingRec

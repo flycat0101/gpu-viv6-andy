@@ -19,7 +19,6 @@
 #include "gc_es_context.h"
 #include "g_asmoff.h"
 //#include "dri/viv_lock.h"
-#include "gc_gl_debug.h"
 
 extern GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                               GLint toType, GLvoid *result, GLint size);
@@ -143,13 +142,6 @@ GLvoid __glImmedFlushPrim_Material(__GLcontext *gc, GLboolean bFlushPipe)
 
 GLvoid APIENTRY __glim_End_Material(__GLcontext *gc)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_End_Material", DT_GLnull);
-#endif
-
     if (gc->input.inconsistentFormat == GL_FALSE)
     {
         gc->input.primitiveFormat = gc->input.preVertexFormat;
@@ -328,13 +320,6 @@ GLvoid __glUpdateMaterialfv(__GLcontext *gc, GLenum face, GLenum pname, GLfloat 
 
 GLvoid APIENTRY __glim_Materialfv(__GLcontext *gc, GLenum face, GLenum pname, const GLfloat *pv)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Materialfv", DT_GLenum, face, DT_GLenum, pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     /* Flush immediate mode vertex buffer only if lighting is enabled.
     */
     if (gc->state.enables.lighting.lighting) {
@@ -346,13 +331,6 @@ GLvoid APIENTRY __glim_Materialfv(__GLcontext *gc, GLenum face, GLenum pname, co
 
 GLvoid APIENTRY __glim_Materialf(__GLcontext *gc, GLenum face, GLenum pname, GLfloat f)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Materialf", DT_GLenum, face, DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
-
     /* Flush immediate mode vertex buffer only if lighting is enabled.
     */
     if (gc->state.enables.lighting.lighting) {
@@ -371,12 +349,6 @@ GLvoid APIENTRY __glim_Materialf(__GLcontext *gc, GLenum face, GLenum pname, GLf
 GLvoid APIENTRY __glim_Materialiv(__GLcontext *gc, GLenum face, GLenum pname, const GLint *pv)
 {
     GLfloat tmpf[4]= {0.0, 0.0, 0.0, 0.0};
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Materialiv", DT_GLenum, face, DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
 
     /* Flush immediate mode vertex buffer only if lighting is enabled.
     */
@@ -413,12 +385,6 @@ GLvoid APIENTRY __glim_Materialiv(__GLcontext *gc, GLenum face, GLenum pname, co
 GLvoid APIENTRY __glim_Materiali(__GLcontext *gc, GLenum face, GLenum pname, GLint i)
 {
     GLfloat tmpf = (GLfloat)i;
- //   __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Materiali", DT_GLenum, face, DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
 
     /* Flush immediate mode vertex buffer only if lighting is enabled.
     */
@@ -439,11 +405,6 @@ GLvoid APIENTRY __glim_GetMaterialfv(__GLcontext *gc, GLenum face, GLenum pname,
 {
     __GLmaterialState *mat;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_GetMaterialfv",DT_GLenum, face, DT_GLenum, pname, DT_GLfloat_ptr, result, DT_GLnull);
-#endif
 
     switch (face)
     {
@@ -502,11 +463,6 @@ GLvoid APIENTRY __glim_GetMaterialiv(__GLcontext *gc, GLenum face, GLenum pname,
 {
     __GLmaterialState *mat;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_GetMaterialiv", DT_GLenum, face, DT_GLenum, pname, DT_GLint_ptr, result, DT_GLnull);
-#endif
 
     switch (face)
     {

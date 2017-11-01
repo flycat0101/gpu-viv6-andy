@@ -79,6 +79,8 @@ GetCategoryName_(
     case gcSHADER_VAR_CATEGORY_EXTRA_FOR_TEX_GATHER:
     case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
     case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+    case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+    case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
         return "";
 
     case gcSHADER_VAR_CATEGORY_STRUCT:
@@ -404,7 +406,7 @@ _DumpRegister(
     IN gcSL_TYPE        Type,
     IN gcSL_FORMAT      Format,
     IN gctUINT          PackedComponents,
-    IN gctUINT16        Index,
+    IN gctUINT32        Index,
     IN gcSL_INDEXED     Mode,
     IN gctINT           Indexed,
     OUT char * Buffer,
@@ -537,7 +539,7 @@ _DumpRegister(
 static gctINT
 _DumpSource(
     IN gctSOURCE_t Source,
-    IN gctUINT16 Index,
+    IN gctUINT32 Index,
     IN gctINT Indexed,
     IN gctBOOL AddComma,
     OUT char * Buffer,
@@ -713,7 +715,7 @@ _DumpSource(
 static gctINT
 _DumpSourceTargetFormat(
     IN gctSOURCE_t Source,
-    IN gctUINT16 Index,
+    IN gctUINT32 Index,
     IN gctINT Indexed,
     IN gctBOOL AddComma,
     OUT char * Buffer,

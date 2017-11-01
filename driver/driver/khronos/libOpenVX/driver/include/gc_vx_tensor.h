@@ -18,6 +18,12 @@
 EXTERN_C_BEGIN
 
 #define TENSOR_DIM_NUM(tensor) \
+    (tensor)->dimCount
+
+#define TENSOR_VIEW_DIM_NUM(tensor) \
+    (tensor)->viewRegion.dimCount
+
+#define TENSOR_ORIG_DIM_NUM(tensor) \
     (tensor)->tensorBuffer->memory.dimCount
 
 #define TENSOR_LOGICAL_ADDR(tensor) \
@@ -27,6 +33,9 @@ EXTERN_C_BEGIN
     (tensor)->tensorBuffer->memory.physicals[0]
 
 #define TENSOR_SIZES(tensor) \
+    (tensor)->dims
+
+#define TENSOR_ORIG_SIZES(tensor) \
     (tensor)->tensorBuffer->memory.dims[0]
 
 #define TENSOR_DATA_TYPE(tensor) \
@@ -35,14 +44,26 @@ EXTERN_C_BEGIN
 #define TENSOR_POS(tensor) \
     (tensor)->tensorBuffer->fixedPointPos
 
-#define TENSOR_STRIDES(tensor) \
-    (tensor)->tensorBuffer->memory.strides[0]
+#define TENSOR_DATA_SIZE(tensor) \
+    (tensor)->tensorBuffer->elementSize
+
+#define TENSOR_ROUNDING_MODE(tensor) \
+    (tensor)->tensorBuffer->roundingMode
 
 #define TENSOR_SIZE_INDEX(tensor, index) \
-    (*(TENSOR_SIZES(tensor) + (index)))
+    (TENSOR_SIZES(tensor)[index])
+
+#define TENSOR_VIEW_SIZE_INDEX(tensor, index) \
+    ((tensor)->viewRegion.viewEnds[index] - (tensor)->viewRegion.viewStarts[index])
+
+#define TENSOR_STRIDES(tensor) \
+    (tensor)->strides
+
+#define TENSOR_ORIG_STRIDES(tensor) \
+    (tensor)->tensorBuffer->memory.strides[0]
 
 #define TENSOR_STRIDE_INDEX(tensor, index) \
-    (*(TENSOR_STRIDES(tensor) + (index)))
+    (TENSOR_STRIDES(tensor)[index])
 
 
 VX_INTERNAL_CALLBACK_API void
@@ -65,6 +86,12 @@ vxoTensor_IsValidAddressing(
     vx_tensor_addressing addressing
     );
 
+VX_INTERNAL_API vx_bool
+vxoTensor_IsOverlap(
+    vx_tensor tensor1,
+    vx_tensor tensor2
+    );
+
 VX_INTERNAL_API vx_status
 vxoTensor_GetTensorBaseMemory(
     vx_tensor tensor,
@@ -72,10 +99,23 @@ vxoTensor_GetTensorBaseMemory(
     vx_uint32 * physical
     );
 
-VX_INTERNAL_API vx_status vxoTensor_GetTensorViewMemory(
+VX_INTERNAL_API vx_status
+vxoTensor_GetTensorViewMemory(
     vx_tensor tensor,
     gctPOINTER * logical,
     vx_uint32 * physical
+    );
+
+VX_INTERNAL_API vx_status
+vxoTensor_GetTensorSize(
+    vx_tensor tensor,
+    vx_uint32 *size
+    );
+
+VX_INTERNAL_API vx_status
+vxoTensor_GetTensorElementCount(
+    vx_tensor tensor,
+    vx_uint32 *count
     );
 
 VX_INTERNAL_API vx_status
@@ -116,12 +156,6 @@ vxoTensor_AllocateMemory(
 VX_INTERNAL_API vx_status
 vxoTensor_ReleaseMemory(
     vx_tensor tensor
-    );
-
-VX_INTERNAL_API vx_tensor_buffer_s*
-vxoTensor_LocateView(
-    vx_tensor tensor,
-    vx_view_region_s *viewRegion
     );
 
 VX_INTERNAL_API void

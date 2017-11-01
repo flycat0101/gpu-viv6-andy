@@ -211,8 +211,10 @@ GLboolean __glCheckTexImgArgs(__GLcontext *gc,
 #ifdef OPENGL40
     if(__GL_TEXTURE_1D_ARRAY_INDEX == tex->targetIndex )
     {
-        if((height <= 0) || (height > maxArray))
+        if ((height <= 0) || (height > maxArray))
+        {
             __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+        }
     }
 #endif
 
@@ -567,6 +569,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 
         case GL_RED:
         case GL_R8:
+//      case GL_R16:
         case GL_R8_SNORM:
         case GL_R8I:
         case GL_R8UI:
@@ -579,6 +582,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 
         case GL_RG:
         case GL_RG8:
+//      case GL_RG16:
         case GL_RG8_SNORM:
         case GL_RG8I:
         case GL_RG8UI:
@@ -698,7 +702,6 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_BGR_EXT:
 #endif
             break;
-
         default:
             invalid = GL_TRUE;
             break;
@@ -761,6 +764,10 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_RGBA16:
         case GL_RGB5_A1:
         case GL_RGB10_A2:
+        case GL_RG16:
+        case GL_RG8:
+        case GL_R16:
+        case GL_R8:
         case GL_ALPHA:
         case GL_ALPHA4:
         case GL_ALPHA8:
@@ -771,9 +778,32 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_INTENSITY8:
         case GL_INTENSITY12:
         case GL_INTENSITY16:
-            if(format == GL_DEPTH_COMPONENT )
+        case GL_RGBA8_SNORM:
+        case GL_RGBA16_SNORM:
+        case GL_RGB8_SNORM:
+        case GL_RGB16_SNORM:
+        case GL_RG8_SNORM:
+        case GL_RG16_SNORM:
+        case GL_R8_SNORM:
+        case GL_R16_SNORM:
+            switch (format)
             {
-                goto bad_operation;
+                case GL_RED_INTEGER_EXT:
+                case GL_BLUE_INTEGER_EXT:
+                case GL_GREEN_INTEGER_EXT:
+                case GL_ALPHA_INTEGER_EXT:
+                case GL_RGB_INTEGER_EXT:
+                case GL_RGBA_INTEGER_EXT:
+                case GL_BGR_INTEGER_EXT:
+                case GL_BGRA_INTEGER_EXT:
+                case GL_LUMINANCE_INTEGER_EXT:
+                case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                    break;
+                case GL_DEPTH_COMPONENT:
+                    goto bad_operation;
+                default:
+                    break;
             }
             break;
 
@@ -782,12 +812,13 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_DEPTH_COMPONENT16:
         case GL_DEPTH_COMPONENT24:
         case GL_DEPTH_COMPONENT32:
+        case GL_DEPTH_COMPONENT32F:
             if(!__glExtension[__GL_EXTID_ARB_depth_texture].bEnabled)
             {
     bad_enum:
                 __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
             }
-            if(format != GL_DEPTH_COMPONENT || !gc->modes.haveDepthBuffer)
+            if(format != GL_DEPTH_COMPONENT || (!gc->frameBuffer.readFramebufObj->name && !gc->modes.haveDepthBuffer))
             {
                 goto bad_operation;
             }
@@ -812,7 +843,40 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
             case GL_PROXY_TEXTURE_CUBE_MAP:
+                break;
+            default:
+                goto  bad_operation;
+            }
+            break;
 
+        case GL_DEPTH_STENCIL:
+        case GL_DEPTH24_STENCIL8:
+        case GL_DEPTH32F_STENCIL8:
+            if(format != GL_DEPTH_STENCIL || (!gc->frameBuffer.readFramebufObj->name && (!gc->modes.haveDepthBuffer || !gc->modes.haveStencilBuffer)))
+            {
+                goto bad_operation;
+            }
+            switch(target)
+            {
+            case GL_TEXTURE_1D:
+            case GL_TEXTURE_2D:
+            case GL_TEXTURE_RECTANGLE_ARB:
+            case GL_PROXY_TEXTURE_1D:
+            case GL_PROXY_TEXTURE_2D:
+            case GL_PROXY_TEXTURE_RECTANGLE_ARB:
+
+            /* for layered framebuffer */
+            case GL_TEXTURE_1D_ARRAY_EXT:
+            case GL_TEXTURE_2D_ARRAY_EXT:
+            case GL_PROXY_TEXTURE_1D_ARRAY_EXT:
+            case GL_PROXY_TEXTURE_2D_ARRAY_EXT:
+            case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+            case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+            case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+            case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+            case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+            case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+            case GL_PROXY_TEXTURE_CUBE_MAP:
                 break;
             default:
                 goto  bad_operation;
@@ -875,6 +939,19 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_RGB16I_EXT:
         case GL_RGB8UI_EXT:
         case GL_RGB8I_EXT:
+        case GL_RGB10_A2UI:
+        case GL_RG32UI:
+        case GL_RG32I:
+        case GL_RG16UI:
+        case GL_RG16I:
+        case GL_RG8UI:
+        case GL_RG8I:
+        case GL_R32UI:
+        case GL_R32I:
+        case GL_R16UI:
+        case GL_R16I:
+        case GL_R8UI:
+        case GL_R8I:
         case GL_LUMINANCE32UI_EXT:
         case GL_LUMINANCE32I_EXT:
         case GL_LUMINANCE16UI_EXT:
@@ -908,8 +985,10 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             case GL_BGRA_INTEGER_EXT:
             case GL_LUMINANCE_INTEGER_EXT:
             case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+                if (type == GL_HALF_FLOAT || type == GL_FLOAT)
+                    goto bad_operation;
                 break;
-        default:
+            default:
                 goto bad_operation;
             }
             break;
@@ -955,6 +1034,10 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         /* extension GL_ARB_texture_float */
         case GL_RGBA32F_ARB:
         case GL_RGB32F_ARB:
+        case GL_RG32F_EXT:
+        case GL_RG16F_EXT:
+        case GL_R32F_EXT:
+        case GL_R16F_EXT:
         case GL_ALPHA32F_ARB:
         case GL_INTENSITY32F_ARB:
         case GL_LUMINANCE32F_ARB:
@@ -984,58 +1067,6 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             goto bad_enum;
     }
 
-    switch(format)
-    {
-        case GL_BLUE_INTEGER_EXT:
-        case GL_GREEN_INTEGER_EXT:
-        case GL_ALPHA_INTEGER_EXT:
-        case GL_RGB_INTEGER_EXT:
-        case GL_RGBA_INTEGER_EXT:
-        case GL_BGR_INTEGER_EXT:
-        case GL_BGRA_INTEGER_EXT:
-        case GL_LUMINANCE_INTEGER_EXT:
-        case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-            switch(internalFormat)
-    {
-                case GL_RGBA32UI_EXT:
-                case GL_RGBA32I_EXT:
-                case GL_RGBA16UI_EXT:
-                case GL_RGBA16I_EXT:
-                case GL_RGBA8UI_EXT:
-                case GL_RGBA8I_EXT:
-                case GL_RGB32UI_EXT:
-                case GL_RGB32I_EXT:
-                case GL_RGB16UI_EXT:
-                case GL_RGB16I_EXT:
-                case GL_RGB8UI_EXT:
-                case GL_RGB8I_EXT:
-                case GL_LUMINANCE32UI_EXT:
-                case GL_LUMINANCE32I_EXT:
-                case GL_LUMINANCE16UI_EXT:
-                case GL_LUMINANCE16I_EXT:
-                case GL_LUMINANCE8UI_EXT:
-                case GL_LUMINANCE8I_EXT:
-                case GL_LUMINANCE_ALPHA32UI_EXT:
-                case GL_LUMINANCE_ALPHA32I_EXT:
-                case GL_LUMINANCE_ALPHA16UI_EXT:
-                case GL_LUMINANCE_ALPHA16I_EXT:
-                case GL_LUMINANCE_ALPHA8UI_EXT:
-                case GL_LUMINANCE_ALPHA8I_EXT:
-                case GL_INTENSITY32UI_EXT:
-                case GL_INTENSITY32I_EXT:
-                case GL_INTENSITY16UI_EXT:
-                case GL_INTENSITY16I_EXT:
-                case GL_INTENSITY8UI_EXT:
-                case GL_INTENSITY8I_EXT:
-                    break;
-                default:
-                    goto bad_operation;
-
-            }
-            break;
-        default:
-            break;
-    }
 
 /* Fix me for this werid style */
     if (!tex) {
@@ -1504,7 +1535,7 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
 {
 
 #ifdef OPENGL40
-    return __glCheckTexImgFmtGL4(gc, tex, target, internalFormat, format, type) || __glCheckTexImgFmtES(gc, tex, target, internalFormat, format, type);
+    return __glCheckTexImgFmtGL4(gc, tex, target, internalFormat, format, type);
 #else
     return __glCheckTexImgFmtES(gc, tex, target, internalFormat, format, type);
 #endif
@@ -1639,22 +1670,17 @@ GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex, GLint
 {
     __GLformatInfo* texFormatInfo;
     __GLformatInfo* rtFormatInfo;
+    __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
 
-    if (GL_RGB9_E5 == internalFormat)
+    if (!gc->dp.isFramebufferComplete(gc, readFBO))
     {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
     }
 
     if (READ_FRAMEBUFFER_BINDING_NAME)
     {
         __GLfboAttachPoint *attachPoint;
-        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
         GLint attachIndex;
-
-        if (!gc->dp.isFramebufferComplete(gc, readFBO))
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
-        }
 
         if (readFBO->readBuffer == GL_NONE)
         {
@@ -1782,6 +1808,9 @@ GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex, GLint
             }
             break;
         }
+        break;
+    case GL_RGB9_E5:
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         break;
     default:
         texFormatInfo = __glGetFormatInfo(internalFormat);
@@ -2184,6 +2213,9 @@ GLint __glTextureBaseFormat(GLint internalFormat)
         case GL_DEPTH_COMPONENT32:
             return GL_DEPTH_COMPONENT;
 
+        case GL_DEPTH_STENCIL:
+            return GL_DEPTH_STENCIL;
+
         case 1:
         case GL_LUMINANCE:
         case GL_LUMINANCE4:
@@ -2415,10 +2447,11 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
     GLboolean paletted;
     GLint requestedFormat = internalFormat;
 
+/*
 #ifdef OPENGL40
        internalFormat = __glTextureBaseFormat( internalFormat);
 #endif
-
+*/
 
     /* For some unsized internal formats, need consider corresponding "type" to
     ** get best matched chosen formats for better performance.
@@ -3568,7 +3601,8 @@ GLvoid GLAPIENTRY __glim_GenerateMipmapEXT(__GLcontext *gc,  GLenum target)
     __gles_GenerateMipmap(gc, target);
 }
 
-GLvoid GLAPIENTRY __glim_GetCompressedTexImage(__GLcontext *gc, GLenum target, GLint level, GLvoid *img)
+GLvoid GLAPIENTRY __glim_GetCompressedTexImage(__GLcontext *gc, GLenum target
+, GLint level, GLvoid *img)
 {
     __GLtextureObject *tex;
     GLuint activeUnit;
@@ -5444,7 +5478,7 @@ GLvoid GL_APIENTRY __gles_TexDirectInvalidateVIV(__GLcontext *gc, GLenum target)
     GLint face = 0;
     GLuint activeUnit;
     __GLtextureObject *tex;
-    GLsizei height;
+    GLsizei height = 1;
 
     __GL_HEADER();
 
@@ -6487,4 +6521,92 @@ GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbu
     }
 }
 
+GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    GLint face;
+    GLuint activeUnit = gc->state.texture.activeTexIndex;
+    __GLtextureObject *tex;
+    GLint maxLod = (GLint)(gc->constants.maxNumTextureLevels - 1);
+    __GLbufferObject *packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+
+    __GL_HEADER();
+
+    switch (target)
+    {
+        case GL_TEXTURE_2D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+            face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+            break;
+        case GL_TEXTURE_2D_ARRAY:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_ARRAY_INDEX];
+            break;
+        case GL_TEXTURE_3D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_3D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
+            if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+            {
+                face = 0;
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
+                break;
+            }
+        default:
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+
+    if (!tex)
+    {
+        __GL_EXIT();
+    }
+
+    /* Check lod, width, height */
+    if (level < 0 || level > maxLod)
+    {
+        __GL_ERROR_RET(GL_INVALID_VALUE);
+    }
+
+    if (!__glCheckTexImgTypeArg(gc, tex, type))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmtArg(gc, tex, format))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[face][level].requestedFormat, format, type))
+    {
+        __GL_EXIT();
+    }
+    /* The image is from unpack buffer object? */
+    if (packBufObj)
+    {
+        __GLmipMapLevel *mipmap = &tex->faceMipmap[face][level];
+
+        if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, mipmap->width, mipmap->height, mipmap->depth, format, type, pixels))
+        {
+            __GL_EXIT();
+        }
+    }
+
+    if (!(*gc->dp.getTexImage)(gc, tex, face, level, (GLubyte*)pixels))
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
+
+OnExit:
+    __GL_FOOTER();
+}
 

@@ -54,17 +54,11 @@ gctINT clfReleaseContext(
             "OCL-002008: (clfReleaseContext) invalid Context.\n");
         clmRETURN_ERROR(CL_INVALID_CONTEXT);
     }
-#if VIVANTE_PROFILER
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-#endif
+
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Context->referenceCount, &oldReference));
 
     if (oldReference == 1)
     {
-#if VIVANTE_PROFILER
-        /* Destroy the profiler. */
-        clfDestroyProfiler(Context);
-#endif
 #if !gcdFPGA_BUILD
         gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
 #endif
@@ -264,9 +258,6 @@ clCreateContext(
 #if cldTUNING
     context->sortRects       = gcvFALSE;
 #endif
-#if VIVANTE_PROFILER
-    context->halProfile            = gcvNULL;
-#endif
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &context->referenceCount),
@@ -367,10 +358,6 @@ clCreateContext(
 
     gcmFOOTER_ARG("0x%x *ErrcodeRet=%d",
                   context, gcmOPT_VALUE(ErrcodeRet));
-
-#if VIVANTE_PROFILER
-    clfInitializeProfiler(context);
-#endif
 
 #if !gcdFPGA_BUILD
     gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);

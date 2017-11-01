@@ -54,6 +54,11 @@ BEGIN_EXTERN_C()
 */
 #define __FULL_PROGRAM_BINARY_HEADER_SIZE__     (sizeof(gctUINT32) * 4) /* Full program binary file header size in bytes*/
 
+#define __OCL_PRINTF_WRITE_MASK__               (0x12345678)
+
+#define __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__      0
+#define __ENABLE_OPTIMIZE_FOR_SHARE_MEMORY__    0
+
 typedef enum _gceKernelBinaryKind
 {
     gcvKERNEL_BINARY_NONE               = 0x00,
@@ -295,6 +300,7 @@ typedef struct _gcsPatchReadImage
     gctUINT                 samplerValue;
     gctUINT                 channelDataType;
     gctUINT                 channelOrder;
+    gctBOOL                 useImageLoad;
 }
 gcsPatchReadImage;
 
@@ -306,6 +312,7 @@ typedef struct _gcsPatchWriteImage
     gctUINT                 channelDataType;
     gctUINT                 channelOrder;
     gctUINT                 imageType;
+    gctBOOL                 imageStore;
 }
 gcsPatchWriteImage;
 
@@ -684,6 +691,12 @@ struct _gcsHINT
 
     /* Local/share memory size. */
     gctUINT     localMemSizeInByte;
+
+    /* Concurrent workThreadCount. */
+    gctUINT16   workThreadCount;
+
+    /* Concurrent workGroupCount. */
+    gctUINT16   workGroupCount;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -740,6 +753,8 @@ extern const gcSHADER_TYPEINFO gcvShaderTypeInfo[];
 #define gcmType_ComonentType(Type)      (gcvShaderTypeInfo[Type].componentType)
 #define gcmType_Kind(Type)              (gcvShaderTypeInfo[Type].kind)
 #define gcmType_Name(Type)              (gcvShaderTypeInfo[Type].name)
+
+#define gcmType_isSampler(Type)         (gcmType_Kind(Type) == gceTK_SAMPLER || gcmType_Kind(Type) == gceTK_SAMPLER_T)
 
 #define gcmType_ComponentByteSize       4
 
@@ -1388,6 +1403,14 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL    oclOcvLocalAddressSpace;
 
+    /*
+     * Handle OCL  in OPENCV
+     *
+     *   VC_OPTION=-OCLOPENCV:0|1
+     *
+     */
+    gctBOOL    oclOpenCV;
+
     /*  OCL has long:
      *
      *   VC_OPTION=-OCLHASLONG:0|1
@@ -1544,6 +1567,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_oclFpCaps()          (gcmGetOptimizerOption()->oclFpCaps)
 #define gcmOPT_oclPackedBasicType() (gcmGetOptimizerOption()->oclPackedBasicType)
 #define gcmOPT_oclOcvLocalAddressSpace() (gcmGetOptimizerOption()->oclOcvLocalAddressSpace)
+#define gcmOPT_oclOpenCV()          (gcmGetOptimizerOption()->oclOpenCV)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
 #define gcmOPT_oclInt64InVIR()      (gcmGetOptimizerOption()->oclInt64InVir)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
@@ -3887,7 +3911,7 @@ gcSHADER_ReallocateOutputs(
 **        gctUINT32 Length
 **            Array length of the output to add.  'Length' must be at least 1.
 **
-**        gctUINT16 TempRegister
+**        gctUINT32 TempRegister
 **            Temporary register index that holds the output value.
 **
 **    OUTPUT:
@@ -3900,7 +3924,7 @@ gcSHADER_AddOutput(
     IN gctCONST_STRING Name,
     IN gcSHADER_TYPE Type,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_PRECISION Precision
     );
 
@@ -3926,7 +3950,7 @@ gcSHADER_AddOutput(
 **      gctUINT32 Length
 **          Array length of the output to add.  'Length' must be at least 1.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the output value.
 **
 **      gctINT Location
@@ -3945,7 +3969,7 @@ gcSHADER_AddOutputWithLocation(
     IN gcSHADER_PRECISION Precision,
     IN gctBOOL IsArray,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_SHADERMODE shaderMode,
     IN gctINT Location,
     IN gctINT FieldIndex,
@@ -3984,7 +4008,7 @@ gcSHADER_AddOutputIndexed(
     IN gcSHADER Shader,
     IN gctCONST_STRING Name,
     IN gctUINT32 Index,
-    IN gctUINT16 TempIndex
+    IN gctUINT32 TempIndex
     );
 
 /*******************************************************************************
@@ -4100,7 +4124,7 @@ gcSHADER_GetOutputByName(
 **        gcSHADER Shader
 **            Pointer to a gcSHADER object.
 **
-**        gctUINT16 TempIndex
+**        gctUINT32 TempIndex
 **            Temp index of output to retrieve.
 **
 **
@@ -4112,7 +4136,7 @@ gcSHADER_GetOutputByName(
 gceSTATUS
 gcSHADER_GetOutputByTempIndex(
     IN gcSHADER Shader,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     OUT gcOUTPUT * Output
     );
 
@@ -4162,7 +4186,7 @@ gcSHADER_ReallocateVariables(
 **        gctUINT32 Length
 **            Array length of the variable to add.  'Length' must be at least 1.
 **
-**        gctUINT16 TempRegister
+**        gctUINT32 TempRegister
 **            Temporary register index that holds the variable value.
 **
 **    OUTPUT:
@@ -4175,7 +4199,7 @@ gcSHADER_AddVariable(
     IN gctCONST_STRING Name,
     IN gcSHADER_TYPE Type,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister
+    IN gctUINT32 TempRegister
     );
 
 
@@ -4199,7 +4223,7 @@ gcSHADER_AddVariable(
 **      gctUINT32 Length
 **          Array length of the variable to add.  'Length' must be at least 1.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the variable value.
 **
 **      gcSHADER_VAR_CATEGORY varCategory
@@ -4226,7 +4250,7 @@ gcSHADER_AddVariableEx(
     IN gcSHADER_TYPE Type,
     IN gctINT ArrayLengthCount,
     IN gctINT * ArrayLengthList,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_VAR_CATEGORY varCategory,
     IN gctUINT8 Precision,
     IN gctUINT16 numStructureElement,
@@ -4248,7 +4272,7 @@ gcSHADER_AddVariableEx(
 **      gctCONST_STRING Name
 **          Name of the variable to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the variable value.
 **
 **      gcsSHADER_VAR_INFO *VarInfo
@@ -4263,7 +4287,7 @@ gceSTATUS
 gcSHADER_AddVariableEx1(
     IN gcSHADER Shader,
     IN gctCONST_STRING Name,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcsSHADER_VAR_INFO *VarInfo,
     OUT gctINT16* ThisVarIndex
     );
@@ -4431,7 +4455,7 @@ gcSHADER_GetVariableIndexingRange(
 **        gcSL_OPCODE Opcode
 **            Opcode to add.
 **
-**        gctUINT16 TempRegister
+**        gctUINT32 TempRegister
 **            Temporary register index that acts as the target of the opcode.
 **
 **        gctUINT8 Enable
@@ -4449,7 +4473,7 @@ gceSTATUS
 gcSHADER_AddOpcode(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision,
@@ -4461,7 +4485,7 @@ gcSHADER_AddOpcode2(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision,
@@ -4483,7 +4507,7 @@ gcSHADER_AddOpcode2(
 **        gcSL_OPCODE Opcode
 **            Opcode to add.
 **
-**        gctUINT16 TempRegister
+**        gctUINT32 TempRegister
 **            Temporary register index that acts as the target of the opcode.
 **
 **        gctUINT8 Enable
@@ -4513,7 +4537,7 @@ gceSTATUS
 gcSHADER_AddOpcodeIndexed(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -4536,7 +4560,7 @@ gcSHADER_AddOpcodeIndexed(
 **      gcSL_OPCODE Opcode
 **          Opcode to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -4566,7 +4590,7 @@ gceSTATUS
 gcSHADER_AddOpcodeIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -4592,7 +4616,7 @@ gcSHADER_AddOpcodeIndexedWithPrecision(
 **      gcSL_CONDITION Condition
 **          Condition to check.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -4620,7 +4644,7 @@ gcSHADER_AddOpcodeConditionIndexed(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
@@ -4646,7 +4670,7 @@ gcSHADER_AddOpcodeConditionIndexed(
 **      gcSL_CONDITION Condition
 **          Condition to check.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -4677,7 +4701,7 @@ gcSHADER_AddOpcodeConditionIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
@@ -4943,6 +4967,31 @@ gcSHADER_UpdateSourcePacked(
     );
 
 /*******************************************************************************
+**  gcSHADER_UpdateResOpType
+**
+**  Update the resOpType
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gcSL_OPCODE_RES_TYPE ResOpType
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateResOpType(
+    IN gcSHADER Shader,
+    IN gcSL_OPCODE_RES_TYPE OpCodeResType
+    );
+
+/*******************************************************************************
 **  gcSHADER_AddRoundingMode
 **
 **  Add rounding mode to a gcSHADER object.
@@ -5042,7 +5091,7 @@ gcSHADER_EndInst(
 **        gcSL_TYPE Type
 **            Type of the source operand.
 **
-**        gctUINT16 SourceIndex
+**        gctUINT32 SourceIndex
 **            Index of the source operand.
 **
 **        gctUINT8 Swizzle
@@ -5059,7 +5108,7 @@ gceSTATUS
 gcSHADER_AddSource(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision
@@ -5079,7 +5128,7 @@ gcSHADER_AddSource(
 **        gcSL_TYPE Type
 **            Type of the source operand.
 **
-**        gctUINT16 SourceIndex
+**        gctUINT32 SourceIndex
 **            Index of the source operand.
 **
 **        gctUINT8 Swizzle
@@ -5102,7 +5151,7 @@ gceSTATUS
 gcSHADER_AddSourceIndexed(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -5123,7 +5172,7 @@ gcSHADER_AddSourceIndexed(
 **      gcSL_TYPE Type
 **          Type of the source operand.
 **
-**      gctUINT16 SourceIndex
+**      gctUINT32 SourceIndex
 **          Index of the source operand.
 **
 **      gctUINT8 Swizzle
@@ -5145,7 +5194,7 @@ gceSTATUS
 gcSHADER_AddSourceIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -6743,7 +6792,7 @@ gceSTATUS
 gcFUNCTION_AddArgument(
     IN gcFUNCTION Function,
     IN gctUINT16 VariableIndex,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctUINT8 Enable,
     IN gctUINT8 Qualifier,
     IN gctUINT8 Precision,
@@ -6753,8 +6802,8 @@ gcFUNCTION_AddArgument(
 gceSTATUS
 gcFUNCTION_GetArgument(
     IN gcFUNCTION Function,
-    IN gctUINT16 Index,
-    OUT gctUINT16_PTR Temp,
+    IN gctUINT32 Index,
+    OUT gctUINT32_PTR Temp,
     OUT gctUINT8_PTR Enable,
     OUT gctUINT8_PTR Swizzle
     );
@@ -6865,7 +6914,7 @@ gceSTATUS
 gcKERNEL_FUNCTION_AddArgument(
     IN gcKERNEL_FUNCTION Function,
     IN gctUINT16 VariableIndex,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctUINT8 Enable,
     IN gctUINT8 Qualifier
     );
@@ -6873,8 +6922,8 @@ gcKERNEL_FUNCTION_AddArgument(
 gceSTATUS
 gcKERNEL_FUNCTION_GetArgument(
     IN gcKERNEL_FUNCTION Function,
-    IN gctUINT16 Index,
-    OUT gctUINT16_PTR Temp,
+    IN gctUINT32 Index,
+    OUT gctUINT32_PTR Temp,
     OUT gctUINT8_PTR Enable,
     OUT gctUINT8_PTR Swizzle
     );
@@ -7076,26 +7125,15 @@ gcSetUniformShaderKind(
 **
 **    OUTPUT:
 **
-**        gctUINT32 * StateBufferSize
-**            Pointer to a variable receicing the number of bytes in the buffer
-**            returned in 'StateBuffer'.
-**
-**        gctPOINTER * StateBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receicing the program state.
 */
 gceSTATUS
 gcLinkShaders(
     IN gcSHADER VertexShader,
     IN gcSHADER FragmentShader,
     IN gceSHADER_FLAGS Flags,
-    OUT gctUINT32 * StateBufferSize,
-    OUT gctPOINTER * StateBuffer,
-    OUT gcsHINT_PTR * Hints
+    IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
 /*******************************************************************************
@@ -7126,17 +7164,8 @@ gcLinkShaders(
 **
 **    OUTPUT:
 **
-**        gctSIZE_T * StateBufferSize
-**            Pointer to a variable receiving the number of bytes in the buffer
-**            returned in 'StateBuffer'.
-**
-**        gctPOINTER * StateBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receiving the program state.
 */
 gceSTATUS
 gcLinkProgram(
@@ -7144,9 +7173,7 @@ gcLinkProgram(
     IN gcSHADER *           ShaderArray,
     IN gceSHADER_FLAGS      Flags,
     IN gceSHADER_SUB_FLAGS  *SubFlags,
-    OUT gctUINT32 *         StateBufferSize,
-    OUT gctPOINTER *        StateBuffer,
-    OUT gcsHINT_PTR *       Hints
+    IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
 
@@ -7167,25 +7194,14 @@ gcLinkProgram(
 **
 **    OUTPUT:
 **
-**        gctSIZE_T * StateBufferSize
-**            Pointer to a variable receiving the number of bytes in the buffer
-**            returned in 'StateBuffer'.
-**
-**        gctPOINTER * StateBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receiving the program state.
 */
 gceSTATUS
 gcLinkProgramPipeline(
     IN gctINT               ShaderCount,
     IN gcSHADER *           ShaderArray,
-    OUT gctUINT32 *         StateBufferSize,
-    OUT gctPOINTER *        StateBuffer,
-    OUT gcsHINT_PTR *       Hints
+    IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
 /*******************************************************************************
@@ -7332,6 +7348,7 @@ gcCreateReadImageDirective(
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
     IN gctBOOL                  PatchUnnormReadImage,
+    IN gctBOOL                  imageLoad,
     OUT gcPatchDirective  **    PatchDirectivePtr
     );
 
@@ -7343,6 +7360,7 @@ gcCreateWriteImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
+    IN gctBOOL                  imageStore,
     OUT gcPatchDirective  **    PatchDirectivePtr
     );
 
@@ -7405,7 +7423,7 @@ gcDestroyPatchDirective(
 
 gceSTATUS
 gcLoadCLPatchLibrary(
-    void
+    IN gcSHADER   Shader
     );
 
 gceSTATUS
@@ -7474,14 +7492,8 @@ gceSTATUS gcSHADER_DynamicPatch(
 **        gcSHADER FragmentShader
 **            Pointer to fragment shader object.
 **
-**        gctUINT32 ProgramBufferSize
-**            Number of bytes in 'ProgramBuffer'.
-**
-**        gctPOINTER ProgramBuffer
-**            Pointer to buffer containing the program states.
-**
-**        gcsHINT_PTR Hints
-**            Pointer to HINTS structure for program states.
+**        gcsPROGRAM_STATE ProgramState
+**            Pointer to program state.
 **
 **    OUTPUT:
 **
@@ -7495,9 +7507,7 @@ gceSTATUS
 gcSaveProgram(
     IN gcSHADER VertexShader,
     IN gcSHADER FragmentShader,
-    IN gctUINT32 ProgramBufferSize,
-    IN gctPOINTER ProgramBuffer,
-    IN gcsHINT_PTR Hints,
+    IN gcsPROGRAM_STATE ProgramState,
     OUT gctPOINTER * Binary,
     OUT gctUINT32 * BinarySize
     );
@@ -7524,17 +7534,8 @@ gcSaveProgram(
 **        gcSHADER FragmentShader
 **            Pointer to a fragment shader object.
 **
-**        gctUINT32 * ProgramBufferSize
-**            Pointer to a variable receicing the number of bytes in the buffer
-**            returned in 'ProgramBuffer'.
-**
-**        gctPOINTER * ProgramBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receicing the program state.
 */
 gceSTATUS
 gcLoadProgram(
@@ -7542,9 +7543,7 @@ gcLoadProgram(
     IN gctUINT32 BinarySize,
     OUT gcSHADER VertexShader,
     OUT gcSHADER FragmentShader,
-    OUT gctUINT32 * ProgramBufferSize,
-    OUT gctPOINTER * ProgramBuffer,
-    OUT gcsHINT_PTR * Hints
+    IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
 /*******************************************************************************
@@ -7558,14 +7557,8 @@ gcLoadProgram(
 **        gcSHADER KernelShader
 **            Pointer to vertex shader object.
 **
-**        gctUINT32 ProgramBufferSize
-**            Number of bytes in 'ProgramBuffer'.
-**
-**        gctPOINTER ProgramBuffer
-**            Pointer to buffer containing the program states.
-**
-**        gcsHINT_PTR Hints
-**            Pointer to HINTS structure for program states.
+**        gcsPROGRAM_STATE ProgramState
+**            Program state.
 **
 **    OUTPUT:
 **
@@ -7578,9 +7571,7 @@ gcLoadProgram(
 gceSTATUS
 gcSaveCLSingleKernel(
     IN gcSHADER KernelShader,
-    IN gctUINT32 ProgramBufferSize,
-    IN gctPOINTER ProgramBuffer,
-    IN gcsHINT_PTR Hints,
+    IN gcsPROGRAM_STATE ProgramState,
     OUT gctPOINTER * Binary,
     OUT gctUINT32 * BinarySize
     );
@@ -7604,26 +7595,15 @@ gcSaveCLSingleKernel(
 **        gcSHADER KernelShader
 **            Pointer to a vertex shader object.
 **
-**        gctUINT32 * ProgramBufferSize
-**            Pointer to a variable receicing the number of bytes in the buffer
-**            returned in 'ProgramBuffer'.
-**
-**        gctPOINTER * ProgramBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receicing the program state.
 */
 gceSTATUS
 gcLoadCLSingleKernel(
     IN gctPOINTER Binary,
     IN gctUINT32 BinarySize,
     OUT gcSHADER KernelShader,
-    OUT gctUINT32 * ProgramBufferSize,
-    OUT gctPOINTER * ProgramBuffer,
-    OUT gcsHINT_PTR * Hints
+    IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
 /*******************************************************************************
@@ -7741,25 +7721,14 @@ gcCLCompileProgram(
 **
 **    OUTPUT:
 **
-**        gctUINT32 * StateBufferSize
-**            Pointer to a variable receiving the number of bytes in the buffer
-**            returned in 'StateBuffer'.
-**
-**        gctPOINTER * StateBuffer
-**            Pointer to a variable receiving a buffer pointer that contains the
-**            states required to download the shaders into the hardware.
-**
-**        gcsHINT_PTR * Hints
-**            Pointer to a variable receiving a gcsHINT structure pointer that
-**            contains information required when loading the shader states.
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receiving the program states.
 */
 gceSTATUS
 gcLinkKernel(
     IN gcSHADER Kernel,
     IN gceSHADER_FLAGS Flags,
-    OUT gctUINT32 * StateBufferSize,
-    OUT gctPOINTER * StateBuffer,
-    OUT gcsHINT_PTR * Hints
+    OUT gcsPROGRAM_STATE *ProgramState
     );
 
 void
@@ -8064,6 +8033,11 @@ gcSL_ConvertSwizzle2Enable(
     IN gcSL_SWIZZLE Y,
     IN gcSL_SWIZZLE Z,
     IN gcSL_SWIZZLE W
+    );
+
+gceSTATUS
+gcFreeProgramState(
+    IN gcsPROGRAM_STATE ProgramState
     );
 
 /* dump instruction to stdout */

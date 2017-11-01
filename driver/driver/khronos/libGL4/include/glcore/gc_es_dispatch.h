@@ -13,8 +13,8 @@
 
 #ifndef __gc_es_dispatch_h__
 #define __gc_es_dispatch_h__
-#include "gl4.h"
 
+typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
 typedef GLvoid (GLAPIENTRY *__T_NewList)(__GLcontext *,  GLuint, GLenum);
 typedef GLvoid (GLAPIENTRY *__T_EndList)(__GLcontext *);
 typedef GLvoid (GLAPIENTRY *__T_CallList)(__GLcontext *,  GLuint);
@@ -1049,7 +1049,8 @@ typedef  GLvoid  (GLAPIENTRY *__T_VertexAttribI4ui)(__GLcontext *gc, GLuint inde
 typedef  GLvoid  (GLAPIENTRY *__T_VertexAttribI4iv)(__GLcontext *gc, GLuint index, const GLint* v);
 typedef  GLvoid  (GLAPIENTRY *__T_VertexAttribI4uiv)(__GLcontext *gc, GLuint index, const GLuint* v);
 typedef  GLvoid  (GLAPIENTRY *__T_GetUniformuiv)(__GLcontext *gc, GLuint program, GLint location, GLuint* params);
-typedef  GLint   (GLAPIENTRY *__T_GetFragDataLocation)(__GLcontext *gc, GLuint program, const GLchar *name);
+typedef  GLint    (GLAPIENTRY *__T_GetFragDataLocation)(__GLcontext *gc, GLuint program, const GLchar *name);
+typedef  GLvoid  (GLAPIENTRY *__T_BindFragDataLocation) (__GLcontext *gc, GLuint program, GLuint colorNumber, const GLchar *name);
 typedef  GLvoid  (GLAPIENTRY *__T_Uniform1ui)(__GLcontext *gc, GLint location, GLuint v0);
 typedef  GLvoid  (GLAPIENTRY *__T_Uniform2ui)(__GLcontext *gc, GLint location, GLuint v0, GLuint v1);
 typedef  GLvoid  (GLAPIENTRY *__T_Uniform3ui)(__GLcontext *gc, GLint location, GLuint v0, GLuint v1, GLuint v2);
@@ -1298,8 +1299,60 @@ typedef  GLvoid (GLAPIENTRY *__T_GetFramebufferAttachmentParameterivEXT)(__GLcon
 typedef  GLvoid (GLAPIENTRY *__T_GenerateMipmapEXT)(__GLcontext *gc,  GLenum target);
 typedef  GLvoid (GLAPIENTRY *__T_BlitFramebufferEXT)(__GLcontext *gc,  GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
 
+/* OpenGL 3.0 */
+typedef GLvoid (GLAPIENTRY *__T_ClampColor)(__GLcontext *, GLenum target, GLenum clamp);
+typedef GLvoid (GLAPIENTRY *__T_BeginConditionalRender) (__GLcontext *,GLuint id, GLenum mode);
+typedef GLvoid (GLAPIENTRY *__T_EndConditionalRender) (__GLcontext *);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI1i)(__GLcontext *, GLuint index, GLint x);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI2i)(__GLcontext *, GLuint index, GLint x, GLint y);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI3i)(__GLcontext *, GLuint index, GLint x, GLint y, GLint z);
 
-typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI1ui)(__GLcontext *, GLuint index, GLuint x);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI2ui)(__GLcontext *, GLuint index, GLuint x, GLuint y);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI3ui)(__GLcontext *, GLuint index, GLuint x, GLuint y, GLuint z);
+
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI1iv)(__GLcontext *, GLuint index, const GLint *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI2iv)(__GLcontext *, GLuint index, const GLint *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI3iv)(__GLcontext *, GLuint index, const GLint *v);
+
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI1uiv)(__GLcontext *, GLuint index, const GLuint *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI2uiv)(__GLcontext *, GLuint index, const GLuint *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI3uiv)(__GLcontext *, GLuint index, const GLuint *v);
+
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI4bv)(__GLcontext *, GLuint index, const GLbyte *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI4sv)(__GLcontext *, GLuint index, const GLshort *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI4ubv)(__GLcontext *, GLuint index, const GLubyte *v);
+typedef GLvoid (GLAPIENTRY *__T_VertexAttribI4usv)(__GLcontext *, GLuint index, const GLushort *v);
+
+typedef  GLvoid (GLAPIENTRY *__T_FramebufferTexture1D)(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+typedef  GLvoid (GLAPIENTRY *__T_FramebufferTexture3D)(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);
+
+/* OpenGL 3.1 */
+typedef GLvoid (GLAPIENTRY *__T_PrimitiveRestartIndex) (__GLcontext *, GLuint index);
+typedef GLvoid (GLAPIENTRY *__T_GetActiveUniformName) (__GLcontext *, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName);
+
+/* OpenGL 4.0 */
+typedef  GLvoid  (GLAPIENTRY *__T_GetUniformdv)(__GLcontext * gc, GLuint program, GLint location, GLdouble* params);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform1d)(__GLcontext *gc, GLint location, GLdouble v0);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform2d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform3d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform4d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform1dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform2dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform3dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_Uniform4dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix2x3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix3x2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix2x4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix4x2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix3x4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix4x3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+
+
+
 
 #define __GLES_API_ENTRIES(esApiMacro) \
     esApiMacro(NewList), \
@@ -1723,6 +1776,8 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(CompressedTexSubImage1D), \
     esApiMacro(GetCompressedTexImage), \
     esApiMacro(BlendFuncSeparate), \
+    esApiMacro(MultiDrawArrays), \
+    esApiMacro(MultiDrawElements), \
     esApiMacro(FogCoordf), \
     esApiMacro(FogCoordfv), \
     esApiMacro(FogCoordd), \
@@ -1934,6 +1989,7 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(VertexAttribI4uiv), \
     esApiMacro(GetUniformuiv), \
     esApiMacro(GetFragDataLocation), \
+    esApiMacro(BindFragDataLocation), \
     esApiMacro(Uniform1ui), \
     esApiMacro(Uniform2ui), \
     esApiMacro(Uniform3ui), \
@@ -2144,6 +2200,47 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(GetFramebufferAttachmentParameterivEXT), \
     esApiMacro(GenerateMipmapEXT), \
     esApiMacro(BlitFramebufferEXT), \
+    esApiMacro(ClampColor), \
+    esApiMacro(BeginConditionalRender), \
+    esApiMacro(EndConditionalRender), \
+    esApiMacro(VertexAttribI1i), \
+    esApiMacro(VertexAttribI2i), \
+    esApiMacro(VertexAttribI3i), \
+    esApiMacro(VertexAttribI1ui), \
+    esApiMacro(VertexAttribI2ui), \
+    esApiMacro(VertexAttribI3ui), \
+    esApiMacro(VertexAttribI1iv), \
+    esApiMacro(VertexAttribI2iv), \
+    esApiMacro(VertexAttribI3iv), \
+    esApiMacro(VertexAttribI1uiv), \
+    esApiMacro(VertexAttribI2uiv), \
+    esApiMacro(VertexAttribI3uiv), \
+    esApiMacro(VertexAttribI4bv), \
+    esApiMacro(VertexAttribI4sv), \
+    esApiMacro(VertexAttribI4ubv), \
+    esApiMacro(VertexAttribI4usv), \
+    esApiMacro(FramebufferTexture1D), \
+    esApiMacro(FramebufferTexture3D), \
+    esApiMacro(PrimitiveRestartIndex), \
+    esApiMacro(GetActiveUniformName), \
+    esApiMacro(GetUniformdv), \
+    esApiMacro(Uniform1d), \
+    esApiMacro(Uniform2d), \
+    esApiMacro(Uniform3d), \
+    esApiMacro(Uniform4d), \
+    esApiMacro(Uniform1dv), \
+    esApiMacro(Uniform2dv), \
+    esApiMacro(Uniform3dv), \
+    esApiMacro(Uniform4dv), \
+    esApiMacro(UniformMatrix2dv), \
+    esApiMacro(UniformMatrix3dv), \
+    esApiMacro(UniformMatrix4dv), \
+    esApiMacro(UniformMatrix2x3dv), \
+    esApiMacro(UniformMatrix3x2dv), \
+    esApiMacro(UniformMatrix2x4dv), \
+    esApiMacro(UniformMatrix4x2dv), \
+    esApiMacro(UniformMatrix3x4dv), \
+    esApiMacro(UniformMatrix4x3dv), \
 
 
 
@@ -2575,6 +2672,8 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(CompressedTexSubImage1D), \
     esApiMacro(GetCompressedTexImage), \
     esApiMacro(BlendFuncSeparate), \
+    esApiMacro(MultiDrawArrays), \
+    esApiMacro(MultiDrawElements), \
     esApiMacro(FogCoordf), \
     esApiMacro(FogCoordfv), \
     esApiMacro(FogCoordd), \
@@ -2786,6 +2885,7 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(VertexAttribI4uiv), \
     esApiMacro(GetUniformuiv), \
     esApiMacro(GetFragDataLocation), \
+    esApiMacro(BindFragDataLocation), \
     esApiMacro(Uniform1ui), \
     esApiMacro(Uniform2ui), \
     esApiMacro(Uniform3ui), \
@@ -2996,7 +3096,47 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(GetFramebufferAttachmentParameterivEXT), \
     esApiMacro(GenerateMipmapEXT), \
     esApiMacro(BlitFramebufferEXT), \
-
+    esApiMacro(ClampColor), \
+    esApiMacro(BeginConditionalRender), \
+    esApiMacro(EndConditionalRender), \
+    esApiMacro(VertexAttribI1i), \
+    esApiMacro(VertexAttribI2i), \
+    esApiMacro(VertexAttribI3i), \
+    esApiMacro(VertexAttribI1ui), \
+    esApiMacro(VertexAttribI2ui), \
+    esApiMacro(VertexAttribI3ui), \
+    esApiMacro(VertexAttribI1iv), \
+    esApiMacro(VertexAttribI2iv), \
+    esApiMacro(VertexAttribI3iv), \
+    esApiMacro(VertexAttribI1uiv), \
+    esApiMacro(VertexAttribI2uiv), \
+    esApiMacro(VertexAttribI3uiv), \
+    esApiMacro(VertexAttribI4bv), \
+    esApiMacro(VertexAttribI4sv), \
+    esApiMacro(VertexAttribI4ubv), \
+    esApiMacro(VertexAttribI4usv), \
+    esApiMacro(FramebufferTexture1D), \
+    esApiMacro(FramebufferTexture3D), \
+    esApiMacro(PrimitiveRestartIndex), \
+    esApiMacro(GetActiveUniformName), \
+    esApiMacro(GetUniformdv), \
+    esApiMacro(Uniform1d), \
+    esApiMacro(Uniform2d), \
+    esApiMacro(Uniform3d), \
+    esApiMacro(Uniform4d), \
+    esApiMacro(Uniform1dv), \
+    esApiMacro(Uniform2dv), \
+    esApiMacro(Uniform3dv), \
+    esApiMacro(Uniform4dv), \
+    esApiMacro(UniformMatrix2dv), \
+    esApiMacro(UniformMatrix3dv), \
+    esApiMacro(UniformMatrix4dv), \
+    esApiMacro(UniformMatrix2x3dv), \
+    esApiMacro(UniformMatrix3x2dv), \
+    esApiMacro(UniformMatrix2x4dv), \
+    esApiMacro(UniformMatrix4x2dv), \
+    esApiMacro(UniformMatrix3x4dv), \
+    esApiMacro(UniformMatrix4x3dv), \
 
 
 /* Enum table for __glop_FuncName (Ex: __glop_NewList)
@@ -3429,6 +3569,8 @@ enum {
     GLvoid         (GLAPIENTRY *CompressedTexSubImage1D)(_gcArgComma_ GLenum, GLint, GLint, GLsizei, GLenum, GLsizei, const GLvoid *); \
     GLvoid         (GLAPIENTRY *GetCompressedTexImage)(_gcArgComma_ GLenum, GLint, GLvoid *); \
     GLvoid         (GLAPIENTRY *BlendFuncSeparate) (_gcArgComma_ GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha); \
+    GLvoid         (GLAPIENTRY *MultiDrawArrays) (_gcArgComma_ GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount); \
+    GLvoid         (GLAPIENTRY *MultiDrawElements) (_gcArgComma_ GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount); \
     GLvoid         (GLAPIENTRY *FogCoordf)(_gcArgComma_  GLfloat); \
     GLvoid         (GLAPIENTRY *FogCoordfv)(_gcArgComma_  const GLfloat *); \
     GLvoid         (GLAPIENTRY *FogCoordd)(_gcArgComma_ GLdouble); \
@@ -3638,7 +3780,8 @@ enum {
     GLvoid         (GLAPIENTRY *VertexAttribI4iv) (_gcArgComma_ GLuint index, const GLint* v); \
     GLvoid         (GLAPIENTRY *VertexAttribI4uiv) (_gcArgComma_ GLuint index, const GLuint* v); \
     GLvoid         (GLAPIENTRY *GetUniformuiv) (_gcArgComma_ GLuint program, GLint location, GLuint* params); \
-    GLint          (GLAPIENTRY *GetFragDataLocation) (_gcArgComma_ GLuint program, const GLchar *name _retLocation_); \
+    GLint           (GLAPIENTRY *GetFragDataLocation) (_gcArgComma_ GLuint program, const GLchar *name _retLocation_); \
+    GLvoid         (GLAPIENTRY *BindFragDataLocation) (_gcArgComma_ GLuint program, GLuint colorNumber, const GLchar *name); \
     GLvoid         (GLAPIENTRY *Uniform1ui) (_gcArgComma_ GLint location, GLuint v0); \
     GLvoid         (GLAPIENTRY *Uniform2ui) (_gcArgComma_ GLint location, GLuint v0, GLuint v1); \
     GLvoid         (GLAPIENTRY *Uniform3ui) (_gcArgComma_ GLint location, GLuint v0, GLuint v1, GLuint v2); \
@@ -3775,7 +3918,7 @@ enum {
     GLvoid         (GLAPIENTRY *GetObjectLabel) (_gcArgComma_ GLenum identifier, GLuint name, GLsizei bufSize, GLsizei *length, GLchar *label); \
     GLvoid         (GLAPIENTRY *ObjectPtrLabel) (_gcArgComma_ const GLvoid* ptr, GLsizei length, const GLchar *label); \
     GLvoid         (GLAPIENTRY *GetObjectPtrLabel) (_gcArgComma_ const GLvoid* ptr, GLsizei bufSize, GLsizei *length, GLchar *label); \
-    GLenum         (GLAPIENTRY *GetGraphicsResetStatus) (_gcArgOnly_); \
+    GLenum       (GLAPIENTRY *GetGraphicsResetStatus) (_gcArgOnly_); \
     GLvoid         (GLAPIENTRY *ReadnPixels) (_gcArgComma_ GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, GLvoid *data); \
     GLvoid         (GLAPIENTRY *GetnUniformfv) (_gcArgComma_ GLuint program, GLint location, GLsizei bufSize, GLfloat *params); \
     GLvoid         (GLAPIENTRY *GetnUniformiv) (_gcArgComma_ GLuint program, GLint location, GLsizei bufSize, GLint *params);   \
@@ -3787,7 +3930,7 @@ enum {
     GLvoid         (GLAPIENTRY  *ColorMaski) (_gcArgComma_ GLuint buf, GLboolean r, GLboolean g, GLboolean b, GLboolean a); \
     GLvoid         (GLAPIENTRY  *Enablei) (_gcArgComma_ GLenum target, GLuint index);  \
     GLvoid         (GLAPIENTRY  *Disablei) (_gcArgComma_ GLenum target, GLuint index); \
-    GLboolean      (GLAPIENTRY  *IsEnabledi) (_gcArgComma_ GLenum target, GLuint index); \
+    GLboolean    (GLAPIENTRY  *IsEnabledi) (_gcArgComma_ GLenum target, GLuint index); \
     GLvoid         (GLAPIENTRY *TexParameterIiv) (_gcArgComma_ GLenum target, GLenum pname, const GLint *params);   \
     GLvoid         (GLAPIENTRY *TexParameterIuiv) (_gcArgComma_ GLenum target, GLenum pname, const GLuint *params); \
     GLvoid         (GLAPIENTRY *GetTexParameterIiv) (_gcArgComma_ GLenum target, GLenum pname, GLint *params);      \
@@ -3834,28 +3977,68 @@ enum {
     GLvoid         (GLAPIENTRY *GetInfoLogARB) (_gcArgComma_ UINT obj, GLsizei maxLength, GLsizei *length, char *infoLog);\
     GLvoid         (GLAPIENTRY *GetObjectParameterivARB) (_gcArgComma_ UINT obj, GLenum pname, GLint *params);\
     GLvoid         (GLAPIENTRY *ClampColorARB)(_gcArgComma_ GLenum target, GLenum clamp);\
-    GLboolean (GLAPIENTRY *IsRenderbufferEXT)( _gcArgComma_ GLuint renderbuffer); \
-    GLvoid (GLAPIENTRY *BindRenderbufferEXT)(_gcArgComma_ GLenum target, GLuint renderbuffer); \
-    GLvoid (GLAPIENTRY *DeleteRenderbuffersEXT)(_gcArgComma_ GLsizei n, const GLuint *renderbuffers); \
-    GLvoid (GLAPIENTRY *GenRenderbuffersEXT)(_gcArgComma_ GLsizei n, GLuint *renderbuffers); \
-    GLvoid (GLAPIENTRY *RenderbufferStorageEXT)(_gcArgComma_ GLenum target, GLenum internalformat, GLsizei width, GLsizei height); \
-    GLvoid (GLAPIENTRY *GetRenderbufferParameterivEXT)(_gcArgComma_ GLenum target, GLenum pname, GLint* params); \
-    GLboolean (GLAPIENTRY *IsFramebufferEXT)(_gcArgComma_ GLuint framebuffer); \
-    GLvoid (GLAPIENTRY *BindFramebufferEXT)(_gcArgComma_ GLenum target, GLuint framebuffer); \
-    GLvoid (GLAPIENTRY *DeleteFramebuffersEXT)(_gcArgComma_ GLsizei n, const GLuint *framebuffers); \
-    GLvoid (GLAPIENTRY *GenFramebuffersEXT)(_gcArgComma_ GLsizei n, GLuint *framebuffers); \
-    GLenum (GLAPIENTRY *CheckFramebufferStatusEXT)(_gcArgComma_ GLenum target); \
-    GLvoid (GLAPIENTRY *FramebufferTexture1DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level); \
-    GLvoid (GLAPIENTRY *FramebufferTexture2DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level); \
-    GLvoid (GLAPIENTRY *FramebufferTexture3DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset); \
-    GLvoid (GLAPIENTRY *FramebufferRenderbufferEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer); \
-    GLvoid (GLAPIENTRY *GetFramebufferAttachmentParameterivEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum pname, GLint *params); \
-    GLvoid (GLAPIENTRY *GenerateMipmapEXT)(_gcArgComma_ GLenum target); \
-    GLvoid (GLAPIENTRY *BlitFramebufferEXT)(_gcArgComma_ GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, \
+    GLboolean    (GLAPIENTRY *IsRenderbufferEXT)( _gcArgComma_ GLuint renderbuffer); \
+    GLvoid         (GLAPIENTRY *BindRenderbufferEXT)(_gcArgComma_ GLenum target, GLuint renderbuffer); \
+    GLvoid         (GLAPIENTRY *DeleteRenderbuffersEXT)(_gcArgComma_ GLsizei n, const GLuint *renderbuffers); \
+    GLvoid         (GLAPIENTRY *GenRenderbuffersEXT)(_gcArgComma_ GLsizei n, GLuint *renderbuffers); \
+    GLvoid         (GLAPIENTRY *RenderbufferStorageEXT)(_gcArgComma_ GLenum target, GLenum internalformat, GLsizei width, GLsizei height); \
+    GLvoid         (GLAPIENTRY *GetRenderbufferParameterivEXT)(_gcArgComma_ GLenum target, GLenum pname, GLint* params); \
+    GLboolean    (GLAPIENTRY *IsFramebufferEXT)(_gcArgComma_ GLuint framebuffer); \
+    GLvoid         (GLAPIENTRY *BindFramebufferEXT)(_gcArgComma_ GLenum target, GLuint framebuffer); \
+    GLvoid         (GLAPIENTRY *DeleteFramebuffersEXT)(_gcArgComma_ GLsizei n, const GLuint *framebuffers); \
+    GLvoid         (GLAPIENTRY *GenFramebuffersEXT)(_gcArgComma_ GLsizei n, GLuint *framebuffers); \
+    GLenum       (GLAPIENTRY *CheckFramebufferStatusEXT)(_gcArgComma_ GLenum target); \
+    GLvoid         (GLAPIENTRY *FramebufferTexture1DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level); \
+    GLvoid         (GLAPIENTRY *FramebufferTexture2DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level); \
+    GLvoid         (GLAPIENTRY *FramebufferTexture3DEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset); \
+    GLvoid         (GLAPIENTRY *FramebufferRenderbufferEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer); \
+    GLvoid         (GLAPIENTRY *GetFramebufferAttachmentParameterivEXT)(_gcArgComma_ GLenum target, GLenum attachment, GLenum pname, GLint *params); \
+    GLvoid         (GLAPIENTRY *GenerateMipmapEXT)(_gcArgComma_ GLenum target); \
+    GLvoid         (GLAPIENTRY *BlitFramebufferEXT)(_gcArgComma_ GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, \
                                           GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, \
                                           GLbitfield mask, GLenum filter); \
-
-
+    GLvoid         (GLAPIENTRY *ClampColor)(_gcArgComma_ GLenum target, GLenum clamp);\
+    GLvoid         (GLAPIENTRY *BeginConditionalRender) (_gcArgComma_ GLuint id, GLenum mode);\
+    GLvoid         (GLAPIENTRY *EndConditionalRender) (_gcArgOnly_);\
+    GLvoid         (GLAPIENTRY *VertexAttribI1i)(_gcArgComma_ GLuint index, GLint x);\
+    GLvoid         (GLAPIENTRY *VertexAttribI2i)(_gcArgComma_ GLuint index, GLint x, GLint y);\
+    GLvoid         (GLAPIENTRY *VertexAttribI3i)(_gcArgComma_ GLuint index, GLint x, GLint y, GLint z);\
+    GLvoid         (GLAPIENTRY *VertexAttribI1ui)(_gcArgComma_ GLuint index, GLuint x);\
+    GLvoid         (GLAPIENTRY *VertexAttribI2ui)(_gcArgComma_ GLuint index, GLuint x, GLuint y);\
+    GLvoid         (GLAPIENTRY *VertexAttribI3ui)(_gcArgComma_ GLuint index, GLuint x, GLuint y, GLuint z);\
+    GLvoid         (GLAPIENTRY *VertexAttribI1iv)(_gcArgComma_ GLuint index, const GLint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI2iv)(_gcArgComma_ GLuint index, const GLint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI3iv)(_gcArgComma_ GLuint index, const GLint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI1uiv)(_gcArgComma_ GLuint index, const GLuint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI2uiv)(_gcArgComma_ GLuint index, const GLuint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI3uiv)(_gcArgComma_ GLuint index, const GLuint *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI4bv)(_gcArgComma_ GLuint index, const GLbyte *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI4sv)(_gcArgComma_ GLuint index, const GLshort *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI4ubv)(_gcArgComma_ GLuint index, const GLubyte *v);\
+    GLvoid         (GLAPIENTRY *VertexAttribI4usv)(_gcArgComma_ GLuint index, const GLushort *v);\
+    GLvoid         (GLAPIENTRY *FramebufferTexture1D)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);\
+    GLvoid         (GLAPIENTRY *FramebufferTexture3D)(_gcArgComma_ GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);\
+    GLvoid         (GLAPIENTRY *PrimitiveRestartIndex) (_gcArgComma_ GLuint index);\
+    GLvoid         (GLAPIENTRY *GetActiveUniformName) (_gcArgComma_ GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName);\
+  /* OpenGL 4.0 */\
+    GLvoid         (GLAPIENTRY *GetUniformdv)(_gcArgComma_ GLuint program, GLint location, GLdouble *params);\
+    GLvoid         (GLAPIENTRY *Uniform1d)(_gcArgComma_ GLint location, GLdouble v0);\
+    GLvoid         (GLAPIENTRY *Uniform2d)(_gcArgComma_ GLint location, GLdouble v0, GLdouble v1);\
+    GLvoid         (GLAPIENTRY *Uniform3d)(_gcArgComma_ GLint location, GLdouble v0, GLdouble v1, GLdouble v2);\
+    GLvoid         (GLAPIENTRY *Uniform4d)(_gcArgComma_ GLint location, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3);\
+    GLvoid         (GLAPIENTRY *Uniform1dv)(_gcArgComma_ GLint location, GLsizei count, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *Uniform2dv)(_gcArgComma_ GLint location, GLsizei count, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *Uniform3dv)(_gcArgComma_ GLint location, GLsizei count, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *Uniform4dv)(_gcArgComma_ GLint location, GLsizei count, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix2dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix3dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix4dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix2x3dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix3x2dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix2x4dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix4x2dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix3x4dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
+    GLvoid         (GLAPIENTRY *UniformMatrix4x3dv)(_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);\
 
 
 

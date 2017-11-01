@@ -420,8 +420,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnFunction(vx_node node, const vx_refere
 
     gcoVX_Flush(gcvTRUE);
  #if defined(__linux__)
-       if (node->base.context->perfEnable)
-            printf("lrn execution time: %10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    if (node->base.context->options.enableCNNPerf)
+        printf("lrn execution time: %10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
     return status;
 }
@@ -828,7 +828,7 @@ static vx_float32 __Round(vx_float32 x)
 
 #endif
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("vxRectprocessInternalKernel      CPU time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
    return status;
@@ -1133,7 +1133,7 @@ static void ReSorting(short *rois,int *hist,int num,short* dst)
 
 #endif
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("vxResortingInternalKernel      CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
    return status;
@@ -1358,7 +1358,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxHoripoolFunction(vx_node node, const vx_r
     /* step3 : post-process */
     ucParameters[5] = (vx_reference)(output_array);
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("vxHoripoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -1755,7 +1755,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxVertpoolFunction(vx_node node, const vx_r
     ucParameters[0] = (vx_reference)(input_array);
  //   ucParameters[4] = (vx_reference)(output_array);
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("vxVertpoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -2162,7 +2162,7 @@ vx_status VX_CALLBACK vxRoipoolInternalKernel(vx_node node, const vx_reference *
 
     status = vxProcessGraph(graph);
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("vxRoipoolInternalKernel      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -2187,7 +2187,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxRoipoolFunction(vx_node node, const vx_re
 
     status = vxProcessGraph(graph);
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("vxRoipoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -2889,7 +2889,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleImageFunction(vx_node 
     ucParameters[8] = (vx_reference)(output_array);
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("ReshuffleImage      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -3135,7 +3135,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxFasterRcnnInterleaveFunction(vx_node node
     }
 #endif
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("interleave      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
     return status;
@@ -3385,7 +3385,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleDataFunction(vx_node n
     ucParameters[0] = (vx_reference)(input_array);
     ucParameters[6] = (vx_reference)(output_array);
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         gcoVX_Flush(gcvTRUE);
         printf("ReshuffleData      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
@@ -3632,7 +3632,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Function(vx_node node, const vx
     gcoVX_Flush(gcvTRUE);
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
     {
         printf("MaxPool3x3      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
     }

@@ -16,7 +16,6 @@
 **
 */
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 GLvoid __glUpdateHitFlag(__GLcontext *gc, __GLfloat z)
 {
@@ -106,11 +105,6 @@ GLvoid APIENTRY __glim_SelectBuffer(__GLcontext *gc, GLsizei bufferLength, GLuin
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_SelectBuffer", DT_GLsizei, bufferLength, DT_GLuint_ptr, buffer, DT_GLnull);
-#endif
-
     if (bufferLength < 0) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
@@ -136,11 +130,6 @@ GLvoid APIENTRY __glim_InitNames(__GLcontext *gc)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_InitNames", DT_GLnull);
-#endif
-
     /* flush the primitive buffer
     */
     __GL_VERTEX_BUFFER_FLUSH(gc);
@@ -164,11 +153,6 @@ GLvoid APIENTRY __glim_InitNames(__GLcontext *gc)
 GLvoid APIENTRY __glim_LoadName(__GLcontext *gc, GLuint name)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadName", DT_GLuint, name, DT_GLnull);
-#endif
 
     /* flush the primitive buffer
     */
@@ -196,11 +180,6 @@ GLvoid APIENTRY __glim_PopName(__GLcontext *gc)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PopName", DT_GLnull);
-#endif
-
     /* flush the primitive buffer
     */
     __GL_VERTEX_BUFFER_FLUSH(gc);
@@ -226,11 +205,6 @@ GLvoid APIENTRY __glim_PopName(__GLcontext *gc)
 GLvoid APIENTRY __glim_PushName(__GLcontext *gc, GLuint name)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PushName", DT_GLuint, name, DT_GLnull);
-#endif
 
     /* flush the primitive buffer
     */

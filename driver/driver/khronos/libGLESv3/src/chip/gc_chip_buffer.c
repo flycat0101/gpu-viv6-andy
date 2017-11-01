@@ -217,7 +217,7 @@ gcChipSetFmtMapAttribs(
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE;
     }
 
-    if (chipCtx->chipFeature.indirectRTT)
+    if (chipCtx->chipFeature.hwFeature.indirectRTT)
     {
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE;
     }
@@ -357,7 +357,7 @@ gcChipInitFormatMapInfo(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (chipCtx->chipFeature.supportMSAA2X)
+    if (chipCtx->chipFeature.hwFeature.supportMSAA2X)
     {
         chipCtx->numSamples = 2;
         chipCtx->samples[0] = 2;
@@ -376,7 +376,7 @@ gcChipInitFormatMapInfo(
     }
 
     if (chipCtx->patchId == gcvPATCH_GTFES30 &&
-        gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALF_FLOAT_PIPE) == gcvFALSE)
+        !chipCtx->chipFeature.hwFeature.hasHalfFloatPipe)
     {
         halfFloatTableSize = gcmCOUNTOF(patchHalfFloatFormats);
     }
@@ -396,7 +396,7 @@ gcChipInitFormatMapInfo(
         }
 
         /* count SRGB rendering */
-        if(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_SRGB_RT_SUPPORT) == gcvFALSE)
+        if(!chipCtx->chipFeature.hwFeature.hasSRGBRT)
         {
             if ((__glChipFmtMapInfo[i].requestFormat == gcvSURF_A8_SBGR8) &&
                 (__glChipFmtMapInfo[i].writeFormat != gcvSURF_A16B16G16R16F))
@@ -889,7 +889,7 @@ __glChipMapBufferRange(
 
         if ((access & GL_MAP_UNSYNCHRONIZED_BIT) == 0)
         {
-            __glChipFlush(gc);
+            __glChipFlush(gc, gcvFALSE);
 
             if (gcvSTATUS_FALSE == gcoBUFOBJ_IsFenceEnabled(bufInfo->bufObj))
             {

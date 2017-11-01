@@ -38,22 +38,13 @@ gceSTATUS gcQueryShaderCompilerHwCfg(
 **        gcoHAL Hal
 **            Pointer to a gcoHAL object.
 **
-**        gctSIZE_T StateBufferSize
-**            The number of bytes in the 'StateBuffer'.
-**
-**        gctPOINTER StateBuffer
-**            Pointer to the states that make up the shader program.
-**
-**        gcsHINT_PTR Hints
-**            Pointer to a gcsHINT structure that contains information required
-**            when loading the shader states.
+**        gcsPROGRAM_STATE ProgramState
+**            Program state.
 */
 gceSTATUS
 gcLoadShaders(
     IN gcoHAL Hal,
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
+    IN gcsPROGRAM_STATE ProgramState
     );
 
 /*******************************************************************************
@@ -89,12 +80,6 @@ gceSTATUS
 gcInvokeThreadWalker(
     IN gcoHARDWARE Hardware,
     IN gcsTHREAD_WALKER_INFO_PTR Info
-    );
-
-gceSTATUS
-gcSHADER_SpecialHint(
-    IN  gcePATCH_ID patchId,
-    OUT   gctUINT32_PTR hint
     );
 
 gceSTATUS

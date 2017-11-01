@@ -20,11 +20,6 @@
 #define _GC_OBJ_ZONE            gcvZONE_STREAM
 #define gcdDEBUG_REBUILD        0
 
-#define ENABLE_STREAM_CACHE_STATIC     0
-#define OPT_CACHE_USAGE                1
-#define DYNAMIC_STREAM_COUNT           0x10000
-#define DYNAMIC_CACHE_MULTIPLE_TIME    20
-#define DYNAMIC_CACHE_ALIGN            2 << 10
 /*******************************************************************************
 **  Stream Cache
 **
@@ -39,10 +34,12 @@
 **  the cache, the oldest buffer will be flushed and marked as free
 **  asynchronously by the hardware
 */
+
+#define DYNAMIC_STREAM_COUNT           0x10000
 #define gcdSTREAM_CACHE_SLOTS   2048
 #define gcdSTREAM_CACHE_HASH    8192
 #define gcdSTREAM_CACHE_SIZE    (1024 << 10)
-#define gcdSTREAM_CACHE_COUNT   5
+#define gcdSTREAM_CACHE_COUNT   2
 
 typedef enum _gceSTREAM_CACHE_TYPE
 {
@@ -60,41 +57,6 @@ typedef enum _gceSTREAM_CACHE_TYPE
 }
 gceSTREAM_CACHE_TYPE;
 
-typedef struct _gcsSTREAM_CACHE     gcsSTREAM_CACHE;
-typedef struct _gcsSTREAM_CACHE *   gcsSTREAM_CACHE_PTR;
-struct _gcsSTREAM_CACHE
-{
-    /* Type of the attributes. */
-    gceSTREAM_CACHE_TYPE        type;
-
-    /* Number of attributes in cache. */
-    gctUINT                     attributeCount;
-
-    /* Attributes. */
-    gcsVERTEXARRAY_ATTRIBUTE    attributes[gcdATTRIBUTE_COUNT];
-
-    /* Offset into the stream. */
-    gctUINT                     offset;
-
-    /* Stride of the stream. */
-    gctUINT                     stride;
-
-    /* Valid match countdown. */
-    gctUINT                     countdown;
-
-    /* CRC value of the data. */
-    gctUINT32                   crc32;
-
-    /* Hash key. */
-    gctUINT                     key;
-
-    /* Pointer to next hash entry. */
-    gcsSTREAM_CACHE_PTR         next;
-
-    /* Number of bytes. */
-    gctSIZE_T                   bytes;
-};
-
 typedef struct _gcsSTREAM_CACHE_BUFFER
 {
     /* Signal for cache. */
@@ -102,7 +64,6 @@ typedef struct _gcsSTREAM_CACHE_BUFFER
 
     /* Allocated video memory node. */
     gcsSURF_NODE                *dynamicNode;
-    gcsSURF_NODE                node;
 
     /* Size of the cache. */
     gctSIZE_T                   bytes;
@@ -127,23 +88,6 @@ typedef struct _gcsSTREAM_RANGE
     gctUINT32   end;
 }
 gcsSTREAM_RANGE;
-
-/* Dynamic buffer management. */
-typedef struct _gcsSTREAM_DYNAMIC
-{
-    gctUINT32                   physical;
-    gctUINT8_PTR                logical;
-    gctSIGNAL                   signal;
-
-    gctSIZE_T                   bytes;
-    gctSIZE_T                   free;
-
-    gctUINT32                   lastStart;
-    gctUINT32                   lastEnd;
-
-    struct _gcsSTREAM_DYNAMIC * next;
-}
-* gcsSTREAM_DYNAMIC_PTR;
 
 /**
  * gcoSTREAM object definition.
@@ -170,10 +114,6 @@ struct _gcoSTREAM
     gcoSTREAM                   rebuild;
     gcsSTREAM_RANGE             mapping[gcdATTRIBUTE_COUNT];
 
-    /* Dynamic management. */
-    gcsSTREAM_DYNAMIC_PTR       dynamic;
-    gcsSTREAM_DYNAMIC_PTR       dynamicHead;
-    gcsSTREAM_DYNAMIC_PTR       dynamicTail;
 
     /* New substream management. */
     gctUINT                     subStreamCount;
@@ -186,18 +126,9 @@ struct _gcoSTREAM
     gctUINT                     count;
 
     /***** Stream Cache *******************************************************/
-
-    /* Number of stream caches. */
-    gctUINT                     cacheCount;
-
-    /* Current stream cache. */
-    gctUINT                     cacheCurrent;
-    gctUINT                     cacheLastHit;
-    gctUINT                     cacheAllocatedCount;
-    gctBOOL                     dynamicAllocate;
-
     /* The cached streams. */
     gcsSTREAM_CACHE_BUFFER_PTR  cache;
+    gctUINT                     cacheCurrent;
 };
 
 /**
@@ -377,19 +308,15 @@ gcoSTREAM_Construct(
         stream->lastStart           = 0;
         stream->lastEnd             = 0;
         stream->rebuild             = gcvNULL;
-        stream->dynamic             = gcvNULL;
         gcoOS_ZeroMemory(stream->mapping, gcmSIZEOF(stream->mapping));
         stream->subStreamCount      = 0;
-        stream->cache               = gcvNULL;
-        stream->dynamicAllocate     = gcvFALSE;
-        stream->cacheAllocatedCount = 0;
-        stream->cacheCurrent        = 0;
-        stream->cacheCount          = 0;
 
         stream->merged              = gcvNULL;
         stream->dirty               = gcvFALSE;
         stream->reference           = gcvNULL;
         stream->count               = 0;
+        stream->cache               = gcvNULL;
+        stream->cacheCurrent        = 0;
 
         /* Return the object pointer. */
         *Stream = stream;
@@ -420,8 +347,7 @@ gcoSTREAM_Destroy(
     )
 {
     gceSTATUS status;
-    gcsSTREAM_DYNAMIC_PTR dynamic;
-    gctUINT i;
+    gctUINT i = 0;
 
     gcmHEADER_ARG("Stream=0x%x", Stream);
 
@@ -432,23 +358,6 @@ gcoSTREAM_Destroy(
     {
         /* Free the memory attached to the gcoSTREAM object. */
         gcmERR_BREAK(_FreeMemory(Stream));
-
-        /* Destroy the dynamic buffer. */
-        if (Stream->dynamic != gcvNULL)
-        {
-            Stream->dynamicTail->next = gcvNULL;
-
-            for (dynamic = Stream->dynamicHead;
-                 dynamic != gcvNULL;
-                 dynamic = dynamic->next)
-            {
-                gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL,
-                                                 dynamic->signal));
-            }
-
-            /* Free the allocation of the buffer structures. */
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Stream->dynamic));
-        }
 
         /* Check if there is a merged stream object. */
         if (Stream->merged != gcvNULL)
@@ -478,34 +387,21 @@ gcoSTREAM_Destroy(
         /* Destroy the stream cache. */
         if (Stream->cache != gcvNULL)
         {
-            /* Walk all cache buffers. */
-            for (i = 0; i < Stream->cacheCount; ++i)
+            for (i = 0; i < gcdSTREAM_CACHE_COUNT; ++i)
             {
-                if (!Stream->dynamicAllocate)
+                if (Stream->cache[i].dynamicNode)
                 {
                     /* Unlock the stream. */
-                    gcmVERIFY_OK(gcoHARDWARE_Unlock(&Stream->cache[i].node,
+                    gcmVERIFY_OK(gcoHARDWARE_Unlock(Stream->cache[i].dynamicNode,
                         gcvSURF_VERTEX));
 
                     /* Free the video memory. */
-                    gcmONERROR(gcsSURF_NODE_Destroy(&Stream->cache[i].node));
-                }
-                else
-                {
-                    if (Stream->cache[i].bytes != 0)
-                    {
-                        /* Unlock the stream. */
-                        gcmVERIFY_OK(gcoHARDWARE_Unlock(Stream->cache[i].dynamicNode,
-                            gcvSURF_VERTEX));
+                    gcmONERROR(gcsSURF_NODE_Destroy(Stream->cache[i].dynamicNode));
 
-                        /* Free the video memory. */
-                        gcmONERROR(gcsSURF_NODE_Destroy(Stream->cache[i].dynamicNode));
-
-                        gcmOS_SAFE_FREE(gcvNULL,Stream->cache[i].dynamicNode);
-                    }
+                    gcmOS_SAFE_FREE(gcvNULL,Stream->cache[i].dynamicNode);
                 }
 
-                /* Destroy the signal. */
+                 /* Destroy the signal. */
                 if (Stream->cache[i].signal != gcvNULL)
                 {
                     gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL,
@@ -551,7 +447,7 @@ gcoSTREAM_GetFence(
 gceSTATUS
 gcoSTREAM_WaitFence(
     IN gcoSTREAM Stream
-)
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("Stream=0x%x", Stream);
@@ -564,27 +460,6 @@ gcoSTREAM_WaitFence(
     gcmFOOTER();
     return status;
 }
-
-
-gceSTATUS
-gcoSTREAM_SetSharedLock(
-    IN gcoSTREAM Stream,
-    IN gctPOINTER SharedLock
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Stream=0x%x SharedLock=0x%x", Stream, SharedLock);
-
-    if (Stream)
-    {
-        status = gcsSURF_NODE_SetSharedLock(&Stream->node, SharedLock);
-    }
-
-    gcmFOOTER();
-    return status;
-}
-
-
 /**
  * Upload data to the memory attached to a gcoSTREAM object.
  * If there is no memory allocated or the allocated memory
@@ -614,7 +489,6 @@ gcoSTREAM_Upload(
     gceSTATUS status;
     gcePOOL pool;
     gctSIZE_T bytes;
-    gctUINT bytes32;
 
     gcmHEADER_ARG("Stream=0x%x Buffer=0x%x Offset=%lu Bytes=%lu Dynamic=%d",
               Stream, Buffer, Offset, Bytes, Dynamic);
@@ -622,15 +496,6 @@ gcoSTREAM_Upload(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
     gcmVERIFY_ARGUMENT(Bytes > 0);
-
-    gcmSAFECASTSIZET(bytes32, Bytes);
-
-    /* Not available in dynamic streams. */
-    if (Stream->dynamic != gcvNULL)
-    {
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_REQUEST);
-        return gcvSTATUS_INVALID_REQUEST;
-    }
 
     do
     {
@@ -777,8 +642,6 @@ gcoSTREAM_Upload(
     }
     while (gcvFALSE);
 
-    gcmPROFILE_GC(GLVERTEX_OBJECT_BYTES, bytes32);
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -878,27 +741,6 @@ gcoSTREAM_SetStride(
 }
 
 gceSTATUS
-gcoSTREAM_Size(
-    IN gcoSTREAM Stream,
-    OUT gctSIZE_T *Size
-    )
-{
-
-    gcmHEADER_ARG("Stream=0x%x", Stream);
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    if (Size != gcvNULL)
-    {
-        *Size = Stream->size;
-    }
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-}
-
-gceSTATUS
 gcoSTREAM_Node(
     IN gcoSTREAM Stream,
     OUT gcsSURF_NODE_PTR * Node
@@ -947,22 +789,12 @@ gcoSTREAM_Lock(
     if (Logical != gcvNULL)
     {
         /* Return logical address. */
-        *Logical = (Stream->dynamic != gcvNULL)
-                 ? Stream->dynamicHead->logical
-                 : Stream->node.logical;
+        *Logical = Stream->node.logical;
     }
 
     if (Physical != gcvNULL)
     {
-        /* Return physical address. */
-        if (Stream->dynamic != gcvNULL)
-        {
-            *Physical = Stream->dynamicHead->physical;
-        }
-        else
-        {
-            gcmGETHARDWAREADDRESS(Stream->node, *Physical);
-        }
+        gcmGETHARDWAREADDRESS(Stream->node, *Physical);
     }
 
     /* Success. */
@@ -1183,8 +1015,6 @@ gcoVERTEX_Construct(
         /* Return the gcoVERTEX object. */
         *Vertex = vertex;
 
-        gcmPROFILE_GC(GLVERTEX_OBJECT, 1);
-
         /* Success. */
         gcmFOOTER_ARG("*Vertex=0x%x", *Vertex);
         return gcvSTATUS_OK;
@@ -1214,8 +1044,6 @@ gcoVERTEX_Destroy(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Vertex, gcvOBJ_VERTEX);
-
-    gcmPROFILE_GC(GLVERTEX_OBJECT, -1);
 
     do
     {
@@ -2416,384 +2244,6 @@ gcoSTREAM_Flush(
 /*******************************************************************************
 *************************** DYNAMIC BUFFER MANAGEMENT **************************
 *******************************************************************************/
-
-/*******************************************************************************
-**
-**  gcoSTREAM_SetDynamic
-**
-**  Mark the gcoSTREAM object as dynamic.  A dynamic object will allocate the
-**  specified number of buffers and upload data after the previous upload.  This
-**  way there is no need for synchronizing the GPU or allocating new objects
-**  each time an stream buffer is required.
-**
-**  INPUT:
-**
-**      gcoSTREAM Stream
-**          Pointer to an gcoSTREAM object that needs to be converted to dynamic.
-**
-**      gctSIZE_T Bytes
-**          Number of bytes per buffer.
-**
-**      gctUINT Buffers
-**          Number of buffers.
-*/
-gceSTATUS
-gcoSTREAM_SetDynamic(
-    IN gcoSTREAM Stream,
-    IN gctSIZE_T Bytes,
-    IN gctUINT Buffers
-    )
-{
-    gceSTATUS status;
-    gctUINT i, bytes32;
-    gctSIZE_T bytes;
-    gcsSTREAM_DYNAMIC_PTR dynamic;
-    gctUINT32 physical;
-    gctUINT8_PTR logical;
-    gctPOINTER pointer = gcvNULL;
-
-    gcmHEADER_ARG("Stream=0x%x Bytes=%lu Buffers=%u", Stream, Bytes, Buffers);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    gcmVERIFY_ARGUMENT(Bytes > 0);
-    gcmVERIFY_ARGUMENT(Buffers > 0);
-
-    /* We can only do this once. */
-    if (Stream->dynamic != gcvNULL)
-    {
-        gcmFOOTER_ARG("Status=%d", gcvSTATUS_INVALID_REQUEST);
-        return gcvSTATUS_INVALID_REQUEST;
-    }
-
-    /* Free any allocated video memory. */
-    gcmONERROR(
-        _FreeMemory(Stream));
-
-    /* Allocate the video memory. */
-
-    bytes = gcmALIGN(Bytes, 64) * Buffers;
-
-    gcmONERROR(gcsSURF_NODE_Construct(
-        &Stream->node,
-        bytes,
-        64,
-        gcvSURF_VERTEX,
-        gcvALLOC_FLAG_NONE,
-        gcvPOOL_DEFAULT
-        ));
-
-    /* Initialize index. */
-    Stream->size               = bytes;
-
-    /* Lock the stream buffer. */
-    gcmONERROR(
-        gcoHARDWARE_Lock(&Stream->node,
-                         &physical,
-                         &pointer));
-
-    logical = pointer;
-
-    /* Allocate memory for the buffer structures. */
-    gcmONERROR(
-        gcoOS_Allocate(gcvNULL,
-                       Buffers * gcmSIZEOF(struct _gcsSTREAM_DYNAMIC),
-                       &pointer));
-
-    Stream->dynamic = pointer;
-
-    gcoOS_ZeroMemory(Stream->dynamic,
-                     Buffers * gcmSIZEOF(struct _gcsSTREAM_DYNAMIC));
-
-    bytes = Stream->size / Buffers;
-    gcmSAFECASTSIZET(bytes32, bytes);
-
-    /* Initialize all buffer structures. */
-    for (i = 0, dynamic = Stream->dynamic; i < Buffers; ++i, ++dynamic)
-    {
-        /* Create the signal. */
-        gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &dynamic->signal));
-
-        gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_SIGNAL,
-            "%s(%d): vertex buffer %d signal created 0x%08X",
-            __FUNCTION__, __LINE__,
-            i, dynamic->signal);
-
-        /* Mark buffer as usuable. */
-        gcmONERROR(gcoOS_Signal(gcvNULL, dynamic->signal, gcvTRUE));
-
-        /* Set buffer address. */
-        dynamic->physical = physical;
-        dynamic->logical  = logical;
-
-        /* Set buffer size. */
-        dynamic->bytes = bytes;
-        dynamic->free  = bytes;
-
-        /* Set usage. */
-        dynamic->lastStart = ~0U;
-        dynamic->lastEnd   = 0;
-
-        /* Link buffer in chain. */
-        dynamic->next = dynamic + 1;
-
-        /* Advance buffer addresses. */
-        physical += bytes32;
-        logical  += bytes;
-    }
-
-    /* Initialize chain of buffer structures. */
-    Stream->dynamicHead       = Stream->dynamic;
-    Stream->dynamicTail       = Stream->dynamic + Buffers - 1;
-    Stream->dynamicTail->next = gcvNULL;
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-    /***************************************************************************
-    **  ERROR HANDLER
-    */
-OnError:
-
-    /* Roll back allocation of buffer structures. */
-    if (Stream->dynamic != gcvNULL)
-    {
-        /* Roll back all signal creations. */
-        for (i = 0; i < Buffers; ++i)
-        {
-            if (Stream->dynamic[i].signal != gcvNULL)
-            {
-                gcmVERIFY_OK(
-                    gcoOS_DestroySignal(gcvNULL,
-                                        Stream->dynamic[i].signal));
-            }
-        }
-
-        /* Roll back the allocation of the buffer structures. */
-        gcmVERIFY_OK(
-            gcmOS_SAFE_FREE(gcvNULL, Stream->dynamic));
-
-        /* No buffers allocated. */
-        Stream->dynamic = gcvNULL;
-    }
-
-    /* Roll back memory allocation. */
-    gcmVERIFY_OK(
-        _FreeMemory(Stream));
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoSTREAM_UploadDynamic
-**
-**  Upload data into a dynamic stream buffer.
-**
-**  INPUT:
-**
-**      gcoSTREAM Stream
-**          Pointer to an gcoSTREAM object that has been configured as dynamic.
-**
-**      gctUINT VertexCount
-**          Number of vertices to upload.
-**
-**      gctUINT InfoCount
-**          Number of entries in the Info array.
-**
-**      gcsSTREAM_INFO_PTR Info
-**          Pointer to an array of InfoCount gcsSTREAM_INFO structures.
-**
-**      gcoVERTEX Vertex
-**          Pointer to a gcoVERTEX object that will be filled in.
-*/
-gceSTATUS
-gcoSTREAM_UploadDynamic(
-    IN gcoSTREAM Stream,
-    IN gctUINT VertexCount,
-    IN gctUINT InfoCount,
-    IN gcsSTREAM_INFO_PTR Info,
-    IN gcoVERTEX Vertex
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-    gcsSTREAM_DYNAMIC_PTR dynamic;
-    gctUINT bytes, size32;
-    gctUINT i, j;
-    gctUINT8_PTR ptr;
-    gctUINT stride = 0;
-    gctUINT8_PTR source[16];
-    gctUINT offset;
-    gctSIZE_T strideTmp = 0;
-
-    gcmHEADER_ARG("Stream=0x%x VertexCount=%d InfoCount=%u Info=0x%x Vertex=0x%x",
-              Stream, VertexCount, InfoCount, Info, Vertex);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    gcmVERIFY_ARGUMENT(VertexCount > 0);
-    gcmVERIFY_ARGUMENT((InfoCount > 0) && (InfoCount < 16));
-    gcmVERIFY_ARGUMENT(Info != gcvNULL);
-
-    /* This has to be a dynamic stream. */
-    if (Stream->dynamic == gcvNULL)
-    {
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_REQUEST);
-        return gcvSTATUS_INVALID_REQUEST;
-    }
-
-    /* Compute the stride and copy pointers. */
-    for (i = 0; i < InfoCount; ++i)
-    {
-        strideTmp += Info[i].size;
-
-        source[i] = (gctUINT8_PTR) Info[i].data;
-    }
-
-    gcmSAFECASTSIZET(stride, strideTmp);
-
-    /* Compute the number of bytes required. */
-    bytes = stride * VertexCount;
-
-    /* Shorthand the pointer. */
-    dynamic = Stream->dynamicHead;
-    gcmASSERT(dynamic != gcvNULL);
-    if (dynamic == gcvNULL)
-    {
-        gcmONERROR(gcvSTATUS_HEAP_CORRUPTED);
-    }
-
-    /* Make sure the dynamic stream buffer is large enough to hold this data. */
-    if (bytes > dynamic->bytes)
-    {
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_DATA_TOO_LARGE);
-        return gcvSTATUS_DATA_TOO_LARGE;
-    }
-
-    if (dynamic->free < bytes)
-    {
-        /* Not enough free bytes in this buffer, mark it busy... */
-        gcmONERROR(
-            gcoOS_Signal(gcvNULL,
-                         dynamic->signal,
-                         gcvFALSE));
-
-        /* ...schedule a signal event... */
-        iface.command            = gcvHAL_SIGNAL;
-        iface.engine             = gcvENGINE_RENDER;
-        iface.u.Signal.signal    = gcmPTR_TO_UINT64(dynamic->signal);
-        iface.u.Signal.auxSignal = 0;
-        iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
-        iface.u.Signal.fromWhere = gcvKERNEL_COMMAND;
-        gcmONERROR(
-            gcoHARDWARE_CallEvent(gcvNULL, &iface));
-
-        /* ...commit the buffer... */
-        gcmONERROR(
-            gcoHARDWARE_Commit(gcvNULL));
-
-        /* ...move it to the tail of the queue... */
-        gcmASSERT(Stream->dynamicTail != gcvNULL);
-        if (Stream->dynamicTail == gcvNULL)
-        {
-            gcmONERROR(gcvSTATUS_HEAP_CORRUPTED);
-        }
-        Stream->dynamicTail->next = dynamic;
-        Stream->dynamicTail       = dynamic;
-        Stream->dynamicHead       = dynamic->next;
-        gcmASSERT(Stream->dynamicHead != gcvNULL);
-
-        /* ...reinitialize the top of the queue... */
-        dynamic            = Stream->dynamicHead;
-        if (dynamic == gcvNULL)
-        {
-            gcmONERROR(gcvSTATUS_HEAP_CORRUPTED);
-        }
-        dynamic->free      = dynamic->bytes;
-        dynamic->lastStart = ~0U;
-        dynamic->lastEnd   = 0;
-
-        /* ...wait for the top of the queue to become available. */
-        gcmONERROR(
-            gcoOS_WaitSignal(gcvNULL,
-                             dynamic->signal,
-                             gcvINFINITE));
-    }
-
-    /* Set pointer. */
-    ptr = dynamic->logical + dynamic->lastEnd;
-
-    /* Copy the data into the buffer. */
-    for (i = 0; i < VertexCount; ++i)
-    {
-        for (j = 0; j < InfoCount; ++j)
-        {
-            gcoOS_MemCopy(ptr, source[j], Info[j].size);
-
-            source[j] += Info[j].stride;
-            ptr       += Info[j].size;
-        }
-    }
-
-    /* Flush the CPU cache. */
-    gcmONERROR(gcoSURF_NODE_Cache(&Stream->node,
-                                dynamic->logical + dynamic->lastEnd,
-                                bytes,
-                                gcvCACHE_CLEAN));
-
-    /* Update the pointers. */
-    dynamic->lastStart = dynamic->lastEnd;
-    dynamic->lastEnd   = dynamic->lastStart + bytes;
-    dynamic->free     -= bytes;
-    Stream->stride     = stride;
-
-    /* Dump the buffer. */
-    gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
-                   dynamic->physical,
-                   dynamic->logical,
-                   dynamic->lastStart,
-                   bytes);
-
-    gcmONERROR(
-        gcoVERTEX_Reset(Vertex));
-
-    /* Copy data into the gcoVERTEX object. */
-    for (i = 0, offset = dynamic->lastStart; i < InfoCount; ++i)
-    {
-        gcmONERROR(
-            gcoVERTEX_EnableAttribute(Vertex,
-                                      Info[i].index,
-                                      Info[i].format,
-                                      Info[i].normalized,
-                                      Info[i].components,
-                                      Stream,
-                                      offset,
-                                      stride));
-
-        gcmSAFECASTSIZET(size32, Info[i].size);
-        offset += size32;
-    }
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-    /***************************************************************************
-    **  ERROR HANDLER
-    */
-OnError:
-
-    /* Return the status.*/
-    gcmFOOTER();
-    return status;
-}
-
 gceSTATUS
 gcoSTREAM_SetAttribute(
     IN gcoSTREAM Stream,
@@ -3143,99 +2593,28 @@ gcoSTREAM_SetCache(
                    )
 {
     gceSTATUS status;
-    gctUINT i;
-    gcsSTREAM_CACHE_BUFFER_PTR cache;
+    gctPOINTER pointer = gcvNULL;
 
     gcmHEADER_ARG("Stream=0x%x", Stream);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
 
-    /* Not valid with dynamic streams. */
-    if (Stream->dynamic != gcvNULL)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-    }
-
     /* Only process if not yet cached. */
     if (Stream->cache == gcvNULL)
     {
-        gctPOINTER pointer = gcvNULL;
-
         /* Allocate the stream cache. */
         gcmONERROR(
             gcoOS_Allocate(gcvNULL,
-                           ( gcmSIZEOF(gcsSTREAM_CACHE_BUFFER)
-                           * gcdSTREAM_CACHE_COUNT
-                           ),
+                           (gcmSIZEOF(gcsSTREAM_CACHE_BUFFER) * gcdSTREAM_CACHE_COUNT),
                            &pointer));
 
         Stream->cache = pointer;
 
         /* Zero all memory. */
         gcoOS_ZeroMemory(Stream->cache,
-                         ( gcmSIZEOF(gcsSTREAM_CACHE_BUFFER)
-                         * gcdSTREAM_CACHE_COUNT)
+                         (gcmSIZEOF(gcsSTREAM_CACHE_BUFFER) * gcdSTREAM_CACHE_COUNT)
                          );
-
-        /* Initialize the stream cache. */
-        Stream->cacheCount   = gcdSTREAM_CACHE_COUNT;
-        Stream->cacheCurrent = 0;
-
-        if (1/*gcoHAL_QuerySpecialHint(gceSPECIAL_HINT4) == gcvSTATUS_FALSE*/)
-        {
-            Stream->dynamicAllocate = gcvTRUE;
-        }
-        else
-        {
-            Stream->dynamicAllocate = gcvFALSE;
-        }
-
-        if (!Stream->dynamicAllocate)
-        {
-            Stream->cacheLastHit = 0;
-
-            for (i = 0, cache = Stream->cache;
-                i < gcdSTREAM_CACHE_COUNT;
-                ++i, ++cache
-                )
-            {
-                gcmONERROR(gcsSURF_NODE_Construct(
-                    &cache->node,
-                    gcdSTREAM_CACHE_SIZE,
-                    64,
-                    gcvSURF_VERTEX,
-                    gcvALLOC_FLAG_NONE,
-                    gcvPOOL_DEFAULT
-                    ));
-
-                /* Lock the stream. */
-                gcmONERROR(gcoHARDWARE_Lock(&cache->node,
-                    gcvNULL, gcvNULL));
-
-                /* Initialize the stream cache. */
-                cache->bytes  = cache->node.size;
-                cache->free   = cache->node.size;
-                cache->offset = 0;
-                cache->index  = 0;
-
-                /* Create the signal. */
-                gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &cache->signal));
-
-                gcmTRACE_ZONE(
-                    gcvLEVEL_INFO, gcvZONE_SIGNAL,
-                    "%s(%d): cache %d signal created 0x%08X",
-                    __FUNCTION__, __LINE__,
-                    i, cache->signal);
-
-                /* Mark the stream as available. */
-                gcmONERROR(gcoOS_Signal(gcvNULL, cache->signal, gcvTRUE));
-            }
-        }
-        else
-        {
-            Stream->cacheAllocatedCount = 0;
-        }
     }
 
     /* Success. */
@@ -3244,36 +2623,10 @@ gcoSTREAM_SetCache(
 
 OnError:
     /* Roll back. */
-    if (Stream->cache != gcvNULL)
+    if (pointer != gcvNULL)
     {
-        /* Walk all streams. */
-        for (i = 0, cache = Stream->cache; i < Stream->cacheCount; ++i, ++cache)
-        {
-            if (cache->signal != gcvNULL)
-            {
-                /* Destroy the signal. */
-                gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL,
-                                                 cache->signal));
-            }
-
-            if (!Stream->dynamicAllocate)
-            {
-                if (cache->node.logical != gcvNULL)
-                {
-                    /* Unlock the stream. */
-                    gcmVERIFY_OK(gcoHARDWARE_Unlock(&cache->node, gcvSURF_VERTEX));
-                }
-
-                if (cache->node.u.normal.node != 0)
-                {
-                    /* Release the stream. */
-                    gcmVERIFY_OK(gcsSURF_NODE_Destroy(&cache->node));
-                }
-            }
-        }
-
         /* Free the stream cache. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Stream->cache));
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pointer));
     }
 
     /* Return the status. */
@@ -3281,582 +2634,7 @@ OnError:
     return status;
 }
 
-#if !OPT_CACHE_USAGE
-static gctUINT
-_Reflect(
-    IN gctUINT32 Value,
-    IN gctINT Bits
-    )
-{
-    /* Reflection table for nibbles. */
-    static gctUINT8 reflect[16] =
-    {
-        0x0,    /* 0000 -> 0000 */
-        0x8,    /* 0001 -> 1000 */
-        0x4,    /* 0010 -> 0100 */
-        0xC,    /* 0011 -> 1100 */
-        0x2,    /* 0100 -> 0010 */
-        0xA,    /* 0101 -> 1010 */
-        0x6,    /* 0110 -> 0110 */
-        0xE,    /* 0111 -> 1110 */
-        0x1,    /* 1000 -> 0001 */
-        0x9,    /* 1001 -> 1001 */
-        0x5,    /* 1010 -> 0101 */
-        0xD,    /* 1011 -> 1101 */
-        0x3,    /* 1100 -> 0011 */
-        0xB,    /* 1101 -> 1011 */
-        0x7,    /* 1110 -> 0111 */
-        0xF     /* 1111 -> 1111 */
-    };
-
-    gctUINT result = 0;
-
-    /* Loop while we have bits to reflect. */
-    while (Bits > 0)
-    {
-        /* Reflect 4 bits at a time. */
-        result = (result << 4) | reflect[Value & 0xF];
-
-        /* Next 4 bits. */
-        Value >>= 4;
-        Bits   -= 4;
-    }
-
-    /* Return result. */
-    return result;
-}
-
-
-#if OPT_VERTEX_ARRAY
-static gceSTATUS
-_CRC32(
-    IN gcoSTREAM Stream,
-    IN gctUINT BufferCount,
-    IN gcsVERTEXARRAY_BUFFER_PTR Buffers,
-    IN gctUINT AttributeCount,
-    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
-    IN gctUINT First,
-    IN gctUINT Count,
-    IN gctPOINTER Logical OPTIONAL,
-    OUT gctUINT32_PTR Crc32 OPTIONAL,
-    OUT gctBOOL_PTR Empty OPTIONAL,
-    OUT gctSIZE_T_PTR Bytes OPTIONAL
-)
-{
-    gctUINT i, j, k;
-    gctUINT8_PTR src[gcdATTRIBUTE_COUNT], dst;
-    gctUINT32 crc = 0xFFFFFFFF;
-    static gctUINT32 crcTable[256];
-    static gctBOOL tableSetup = gcvFALSE;
-    gctUINT stride = 0;
-    gcsVERTEXARRAY_BUFFER_PTR buffer;
-    gcsVERTEXARRAY_ATTRIBUTE_PTR attribute = Attributes;
-    gctUINT attribStride[gcdATTRIBUTE_COUNT];
-    gctSIZE_T bytes = 0;
-
-    gcmHEADER_ARG("Stream=0x%x BufferCount=%u Buffers=0x%x AttributeCount=%u "
-                  "Attributes=0x%x First=%u Count=%u Logical=0x%x",
-                  Stream, BufferCount, Buffers, AttributeCount,
-                  Attributes, First, Count, Logical);
-
-    /* Check if we need to setup the CRC table. */
-    if (!tableSetup)
-    {
-        /* Polynominal widely used for CRC-32 checking. */
-        gctUINT32 polynomial = 0x04C11DB7;
-
-        /* Setup the entire table. */
-        for (i = 0; i < 256; ++i)
-        {
-            /* Put the reflection of the index into the table. */
-            crcTable[i] = _Reflect(i, 8) << 24;
-
-            /* Shift the table entry by 8 and use the shifted bits to xor in the
-            ** polynomial. */
-            for (j = 0; j < 8; ++j)
-            {
-                crcTable[i] = (crcTable[i] << 1)
-                            ^ ((crcTable[i] & (1U << 31)) ? polynomial : 0);
-            }
-
-            /* Reflect the entire table entry. */
-            crcTable[i] = _Reflect(crcTable[i], 32);
-        }
-
-        /* CRC-32 table has been setup. */
-        tableSetup = gcvTRUE;
-    }
-
-    /* Compute the destination address. */
-    dst = (gctUINT8_PTR) Logical;
-
-    /* Check if we need to copy the attributes. */
-    if (Logical != gcvNULL)
-    {
-        /* Walk through all buffers. */
-        for (i = 0, buffer = Buffers;
-             i < BufferCount;
-             i++, buffer++)
-        {
-            /* We copy whole range for non-combined buffer. */
-            if (!buffer->combined)
-            {
-                gctUINT size;
-
-                stride = attribute[buffer->map[0]].vertexPtr->enable
-                       ? attribute[buffer->map[0]].vertexPtr->stride
-                       : 0;
-
-                src[0] = (gctUINT8_PTR)buffer->start + First * stride;
-                dst    = (gctUINT8_PTR)Logical + buffer->offset;
-                size   = Count * buffer->stride;
-
-                /* Attribute pointer enabled case. */
-                if (stride != 0)
-                {
-                    gcoOS_MemCopy(dst, src[0], size);
-
-                    bytes += size;
-                }
-                /* Copy from generic value. */
-                else
-                {
-                    for (j = 0; j < Count; j++)
-                    {
-                        gcoOS_MemCopy(dst, src[0], attribute[buffer->map[0]].bytes);
-
-                        dst   += attribute[buffer->map[0]].bytes;
-                        bytes += attribute[buffer->map[0]].bytes;
-                    }
-                }
-            }
-            /* Combined case, need to pack from all attribute pointers. */
-            else
-            {
-                gctUINT size[gcdATTRIBUTE_COUNT];
-
-                dst = (gctUINT8_PTR)Logical + buffer->offset;
-
-                /* Setup source info for all attributes. */
-                for (j = 0; j < buffer->count; j++)
-                {
-                    attribStride[j]  = Attributes[buffer->map[j]].vertexPtr->enable
-                                     ? Attributes[buffer->map[j]].vertexPtr->stride
-                                     : 0;
-
-                    /* Add the first vertex. */
-                    src[j] = (gctUINT8_PTR) Attributes[buffer->map[j]].logical
-                           + First * attribStride[j];
-
-                    size[j] = Attributes[buffer->map[j]].bytes;
-                }
-
-                /* Walk through all vertices. */
-                for(j = 0; j < Count; j++)
-                {
-                    /* Walk through all attributes in a buffer. */
-                    for(k = 0; k < buffer->count; k++)
-                    {
-                        gcoOS_MemCopy(dst, src[k], size[k]);
-
-                        /* Advance the pointers. */
-                        src[k] += attribStride[k];
-                        dst    += size[k];
-                        bytes  += size[k];
-                    }
-                }
-            }
-        }
-    }
-
-    /* Check if we need to compute the CRC-32 value. */
-    if (Crc32 != gcvNULL)
-    {
-        /* Compute all source addresses for the attributes. */
-        for (i = 0; i < AttributeCount; ++i)
-        {
-            attribStride[i] = Attributes[i].vertexPtr->enable
-                            ? Attributes[i].vertexPtr->stride
-                            : 0;
-
-            /* Add the first vertex. */
-            src[i] = (gctUINT8_PTR) Attributes[i].logical
-                   + First * attribStride[i];
-        }
-
-        /* Walk through all vertices. */
-        for (i = 0; i < Count; ++i)
-        {
-            /* Walk through all attributes. */
-            for (j = 0; j < AttributeCount; ++j)
-            {
-                /* Walk through all bytes. */
-                for (k = 0; k < Attributes[j].bytes; ++k)
-                {
-                    /* Compute the CRC32 value. */
-                    crc = (crc >> 8) ^ crcTable[(crc & 0xFF) ^ src[j][k]];
-                }
-
-                /* Advance the pointers. */
-                src[j] += attribStride[j];
-            }
-        }
-    }
-
-    /* Copy the CRC-32 value. */
-    if (Crc32 != gcvNULL)
-    {
-        *Crc32 = crc;
-    }
-
-    /* Return the number of bytes copied. */
-    if (Bytes != gcvNULL)
-    {
-        *Bytes = bytes;
-    }
-
-    /* Success. */
-    gcmFOOTER_ARG("*Crc32=0x%08x *Empty=%d *Bytes=%u",
-                  gcmOPT_VALUE(Crc32), gcmOPT_VALUE(Empty),
-                  gcmOPT_VALUE(Bytes));
-    return gcvSTATUS_OK;
-}
-#else
-
-static gctFLOAT
-_Half2Float(
-    IN gctUINT16 Half
-    )
-{
-    union gcsFLOAT_UINT32
-    {
-        gctFLOAT  f;
-        gctUINT32 u;
-    } result;
-    static gctUINT mantissaTable[2048];
-    static gctUINT exponentTable[32];
-    static gctBOOL tableSetup = gcvFALSE;
-    gctUINT16 mIndex, eIndex, sign;
-
-    gcmHEADER_ARG("Half=0x%04x", Half);
-
-    /* Check if the tables are setup or not. */
-    if (!tableSetup)
-    {
-        gctINT i;
-        gctUINT m, e;
-
-        /* Build exponent table. */
-        exponentTable[0] = 0;
-        for (i = 1; i <= 30; ++i)
-        {
-            exponentTable[i] = i << 23;
-        }
-        exponentTable[31] = 0x47800000;
-
-        /* Build mantissa table. */
-        mantissaTable[0] = 0;
-        for (i = 1; i <= 1023; ++i)
-        {
-            m = i << 13;
-            e = 0;
-            while (!(m & 0x00800000))
-            {
-                e  -= 0x00800000;
-                m <<= 1;
-            }
-            m &= ~0x00800000;
-            e +=  0x38800000;
-            mantissaTable[i] = m | e;
-        }
-        for (i = 1024; i <= 2047; ++i)
-        {
-            mantissaTable[i] = 0x38000000 + ((i - 1024) << 13);
-        }
-
-        tableSetup = gcvTRUE;
-    }
-
-    /* Compute lookup indices. */
-    eIndex = (Half & 0x7C00) >> 10;
-    mIndex = (Half & 0x03FF) + (eIndex ? 1024 : 0);
-    sign   = Half & 0x8000;
-
-    /* Convert half into float. */
-    result.u = mantissaTable[mIndex]
-             + exponentTable[eIndex]
-             + (sign ? 0x80000000U : 0);
-
-    /* Return float. */
-    gcmFOOTER_ARG("%f", result.f);
-    return result.f;
-}
-
-
-static gceSTATUS
-_CRC32(
-    IN gcoSTREAM Stream,
-    IN gctUINT AttributeCount,
-    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
-    IN gctUINT First,
-    IN gctUINT Count,
-    IN gctPOINTER Logical OPTIONAL,
-    OUT gctUINT32_PTR Crc32 OPTIONAL,
-    OUT gctBOOL_PTR Empty OPTIONAL,
-    OUT gctSIZE_T_PTR Bytes OPTIONAL
-)
-{
-    gctUINT i, j, k;
-    gctUINT32 crc = 0xFFFFFFFF;
-    gctUINT8_PTR dst, src[gcdATTRIBUTE_COUNT];
-    static gctUINT32 crcTable[256];
-    static gctBOOL tableSetup = gcvFALSE;
-    gctINT c;
-    gctFLOAT components[4];
-    gctBOOL empty[gcdATTRIBUTE_COUNT];
-    gctSIZE_T bytes = 0;
-    gctUINT attribStride[gcdATTRIBUTE_COUNT];
-
-    gcmHEADER_ARG("Stream=0x%x AttributeCount=%u Attributes=0x%x First=%u "
-                  "Count=%u Logical=0x%x",
-                  Stream, AttributeCount, Attributes, First, Count, Logical);
-
-    /* Check if we need to setup the CRC table. */
-    if (!tableSetup)
-    {
-        /* Polynominal widely used for CRC-32 checking. */
-        gctUINT32 polynomial = 0x04C11DB7;
-
-        /* Setup the entire table. */
-        for (i = 0; i < 256; ++i)
-        {
-            /* Put the reflection of the index into the table. */
-            crcTable[i] = _Reflect(i, 8) << 24;
-
-            /* Shift the table entry by 8 and use the shifted bits to xor in the
-            ** polynomial. */
-            for (j = 0; j < 8; ++j)
-            {
-                crcTable[i] = (crcTable[i] << 1)
-                            ^ ((crcTable[i] & (1U << 31)) ? polynomial : 0);
-            }
-
-            /* Reflect the entire table entry. */
-            crcTable[i] = _Reflect(crcTable[i], 32);
-        }
-
-        /* CRC-32 table has been setup. */
-        tableSetup = gcvTRUE;
-    }
-
-    /* Compute all source addresses for the attributes. */
-    for (i = 0; i < AttributeCount; ++i)
-    {
-        attribStride[i] = Attributes[i].vertexPtr->enable
-                        ? Attributes[i].vertexPtr->stride
-                        : 0;
-
-        /* Add the first vertex. */
-        src[i] = (gctUINT8_PTR) Attributes[i].logical
-               + First * attribStride[i];
-
-        /* Mark array as empty. */
-        empty[i] = ((Empty == gcvNULL) || !Attributes[i].vertexPtr->enable)
-                 ? gcvFALSE
-                 : gcvTRUE;
-    }
-
-    /* Compute the destination address. */
-    dst = (gctUINT8_PTR) Logical;
-
-    /* Loop through all vertices. */
-    /* Optimization for AttributeCount=1 with Empty=gcvNULL (copy case). */
-    if ((Crc32 == gcvNULL)
-     && (AttributeCount == 1)
-     && (Empty == gcvNULL)
-     && (attribStride[0] == Attributes[0].bytes)
-     && (dst != gcvNULL)
-     )
-    {
-        /* Just copy the attributes. */
-        gcoOS_MemCopy(dst, src[0], Count * Attributes[0].bytes);
-        bytes += Count * Attributes[0].bytes;
-    }
-    else
-    {
-        for (i = 0; i < Count; ++i)
-        {
-            /* Check if we need to compute the CRC-32 value. */
-            if (Crc32 != gcvNULL)
-            {
-                /* Walk through all attributes. */
-                for (j = 0; j < AttributeCount; ++j)
-                {
-                    /* Walk through all bytes. */
-                    for (k = 0; k < Attributes[j].bytes; ++k)
-                    {
-                        /* Compute the CRC32 value. */
-                        crc = (crc >> 8) ^ crcTable[(crc & 0xFF) ^ src[j][k]];
-                    }
-                }
-            }
-
-            /* Check if we need to copy the attributes. */
-            if (dst != gcvNULL)
-            {
-                /* Walk all attributes. */
-                for (j = 0; j < AttributeCount; ++j)
-                {
-                    /* Just copy the attributes. */
-                    gcoOS_MemCopy(dst, src[j], Attributes[j].bytes);
-
-                    /* Advance the pointers. */
-                    dst   += Attributes[j].bytes;
-                    bytes += Attributes[j].bytes;
-                }
-            }
-
-            /* Adjust the source of all attributes. */
-            for (j = 0; j < AttributeCount; ++j)
-            {
-                /* Check if this attribute is the same as the previous attribute,
-                ** but only if all attributes so far are the same. */
-                if (Empty != gcvNULL)
-                {
-                    if (empty[j] && (i > 0))
-                    {
-                        if (gcoOS_MemCmp(src[j],
-                                         src[j] - attribStride[j],
-                                         Attributes[j].bytes) != gcvSTATUS_OK)
-                        {
-                            /* We found a different attribute. */
-                            empty[j] = gcvFALSE;
-                        }
-                    }
-                }
-
-                /* Add the stride. */
-                src[j] += attribStride[j];
-            }
-        }
-    }
-
-    /* Copy the CRC-32 value. */
-    if (Crc32 != gcvNULL)
-    {
-        *Crc32 = crc;
-    }
-
-    /* Copy the empty flag. */
-    if (Empty != gcvNULL)
-    {
-        gctBOOL anyEmpty = empty[0];
-
-        /* Find at least one non-empty array. */
-        for (i = 1; !anyEmpty && (i < AttributeCount); ++i)
-        {
-            anyEmpty |= empty[i];
-        }
-
-        /* Return any empty flag. */
-        *Empty = anyEmpty;;
-    }
-
-    /* Return the number of bytes copied. */
-    if (Bytes != gcvNULL)
-    {
-        *Bytes = bytes;
-    }
-
-    /* Success. */
-    gcmFOOTER_ARG("*Crc32=0x%08x *Empty=%d *Bytes=%u",
-                  gcmOPT_VALUE(Crc32), gcmOPT_VALUE(Empty),
-                  gcmOPT_VALUE(Bytes));
-    return gcvSTATUS_OK;
-}
-#endif
-#endif
-static gceSTATUS
-_NewCache(
-    IN gcoSTREAM Stream,
-    OUT  gcsSTREAM_CACHE_BUFFER_PTR * Cache
-    )
-{
-    gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
-    gcsHAL_INTERFACE ioctl;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Stream=0x%x", Stream);
-
-    /* Move to the oldest cache. */
-    cache = &Stream->cache[Stream->cacheCurrent];
-
-    /* Check if the cache is in use. */
-    if (cache->offset > 0)
-    {
-        /* Mark cache as unavailable. */
-        gcmONERROR(gcoOS_Signal(gcvNULL, cache->signal, gcvFALSE));
-
-        /* Schedule a signal event. */
-        ioctl.command = gcvHAL_SIGNAL;
-        ioctl.engine             = gcvENGINE_RENDER;
-        ioctl.u.Signal.signal    = gcmPTR_TO_UINT64(cache->signal);
-        ioctl.u.Signal.auxSignal = 0;
-        ioctl.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
-        ioctl.u.Signal.fromWhere = gcvKERNEL_COMMAND;
-        gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &ioctl));
-
-        /* Commit the command buffer. */
-        gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
-
-        /* Reset the cache. */
-        cache->offset = 0;
-        cache->free   = cache->bytes;
-        cache->index  = 0;
-
-#if !OPT_CACHE_USAGE
-        /* Clear the caches. */
-        gcoOS_ZeroMemory(cache->cacheHash,
-                         gcmSIZEOF(cache->cacheHash));
-        gcoOS_ZeroMemory(cache->cacheArray,
-                         gcmSIZEOF(cache->cacheArray));
-#endif
-
-
-    }
-
-    /* Move to next cache. */
-    Stream->cacheCurrent = (Stream->cacheCurrent + 1) % Stream->cacheCount;
-
-    cache = &Stream->cache[Stream->cacheCurrent];
-
-    /* Wait for the cache to become ready. */
-    status = gcoOS_WaitSignal(gcvNULL, cache->signal, 0);
-    if (status == gcvSTATUS_TIMEOUT)
-    {
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VERTEX,
-                      "Waiting for vertex buffer 0x%x",
-                      cache);
-
-        gcmONERROR(gcoOS_WaitSignal(gcvNULL,
-                                    cache->signal,
-                                    gcvINFINITE));
-    }
-
-    /* Return cache. */
-    *Cache = cache;
-
-    /* Success. */
-    gcmFOOTER_ARG("*Cache=0x%x", *Cache);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-#define ALLOCATE_NEW_CACHE(cacheSize) \
+#define ALLOCATE_NEW_CACHE() \
             /* Allocate node */ \
             gcmONERROR(gcoOS_Allocate(gcvNULL,gcmSIZEOF(gcsSURF_NODE),&pointer)); \
             cache->dynamicNode = pointer; \
@@ -3864,7 +2642,7 @@ OnError:
             /* Allocate linear video memory. */  \
             gcmONERROR(gcsSURF_NODE_Construct( \
                 cache->dynamicNode, \
-                cacheSize, \
+                gcdSTREAM_CACHE_SIZE, \
                 64, \
                 gcvSURF_VERTEX, \
                 gcvALLOC_FLAG_NONE, \
@@ -3874,8 +2652,8 @@ OnError:
             gcmONERROR(gcoHARDWARE_Lock(cache->dynamicNode, \
                                         gcvNULL, gcvNULL)); \
             /* Initialize the stream cache. */ \
-            cache->bytes  = cacheSize; \
-            cache->free   = cacheSize; \
+            cache->bytes  = gcdSTREAM_CACHE_SIZE; \
+            cache->free   = gcdSTREAM_CACHE_SIZE; \
             cache->offset = 0; \
             /* Create the signal. */ \
             gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &cache->signal)); \
@@ -3885,47 +2663,21 @@ OnError:
 static gceSTATUS
 _NewDynamicCache(
     IN gcoSTREAM Stream,
-    IN gctUINT   Bytes,
-    IN gctBOOL   bForceVirtual,
-    OUT  gcsSTREAM_CACHE_BUFFER_PTR * Cache
+    IN gctUINT   Bytes
     )
 {
     gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
-    gcsHAL_INTERFACE ioctl;
-    gceSTATUS status;
-    gctUINT   cacheSize;
+    gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER pointer;
-    gctBOOL bReAlloc = gcvFALSE;
+    gcsHAL_INTERFACE ioctl;
+    gctBOOL bReuse = gcvFALSE;
 
     gcmHEADER_ARG("Stream=0x%x", Stream);
 
-    /* Move to the oldest cache. */
-    cache = &Stream->cache[Stream->cacheCurrent];
+    gcmASSERT(Bytes < gcdSTREAM_CACHE_SIZE);
 
-    /* If this cach not allocated */
-    if (cache->bytes == 0)
-    {
-        /* First time new cache, allocate a bigger size */
-        cacheSize = Bytes * DYNAMIC_CACHE_MULTIPLE_TIME;
-
-        cacheSize = gcmALIGN(cacheSize,DYNAMIC_CACHE_ALIGN);
-
-        if (cacheSize >= gcdSTREAM_CACHE_SIZE)
-        {
-            cacheSize = gcdSTREAM_CACHE_SIZE;
-        }
-
-        ALLOCATE_NEW_CACHE(cacheSize);
-
-        Stream->cacheAllocatedCount++;
-
-        /* Return cache. */
-        *Cache = cache;
-
-        /* Success. */
-        gcmFOOTER_ARG("*Cache=0x%x", *Cache);
-        return gcvSTATUS_OK;
-    }
+    /* Current cache */
+    cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
 
     /* Check if the cache is in use. */
     if (cache->offset > 0)
@@ -3944,97 +2696,44 @@ _NewDynamicCache(
 
         /* Commit the command buffer. */
         gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
-
-        /* Reset the cache. */
-        cache->offset = 0;
-        cache->free   = cache->bytes;
     }
 
-    if(Stream->cacheAllocatedCount > 0)
+    /* move to next cache */
+    cache = &Stream->cache[(++Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
+
+    /* destory old cache.*/
+    if (cache->dynamicNode != gcvNULL)
     {
-        /* Move to next cache. */
-        Stream->cacheCurrent = (Stream->cacheCurrent + 1) % Stream->cacheAllocatedCount;
-    }
-
-    cache = &Stream->cache[Stream->cacheCurrent];
-
-    /* Wait for the cache to become ready. */
-    status = gcoOS_WaitSignal(gcvNULL, cache->signal, 0);
-
-    bReAlloc = (cache->bytes < Bytes) || bForceVirtual;
-    if (status == gcvSTATUS_TIMEOUT || bReAlloc)
-    {
-        if (Stream->cacheAllocatedCount == Stream->cacheCount)
+        /* Check we can reuse or not */
+        if (gcmIS_SUCCESS(gcoOS_WaitSignal(gcvNULL, cache->signal, 0)) && Bytes < cache->bytes)
         {
-            if(status == gcvSTATUS_TIMEOUT)
-            {
-                /* We have allocated all caches, so, wait it */
-                gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VERTEX,
-                    "Waiting for vertex buffer 0x%x",
-                    cache);
+            cache->offset = 0;
+            cache->free   = cache->bytes;
 
-                gcmONERROR(gcoOS_WaitSignal(gcvNULL,
-                    cache->signal,
-                    gcvINFINITE));
-            }
-
-            /* As we have allocate all cache and we still got a wait,
-               that means we need enlarge our cache size */
-            if (cache->bytes <= gcdSTREAM_CACHE_SIZE)
-            {
-                /* Destroy the old one */
-                if (cache->dynamicNode != gcvNULL)
-                {
-                    gcmVERIFY_OK(gcoHARDWARE_Unlock(cache->dynamicNode, gcvSURF_VERTEX));
-
-                    gcmONERROR(gcsSURF_NODE_Destroy(cache->dynamicNode));
-
-                    /* Destroy the signal. */
-                    gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, cache->signal));
-
-                    gcmOS_SAFE_FREE(gcvNULL,cache->dynamicNode);
-                }
-
-                /* new cache, allocate a bigger size */
-                gcmSAFECASTSIZET(cacheSize, gcmMAX(Bytes,cache->bytes) * DYNAMIC_CACHE_MULTIPLE_TIME);
-
-                cacheSize = gcmALIGN(cacheSize,DYNAMIC_CACHE_ALIGN);
-
-                if (cacheSize >= gcdSTREAM_CACHE_SIZE)
-                {
-                    cacheSize = gcdSTREAM_CACHE_SIZE;
-                }
-
-                ALLOCATE_NEW_CACHE(cacheSize);
-            }
+            bReuse = gcvTRUE;
+            /*if we did not allocate a new cache and use the old cache, should flush the vertex cache here*/
+            gcmONERROR(gcoHARDWARE_FlushVertex(gcvNULL));
         }
         else
         {
-            cache = &Stream->cache[Stream->cacheAllocatedCount];
+            gcmVERIFY_OK(gcoHARDWARE_Unlock(cache->dynamicNode, gcvSURF_VERTEX));
+            gcmONERROR(gcsSURF_NODE_Destroy(cache->dynamicNode));
 
-            /* new cache, allocate a bigger size */
-            cacheSize = Bytes * DYNAMIC_CACHE_MULTIPLE_TIME;
+            gcmOS_SAFE_FREE(gcvNULL,cache->dynamicNode);
 
-            cacheSize = gcmALIGN(cacheSize,DYNAMIC_CACHE_ALIGN);
-
-            if (cacheSize >= gcdSTREAM_CACHE_SIZE)
-            {
-                cacheSize = gcdSTREAM_CACHE_SIZE;
-            }
-
-            ALLOCATE_NEW_CACHE(cacheSize);
-
-            Stream->cacheCurrent = Stream->cacheAllocatedCount;
-
-            Stream->cacheAllocatedCount++;
+            /* Reset the cache. */
+            cache->offset = 0;
+            cache->free   = 0;
         }
     }
 
-    /* Return cache. */
-    *Cache = cache;
+    if (!bReuse)
+    {
+        ALLOCATE_NEW_CACHE();
+    }
 
     /* Success. */
-    gcmFOOTER_ARG("*Cache=0x%x", *Cache);
+    gcmFOOTER();
     return gcvSTATUS_OK;
 
 OnError:
@@ -4338,7 +3037,6 @@ OnError:
     return status;
 }
 
-#if OPT_CACHE_USAGE
 static gceSTATUS
 _copyBuffers(
     IN gctUINT BufferCount,
@@ -4738,7 +3436,7 @@ OnError:
 gctSIZE_T
 gcoSTREAM_GetSize(
     IN gcoSTREAM Stream
-        )
+    )
 {
     return Stream->size;
 }
@@ -4777,7 +3475,7 @@ gcoSTREAM_DynamicCacheAttributes(
     gcmDEBUG_VERIFY_ARGUMENT(Physical != gcvNULL);
 
     /* Index current cache. */
-    cache = &Stream->cache[Stream->cacheCurrent];
+    cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
 
     if (Bytes > gcdSTREAM_CACHE_SIZE)
     {
@@ -4797,7 +3495,8 @@ gcoSTREAM_DynamicCacheAttributes(
     if (Bytes > cache->free || bForceVirtual)
     {
         /* Move to a new cache. */
-        gcmONERROR(_NewDynamicCache(Stream, Bytes, bForceVirtual, &cache));
+        gcmONERROR(_NewDynamicCache(Stream, Bytes));
+        cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
 
     /* Allocate data form the cache. */
@@ -4869,7 +3568,7 @@ gcoSTREAM_DynamicCacheAttributesEx(
     gcmDEBUG_VERIFY_ARGUMENT(Streams != gcvNULL);
 
     /* Index current cache. */
-    cache = &Stream->cache[Stream->cacheCurrent];
+    cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
 
     if (cache->dynamicNode != gcvNULL)
     {
@@ -4883,7 +3582,8 @@ gcoSTREAM_DynamicCacheAttributesEx(
     if (TotalBytes > cache->free || bForceVirtual)
     {
         /* Move to a new cache. */
-        gcmONERROR(_NewDynamicCache(Stream, TotalBytes, bForceVirtual, &cache));
+        gcmONERROR(_NewDynamicCache(Stream, TotalBytes));
+        cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
 
     /* Allocate data form the cache. */
@@ -4940,11 +3640,9 @@ gcoSTREAM_CacheAttributesEx(
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT totalBytes;
     gctSIZE_T totalBytesTmp;
-    gctUINT offset;
     gctUINT32 stride;
     gcsVERTEXARRAY_BUFOBJ_PTR streamPtr;
     gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR attrPtr;
-    gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
     gctSIZE_T copiedBytes = 0;
     gcoSTREAM newStream = gcvNULL;
     gctPOINTER logical = 0;
@@ -5103,72 +3801,18 @@ gcoSTREAM_CacheAttributesEx(
     }
     else
     {
-        /* If the stream wasn't initialized as dynamic, do it now */
-        if (Stream->dynamic == gcvNULL)
+        /* If the stream wasn't initialized, do it now */
+        if (Stream->cache == gcvNULL)
         {
             gcmONERROR(gcoSTREAM_SetCache(Stream));
         }
 
-        if (Stream->dynamicAllocate)
-        {
-            status = gcoSTREAM_DynamicCacheAttributesEx(Stream,
-                                                        StreamCount,
-                                                        Streams,
-                                                        First,
-                                                        totalBytes);
+        gcmONERROR(gcoSTREAM_DynamicCacheAttributesEx(Stream,
+                                                      StreamCount,
+                                                      Streams,
+                                                      First,
+                                                      totalBytes));
 
-            gcmFOOTER();
-            return status;
-        }
-
-        /* Index current cache. */
-        cache = &Stream->cache[Stream->cacheCurrent];
-
-        /* Check if the data is too big. */
-        if (totalBytes > cache->bytes)
-        {
-           gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-        }
-
-        /* Check if the stream will fit in the current cache. */
-        if (totalBytes > cache->free)
-        {
-            /* Move to a new cache. */
-            gcmONERROR(_NewCache(Stream, &cache));
-        }
-
-        /* Allocate data form the cache. */
-        offset         = cache->offset;
-        cache->offset += totalBytes;
-        cache->free   -= totalBytes;
-
-        gcmGETHARDWAREADDRESS(cache->node, physical);
-
-        /* Copy the data. */
-        gcmONERROR(_copyBuffersEx(StreamCount,
-                                  Streams,
-                                  &cache->node,
-                                  First,
-                                  cache->node.logical + offset,
-                                  physical + offset,
-                                  &copiedBytes
-                                  ));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                      cache->node.logical + offset,
-                                      copiedBytes,
-                                      gcvCACHE_CLEAN));
-
-        gcmASSERT(totalBytes == copiedBytes);
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       physical,
-                       cache->node.logical,
-                       offset,
-                       copiedBytes);
     }
 
     /* Success. */
@@ -5195,9 +3839,6 @@ gcoSTREAM_CacheAttributes(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
-    gctUINT offset;
-    gctSIZE_T copiedBytes = 0;
 
     gcmHEADER_ARG("Stream=0x%x First=%u Count=%u TotalBytes=%u BufferCount=%u "
                   "Buffers=0x%x AttributeCount=%u Attributes=0x%x",
@@ -5212,77 +3853,21 @@ gcoSTREAM_CacheAttributes(
     gcmDEBUG_VERIFY_ARGUMENT(Attributes != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(Physical != gcvNULL);
 
-    /* If the stream wasn't initialized as dynamic, do it now */
-    if (Stream->dynamic == gcvNULL)
+    /* If the stream wasn't initialized, do it now */
+    if (Stream->cache == gcvNULL)
     {
         gcmONERROR(gcoSTREAM_SetCache(Stream));
     }
 
-    if (Stream->dynamicAllocate)
-    {
-        status = gcoSTREAM_DynamicCacheAttributes(Stream,
-                                                  First,
-                                                  Count,
-                                                  TotalBytes,
-                                                  BufferCount,
-                                                  Buffers,
-                                                  AttributeCount,
-                                                  Attributes,
-                                                  Physical);
-
-        gcmFOOTER();
-        return status;
-    }
-
-    /* Index current cache. */
-    cache = &Stream->cache[Stream->cacheCurrent];
-
-    /* Check if the data is too big. */
-    if (TotalBytes > cache->bytes)
-    {
-       gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-    }
-
-    /* Check if the stream will fit in the current cache. */
-    if (TotalBytes > cache->free)
-    {
-        /* Move to a new cache. */
-        gcmONERROR(_NewCache(Stream, &cache));
-    }
-
-    /* Allocate data form the cache. */
-    offset         = cache->offset;
-    cache->offset += TotalBytes;
-    cache->free   -= TotalBytes;
-
-    /* Copy the data. */
-    gcmONERROR(_copyBuffers(
-        BufferCount,
-        Buffers,
-        AttributeCount,
-        Attributes,
-        First, Count,
-        cache->node.logical + offset,
-        &copiedBytes
-        ));
-
-    /* Flush the uploaded data. */
-    gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                cache->node.logical + offset,
-                                copiedBytes,
-                                gcvCACHE_CLEAN));
-
-    /* Dump the buffer. */
-    gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
-                   gcsSURF_NODE_GetHWAddress(&cache->node),
-                   cache->node.logical,
-                   offset,
-                   copiedBytes);
-
-    /* Return physical address for stream. */
-    gcmGETHARDWAREADDRESS(cache->node, *Physical);
-    *Physical += offset;
+    gcmONERROR(gcoSTREAM_DynamicCacheAttributes(Stream,
+                                                First,
+                                                Count,
+                                                TotalBytes,
+                                                BufferCount,
+                                                Buffers,
+                                                AttributeCount,
+                                                Attributes,
+                                                Physical));
 
     /* Success. */
     gcmFOOTER();
@@ -5293,828 +3878,6 @@ OnError:
     gcmFOOTER();
     return status;
 }
-
-#else
-#if OPT_VERTEX_ARRAY
-gceSTATUS
-gcoSTREAM_UploadUnCacheableAttributes(
-    IN gcoSTREAM Stream,
-    IN gctUINT First,
-    IN gctUINT Count,
-    IN gctUINT TotalBytes,
-    IN gctUINT BufferCount,
-    IN gcsVERTEXARRAY_BUFFER_PTR Buffers,
-    IN gctUINT AttributeCount,
-    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
-    OUT gctUINT32_PTR Physical,
-    OUT gcoSTREAM * OutStream
-)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctSIZE_T copiedBytes = 0;
-    gcoSTREAM newStream = gcvNULL;
-    gctPOINTER logical = 0;
-    gctUINT32  physical = 0;
-
-    gcmHEADER_ARG("Stream=0x%x First=%u Count=%u TotalBytes=%u BufferCount=%u "
-                  "Buffers=0x%x AttributeCount=%u Attributes=0x%x",
-                  Stream, First, Count, TotalBytes, BufferCount, Buffers, AttributeCount, Attributes);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    gcmDEBUG_VERIFY_ARGUMENT(Count > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(BufferCount > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(Buffers != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(AttributeCount > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(Attributes != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Physical != gcvNULL);
-
-    if (TotalBytes > gcdSTREAM_CACHE_SIZE)
-    {
-        gcmONERROR(gcoSTREAM_Construct(gcvNULL, &newStream));
-
-        gcmONERROR(gcoSTREAM_Reserve(newStream, TotalBytes));
-
-        gcmONERROR(gcoSTREAM_Lock(newStream,&logical,&physical));
-
-        gcmONERROR(_CRC32(Stream,
-            BufferCount, Buffers,
-            AttributeCount, Attributes,
-            First, Count,
-            logical,
-            gcvNULL,
-            gcvNULL,
-            &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&newStream->node,
-            logical,
-            copiedBytes,
-            gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-            "stream",
-            physical,
-            logical,
-            0,
-            copiedBytes);
-
-        /* Return physical address for stream. */
-        *Physical = physical;
-        *OutStream = newStream;
-
-        /* Seems can't do unlock here, because stream lock don't really lock node, unlock doese */
-        /*gcmONERROR(gcoSTREAM_Unlock(newStream));*/
-
-        /* Success. */
-        gcmFOOTER_ARG("*Physical=0x%08x", *Physical);
-        return gcvSTATUS_OK;
-    }
-    else
-    {
-        /* Only handle uncachable */
-        gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-    }
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcoSTREAM_CacheAttributes(
-    IN gcoSTREAM Stream,
-    IN gctUINT First,
-    IN gctUINT Count,
-    IN gctUINT TotalBytes,
-    IN gctUINT BufferCount,
-    IN gcsVERTEXARRAY_BUFFER_PTR Buffers,
-    IN gctUINT AttributeCount,
-    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
-    OUT gctUINT32_PTR Physical
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT keyValue, key;
-    gctUINT i;
-    gctINT n;
-    gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
-    gcsSTREAM_CACHE_PTR ptr = gcvNULL;
-    gctUINT crc32, offset;
-#if ENABLE_STREAM_CACHE_STATIC
-    gctBOOL empty;
-#endif
-    gctSIZE_T copiedBytes = 0;
-    gctUINT32 minBytes = 64;
-
-    gcmHEADER_ARG("Stream=0x%x First=%u Count=%u TotalBytes=%u BufferCount=%u "
-                  "Buffers=0x%x AttributeCount=%u Attributes=0x%x",
-                  Stream, First, Count, TotalBytes, BufferCount, Buffers, AttributeCount, Attributes);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    gcmDEBUG_VERIFY_ARGUMENT(Count > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(BufferCount > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(Buffers != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(AttributeCount > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(Attributes != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Physical != gcvNULL);
-
-    /* If the stream wasn't initialized as dynamic, do it now */
-    if (Stream->dynamic == gcvNULL)
-    {
-        gcmONERROR(gcoSTREAM_SetCache(Stream));
-    }
-
-    /* Check for small number of vertices and bytes per vertex. */
-    if ((Count <= 4) && (TotalBytes <= minBytes))
-    {
-        /* Index current cache. */
-        cache = &Stream->cache[Stream->cacheCurrent];
-
-        /* Check if the data is too big. */
-        if (TotalBytes > cache->bytes)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-        }
-
-        /* Check if the stream will fit in the current cache. */
-        if (TotalBytes > cache->free)
-        {
-            /* Move to a new cache. */
-            gcmONERROR(_NewCache(Stream, &cache));
-        }
-
-        /* Allocate data form the cache. */
-        offset         = cache->offset;
-        cache->offset += TotalBytes;
-        cache->free   -= TotalBytes;
-
-        /* Copy the data. */
-        gcmONERROR(_CRC32(Stream,
-                          BufferCount, Buffers,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + offset,
-                          gcvNULL,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + offset,
-                                    copiedBytes,
-                                    gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       offset,
-                       copiedBytes);
-
-        /* Return physical address for stream. */
-        *Physical = cache->node.physical + offset;
-
-        /* Success. */
-        gcmFOOTER_ARG("*Physical=0x%08x", *Physical);
-        return gcvSTATUS_OK;
-    }
-
-    /* Compute hash key. */
-    keyValue = ((First + (Count << 16)) ^ ((TotalBytes / Count) + (AttributeCount << 16)))
-             + gcmPTR2INT32(Attributes[AttributeCount - 1].logical);
-    key      = (keyValue ^ (keyValue >> 16)) % gcdSTREAM_CACHE_HASH;
-
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM, "Hash key %u", key);
-
-    /* Walk all caches from the last hit to the current. */
-    for (i = 0; i < Stream->cacheCount; ++i)
-    {
-        /* Get pointer to the stream cache. */
-        n     = (Stream->cacheLastHit + i) % Stream->cacheCount;
-        cache = &Stream->cache[n];
-
-        /* Check whether the stream is available. */
-        status = gcoOS_WaitSignal(gcvNULL, cache->signal, 0);
-
-        if (status == gcvSTATUS_OK)
-        {
-            /* Check the hash table. */
-            for (ptr = cache->cacheHash[key]; ptr != gcvNULL; ptr = ptr->next)
-            {
-                /* Check if the hash key matches. */
-                if ((ptr->key == keyValue)
-
-                /* Check if the attribute count matches. */
-                &&  (ptr->attributeCount == AttributeCount)
-
-                /* Check if the attributes match. */
-                &&  gcmIS_SUCCESS(
-                        gcoOS_MemCmp(Attributes,
-                                     ptr->attributes,
-                                     ( AttributeCount
-                                     * gcmSIZEOF(gcsVERTEXARRAY_ATTRIBUTE)
-                                     )))
-                )
-                {
-                    /* We have a cache hit. */
-                    Stream->cacheLastHit = n;
-                    break;
-                }
-            }
-
-            if (ptr != gcvNULL)
-            {
-                /* We have a cache hit. */
-                break;
-            }
-        }
-
-        else if (status != gcvSTATUS_TIMEOUT)
-        {
-            /* Error. */
-            gcmONERROR(status);
-        }
-    }
-
-    /* Check if we need to create a new cache entry. */
-Again:
-    if ((cache     == gcvNULL)
-    ||  (ptr       == gcvNULL)
-    ||  (ptr->type == gcvSTREAM_CACHE_DYNAMIC)
-    )
-    {
-        /* Index current cache. */
-        cache = &Stream->cache[Stream->cacheCurrent];
-
-        /* Check if the data is too big. */
-        if (TotalBytes > cache->bytes)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-        }
-
-        /* Check if the stream will fit in the current cache. */
-        if ((cache->free < TotalBytes)
-        ||  (  (ptr          == gcvNULL)
-            && (cache->index >= gcmCOUNTOF(cache->cacheArray))
-            )
-        )
-        {
-            /* Move to a new cache. */
-            gcmONERROR(_NewCache(Stream, &cache));
-
-            /* Make sure we move to a new cache. */
-            ptr = gcvNULL;
-        }
-
-        if (ptr == gcvNULL)
-        {
-            /* Get next cache slot. */
-            ptr = &cache->cacheArray[cache->index];
-
-            /* Test for hash collision. */
-            gcmDEBUG_ONLY(
-                if (cache->cacheHash[key] != gcvNULL)
-                {
-                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
-                                  "Stream=0x%x Cache=0x%x Key=%u Value=%u/%u "
-                                  "collision",
-                                  Stream, cache, key,
-                                  cache->cacheHash[key]->key, keyValue);
-                }
-            );
-
-            /* Link in hash table. */
-            ptr->next             = cache->cacheHash[key];
-            cache->cacheHash[key] = ptr;
-
-            /* Copy attributes into cache. */
-            ptr->attributeCount = AttributeCount;
-            gcoOS_MemCopy(
-                ptr->attributes,
-                Attributes,
-                AttributeCount * gcmSIZEOF(gcsVERTEXARRAY_ATTRIBUTE));
-
-            /* Set buffer information. */
-            ptr->offset = cache->offset;
-
-            ptr->key    = keyValue;
-
-            /* Set countdown to prevent assuming data as static on the second
-               reentry and allowing it to become static only after countdown
-               becomes 0. Conformance test (pntszary.c in particular) calls
-               draw function twice with the same set of vertex arrays before
-               modifying their content and calling again. */
-            ptr->countdown = 1;
-
-            /* Update cache usage. */
-            cache->index += 1;
-        }
-        else if (ptr->type == gcvSTREAM_CACHE_DYNAMIC)
-        {
-            /* Update pointer to new data. */
-            ptr->offset = cache->offset;
-        }
-
-        /* Update cache usage. */
-        cache->offset += TotalBytes;
-        cache->free   -= TotalBytes;
-    }
-
-    switch (ptr->type)
-    {
-    case gcvSTREAM_CACHE_FREE:
-        /* We need to copy the data and compute a CRC. */
-        gcmONERROR(_CRC32(Stream,
-                          BufferCount, Buffers,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + ptr->offset,
-                          &ptr->crc32,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + ptr->offset,
-                                    copiedBytes,gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       ptr->offset,
-                       copiedBytes);
-
-        /* Mark the data as copied. */
-        ptr->type  = gcvSTREAM_CACHE_COPIED;
-        ptr->bytes = copiedBytes;
-        break;
-
-    case gcvSTREAM_CACHE_COPIED:
-#if ENABLE_STREAM_CACHE_STATIC
-        /* Compute a CRC of the data. */
-        gcmONERROR(_CRC32(Stream,
-                          BufferCount, Buffers,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          gcvNULL,
-                          &crc32,
-                          &empty,
-                          gcvNULL));
-
-        /* Verify CRC. */
-        if (crc32 != ptr->crc32)
-        {
-            /* Mark data as dynamic. */
-            ptr->type = gcvSTREAM_CACHE_DYNAMIC;
-            goto Again;
-        }
-        else if (!empty)
-        {
-            /* Time to mark as static? */
-            if (ptr->countdown == 0)
-            {
-                /* The buffer remained constant for the specified
-                   number of times, mark as static. */
-                ptr->type = gcvSTREAM_CACHE_STATIC;
-            }
-            else
-            {
-                /* Update countdown. */
-                ptr->countdown -= 1;
-            }
-        }
-#else
-        /* Compute a CRC of the data. */
-        gcmONERROR(_CRC32(Stream,
-                          BufferCount, Buffers,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          gcvNULL,
-                          &crc32,
-                          gcvNULL,
-                          gcvNULL));
-
-        /* Verify CRC. */
-        if (crc32 != ptr->crc32)
-        {
-            /* Mark data as dynamic. */
-            ptr->type = gcvSTREAM_CACHE_DYNAMIC;
-            goto Again;
-        }
-#endif
-        break;
-
-    case gcvSTREAM_CACHE_STATIC:
-        /* If the vertex buffer is big enough, we keep it static. */
-        if (ptr->bytes > minBytes)
-        {
-            /* Nothing to do. */
-            break;
-        }
-
-        /* Fall through. */
-
-    case gcvSTREAM_CACHE_DYNAMIC:
-        /* Copy the data. */
-        gcmONERROR(_CRC32(Stream,
-                          BufferCount, Buffers,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + ptr->offset,
-                          gcvNULL,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + ptr->offset,
-                                    copiedBytes, gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       ptr->offset,
-                       copiedBytes);
-        break;
-    }
-
-    /* Return physical address for stream. */
-    *Physical = cache->node.physical + ptr->offset;
-
-    /* Success. */
-    gcmFOOTER_ARG("*Physical=0x%08x", *Physical);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-#else
-
-gceSTATUS
-gcoSTREAM_CacheAttributes(
-    IN gcoSTREAM Stream,
-    IN gctUINT First,
-    IN gctUINT Count,
-    IN gctUINT Stride,
-    IN gctUINT AttributeCount,
-    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
-    OUT gctUINT32_PTR Physical
-    )
-{
-    gceSTATUS status;
-    gctUINT keyValue, key;
-    gctUINT i;
-    gctINT n;
-    gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
-    gcsSTREAM_CACHE_PTR ptr = gcvNULL;
-    gctUINT bytes;
-    gctUINT crc32, offset;
-    gctBOOL empty;
-    gctSIZE_T copiedBytes = 0;
-    gctUINT32 minBytes = 64;
-
-    gcmHEADER_ARG("Stream=0x%x First=%u Count=%u Stride=%u AttributeCount=%u "
-                  "Attributes=0x%x",
-                  Stream, First, Count, Stride, AttributeCount, Attributes);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);
-    gcmVERIFY_ARGUMENT(Count > 0);
-    gcmVERIFY_ARGUMENT(AttributeCount > 0);
-    gcmVERIFY_ARGUMENT(Attributes != gcvNULL);
-    gcmVERIFY_ARGUMENT(Physical != gcvNULL);
-
-    /* If the stream wasn't initialized as dynamic, do it now */
-    if (Stream->dynamic == gcvNULL)
-    {
-        gcmONERROR(gcoSTREAM_SetCache(Stream));
-    }
-
-    /* Compute number of bytes required. */
-    bytes = Count * Stride;
-
-    /* Check for small number of vertices and bytes per vertex. */
-    if ((Count <= 4) && (bytes <= minBytes))
-    {
-        /* Index current cache. */
-        cache = &Stream->cache[Stream->cacheCurrent];
-
-        /* Check if the data is too big. */
-        if (bytes > cache->bytes)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-        }
-
-        /* Check if the stream will fit in the current cache. */
-        if (bytes > cache->free)
-        {
-            /* Move to a new cache. */
-            gcmONERROR(_NewCache(Stream, &cache));
-        }
-
-        /* Allocate data form the cache. */
-        offset         = cache->offset;
-        cache->offset += bytes;
-        cache->free   -= bytes;
-
-        /* Copy the data. */
-        gcmONERROR(_CRC32(Stream,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + offset,
-                          gcvNULL,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + offset,
-                                    copiedBytes,
-                                    gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       offset,
-                       copiedBytes);
-
-        /* Return physical address for stream. */
-        *Physical = cache->node.physical + offset;
-
-        /* Success. */
-        gcmFOOTER_ARG("*Physical=0x%08x", *Physical);
-        return gcvSTATUS_OK;
-    }
-
-    /* Compute hash key. */
-    keyValue = ((First + (Count << 16)) ^ (Stride + (AttributeCount << 16)))
-             + gcmPTR2INT32(Attributes[AttributeCount - 1].logical);
-    key      = (keyValue ^ (keyValue >> 16)) % gcdSTREAM_CACHE_HASH;
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM, "Hash key %u", key);
-
-    /* Walk all caches from the last hit to the current. */
-    for (i = 0; i < Stream->cacheCount; ++i)
-    {
-        /* Get pointer to the stream cache. */
-        n     = (Stream->cacheLastHit + i) % Stream->cacheCount;
-        cache = &Stream->cache[n];
-
-        /* Check whether the stream is available. */
-        status = gcoOS_WaitSignal(gcvNULL, cache->signal, 0);
-
-        if (status == gcvSTATUS_OK)
-        {
-            /* Check the hash table. */
-            for (ptr = cache->cacheHash[key]; ptr != gcvNULL; ptr = ptr->next)
-            {
-                /* Check if the hash key matches. */
-                if ((ptr->key == keyValue)
-
-                /* Check if the attribute count matches. */
-                &&  (ptr->attributeCount == AttributeCount)
-
-                /* Check if the attributes match. */
-                &&  gcmIS_SUCCESS(
-                        gcoOS_MemCmp(Attributes,
-                                     ptr->attributes,
-                                     ( AttributeCount
-                                     * gcmSIZEOF(gcsVERTEXARRAY_ATTRIBUTE)
-                                     )))
-                )
-                {
-                    /* We have a cache hit. */
-                    Stream->cacheLastHit = n;
-                    break;
-                }
-            }
-
-            if (ptr != gcvNULL)
-            {
-                /* We have a cache hit. */
-                break;
-            }
-        }
-
-        else if (status != gcvSTATUS_TIMEOUT)
-        {
-            /* Error. */
-            gcmONERROR(status);
-        }
-    }
-
-    /* Check if we need to create a new cache entry. */
-Again:
-    if ((cache     == gcvNULL)
-    ||  (ptr       == gcvNULL)
-    ||  (ptr->type == gcvSTREAM_CACHE_DYNAMIC)
-    )
-    {
-        /* Index current cache. */
-        cache = &Stream->cache[Stream->cacheCurrent];
-
-        /* Check if the data is too big. */
-        if (bytes > cache->bytes)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-        }
-
-        /* Check if the stream will fit in the current cache. */
-        if ((cache->free < bytes)
-        ||  (  (ptr          == gcvNULL)
-            && (cache->index >= gcmCOUNTOF(cache->cacheArray))
-            )
-        )
-        {
-            /* Move to a new cache. */
-            gcmONERROR(_NewCache(Stream, &cache));
-
-            /* Make sure we move to a new cache. */
-            ptr = gcvNULL;
-        }
-
-        if (ptr == gcvNULL)
-        {
-            /* Get next cache slot. */
-            ptr = &cache->cacheArray[cache->index];
-
-            /* Test for hash collision. */
-            gcmDEBUG_ONLY(
-                if (cache->cacheHash[key] != gcvNULL)
-                {
-                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
-                                  "Stream=0x%x Cache=0x%x Key=%u Value=%u/%u "
-                                  "collision",
-                                  Stream, cache, key,
-                                  cache->cacheHash[key]->key, keyValue);
-                }
-            );
-
-            /* Link in hash table. */
-            ptr->next             = cache->cacheHash[key];
-            cache->cacheHash[key] = ptr;
-
-            /* Copy attributes into cache. */
-            ptr->attributeCount = AttributeCount;
-            gcoOS_MemCopy(
-                ptr->attributes,
-                Attributes,
-                AttributeCount * gcmSIZEOF(gcsVERTEXARRAY_ATTRIBUTE));
-
-            /* Set buffer information. */
-            ptr->offset = cache->offset;
-            ptr->stride = Stride;
-            ptr->key    = keyValue;
-
-            /* Set countdown to prevent assuming data as static on the second
-               reentry and allowing it to become static only after countdown
-               becomes 0. Conformance test (pntszary.c in particular) calls
-               draw function twice with the same set of vertex arrays before
-               modifying their content and calling again. */
-            ptr->countdown = 1;
-
-            /* Update cache usage. */
-            cache->index += 1;
-        }
-        else if (ptr->type == gcvSTREAM_CACHE_DYNAMIC)
-        {
-            /* Update pointer to new data. */
-            ptr->offset = cache->offset;
-        }
-
-        /* Update cache usage. */
-        cache->offset += bytes;
-        cache->free   -= bytes;
-    }
-
-    switch (ptr->type)
-    {
-    case gcvSTREAM_CACHE_FREE:
-        /* We need to copy the data and compute a CRC. */
-        gcmONERROR(_CRC32(Stream,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + ptr->offset,
-                          &ptr->crc32,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + ptr->offset,
-                                    copiedBytes,gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       ptr->offset,
-                       copiedBytes);
-
-        /* Mark the data as copied. */
-        ptr->type  = gcvSTREAM_CACHE_COPIED;
-        ptr->bytes = copiedBytes;
-        break;
-
-    case gcvSTREAM_CACHE_COPIED:
-        /* Compute a CRC of the data. */
-        gcmONERROR(_CRC32(Stream,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          gcvNULL,
-                          &crc32,
-                          &empty,
-                          gcvNULL));
-
-        /* Verify CRC. */
-        if (crc32 != ptr->crc32)
-        {
-            /* Mark data as dynamic. */
-            ptr->type = gcvSTREAM_CACHE_DYNAMIC;
-            goto Again;
-        }
-#if ENABLE_STREAM_CACHE_STATIC
-        else if (!empty)
-        {
-            /* Time to mark as static? */
-            if (ptr->countdown == 0)
-            {
-                /* The buffer remained constant for the specified
-                   number of times, mark as static. */
-                ptr->type = gcvSTREAM_CACHE_STATIC;
-            }
-            else
-            {
-                /* Update countdown. */
-                ptr->countdown -= 1;
-            }
-        }
-#endif
-        break;
-
-    case gcvSTREAM_CACHE_STATIC:
-        /* If the vertex buffer is big enough, we keep it static. */
-        if (ptr->bytes > minBytes)
-        {
-            /* Nothing to do. */
-            break;
-        }
-
-        /* Fall through. */
-
-    case gcvSTREAM_CACHE_DYNAMIC:
-        /* Copy the data. */
-        gcmONERROR(_CRC32(Stream,
-                          AttributeCount, Attributes,
-                          First, Count,
-                          cache->node.logical + ptr->offset,
-                          gcvNULL,
-                          gcvNULL,
-                          &copiedBytes));
-
-        /* Flush the uploaded data. */
-        gcmONERROR(gcoSURF_NODE_Cache(&cache->node,
-                                    cache->node.logical + ptr->offset,
-                                    copiedBytes, gcvCACHE_CLEAN));
-
-        /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL,
-                       "stream",
-                       gcsSURF_NODE_GetHWAddress(&cache->node),
-                       cache->node.logical,
-                       ptr->offset,
-                       copiedBytes);
-        break;
-    }
-
-    /* Return physical address for stream. */
-    *Physical = cache->node.physical + ptr->offset;
-
-    /* Success. */
-    gcmFOOTER_ARG("*Physical=0x%08x", *Physical);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-#endif
-#endif
 
 gceSTATUS
 gcoSTREAM_UnAlias(
@@ -6929,31 +4692,12 @@ gceSTATUS gcoVERTEX_Bind(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS gcoSTREAM_SetDynamic(
-    IN gcoSTREAM Stream,
-    IN gctSIZE_T Bytes,
-    IN gctUINT Buffers
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS gcoSTREAM_UploadDynamic(
-    IN gcoSTREAM Stream,
-    IN gctUINT VertexCount,
-    IN gctUINT InfoCount,
-    IN gcsSTREAM_INFO_PTR Info,
-    IN gcoVERTEX Vertex
-    )
-{
-    return gcvSTATUS_OK;
-}
-
 gceSTATUS gcoSTREAM_SetAttribute(
     IN gcoSTREAM Stream,
     IN gctUINT Offset,
     IN gctUINT Bytes,
     IN gctUINT Stride,
+    IN gctUINT Divisor,
     IN OUT gcsSTREAM_SUBSTREAM_PTR * SubStream
     )
 {
@@ -7091,6 +4835,40 @@ gcoSTREAM_CPUCacheOperation_Range(
     IN gctSIZE_T Offset,
     IN gctSIZE_T Length,
     IN gceCACHEOPERATION Operation
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoSTREAM_GetFence(
+    IN gcoSTREAM Stream
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+
+gctSIZE_T
+gcoSTREAM_GetSize(
+    IN gcoSTREAM Stream
+    )
+{
+    return 0;
+}
+
+gceSTATUS
+gcoSTREAM_WaitFence(
+    IN gcoSTREAM Stream
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoSTREAM_Node(
+    IN gcoSTREAM Stream,
+    OUT gcsSURF_NODE_PTR * Node
     )
 {
     return gcvSTATUS_OK;

@@ -1,16 +1,3 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 #ifndef __glxext_h_
 #define __glxext_h_ 1
 
@@ -44,7 +31,11 @@ extern "C" {
 ** This header is generated from the Khronos OpenGL / OpenGL ES XML
 ** API Registry. The current version of the Registry, generator scripts
 ** used to make the header, and the header can be found at
-**   http:
+**   http://www.opengl.org/registry/
+**
+** Khronos $Revision: 33136 $ on $Date: 2016-09-15 06:33:58 -0400 (Thu, 15 Sep 2016) $
+*/
+
 #define GLX_GLXEXT_VERSION 20160914
 
 /* Generated C header for:

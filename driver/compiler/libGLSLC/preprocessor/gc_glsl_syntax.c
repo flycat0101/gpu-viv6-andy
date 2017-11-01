@@ -1456,6 +1456,59 @@ ppoPREPROCESSOR_ControlLine(
     }
 }
 
+typedef struct _slsVERSION_INFO
+{
+    gctUINT     langVersion;
+    gctBOOL     isGLVersion;
+    gctSTRING   postfixString;
+    gctBOOL     isSupport;
+}
+slsVERSION_INFO;
+
+slsVERSION_INFO _DefinedVersionInfo[] =
+{
+    /* GL version. */
+    {110,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {120,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    /* GLES version. */
+    {100,   gcvFALSE,   gcvNULL,    gcvFALSE},
+    {300,   gcvFALSE,   "es",       gcvFALSE},
+    {310,   gcvFALSE,   "es",       gcvFALSE},
+    {320,   gcvFALSE,   "es",       gcvFALSE},
+};
+
+#define __sldDefinedVersionInfoCount (gcmSIZEOF(_DefinedVersionInfo) / gcmSIZEOF(slsVERSION_INFO))
+
+static gceSTATUS _InitializeVersionInfoTable(ppoPREPROCESSOR PP, sleSHADER_TYPE ShaderType)
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gctBOOL     isClientVersion = (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL);
+    gctBOOL     isFromLibShader = (ShaderType == slvSHADER_TYPE_LIBRARY);
+    gctUINT     i;
+
+    for (i = 0; i < __sldDefinedVersionInfoCount; i++)
+    {
+        _DefinedVersionInfo[i].isSupport = gcvFALSE;
+
+        /* So far GL client can only support GLSL. */
+        if (_DefinedVersionInfo[i].isGLVersion)
+        {
+            _DefinedVersionInfo[i].isSupport = isClientVersion;
+        }
+        else
+        {
+            _DefinedVersionInfo[i].isSupport = !isClientVersion || isFromLibShader;
+
+            if (_DefinedVersionInfo[i].langVersion > 100)
+            {
+                _DefinedVersionInfo[i].isSupport &= _slHaltiSupport;
+            }
+        }
+    }
+
+    return status;
+}
+
 /******************************************************************************\
 Version
 OpenGL version------GLSL Version
@@ -1478,10 +1531,17 @@ OpenGLES version----GLSL Version
 \******************************************************************************/
 gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
 {
-    gctBOOL     doWeInValidArea = PP->doWeInValidArea;
-    gceSTATUS   status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-    gctBOOL     isGLVersion = (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL);
-    gctUINT32   langVersion = 0;
+    gctBOOL             doWeInValidArea = PP->doWeInValidArea;
+    gceSTATUS           status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    gctUINT32           langVersion = 0;
+    slsVERSION_INFO*    versionInfo = gcvNULL;
+    gctUINT             i;
+    sleSHADER_TYPE      shaderType;
+
+    sloCOMPILER_GetShaderType(PP->compiler, &shaderType);
+
+    /* Initialize the versionInfo table first. */
+    _InitializeVersionInfoTable(PP, shaderType);
 
     if (doWeInValidArea == gcvTRUE)
     {
@@ -1493,9 +1553,8 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
         if (ntoken->type != ppvTokenType_INT)
         {
             ppoPREPROCESSOR_Report(PP,
-                slvREPORT_ERROR,
-                "Expect a number afer the #version.");
-
+                                   slvREPORT_ERROR,
+                                   "Expect a number afer the #version.");
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
 
             status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
@@ -1505,83 +1564,47 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
         /* Get the version integer number first. */
         gcmONERROR(gcoOS_StrToInt(ntoken->poolString, (gctINT *)&langVersion));
 
-        /* So far we can only support OpenGL2.0/2.1 */
-        if (isGLVersion)
+        /* Find the match versionInfo.*/
+        for (i = 0; i < __sldDefinedVersionInfoCount; i++)
         {
-            switch (langVersion)
+            if (_DefinedVersionInfo[i].langVersion == langVersion)
             {
-            case 110:
-            case 120:
+                versionInfo = &_DefinedVersionInfo[i];
                 break;
-
-            default:
-                ppoPREPROCESSOR_Report(PP,
-                                       slvREPORT_ERROR,
-                                       "Can not support version %d.",
-                                       PP->currentSourceFileStringNumber,
-                                       PP->currentSourceFileLineNumber,
-                                       langVersion);
-
-                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-            }
-        }
-        else
-        {
-            switch (langVersion)
-            {
-            case 100:
-                break;
-
-            case 300:
-            case 310:
-            case 320:
-                if (!_slHaltiSupport)
-                {
-                    ppoPREPROCESSOR_Report(PP,
-                                           slvREPORT_ERROR,
-                                           "Can not support version %d.",
-                                           PP->currentSourceFileStringNumber,
-                                           PP->currentSourceFileLineNumber,
-                                           langVersion);
-
-                    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-                    return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-                }
-                break;
-
-            default:
-                ppoPREPROCESSOR_Report(PP,
-                                       slvREPORT_ERROR,
-                                       "Can not support version %d.",
-                                       PP->currentSourceFileStringNumber,
-                                       PP->currentSourceFileLineNumber,
-                                       langVersion);
-
-                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
         }
 
-        /* For GLES 30 and above, we need to check if there is a 'es' after the version number. */
-        if (!isGLVersion && langVersion > 100)
+        /* No matched versionInfo found or can't support this version. */
+        if (versionInfo == gcvNULL || !versionInfo->isSupport)
+        {
+            ppoPREPROCESSOR_Report(PP,
+                                   slvREPORT_ERROR,
+                                   "Can not support version %d.",
+                                   langVersion);
+
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
+
+        /* Check if we need a postfix token after the version number. */
+        if (versionInfo->postfixString != gcvNULL)
         {
             gcmONERROR(PP->inputStream->GetToken(PP,
                                                  &(PP->inputStream),
                                                  &nextToken,
                                                  !ppvICareWhiteSpace));
 
-            if (!gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "es")))
+            if (!gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, versionInfo->postfixString)))
             {
                 ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                                       "Expect 'es' afer the #version directive.",
-                                       PP->currentSourceFileStringNumber,
-                                       PP->currentSourceFileLineNumber);
+                                       "Expect '%s' afer the #version directive.",
+                                       versionInfo->postfixString);
 
                 gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
                 gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
                 return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
+            gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
         }
 
         gcmONERROR(PP->inputStream->GetToken(PP,
@@ -1592,9 +1615,7 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
         if (nextToken && nextToken->poolString != PP->keyword->newline)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                                   "The #version directive must be followed by a newline",
-                                   PP->currentSourceFileStringNumber,
-                                   PP->currentSourceFileLineNumber);
+                                   "The #version directive must be followed by a newline");
 
             gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));

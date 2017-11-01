@@ -35,7 +35,9 @@ BEGIN_EXTERN_C()
 /* the max value for live range's weight */
 #define VIR_RA_LS_MAX_WEIGHT        5.0
 
-#define VIR_RA_LS_MOVA_REG          2
+#define VIR_RA_LS_MAX_MOVA_REG      4
+
+#define VIR_RA_LS_DATA_REG_NUM      (VIR_MAX_SRC_NUM + 1)
 
 /* we use a gctUINT to represent a register pair.
    we use 10 bit to represent a HW register number, which restricts the
@@ -97,6 +99,7 @@ struct VIR_RA_LS_INTERVAL
 
 typedef enum _VIR_RA_LR_FLAG
 {
+    VIR_RA_LRFLAG_NONE              = 0x0, /* No flags. */
     VIR_RA_LRFLAG_NO_SHIFT          = 0x1, /* whether this LR allows shift */
     VIR_RA_LRFLAG_INVALID           = 0x2, /* whether this LR is invalid and no color assigned.
                                                   A LR is invalid because it is not the first temp in
@@ -227,13 +230,14 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     gctUINT                     spillOffset;
     /* reserved HW register for base address, offset, or threadIndex
        baseRegister.x base address for spill
-       baseRegister.y computed offset for spill (LDARR/STARR)
+       baseRegister.y computed offset for spill (LDARR/STARR), save dest for spill(STARR) if the src2 is not in temp
        baseRegister.z threadIndex got from the atomic add  */
     VIR_HwRegId                 baseRegister;
 
     /* reserved HW register for saving MOVA src0 if
        LDARR spill base  */
-    VIR_HwRegId                 movaRegister[VIR_RA_LS_MOVA_REG];
+    gctUINT                     movaRegCount;
+    VIR_HwRegId                 movaRegister[VIR_RA_LS_MAX_MOVA_REG];
 
     /* a hash table to connect spilled offset' MOVA with its MOV instruction
        (we need a MOV, in case MOVA's src is redefined, we reserve the register
@@ -242,16 +246,16 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 
     /* reserved HW register for data, we may need to reserve more than one
        registers to save the data, since in some instruction, maybe more than
-       one src is spilled */
+       one src is spilled, and even the dest may need a extra register. */
     gctUINT                     resDataRegisterCount;
-    VIR_HwRegId                 dataRegister[VIR_MAX_SRC_NUM];
-    gctBOOL                     dataRegisterUsed[VIR_MAX_SRC_NUM];
+    VIR_HwRegId                 dataRegister[VIR_RA_LS_DATA_REG_NUM];
+    gctBOOL                     dataRegisterUsed[VIR_RA_LS_DATA_REG_NUM];
 
     /* save and use the correct symbolId to make IR valid */
     VIR_SymId                   baseAddrSymId;
     VIR_SymId                   spillOffsetSymId;
     VIR_SymId                   threadIdxSymId;
-    VIR_SymId                   dataSymId[VIR_MAX_SRC_NUM];
+    VIR_SymId                   dataSymId[VIR_RA_LS_DATA_REG_NUM];
 
     VIR_HwRegId                 samplePosRegister;
 

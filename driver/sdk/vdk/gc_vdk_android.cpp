@@ -83,8 +83,8 @@
 
 #endif
 
-#if ANDROID_SDK_VERSION > 23
-# warning "Not verified for ANDROID_SDK_VERSION > 23"
+#if ANDROID_SDK_VERSION > 26
+# warning "Not verified for ANDROID_SDK_VERSION > 26"
 #endif
 
 using namespace android;

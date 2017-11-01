@@ -827,8 +827,8 @@ static inline int get_power_imx8_subsystem(struct device *pdev)
             continue;
         }
 
-#ifdef CONFIG_ANDROID
-        /* TODO: freescale BSP issue. */
+#if defined(CONFIG_ANDROID) && LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+        /* TODO: freescale BSP issue in some platform like imx8dv. */
         clk_prepare(clk_core);
         clk_set_rate(clk_core, 800000000);
         clk_unprepare(clk_core);
@@ -849,7 +849,10 @@ static inline int get_power_imx8_subsystem(struct device *pdev)
 #endif
 
 #ifdef CONFIG_PM
+        pm_runtime_get_noresume(&pdev_gpu->dev);
+        pm_runtime_set_active(&pdev_gpu->dev);
         pm_runtime_enable(&pdev_gpu->dev);
+        pm_runtime_put_sync(&pdev_gpu->dev);
         priv->pmdev[core] = &pdev_gpu->dev;
 #endif
         of_node_put(core_node);

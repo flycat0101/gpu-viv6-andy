@@ -71,7 +71,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
         {
             gc->vertexStreams.indexStream.ppIndexBufPriv = &gc->bufferObject.generalBindingPoint[__GL_ELEMENT_ARRAY_BUFFER_INDEX].boundBufObj->privateData;
             gc->vertexStreams.indexStream.streamAddr = NULL;
-            gc->vertexStreams.indexStream.offset = gc->vertexArray.indices;
+            gc->vertexStreams.indexStream.offset = __GL_PTR2SIZE(gc->vertexArray.indices);
         }
     }
 
@@ -208,12 +208,12 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 prevElement = &stream->streamElement[stream->numElements-1];
                 prevArray = &vertexArrayState->attribute[prevElement->inputIndex];
 
-                GL_ASSERT(prevArray->stride == stream->stride);
+                GL_ASSERT(prevArray->stride == (GLsizei)stream->stride);
                 GL_ASSERT(streamIdx == prevElement->streamIndex);
 
                 /*array->offset may be an offset or a pointer. No matter what it is,
                 (array->offset - prevArray->offset) is always what we want here*/
-                if( (array->stride == stream->stride) && ( (GLuint)abs((GLint)glALL_TO_UINT32(array->offset - prevArray->offset)) < stream->stride ))
+                if( (array->stride == (GLsizei)stream->stride) && ( (GLuint)abs((GLint)glALL_TO_UINT32(array->offset - prevArray->offset)) < stream->stride ))
                 {
                     /*configure the next element in the stream*/
                     element = &stream->streamElement[stream->numElements];
@@ -334,11 +334,7 @@ GLvoid __glSetAttributeStatesDirty(__GLcontext *gc)
 
     for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; unit++)
     {
-#ifdef OPENGL40
         gc->texUnitAttrState[unit] = (GLuint64)(-1);
-#else
-        gc->texUnitAttrState[unit] = (GLbitfield)(-1);
-#endif
     }
 
     gc->drawableDirtyMask = __GL_BUFFER_DRAW_READ_BITS;
@@ -362,11 +358,8 @@ __GL_INLINE GLvoid __glClearAttributeStates(__GLcontext *gc)
 {
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);
-#ifdef OPENGL40
+
     __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLuint64));
-#else
-    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLbitfield));
-#endif
     __GL_MEMZERO(gc->globalDirtyState, __GL_DIRTY_ATTRS_END   * sizeof(GLbitfield));
 }
 
@@ -377,7 +370,7 @@ GLvoid __glBuildTexEnableDim(__GLcontext * gc, __GLattribute* cs, __GLattribute*
     (*gc->dp.buildTexEnableDim)(gc);
 
     /* Mark texture enable dimension changed */
-    for (unit = 0; unit < (GLint)gc->constants.shaderCaps.maxCombinedTextureImageUnits; ++unit)
+    for (unit = 0; unit < (GLint)gc->shaderProgram.maxUnit; ++unit)
     {
         if (ds->texture.texUnits[unit].enableDim != cs->texture.texUnits[unit].enableDim)
         {
@@ -1004,12 +997,8 @@ __GL_INLINE GLuint __glGetTextureDIM(__GLattribute* cs, GLint i)
 }
 __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs, __GLattribute* ds)
 {
-    GLint  i = -1;
-#ifdef OPENGL40
+    GLint i = -1;
     GLuint64 localMask;
-#else
-    GLuint localMask;
-#endif
     GLuint enableDim, realEnableDim, lastRealEnableDim;
     __GLbitmask unitMask = gc->texUnitAttrDirtyMask;
     GLuint lastMaxLevelUsed = 0;
@@ -1166,7 +1155,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_G_BIT, swizzle[1]);
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_B_BIT, swizzle[2]);
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_A_BIT, swizzle[3]);
-                    __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_D_ST_TEXMODE_BIT, depthStTexMode);
+                    __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_DS_TEXMODE_BIT, dsTexMode);
                 }
             }
             else if (realEnableDim < __GL_MAX_TEXTURE_BINDINGS &&
@@ -1345,7 +1334,7 @@ __GL_INLINE GLvoid __glEvaluateProgramAttrib(__GLcontext* gc, __GLattribute* cs,
         /* Current sampler2TexUnit will be build in __glBuildTexEnableDim */
         __glBuildTexEnableDim(gc, cs, ds);
 
-        for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; ++sampler)
+        for (sampler = 0; sampler < gc->shaderProgram.maxSampler; ++sampler)
         {
             if (oldSampler2TexUnit[sampler] != newSampler2TexUnit[sampler])
             {
@@ -1415,8 +1404,8 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
         __glOverturnCommitStates(gc);
         __glSetAttributeStatesDirty(gc);
 
-        gc->invalidCommonCommit = GL_FALSE;
-        gc->invalidDrawCommit = GL_FALSE;
+        gc->shaderProgram.maxSampler = gc->constants.shaderCaps.maxTextureSamplers;
+        gc->shaderProgram.maxUnit = gc->constants.shaderCaps.maxCombinedTextureImageUnits;
     }
 
     if (gc->globalDirtyState[__GL_ALL_ATTRS])
@@ -1478,169 +1467,98 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
 #ifdef OPENGL40
 
 GLenum indexPrimMode[] = {
-
     GL_POINTS,                          /* GL_POINTS */
-
     GL_LINES,                           /* GL_LINES */
-
     GL_LINE_LOOP,                       /* GL_LINE_LOOP */
-
     GL_LINE_STRIP,                      /* GL_LINE_STRIP */
-
     GL_TRIANGLES,                       /* GL_TRIANGLES */
-
     GL_TRIANGLE_STRIP,                  /* GL_TRIANGLE_STRIP */
-
     GL_TRIANGLE_FAN,                    /* GL_TRIANGLE_FAN */
-
     GL_QUADS,                           /* GL_QUADS */
-
     GL_QUAD_STRIP,                      /* GL_QUAD_STRIP */
-
     GL_POLYGON,                         /* GL_POLYGON */
-
     GL_LINES_ADJACENCY_EXT,             /* GL_LINES_ADJACENCY_EXT */
-
     GL_LINE_STRIP_ADJACENCY_EXT,        /* GL_LINE_STRIP_ADJACENCY_EXT */
-
     GL_TRIANGLES_ADJACENCY_EXT,         /* GL_TRIANGLES_ADJACENCY_EXT */
-
     GL_TRIANGLE_STRIP_ADJACENCY_EXT,    /* GL_TRIANGLE_STRIP_ADJACENCY_EXT */
-
 };
 
 /***** Vertex stream config functions ********/
 
-
-
 GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode)
-
 {
-
     __GLvertexInput *input = NULL;
-
     __GLstreamDecl *stream;
-
     __GLvertexElement *element;
-
-    GLint offset;
-
+    GLuint offset;
     GLubyte inputIdx;
-
     GLuint mask, i;
-
-
+    __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
 
     /* Immediate mode vertex input always use single stream */
-
     gc->vertexStreams.numStreams = 1;
-
     gc->vertexStreams.endVertex = gc->input.vertex.index;
-
     gc->vertexStreams.indexCount = gc->input.indexCount;
-
     gc->vertexStreams.startVertex = 0;
-
     gc->vertexStreams.primElemSequence = gc->input.primElemSequence;
-
     gc->vertexStreams.primElementMask = gc->input.primInputMask;
-
     gc->vertexStreams.missingAttribs = gc->input.requiredInputMask & (~gc->input.primInputMask) & (~__GL_INPUT_EDGEFLAG) & (~__GL_INPUT_VERTEX);
-
     gc->vertexStreams.edgeflagStream =
-
         (gc->input.primInputMask & __GL_INPUT_EDGEFLAG) ? gc->input.edgeflag.pointer : NULL;
 
-
-
     stream = &gc->vertexStreams.streams[0];
-
     stream->numElements = gc->input.numberOfElements;
-
     stream->streamAddr = (GLuint *)gc->input.vertexDataBuffer;
-
     stream->stride = (gc->input.vertTotalStrideDW << 2);
-
     stream->privPtrAddr = NULL;
 
-
-
     offset = 0;
-
     for (i = 0; i < gc->input.numberOfElements; i++)
-
     {
-
         element = &stream->streamElement[i];
 
-
-
         inputIdx = 0;
-
         mask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
-
         while (mask)
-
         {
-
             if ((mask & 0x1) && (gc->input.currentInput[inputIdx].offsetDW == offset))
-
             {
-
                 input = &gc->input.currentInput[inputIdx];
-
                 offset += input->sizeDW;
-
                 break;
-
             }
-
             mask >>= 1;
-
             inputIdx += 1;
-
         }
-
-
 
         GL_ASSERT( ( 1 << inputIdx ) & gc->input.primInputMask );
 
-
-
         element->inputIndex = inputIdx;
-
         element->streamIndex = 0;
-
         element->offset = (input->offsetDW << 2);
-
         element->size = input->sizeDW;
-
         element->type = GL_FLOAT;
-
         element->normalized = GL_FALSE;
-
         element->integer = GL_FALSE;
-
         if (element->inputIndex == __GL_INPUT_DIFFUSE_INDEX && element->size == 1)
-
         {
-
             /* Special case for RGBA ubyte format */
-
             element->size = 4;
-
             element->type = GL_UNSIGNED_BYTE;
-
             element->normalized = GL_TRUE;
-
         }
-
     }
-
-
 
     gc->vertexStreams.streamMode = IMMEDIATE_STREAMMODE;
 
+
+    vertexArray->indexCount = 0;
+    vertexArray->instanceCount  = 1;
+    vertexArray->start = 0;
+    vertexArray->end = gc->input.vertex.index;
+    vertexArray->baseVertex = 0;
+    vertexArray->drawIndirect = GL_FALSE;
+    vertexArray->multidrawIndirect = GL_FALSE;
 }
 #endif
 
@@ -1651,6 +1569,9 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
     if (ret)
     {
         GLuint index;
+        __GLprogramObject *progObj;
+        __GLSLStage stage;
+
         for (index = 0; index < __GL_MAX_BUFFER_INDEX; index++)
         {
             __glBitmaskSetAll(&gc->bufferObject.bindingDirties[index], GL_FALSE);
@@ -1667,6 +1588,29 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         }
 
         gc->vertexArray.varrayDirty = 0;
+
+        if (gc->invalidCommonCommit || gc->invalidDrawCommit)
+        {
+            gc->invalidCommonCommit = GL_FALSE;
+            gc->invalidDrawCommit = GL_FALSE;
+
+            if (gc->shaderProgram.mode == __GLSL_MODE_GRAPHICS)
+            {
+                /* reset valude.*/
+                gc->shaderProgram.maxSampler = 0;
+                gc->shaderProgram.maxUnit = 0;
+
+                for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
+                {
+                    progObj = __glGetCurrentStageProgram(gc, stage);
+                    if (progObj)
+                    {
+                        gc->shaderProgram.maxSampler = gcmMAX(gc->shaderProgram.maxSampler, progObj->maxSampler);
+                        gc->shaderProgram.maxUnit = gcmMAX(gc->shaderProgram.maxUnit, progObj->maxUnit);
+                    }
+                }
+            }
+        }
 
         /* Temp disable the dirty in case to affect perf */
     }
@@ -1954,69 +1898,32 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
 extern GLvoid configStream(__GLcontext *gc);
 
 /* Immediate mode draw function */
-
 GLvoid  __glDrawImmedPrimitive(__GLcontext *gc)
-
 {
-
     GLenum mode;
 
-
-
     ENTERFUNC_TM();
-
-/*
-
-#if (defined(DEBUG) || defined(_DEBUG))
-
-    gdbg_drawImmeCount ++;
-
-#endif
-
-*/
-
     mode = (gc->input.indexCount ? indexPrimMode[gc->input.primMode] : gc->input.primMode);
 
-
-
     if (mode != gc->vertexStreams.primMode)
-
     {
-
         gc->vertexStreams.primMode = mode;
-
         __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_PRIMMODE_BIT);
-
     }
 
-
-
     /* Get the latest drawable information */
-
 //   LINUX_LOCK_FRAMEBUFFER(gc);
-
-
 
  //   __glEvaluateAttribDrawableChange(gc);
 
-
-
     __glConfigImmedVertexStream(gc, mode);
-
-
 
 //    configStream(gc);
 
-
-
     __glDrawPrimitive(gc,mode);
 
-
-
 //    LINUX_UNLOCK_FRAMEBUFFER(gc);
-
     LEAVEFUNC_TM();
-
 }
 
 GLvoid __glEvaluateAttributeChange(__GLcontext *gc)
@@ -2046,6 +1953,7 @@ GLvoid __glConfigDlistVertexStream(__GLcontext *gc, __GLPrimBegin *primBegin, GL
 {
     __GLstreamDecl *stream;
     __GLvertexElement *element;
+    __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
     GLint i, offset;
     GLubyte inputIdx;
     GLuint mask;
@@ -2107,7 +2015,23 @@ GLvoid __glConfigDlistVertexStream(__GLcontext *gc, __GLPrimBegin *primBegin, GL
         }
     }
 
+    if (indexCount)
+    {
+        vertexArray->end = 0;
+        vertexArray->indices = indexBuffer;
+        vertexArray->indexType = GL_UNSIGNED_SHORT;
+    }
+    else
+    {
+        vertexArray->end = vertexCount;
+    }
     gc->vertexStreams.streamMode = DLIST_STREAMMODE;
+    vertexArray->instanceCount  = 1;
+    vertexArray->start = 0;
+    vertexArray->baseVertex = 0;
+    vertexArray->indexCount = indexCount;
+    vertexArray->drawIndirect = GL_FALSE;
+    vertexArray->multidrawIndirect = GL_FALSE;
 }
 GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
 {
@@ -2229,13 +2153,9 @@ __GL_INLINE GLboolean __glComputeEnd(__GLcontext *gc)
 
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);
-#ifdef OPENGL40
     __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLuint64));
-#else
-    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLbitfield));
-#endif
-    gc->globalDirtyState[__GL_PROGRAM_ATTRS] = 0;
 
+    gc->globalDirtyState[__GL_PROGRAM_ATTRS] = 0;
     gc->globalDirtyState[__GL_ALL_ATTRS] &= ~(__GL_ONE_32 << __GL_PROGRAM_ATTRS |
                                               __GL_ONE_32 << __GL_TEX_UNIT_ATTRS |
                                               __GL_ONE_32 << __GL_IMG_UNIT_ATTRS);

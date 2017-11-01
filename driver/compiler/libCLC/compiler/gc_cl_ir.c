@@ -538,7 +538,8 @@ IN clsDECL *Decl
    clsNAME *fieldName;
    gctBOOL packed = gcvFALSE;
 
-   if(clmDECL_IsPointerType(Decl)) {
+   if(clmDECL_IsPointerType(Decl) ||
+      clmDECL_IsPointerArray(Decl)) {
       size = 4;
    }
    else {
@@ -698,7 +699,8 @@ OUT gctBOOL *Packed
    gctUINT alignment = 0;
    gctBOOL packed = gcvFALSE;
 
-   if(clmDECL_IsPointerType(Decl)) {
+   if(clmDECL_IsPointerType(Decl) ||
+      clmDECL_IsPointerArray(Decl)) {
       size = 4;
       alignment = 4;
    }
@@ -1101,6 +1103,100 @@ cltELEMENT_TYPE ElementType
       }
 
       return size;
+}
+
+cltELEMENT_TYPE
+clGenElementTypeByByteSizeAndBaseType(
+    IN cloCOMPILER Compiler,
+    IN cltELEMENT_TYPE BaseElementType,
+    IN gctBOOL IsPacked,
+    IN gctUINT Size,
+    OUT VIR_TypeId * VirPrimitiveType
+    )
+{
+    cltELEMENT_TYPE elementType = BaseElementType;
+    VIR_TypeId virPrimitiveType = VIR_INVALID_ID;
+
+    if (clmIsElementTypeUnsigned(BaseElementType))
+    {
+        switch (Size)
+        {
+        case 1:
+            elementType = clvTYPE_UCHAR;
+            virPrimitiveType = VIR_TYPE_UINT8;
+            break;
+
+        case 2:
+            elementType = clvTYPE_USHORT;
+            virPrimitiveType = VIR_TYPE_UINT16;
+            break;
+
+        case 4:
+            elementType = clvTYPE_UINT;
+            virPrimitiveType = VIR_TYPE_UINT32;
+            break;
+
+        default:
+            gcmASSERT(8);
+            elementType = clvTYPE_ULONG;
+            virPrimitiveType = VIR_TYPE_UINT64;
+            break;
+        }
+    }
+    else if (clmIsElementTypeSigned(BaseElementType))
+    {
+        switch (Size)
+        {
+        case 1:
+            elementType = clvTYPE_CHAR;
+            virPrimitiveType = VIR_TYPE_INT8;
+            break;
+
+        case 2:
+            elementType = clvTYPE_SHORT;
+            virPrimitiveType = VIR_TYPE_INT16;
+            break;
+
+        case 4:
+            elementType = clvTYPE_INT;
+            virPrimitiveType = VIR_TYPE_INT32;
+            break;
+
+        default:
+            gcmASSERT(8);
+            elementType = clvTYPE_LONG;
+            virPrimitiveType = VIR_TYPE_INT64;
+            break;
+        }
+    }
+    else if (clmIsElementTypeFloating(BaseElementType))
+    {
+        switch (Size)
+        {
+        case 2:
+            elementType = clvTYPE_HALF;
+            virPrimitiveType = VIR_TYPE_FLOAT16;
+            break;
+
+        case 4:
+            elementType = clvTYPE_FLOAT;
+            virPrimitiveType = VIR_TYPE_FLOAT32;
+            break;
+
+        default:
+            gcmASSERT(8);
+            elementType = clvTYPE_DOUBLE;
+            virPrimitiveType = VIR_TYPE_FLOAT64;
+            break;
+        }
+    }
+
+    if (VirPrimitiveType)
+    {
+        *VirPrimitiveType = virPrimitiveType;
+    }
+
+    return elementType;
 }
 
 gctSIZE_T
@@ -2098,6 +2194,50 @@ OUT clsNAME ** Name
         *Name = gcvNULL;
         return gcvSTATUS_NAME_NOT_FOUND;
     }
+}
+
+gceSTATUS
+clsNAME_SPACE_SearchFieldSpaceWithUnnamedField(
+IN cloCOMPILER Compiler,
+IN clsNAME_SPACE * FieldSpace,
+IN cltPOOL_STRING Symbol,
+IN gctBOOL Recursive,
+OUT clsNAME ** Name
+)
+{
+    clsNAME *name;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    gcmASSERT(FieldSpace);
+
+    FOR_EACH_DLINK_NODE(&FieldSpace->names, clsNAME, name) {
+        if (name->symbol == Symbol) {
+            if (name->extension != clvEXTENSION_NONE) {
+               if (!cloCOMPILER_ExtensionEnabled(Compiler,
+                                 name->extension)) continue;
+            }
+            *Name = name;
+            return gcvSTATUS_OK;
+        }
+        else if(Recursive && name->symbol[0] == '\0') { /* unnamed field */
+            if (clmDATA_TYPE_IsStructOrUnion(name->decl.dataType)) {
+                gceSTATUS status;
+                clsNAME *fieldName;
+                status = clsNAME_SPACE_SearchFieldSpaceWithUnnamedField(Compiler,
+                                                                        name->decl.dataType->u.fieldSpace,
+                                                                        Symbol,
+                                                                        gcvFALSE,
+                                                                        &fieldName);
+                if(status == gcvSTATUS_NAME_NOT_FOUND) continue;
+                *Name = fieldName;
+                return gcvSTATUS_OK;
+            }
+        }
+    }
+
+    *Name = gcvNULL;
+    return gcvSTATUS_NAME_NOT_FOUND;
 }
 
 gceSTATUS
@@ -3177,9 +3317,10 @@ OUT gctBOOL *HasGenType,
 OUT clsDATA_TYPE *FuncDataType
 )
 {
-    gctUINT        paramCount;
-    clsNAME *    paramName;
-    cloIR_EXPR    argument;
+    gceSTATUS   status;
+    gctUINT     paramCount;
+    clsNAME *   paramName;
+    cloIR_EXPR  argument;
 
     gcmASSERT(FuncName);
     gcmASSERT(FuncName->type == clvFUNC_NAME ||
@@ -3222,6 +3363,19 @@ OUT clsDATA_TYPE *FuncDataType
                 return gcvFALSE;
             }
 
+            if (clmDECL_IsPointerType(&paramName->decl) && clmDECL_IsArray(&argument->decl)) {
+                slsDLINK_NODE *nextArgument = ((slsDLINK_NODE *)argument)->next;
+
+                /* edit array argument to the form of &A[0] */
+                slsDLINK_NODE_Detach((slsDLINK_NODE *)argument);
+                status = clParseMakeArrayPointerExpr(Compiler,
+                                                     argument,
+                                                     &argument);
+                if(gcmIS_ERROR(status)) return gcvFALSE;
+
+                slsDLINK_NODE_InsertPrev(nextArgument, (slsDLINK_NODE *)argument);
+            }
+
             if(!*HasGenType && refParamName &&
                clmIsElementTypeGenType(refParamName->decl.dataType->elementType)) {
                 *HasGenType = gcvTRUE;
@@ -3241,6 +3395,19 @@ OUT clsDATA_TYPE *FuncDataType
             if (paramName->type != clvPARAMETER_NAME) break;
 
             if (!_IsDeclParameterizableTo(&paramName->decl, &argument->decl)) return gcvFALSE;
+            if (clmDECL_IsPointerType(&paramName->decl) && clmDECL_IsArray(&argument->decl)) {
+                slsDLINK_NODE *nextArgument = ((slsDLINK_NODE *)argument)->next;
+
+                /* edit array argument to the form of &A[0] */
+                slsDLINK_NODE_Detach((slsDLINK_NODE *)argument);
+                status = clParseMakeArrayPointerExpr(Compiler,
+                                                     argument,
+                                                     &argument);
+                if(gcmIS_ERROR(status)) return gcvFALSE;
+
+                slsDLINK_NODE_InsertPrev(nextArgument, (slsDLINK_NODE *)argument);
+            }
+
        }
     }
 
@@ -4055,11 +4222,13 @@ OUT clsNAME **Name
 {
     gceSTATUS status;
     clsNAME *name;
+    cltPOOL_STRING symbol;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     gcmASSERT(NameSpace);
 
+    symbol = Symbol;
     switch (Type) {
     case clvFUNC_NAME:
     case clvKERNEL_FUNC_NAME:
@@ -4091,9 +4260,41 @@ OUT clsNAME **Name
         }
 
         if(Symbol[0] != '\0') {
+            symbol = Symbol;
+            if(Type == clvSTRUCT_NAME || Type == clvUNION_NAME) {
+                gctSIZE_T length, prefixLength;
+                gctSTRING prefix;
+                gctSTRING nameBuffer = gcvNULL;
+                gctPOINTER pointer;
+
+                if(Type == clvSTRUCT_NAME)
+                {
+                    prefix = cldSTRUCT_NAME_PREFIX;
+                }
+                else prefix = cldUNION_NAME_PREFIX;
+
+                gcoOS_StrLen(prefix, &prefixLength);
+                gcoOS_StrLen(Symbol, &length);
+
+                length += prefixLength + 1;
+                status = cloCOMPILER_Allocate(Compiler,
+                                              length,
+                                              &pointer);
+                if (gcmIS_ERROR(status))  return status;
+                nameBuffer = pointer;
+
+                gcmVERIFY_OK(gcoOS_StrCopySafe(nameBuffer, length, prefix));
+                gcmVERIFY_OK(gcoOS_StrCatSafe(nameBuffer, length, Symbol));
+
+                status = cloCOMPILER_AllocatePoolString(Compiler,
+                                                        nameBuffer,
+                                                        &symbol);
+                gcmVERIFY_OK(cloCOMPILER_Free(Compiler, pointer));
+                if (gcmIS_ERROR(status)) return status;
+            }
             status = clsNAME_SPACE_Search(Compiler,
                                           NameSpace,
-                                          Symbol,
+                                          symbol,
                                           gcvFALSE,
                                           &name);
 
@@ -4127,7 +4328,7 @@ OUT clsNAME **Name
                                       StringNo,
                                       Type,
                                       Decl,
-                                      Symbol,
+                                      symbol,
                                       PtrDscr,
                                       IsBuiltin,
                                       Extension,
@@ -8070,42 +8271,119 @@ clGetFieldByteOffset(
    clsNAME *    fieldName;
    gctUINT alignment;
    gctBOOL packed = gcvFALSE;
+   clsNAME_SPACE *fieldSpace;
 
    gcmASSERT(StructDecl);
    gcmASSERT(clmDATA_TYPE_IsStructOrUnion(StructDecl->dataType));
    gcmASSERT(FieldName);
 
-   gcmASSERT(StructDecl->dataType->u.fieldSpace);
+   fieldSpace = StructDecl->dataType->u.fieldSpace;
+   gcmASSERT(fieldSpace);
 
-   FOR_EACH_DLINK_NODE(&StructDecl->dataType->u.fieldSpace->names, clsNAME, fieldName)
-   {
-      if (fieldName == FieldName) break;
-      gcmASSERT(fieldName->decl.dataType);
+   if(fieldSpace->scopeName->u.typeInfo.hasUnnamedFields) {
+       FOR_EACH_DLINK_NODE(&fieldSpace->names, clsNAME, fieldName)
+       {
+          if (fieldName == FieldName) break;
+          gcmASSERT(fieldName->decl.dataType);
 
-      if(fieldName->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
-         packed = gcvTRUE;
-      }
-      else {
-         packed = gcvFALSE;
-      }
-      if(StructDecl->dataType->elementType == clvTYPE_UNION) continue;
-      else {
-        if(fieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
-           alignment = fieldName->context.alignment;
-        }
-        else {
-           if(clmDECL_IsUnderlyingStructOrUnion(&fieldName->decl)) {
-              clsNAME *subField;
-              subField = slsDLINK_LIST_First(&fieldName->decl.dataType->u.fieldSpace->names, struct _clsNAME);
-              if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
-                 alignment = subField->context.alignment;
+          if(fieldName->symbol[0] == '\0') { /* unnamed field */
+              if (clmDATA_TYPE_IsStructOrUnion(fieldName->decl.dataType)) {
+                  clsNAME * fld;
+
+                  FOR_EACH_DLINK_NODE(&fieldName->decl.dataType->u.fieldSpace->names, clsNAME, fld)
+                  {
+                      if (fld == FieldName) {
+                          fieldName = fld;
+                          goto Found;
+                      }
+
+                      if(fld->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
+                          packed = gcvTRUE;
+                      }
+                      else {
+                          packed = gcvFALSE;
+                      }
+                      if(fld->decl.dataType->elementType == clvTYPE_UNION) continue;
+                      else {
+                          if(fld->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                             alignment = fld->context.alignment;
+                          }
+                          else {
+                             if(clmDECL_IsUnderlyingStructOrUnion(&fld->decl)) {
+                                 clsNAME *subField;
+                                 subField = slsDLINK_LIST_First(&fld->decl.dataType->u.fieldSpace->names, struct _clsNAME);
+                                 if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                                    alignment = subField->context.alignment;
+                                 }
+                                 else alignment = clPermissibleAlignment(Compiler, &fld->decl);
+                             }
+                             else alignment = clPermissibleAlignment(Compiler, &fld->decl);
+                          }
+                          offset = clmALIGN(offset, alignment, packed) + clsDECL_GetByteSize(Compiler, &fld->decl);
+                      }
+                  }
               }
-              else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
-           }
-           else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
-        }
-        offset = clmALIGN(offset, alignment, packed) + clsDECL_GetByteSize(Compiler, &fieldName->decl);
-      }
+          }
+          else {
+              if(fieldName->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
+                 packed = gcvTRUE;
+              }
+              else {
+                 packed = gcvFALSE;
+              }
+              if(StructDecl->dataType->elementType == clvTYPE_UNION) continue;
+              else {
+                  if(fieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                     alignment = fieldName->context.alignment;
+                  }
+                  else {
+                     if(clmDECL_IsUnderlyingStructOrUnion(&fieldName->decl)) {
+                        clsNAME *subField;
+                        subField = slsDLINK_LIST_First(&fieldName->decl.dataType->u.fieldSpace->names, struct _clsNAME);
+                        if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                           alignment = subField->context.alignment;
+                        }
+                        else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+                     }
+                     else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+                  }
+                  offset = clmALIGN(offset, alignment, packed) + clsDECL_GetByteSize(Compiler, &fieldName->decl);
+              }
+          }
+       }
+Found:;
+   }
+   else {
+       FOR_EACH_DLINK_NODE(&fieldSpace->names, clsNAME, fieldName)
+       {
+          if (fieldName == FieldName) break;
+          gcmASSERT(fieldName->decl.dataType);
+
+          if(fieldName->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
+             packed = gcvTRUE;
+          }
+          else {
+             packed = gcvFALSE;
+          }
+          if(StructDecl->dataType->elementType == clvTYPE_UNION) continue;
+          else {
+            if(fieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+               alignment = fieldName->context.alignment;
+            }
+            else {
+               if(clmDECL_IsUnderlyingStructOrUnion(&fieldName->decl)) {
+                  clsNAME *subField;
+                  subField = slsDLINK_LIST_First(&fieldName->decl.dataType->u.fieldSpace->names, struct _clsNAME);
+                  if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                     alignment = subField->context.alignment;
+                  }
+                  else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+               }
+               else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+            }
+            offset = clmALIGN(offset, alignment, packed) + clsDECL_GetByteSize(Compiler, &fieldName->decl);
+          }
+       }
    }
 
    gcmASSERT(fieldName == FieldName);
@@ -8876,6 +9154,8 @@ IN gctINT intType
    case T_BOOL:
    case T_HALF_PACKED:
    case T_BOOL_PACKED:
+   case T_ENUM:
+   case T_EVENT_T:
       return T_INT;
 
    case T_UINT2:
@@ -10202,6 +10482,10 @@ OUT cloIR_BINARY_EXPR *BinaryExpr
     binaryExpr->leftOperand    = LeftOperand;
     binaryExpr->rightOperand = RightOperand;
 
+    /* Do the implicit type conversion. */
+    status = cloIR_BINARY_EXPR_ImplicitTypeConv(Compiler,
+                                                binaryExpr);
+
     *BinaryExpr = binaryExpr;
     return gcvSTATUS_OK;
    } while (gcvFALSE);
@@ -10300,6 +10584,153 @@ OUT cloIR_CONSTANT * ResultConstant
 
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+}
+
+static gctBOOL
+_checkNeedImplicitTypeConvForAssignment(
+    IN cloCOMPILER  Compiler,
+    IN clsDATA_TYPE *LeftExprDataType,
+    IN clsDATA_TYPE *RightExprDataType,
+    OUT clsDATA_TYPE ** DataType
+    )
+{
+    gctBOOL         converted = gcvFALSE;
+    cltELEMENT_TYPE leftElementType = LeftExprDataType->elementType;
+    cltELEMENT_TYPE rightElementType = RightExprDataType->elementType;
+    gctSIZE_T       leftElementTypeByteSize = clGetElementTypeByteSize(Compiler, leftElementType);
+    gctSIZE_T       rightElementTypeByteSize = clGetElementTypeByteSize(Compiler, rightElementType);
+    clsDATA_TYPE   *newDataType = gcvNULL;
+    cltELEMENT_TYPE newElementType;
+    VIR_TypeId      newVirPrimitiveType = VIR_INVALID_ID;
+
+    if (leftElementTypeByteSize < rightElementTypeByteSize)
+    {
+        return gcvFALSE;
+    }
+
+    if (clmIsElementTypeFloating(leftElementType))
+    {
+        if (clmIsElementTypeInteger(rightElementType))
+        {
+            newElementType = clGenElementTypeByByteSizeAndBaseType(Compiler,
+                                                                   rightElementType,
+                                                                   gcvFALSE,
+                                                                   leftElementTypeByteSize,
+                                                                   &newVirPrimitiveType);
+
+            if (newElementType != rightElementType)
+            {
+                cloCOMPILER_CloneDataTypeExplicit(Compiler,
+                                                  RightExprDataType->accessQualifier,
+                                                  RightExprDataType->addrSpaceQualifier,
+                                                  RightExprDataType,
+                                                  &newDataType);
+                gcmASSERT(newDataType);
+
+                newDataType->elementType = newElementType;
+                newDataType->virPrimitiveType = newVirPrimitiveType;
+                converted = gcvTRUE;
+            }
+        }
+    }
+
+    if (converted && DataType)
+    {
+        gcmASSERT(newDataType);
+        *DataType = newDataType;
+    }
+
+    return converted;
+}
+
+static gctBOOL
+_NeedImplicitTypeConv(
+    IN cloIR_BINARY_EXPR BinaryExpr
+    )
+{
+    gctBOOL need = gcvFALSE;
+    cloIR_EXPR rightExpr = BinaryExpr->rightOperand;
+    cloIR_BINARY_EXPR binaryRightExpr;
+    clsDATA_TYPE *leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
+    clsDATA_TYPE *rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
+
+    /* Right now only check arithmetic binary. */
+    if (rightExpr->base.vptr->type != clvIR_BINARY_EXPR)
+    {
+        return gcvFALSE;
+    }
+
+    binaryRightExpr = (cloIR_BINARY_EXPR)rightExpr;
+    if (!(binaryRightExpr->type == clvBINARY_ADD  ||
+          binaryRightExpr->type == clvBINARY_SUB  ||
+          binaryRightExpr->type == clvBINARY_MUL  ||
+          binaryRightExpr->type == clvBINARY_DIV  ||
+          binaryRightExpr->type == clvBINARY_MOD  ||
+          binaryRightExpr->type == clvBINARY_AND  ||
+          binaryRightExpr->type == clvBINARY_OR   ||
+          binaryRightExpr->type == clvBINARY_XOR))
+    {
+        return gcvFALSE;
+    }
+
+    /* Check floating and integer only. */
+    if ((clmIsElementTypeFloating(leftExprDataType->elementType) || clmIsElementTypeInteger(leftExprDataType->elementType))
+        &&
+        (clmIsElementTypeFloating(rightExprDataType->elementType) || clmIsElementTypeInteger(rightExprDataType->elementType)))
+    {
+        need = gcvTRUE;
+    }
+
+    /* Skip packed type now. */
+    if (clmIsElementTypePacked(leftExprDataType->elementType) || clmIsElementTypePacked(rightExprDataType->elementType))
+    {
+        need = gcvFALSE;
+    }
+
+    return need;
+}
+
+gceSTATUS
+cloIR_BINARY_EXPR_ImplicitTypeConv(
+    IN cloCOMPILER Compiler,
+    IN cloIR_BINARY_EXPR BinaryExpr
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    clsDATA_TYPE    *leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
+    clsDATA_TYPE    *rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
+    clsDATA_TYPE    *newRightExprDataType = gcvNULL;
+
+    if (!_NeedImplicitTypeConv(BinaryExpr))
+    {
+        return status;
+    }
+
+    /* Now only enable for assignment. */
+    /*
+    ** Right now we only have assignment conversion.
+    ** VIV:TODO: we also need Integral Promotion.
+    */
+    switch (BinaryExpr->type)
+    {
+    case clvBINARY_ASSIGN:
+        {
+            if (_checkNeedImplicitTypeConvForAssignment(Compiler,
+                                                        leftExprDataType,
+                                                        rightExprDataType,
+                                                        &newRightExprDataType))
+            {
+                /* Update the dataType. */
+                BinaryExpr->rightOperand->decl.dataType = newRightExprDataType;
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return status;
 }
 
 /* cloIR_SELECTION object. */

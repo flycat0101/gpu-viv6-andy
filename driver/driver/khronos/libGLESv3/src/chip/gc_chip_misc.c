@@ -84,7 +84,7 @@ __glChipBeginQuery(
     else if ((queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN) ||
              (queryObj->target == GL_PRIMITIVES_GENERATED_EXT))
     {
-        if (!chipCtx->chipFeature.hasHwTFB)
+        if (!chipCtx->chipFeature.hwFeature.hasHwTFB)
         {
             gcmFOOTER_ARG("return=%d", GL_TRUE);
             return GL_TRUE;
@@ -158,7 +158,7 @@ __glChipEndQuery(
 
     if ((queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN ||
          queryObj->target == GL_PRIMITIVES_GENERATED_EXT) &&
-         !chipCtx->chipFeature.hasHwTFB)
+         !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         queryObj->resultAvailable = GL_TRUE;
         gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -214,7 +214,7 @@ __glChipGetQueryObject(
 
     if ((queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN ||
          queryObj->target == GL_PRIMITIVES_GENERATED_EXT) &&
-         !chipCtx->chipFeature.hasHwTFB)
+         !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         queryObj->resultAvailable = GL_TRUE;
         gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -570,7 +570,7 @@ __glChipBindXFB(
 
     gcmHEADER_ARG("gc=0x%x xfbObj=0x%x", gc, xfbObj);
 
-    if (chipCtx->chipFeature.hasHwTFB)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         if (chipXfb == NULL)
         {
@@ -635,7 +635,7 @@ __glChipBeginXFB(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (chipCtx->chipFeature.hasHwTFB)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_BEGIN);
     }
@@ -655,7 +655,7 @@ __glChipEndXFB(
 
     gcmHEADER_ARG("gc=0x%x xfbObj=0x%x", gc, xfbObj);
 
-    if (chipCtx->chipFeature.hasHwTFB)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         gcmONERROR(gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_END));
     }
@@ -665,7 +665,7 @@ __glChipEndXFB(
     }
 
     gcmONERROR(gco3D_Semaphore(chipCtx->engine,
-                               chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
+                               chipCtx->chipFeature.hwFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
                                gcvWHERE_PIXEL,
                                gcvHOW_SEMAPHORE));
 
@@ -770,7 +770,7 @@ __glChipPauseXFB(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (chipCtx->chipFeature.hasHwTFB)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_PAUSE);
     }
@@ -788,7 +788,7 @@ __glChipResumeXFB(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (chipCtx->chipFeature.hasHwTFB)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_RESUME);
     }
@@ -975,7 +975,7 @@ __glChipMemoryBarrier(
         {
             gcmONERROR(gco3D_FlushSHL1Cache(chipCtx->engine));
 
-            if (chipCtx->chipFeature.hasCommandPrefetch)
+            if (chipCtx->chipFeature.hwFeature.hasCommandPrefetch)
             {
                 gcmONERROR(gco3D_Semaphore(chipCtx->engine,
                                            gcvWHERE_COMMAND_PREFETCH,

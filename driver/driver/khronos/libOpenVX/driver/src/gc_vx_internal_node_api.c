@@ -26,8 +26,21 @@ VX_INTERNAL_API vx_node vxSobelMxNNode(vx_graph graph, vx_image input, vx_scalar
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SOBEL_MxN, parameters, vxmLENGTH_OF(parameters));
 }
 
+VX_INTERNAL_API vx_node vxSobelMxNF16Node(vx_graph graph, vx_image input, vx_scalar ws, vx_scalar shift, vx_image gx, vx_image gy)
+{
+    vx_reference parameters[] = {
+        (vx_reference)input,
+        (vx_reference)ws,
+        (vx_reference)shift,
+        (vx_reference)gx,
+        (vx_reference)gy
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SOBEL_MxN_F16, parameters, vxmLENGTH_OF(parameters));
+}
+
 VX_INTERNAL_API vx_node vxHarrisScoreNode(
-        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_image score)
+        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_scalar shift, vx_image score)
 {
     vx_reference parameters[] = {
         (vx_reference)gx,
@@ -35,6 +48,7 @@ VX_INTERNAL_API vx_node vxHarrisScoreNode(
         (vx_reference)sensitivity,
         (vx_reference)winSize,
         (vx_reference)blockSize,
+        (vx_reference)shift,
         (vx_reference)score
     };
 
@@ -77,6 +91,30 @@ VX_INTERNAL_API vx_node vxElementwiseNormNode(
     };
 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_ELEMENTWISE_NORM, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxElementwiseNormF16Node(
+        vx_graph graph, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output)
+{
+    vx_reference parameters[] = {
+        (vx_reference)input_x,
+        (vx_reference)input_y,
+        (vx_reference)norm_type,
+        (vx_reference)output
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_ELEMENTWISE_NORM_F16, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxPhaseF16Node(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image orientation)
+{
+    vx_reference parameters[] = {
+       (vx_reference)grad_x,
+       (vx_reference)grad_y,
+       (vx_reference)orientation
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_PHASE_F16, parameters, vxmLENGTH_OF(parameters));
 }
 
 VX_INTERNAL_API vx_node vxNonMaxSuppressionNode(vx_graph graph, vx_image mag, vx_image phase, vx_image edge)

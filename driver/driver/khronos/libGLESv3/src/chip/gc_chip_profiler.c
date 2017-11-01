@@ -19,47 +19,7 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_PROFILER
 
 
-extern GLint __glesApiProfileMode;
-
 #if VIVANTE_PROFILER
-
-gctBOOL __glesIsSyncMode = gcvTRUE;
-
-
-#define gcmWRITE_CONST(ConstValue) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = ConstValue; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_VALUE(IntData) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = IntData; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_COUNTER(Counter, Value) \
-    gcmWRITE_CONST(Counter); \
-    gcmWRITE_VALUE(Value)
-
-/* Write a string value (char*). */
-#define gcmWRITE_STRING(String) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 length; \
-        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(length), &length)); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, length, String)); \
-    } \
-    while (gcvFALSE)
-
 #define PRO_NODE_SIZE 8
 typedef struct _program_list{
     gctUINT32 program_id[PRO_NODE_SIZE];
@@ -124,6 +84,25 @@ static gctBOOL _pro_dirty(gctUINT32 program){
     return gcvTRUE;
 }
 
+/*******************************************************************************
+**    _pro_destroy
+**
+**    Free memory data in each frame.
+**
+*/
+static void _pro_destroy() {
+    program_list *pPGM, *freenode;
+    pPGM = PGM;
+    while (pPGM != gcvNULL)
+    {
+        freenode = pPGM;
+        pPGM = pPGM->next;
+        gcoOS_Free(gcvNULL, freenode);
+    }
+    PGM = gcvNULL;
+    return;
+}
+
 gceSTATUS
 gcChipProfilerInitialize(
     IN __GLcontext *gc
@@ -133,9 +112,7 @@ gcChipProfilerInitialize(
     gctCHAR *env = gcvNULL;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     glsPROFILER * profiler = &gc->profiler;
-#ifdef ANDROID
-    gctBOOL matchResult = gcvFALSE;
-#endif
+
     gcmHEADER_ARG("gc=0x%x", gc);
 
     /* Clear the profiler. */
@@ -148,7 +125,7 @@ gcChipProfilerInitialize(
         gcmFOOTER();
         return gcvSTATUS_OK;
     case 0:
-        gcoPROFILER_NEW_Disable();
+        gcoPROFILER_Disable();
         profiler->enable = gcvFALSE;
         gcmFOOTER();
         return gcvSTATUS_OK;
@@ -190,7 +167,7 @@ gcChipProfilerInitialize(
         gcmFOOTER();
         return status;
     }
-    gcmONERROR(gcoPROFILER_NEW_Construct(&chipCtx->profiler));
+    gcmONERROR(gcoPROFILER_Construct(&chipCtx->profiler));
 
     profiler->useGlfinish = gcvFALSE;
     gcoOS_GetEnv(gcvNULL, "VP_USE_GLFINISH", &env);
@@ -199,52 +176,34 @@ gcChipProfilerInitialize(
         profiler->useGlfinish = gcvTRUE;
     }
 
-    gcoOS_GetEnv(gcvNULL, "VP_SYNC_MODE", &env);
-    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+    profiler->perDrawMode = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VP_PERDRAW_MODE", &env);
+    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
     {
-        profiler->syncMode =
-        chipCtx->profiler->isSyncMode = gcvFALSE;
+        profiler->perDrawMode =
+        chipCtx->profiler->perDrawMode = gcvTRUE;
     }
 
-    gcoOS_GetEnv(gcvNULL, "VP_OUTPUT", &env);
-    if ((env != gcvNULL) && *env != '\0')
-    {
-        chipCtx->profiler->fileName = env;
-    }
+    chipCtx->profiler->profilerClient = gcvCLIENT_OPENGLES;
 
-#ifdef ANDROID
-    gcoOS_GetEnv(gcvNULL, "VP_PROCESS_NAME", &env);
-    if ((env != gcvNULL) && (env[0] != 0)) matchResult = (gcoOS_DetectProcessByName(env) ? gcvTRUE : gcvFALSE);
-    if (matchResult != gcvTRUE) {
-        gcmFOOTER();
-        return gcvSTATUS_MISMATCH;
-    }
-#endif
-
-    if (gcoPROFILER_NEW_Enable(chipCtx->profiler) != gcvSTATUS_OK)
+    if (gcoPROFILER_Enable(chipCtx->profiler) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER();
         return status;
     }
-    profiler->enable = gcvTRUE;
 
+    profiler->enable = gcvTRUE;
     profiler->curFrameNumber = 0;
     profiler->frameNumber = 0;
     profiler->frameBegun = gcvFALSE;
     profiler->finishNumber = 0;
-    profiler->finishBegun = gcvFALSE;
     profiler->drawCount = 0;
-    profiler->perDraw = gcvFALSE;
-    profiler->perFrame = gcvFALSE;
-    profiler->useFBO = gcvFALSE;
     profiler->writeDrawable = gcvFALSE;
 
-    gcoOS_GetTime(&profiler->frameStart);
-    profiler->frameStartTimeusec =
-    profiler->finishStartTimeusec = profiler->frameStart;
+    gcoOS_GetTime(&profiler->frameStartTimeusec);
 
-    __glChipProfilerSet(gc, GL3_PROFILER_BEGIN, 0);
+    gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_HEADER);
 
 OnError:
     /* Return the error. */
@@ -265,8 +224,9 @@ gcChipProfilerDestroy(
 
     if (profiler->enable)
     {
+        _pro_destroy();
         profiler->enable = gcvFALSE;
-        gcmVERIFY_OK(gcoPROFILER_NEW_Destroy(chipCtx->profiler));
+        gcmVERIFY_OK(gcoPROFILER_Destroy(chipCtx->profiler));
     }
 
     /* Success. */
@@ -283,7 +243,7 @@ gcChipProfilerWrite(
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT rev;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gcoPROFILER profilerObj = chipCtx->profiler;
+    gcoPROFILER Profiler = chipCtx->profiler;
     gctSTRING infoCompany = "Vivante Corporation";
     gctSTRING infoVersion = "1.3";
     gctCHAR infoRevision[255] = { '\0' };   /* read from hw */
@@ -331,7 +291,7 @@ gcChipProfilerWrite(
         gcmWRITE_STRING(infoRevision);
         gcmWRITE_CONST(VPC_INFODRIVER);
         gcmWRITE_STRING(infoDriver);
-#if gcdNULL_DRIVER >= 2
+#if gcdNULL_DRIVER
         {
             char* infoDiverMode = "NULL Driver";
             gcmWRITE_CONST(VPC_INFODRIVERMODE);
@@ -341,57 +301,26 @@ gcChipProfilerWrite(
         break;
 
     case GL3_PROFILER_WRITE_FRAME_BEGIN:
-
         if (!gc->profiler.writeDrawable && gc->drawablePrivate)
         {
             gctUINT offset = 0;
             gctCHAR  infoScreen[255] = { '\0' };
             gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
             gcmONERROR(gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
-                &offset, "%d x %d", gc->drawablePrivate->width, gc->drawablePrivate->height));
+                                          &offset, "%d x %d", gc->drawablePrivate->width, gc->drawablePrivate->height));
             gcmWRITE_CONST(VPC_INFOSCREENSIZE);
             gcmWRITE_STRING(infoScreen);
 
             gcmWRITE_CONST(VPG_END);
             gc->profiler.writeDrawable = gcvTRUE;
         }
-
         if (!gc->profiler.frameBegun && gc->profiler.need_dump)
         {
-            gcoPROFILER_NEW_GetPos(profilerObj, &gc->profiler.frameBegunPos);
             gcmWRITE_COUNTER(VPG_FRAME, gc->profiler.frameNumber);
             gc->profiler.frameBegun = gcvTRUE;
         }
         break;
 
-    case GL3_PROFILER_WRITE_FINISH_BEGIN:
-
-        if (!gc->profiler.writeDrawable && gc->drawablePrivate)
-        {
-            gctUINT offset = 0;
-            gctCHAR  infoScreen[255] = { '\0' };
-            gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
-            gcmONERROR(gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
-                &offset, "%d x %d", gc->drawablePrivate->width, gc->drawablePrivate->height));
-            gcmWRITE_CONST(VPC_INFOSCREENSIZE);
-            gcmWRITE_STRING(infoScreen);
-
-            gcmWRITE_CONST(VPG_END);
-            gc->profiler.writeDrawable = gcvTRUE;
-        }
-
-        if (!gc->profiler.finishBegun && gc->profiler.need_dump)
-        {
-            if (gc->profiler.frameBegun)
-            {
-                gcmONERROR(gcoPROFILER_NEW_Seek(profilerObj, gc->profiler.frameBegunPos, gcvFILE_SEEK_SET));
-            }
-            gcmWRITE_COUNTER(VPG_FINISH, gc->profiler.finishNumber);
-            gcmONERROR(gcoPROFILER_NEW_Seek(profilerObj, 0, gcvFILE_SEEK_END));
-            gc->profiler.finishBegun = gcvTRUE;
-            gc->profiler.frameBegun = gcvFALSE;
-        }
-        break;
     case GL3_PROFILER_WRITE_FRAME_END:
 
         /*write time*/
@@ -444,6 +373,14 @@ gcChipProfilerWrite(
                     case GLES3_DRAWELEMENTSINSTANCED:
                     case GLES3_MULTIDRAWARRAYSEXT:
                     case GLES3_MULTIDRAWELEMENTSEXT:
+                    case GLES31_DRAWARRAYSINDIRECT:
+                    case GLES31_DRAWELEMENTSINDIRECT:
+                    case GLES31_MULTIDRAWARRAYSINDIRECTEXT:
+                    case GLES31_MULTIDRAWELEMENTSINDIRECTEXT:
+                    case GLES31_DRAWELEMENTSBASEVERTEX:
+                    case GLES31_DRAWRANGEELEMENTSBASEVERTEX:
+                    case GLES31_DRAWELEMENTSINSTANCEDBASEVERTEX:
+                    case GLES31_MULTIDRAWELEMENTSBASEVERTEXEXT:
                         totalDrawCalls += gc->profiler.apiCalls[i];
                         break;
 
@@ -576,15 +513,11 @@ gcChipProfilerWrite(
         gc->profiler.drawPointCount = 0;
         gc->profiler.drawLineCount = 0;
         gc->profiler.drawTriangleCount = 0;
-        gc->profiler.drawVertexCount = 0;
-        gc->profiler.textureUploadSize = 0;
         gc->profiler.drawCount = 0;
         gc->profiler.totalDriverTime = 0;
 
-        if (gc->profiler.timeEnable)
-        {
-            gcmONERROR(gcoOS_GetTime(&gc->profiler.frameStartTimeusec));
-        }
+        gcmONERROR(gcoOS_GetTime(&gc->profiler.frameStartTimeusec));
+
         break;
     default:
         GL_ASSERT(0);
@@ -606,7 +539,7 @@ __glChipProfilerSet(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     glsPROFILER * profiler = &gc->profiler;
-    gcoPROFILER profilerObj;
+    gcoPROFILER Profiler;
     static gctBOOL dump_program = gcvFALSE;
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -619,39 +552,39 @@ __glChipProfilerSet(
         return GL_FALSE;
     }
 
-    profilerObj = chipCtx->profiler;
+    Profiler = chipCtx->profiler;
 
     switch (__glesApiProfileMode)
     {
     case 1:
         if (profiler->frameCount == 0 || profiler->frameNumber < profiler->frameCount)
         {
-            profilerObj->needDump = profiler->need_dump = gcvTRUE;
+            Profiler->needDump = profiler->need_dump = gcvTRUE;
         }
         else
         {
-            profilerObj->needDump = profiler->need_dump = GL_FALSE;
+            Profiler->needDump = profiler->need_dump = GL_FALSE;
         }
         break;
     case 2:
         if (profiler->enableOutputCounters)
         {
-            profilerObj->needDump = profiler->need_dump = gcvTRUE;
+            Profiler->needDump = profiler->need_dump = gcvTRUE;
         }
         else
         {
-            profilerObj->needDump = profiler->need_dump = GL_FALSE;
+            Profiler->needDump = profiler->need_dump = GL_FALSE;
         }
         break;
     case 3:
         if ((profiler->frameStartNumber == 0 && profiler->frameEndNumber == 0) ||
             (profiler->curFrameNumber >= profiler->frameStartNumber && profiler->curFrameNumber <= profiler->frameEndNumber))
         {
-            profilerObj->needDump = profiler->need_dump = gcvTRUE;
+            Profiler->needDump = profiler->need_dump = gcvTRUE;
         }
         else
         {
-            profilerObj->needDump = profiler->need_dump = GL_FALSE;
+            Profiler->needDump = profiler->need_dump = GL_FALSE;
         }
         break;
     default:
@@ -661,71 +594,49 @@ __glChipProfilerSet(
 
     switch (Enum)
     {
-    case GL3_PROFILER_BEGIN:
-
-        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_HEADER));
-        gcmONERROR(gcoPROFILER_NEW_Begin(chipCtx->profiler, gcvCOUNTER_OP_NONE));
-        break;
-
     case GL3_PROFILER_FRAME_END:
-
-        /*if this thread has eglSwapBuffers, regardless of VP_USE_GLFINISH,
-        the delimeter in glFinish and glFlush is useless*/
-        profiler->useGlfinish = gcvFALSE;
 
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
         profiler->drawCount = 0;
         profiler->curFrameNumber++;
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
 
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(profilerObj, gcvCOUNTER_OP_NONE));
+        gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_FRAME, profiler->frameNumber));
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_END));
-
-        gcmONERROR(gcoPROFILER_NEW_Flush(profilerObj));
+        gcmONERROR(gcoPROFILER_Flush(Profiler));
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_RESET));
-        gcmONERROR(gcoOS_GetTime(&profiler->frameStartTimeusec));
         /* Next frame. */
         if (profiler->need_dump)
-        profiler->frameNumber++;
+        {
+            profiler->frameNumber++;
+        }
         profiler->frameBegun = gcvFALSE;
         break;
 
     case GL3_PROFILER_FINISH_BEGIN:
 
-        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FINISH_BEGIN));
-        gcmONERROR(gcoPROFILER_NEW_End(chipCtx->profiler, profiler->finishNumber, gcvCOUNTER_OP_FINISH));
+        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FINISH));
+        profiler->drawCount = 0;
 
         break;
 
     case GL3_PROFILER_FINISH_END:
 
-        gcmONERROR(gcoOS_GetTime(&profiler->finishEndTimeusec));
-
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(profilerObj, gcvCOUNTER_OP_FINISH));
-        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_END));
-        gcmONERROR(gcoPROFILER_NEW_Flush(profilerObj));
-
-        if (gc->profiler.timeEnable)
-        {
-            gcmONERROR(gcoOS_GetTime(&profiler->finishStartTimeusec));
-        }
-        if (profiler->need_dump)
-        profiler->finishNumber++;
-        profiler->finishBegun = gcvFALSE;
-        break;
-
-    case GL3_PROFILER_END:
-
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
-        profiler->drawCount = 0;
-        profiler->curFrameNumber++;
-        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(profilerObj, gcvCOUNTER_OP_NONE));
+        gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_FINISH, profiler->finishNumber));
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_END));
+        gcmONERROR(gcoPROFILER_Flush(Profiler));
 
-        gcmONERROR(gcoPROFILER_NEW_Flush(profilerObj));
+        gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_RESET));
+        /* Next frame. */
+        if (profiler->need_dump)
+        {
+            profiler->finishNumber++;
+            profiler->frameNumber++;
+        }
+        profiler->frameBegun = gcvFALSE;
         break;
 
     case GL3_PROFILER_PRIMITIVE_TYPE:
@@ -755,27 +666,27 @@ __glChipProfilerSet(
         break;
 
     case GL3_PROFILER_DRAW_BEGIN:
-        if (profiler->perDraw == gcvFALSE)
-        {
-            profiler->perDraw = gcvTRUE;
-            profiler->drawCount = 0;
-        }
+
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_NEW_Begin(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
         break;
 
     case GL3_PROFILER_DRAW_END:
 
-        gcmONERROR(gcoPROFILER_NEW_End(profilerObj, profiler->drawCount, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_DRAW, profiler->drawCount));
         profiler->drawCount++;
         break;
 
-    /* Print program info immediately as we do not save it. */
+        /* Print program info immediately as we do not save it. */
     case GL3_PROGRAM_IN_USE_BEGIN:
         if (!profiler->need_dump)
             break;
         dump_program = _pro_dirty(gcmPTR2INT32(Value));
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
+        if (!profiler->perDrawMode)
+        {
+            gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FRAME));
+        }
         gcmWRITE_CONST(VPG_PROG);
         gcmWRITE_COUNTER(VPC_PROGRAMHANDLE, gcmPTR2INT32(Value));
         break;
@@ -809,17 +720,7 @@ __glChipProfilerSet(
             gcmWRITE_CONST(VPG_END);
         }
         break;
-    case GL3_PROFILER_SYNC_MODE:
-        if (profiler->syncMode)
-        {
-            gcmFOOTER_ARG("return=%d", GL_TRUE);
-            return gcvTRUE;
-        }
-        else
-        {
-            gcmFOOTER_ARG("return=%d", GL_FALSE);
-            return gcvFALSE;
-        }
+
     default:
         break;
     }
@@ -992,13 +893,25 @@ __glChipProfile_DrawEnd(
 
 GLboolean
 __glChipProfile_Flush(
-    __GLcontext *gc
+    __GLcontext *gc,
+    GLboolean bInternal
     )
 {
     GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
 
-    ret = __glChipFlush(gc);
+    if (gc->profiler.enable && gc->profiler.useGlfinish && !bInternal)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
+    ret = __glChipFlush(gc, gcvFALSE);
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish && !bInternal)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
+    }
+
     __GLCHIP_PROFILER_FOOTER();
     return ret;
 }
@@ -1010,7 +923,18 @@ __glChipProfile_Finish(
 {
     GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
     ret = __glChipFinish(gc);
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
+    }
 
     __GLCHIP_PROFILER_FOOTER();
     return ret;
@@ -2411,18 +2335,18 @@ GLvoid __glChipProfile_BlitFramebuffer(__GLcontext *gc,
 {
     __GLCHIP_PROFILER_HEADER();
     __glChipBlitFramebuffer(gc,
-                                   srcX0,
-                                   srcY0,
-                                   srcX1,
-                                   srcY1,
-                                   dstX0,
-                                   dstY0,
-                                   dstX1,
-                                   dstY1,
-                                   mask,
-                                   xReverse,
-                                   yReverse,
-                                   filter);
+                            srcX0,
+                            srcY0,
+                            srcX1,
+                            srcY1,
+                            dstX0,
+                            dstY0,
+                            dstX1,
+                            dstY1,
+                            mask,
+                            xReverse,
+                            yReverse,
+                            filter);
     __GLCHIP_PROFILER_FOOTER();
 }
 
@@ -3028,6 +2952,8 @@ gcChipInitProfileDevicePipeline(
     /* profiler */
 #if VIVANTE_PROFILER
     gc->dp.profiler = __glChipProfile_ProfilerSet;
+#else
+    gc->dp.profiler = NULL;
 #endif
 
     /* Patches. */

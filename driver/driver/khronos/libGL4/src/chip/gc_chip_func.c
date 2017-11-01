@@ -20,7 +20,7 @@
 #define _GC_OBJ_ZONE __GLES3_ZONE_TRACE
 
 extern gceSTATUS getHashedProgram( __GLchipContext  *chipCtx, glsPROGRAMINFO_PTR* Program);
-extern gceSTATUS gcLoadShaders( IN gcoHAL Hal, IN gctSIZE_T StateBufferSize, IN gctPOINTER StateBuffer, IN gcsHINT_PTR Hints);
+extern gceSTATUS gcLoadShaders( IN gcoHAL Hal, IN gcsPROGRAM_STATE ProgramState);
 /*******************************************************************************
 ** Shader generation helpers.
 */
@@ -44,7 +44,7 @@ gceSTATUS glfUsingUniform(
         /* Allocate if not yet allocated. */
         if (*UniformWrap == gcvNULL)
         {
-            gctSIZE_T index = 0;
+            gctUINT32 index = 0;
             glsUNIFORMWRAP wrap;
 
             /* Query the number of uniforms in the shader. */
@@ -58,7 +58,7 @@ gceSTATUS glfUsingUniform(
                 ShaderControl->shader,
                 Name,
                 Type,
-                Length,
+                (gctUINT32)Length,
                 gcSHADER_PRECISION_LOW,
                 &wrap.uniform
                 ));
@@ -109,7 +109,7 @@ gceSTATUS glfUsingAttribute(
         /* Allocate if not yet allocated. */
         if (*AttributeWrap == gcvNULL)
         {
-            gctSIZE_T index = 0;
+            gctUINT32 index = 0;
             glsATTRIBUTEWRAP wrap;
 
             /* Query the number of attributes in the shader. */
@@ -123,7 +123,7 @@ gceSTATUS glfUsingAttribute(
                 ShaderControl->shader,
                 Name,
                 Type,
-                Length,
+                (gctUINT32)Length,
                 IsTexture,
                 ShadingMode,
                 gcSHADER_PRECISION_LOW,
@@ -237,7 +237,7 @@ static gceSTATUS set_uTexGenObjectPlane(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, 4 * i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, 4 * i, chipCtx->currProgram->programState.hints, valueArray);
     }
 
     gcmFOOTER();
@@ -293,7 +293,7 @@ static gceSTATUS set_uTexGenEyePlane(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, 4 * i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, 4 * i, chipCtx->currProgram->programState.hints, valueArray);
     }
 
     gcmFOOTER();
@@ -357,7 +357,7 @@ static gceSTATUS set_uTexCoord(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
 
     gcmFOOTER();
@@ -447,7 +447,7 @@ gceSTATUS loadUniforms(
     )
 {
     gceSTATUS status;
-    gctSIZE_T i = 0, uniformCount = 0;
+    gctUINT32 i = 0, uniformCount = 0;
     gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
 
     /* Query the number of attributes. */
@@ -526,6 +526,8 @@ gceSTATUS gcChipLoadFixFunctionShader(
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status;
     glsPROGRAMINFO_PTR program = gcvNULL;
+    gctUINT enableBits = 0;
+    gctUINT i, j, count = 0, attr = 0;
     gcmHEADER_ARG("gc=0x%x ", gc);
 
     do
@@ -545,7 +547,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
             chipCtx->currProgram = program;
 
             /* Create new program if necessary. */
-            if (chipCtx->currProgram->programSize == 0)
+            if (chipCtx->currProgram->programState.stateBufferSize == 0)
             {
                 /* Generate shaders. */
                 gcmONERROR(glfGenerateVSFixedFunction(gc));
@@ -561,18 +563,14 @@ gceSTATUS gcChipLoadFixFunctionShader(
                     | gcvSHADER_RESOURCE_USAGE
                     | gcvSHADER_OPTIMIZER
                     ),
-                    &chipCtx->currProgram->programSize,
-                    &chipCtx->currProgram->programBuffer,
-                    &chipCtx->currProgram->hints
+                    &chipCtx->currProgram->programState
                     ));
             }
 
             /* Send states to hardware. */
             gcmONERROR(gcLoadShaders(
                 chipCtx->hal,
-                chipCtx->currProgram->programSize,
-                chipCtx->currProgram->programBuffer,
-                chipCtx->currProgram->hints
+                chipCtx->currProgram->programState
                 ));
         } else {
             /* Shader switched from GLSH to fix function */
@@ -580,9 +578,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
                 /* Send states to hardware. */
                 gcmONERROR(gcLoadShaders(
                     chipCtx->hal,
-                    chipCtx->currProgram->programSize,
-                    chipCtx->currProgram->programBuffer,
-                    chipCtx->currProgram->hints
+                    chipCtx->currProgram->programState
                     ));
                 chipCtx->programDirty = GL_FALSE;
             }
@@ -593,6 +589,34 @@ gceSTATUS gcChipLoadFixFunctionShader(
         gcmONERROR(loadUniforms(gc, &chipCtx->currProgram->fs));
     }
     while (gcvFALSE);
+
+    /* Get number of attributes for the vertex shader. */
+    gcmONERROR(gcSHADER_GetAttributeCount(chipCtx->currProgram->vs.shader, &count));
+
+    /* Walk all vertex shader attributes. */
+    for (i = 0, j = 0; i < count; ++i)
+    {
+        gctBOOL attributeEnabled;
+
+
+        /* Get the attribute linkage. */
+        attr = chipCtx->currProgram->vs.attributes[i].binding;
+
+        gcmERR_BREAK(gcATTRIBUTE_IsEnabled(
+            chipCtx->currProgram->vs.attributes[i].attribute,
+            &attributeEnabled
+            ));
+
+        if (attributeEnabled)
+        {
+            /* Link the attribute to the vertex shader input. */
+            chipCtx->attributeArray[attr].linkage = j++;
+
+            /* Enable the attribute. */
+            enableBits |= 1 << attr;
+        }
+    }
+    chipCtx ->attribMask = enableBits;
 
     /* Return status. */
     gcmFOOTER();

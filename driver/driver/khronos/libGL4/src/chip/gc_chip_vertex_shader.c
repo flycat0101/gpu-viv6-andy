@@ -217,7 +217,7 @@ static gceSTATUS set_uFogCoord(
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     valueArray[0] = gc->state.current.fog;
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER_NO();
     return status;
 }
@@ -231,7 +231,7 @@ static gceSTATUS set_uColor(
     gceSTATUS status;
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &gc->state.current.color.r);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &gc->state.current.color.r);
     gcmFOOTER_NO();
     return status;
 }
@@ -245,7 +245,7 @@ static gceSTATUS set_uNormal(
     gceSTATUS status;
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, gc->state.current.normal.v);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, gc->state.current.normal.v);
     gcmFOOTER();
     return status;
 }
@@ -267,7 +267,7 @@ gceSTATUS set_uModelView(
         }
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
     return status;
@@ -290,7 +290,7 @@ gceSTATUS set_uModelViewInverse3x3Transposed(
             *value++ = gc->transform.modelView->inverseTranspose.matrix[x][y];
         }
     }
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 3, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 3, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -314,7 +314,7 @@ gceSTATUS set_uModelViewProjection(
     }
 
     convertToVivanteMatrix(gc, valueArray);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
     return status;
@@ -337,7 +337,7 @@ gceSTATUS set_uProjection(
         }
     }
     convertToVivanteMatrix(gc, valueArray);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 4, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -354,7 +354,7 @@ static gceSTATUS set_uEcm(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     setColor(gc->state.light.front.emissive, value);
     setColor(gc->state.light.back.emissive, value);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -371,7 +371,7 @@ static gceSTATUS set_uAcm(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     setColor(gc->state.light.front.ambient, value);
     setColor(gc->state.light.back.ambient, value);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER_NO();
     return status;
 }
@@ -388,7 +388,7 @@ static gceSTATUS set_uDcm(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     setColor(gc->state.light.front.diffuse, value);
     setColor(gc->state.light.back.diffuse, value);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -401,7 +401,7 @@ static gceSTATUS set_uAcs(
     gceSTATUS status;
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &gc->state.light.model.ambient.r);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &gc->state.light.model.ambient.r);
     gcmFOOTER();
     return status;
 }
@@ -418,7 +418,7 @@ static gceSTATUS set_uSrm(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     *value++ = gc->state.light.front.specularExponent;
     *value = gc->state.light.back.specularExponent;
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -435,7 +435,7 @@ static gceSTATUS set_uScm(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
     setColor(gc->state.light.front.specular, value);
     setColor(gc->state.light.back.specular, value);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 2, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -464,7 +464,7 @@ static gceSTATUS set_uPpli(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
     gcmFOOTER();
     return status;
@@ -493,7 +493,7 @@ static gceSTATUS set_uKi(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
     gcmFOOTER();
     return status;
@@ -518,7 +518,7 @@ static gceSTATUS set_uSrli(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
 
     gcmFOOTER();
@@ -549,7 +549,7 @@ static gceSTATUS set_uAcli(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
     gcmFOOTER();
     return status;
@@ -579,7 +579,7 @@ static gceSTATUS set_uDcli(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
     gcmFOOTER();
     return status;
@@ -609,7 +609,7 @@ static gceSTATUS set_uScli(
         enableMask >>= 1;
     }
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, valueArray);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, valueArray);
     }
     gcmFOOTER();
     return status;
@@ -651,7 +651,7 @@ static gceSTATUS set_uTexMatrix(
 
     if (i > 0) {
         status = gcUNIFORM_SetValueF_Ex(Uniform,
-            4 * i, chipCtx->currProgram->hints, valueArray);
+            4 * i, chipCtx->currProgram->programState.hints, valueArray);
     }
 
     gcmFOOTER();
@@ -674,7 +674,7 @@ static gceSTATUS set_uClipPlane(
         valueArray[index++] = gc->state.transform.eyeClipPlanes[i].f.z;
         valueArray[index++] = gc->state.transform.eyeClipPlanes[i].f.w;
     }
-    status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_CLIP_PLANES, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_CLIP_PLANES, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER_NO();
     return status;
@@ -688,7 +688,7 @@ static gceSTATUS set_uPointAttenuation(
     gceSTATUS status;
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, gc->state.point.distanceAttenuation);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, gc->state.point.distanceAttenuation);
     gcmFOOTER_NO();
     return status;
 }
@@ -706,7 +706,7 @@ static gceSTATUS set_uPointSize(
     valueArray[1] = gc->state.point.sizeMin;
     valueArray[2] = gc->state.point.sizeMax;
     valueArray[3] = gc->state.point.fadeThresholdSize;
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
     gcmFOOTER();
     return status;
 }
@@ -733,7 +733,7 @@ static gceSTATUS set_uViewport(
     /* ViewportOriginY */
     valueArray[3] = glmINT2FRAC(gc->state.viewport.y + gc->state.viewport.height / 2);
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
     return status;
@@ -792,7 +792,7 @@ static gceSTATUS set_uAcmAcli(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, vAcmAcli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, vAcmAcli);
     }
 
     gcmFOOTER();
@@ -853,7 +853,7 @@ static gceSTATUS set_uAcmAcli2(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, vAcmAcli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, vAcmAcli);
     }
 
     gcmFOOTER();
@@ -888,7 +888,7 @@ static gceSTATUS set_uVPpli(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, vPpli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, vPpli);
     }
 
     gcmFOOTER();
@@ -948,7 +948,7 @@ static gceSTATUS set_uDcmDcli(
         i++;
         enableMask >>= 1;
     }
-    status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->hints, vDcmDcli);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->programState.hints, vDcmDcli);
 
     gcmFOOTER();
 
@@ -1009,7 +1009,7 @@ static gceSTATUS set_uDcmDcli2(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->hints, vDcmDcli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->programState.hints, vDcmDcli);
     }
 
     gcmFOOTER();
@@ -1039,7 +1039,7 @@ static gceSTATUS set_uCrli(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->hints, uCrli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->programState.hints, uCrli);
     }
 
     gcmFOOTER();
@@ -1071,7 +1071,7 @@ static gceSTATUS set_uCosCrli(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->hints, mCosCrli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, glvMAX_LIGHTS, chipCtx->currProgram->programState.hints, mCosCrli);
     }
 
     gcmFOOTER();
@@ -1103,7 +1103,7 @@ static gceSTATUS set_uNormedSdli(
     }
 
     if (i > 0) {
-        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->hints, vNormedSdli);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, i, chipCtx->currProgram->programState.hints, vNormedSdli);
     }
 
     gcmFOOTER();
@@ -1996,7 +1996,7 @@ static gceSTATUS assign_vEyePosition(
     gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x TempRegister=%u", ShaderControl, TempRegister);
     status = gcSHADER_AddOutput(
         ShaderControl->i->shader,
-        "#FogFragCoord",
+        "FogFragCoordX",
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,

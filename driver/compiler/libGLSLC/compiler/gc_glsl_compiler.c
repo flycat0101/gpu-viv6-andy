@@ -115,7 +115,7 @@ sloCOMPILER_Construct_General(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          gcvNULL,
-                                         slvNAME_SPACE_BUILTIN,
+                                         slvNAME_SPACE_TYPE_BUILTIN,
                                          &compiler->context.generalBuiltinSpace);
         if (gcmIS_ERROR(status)) break;
         compiler->context.currentSpace = compiler->context.generalBuiltinSpace;
@@ -244,7 +244,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          gcvNULL,
-                                         slvNAME_SPACE_STATE_SET,
+                                         slvNAME_SPACE_TYPE_STATE_SET,
                                          &compiler->context.unnamedSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -257,7 +257,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          compiler->context.generalBuiltinSpace,
-                                         slvNAME_SPACE_BUILTIN,
+                                         slvNAME_SPACE_TYPE_BUILTIN,
                                          &compiler->context.builtinSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -272,7 +272,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          compiler->context.builtinSpace,
-                                         slvNAME_SPACE_DECL_SET,
+                                         slvNAME_SPACE_TYPE_DECL_SET,
                                          &compiler->context.globalSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -283,8 +283,8 @@ sloCOMPILER_Construct(
 
         /* Init input layout. */
         compiler->context.inDefaultLayout.tesPrimitiveMode = slvTES_PRIMITIVE_MODE_NONE;
-        compiler->context.inDefaultLayout.tesVertexSpacing = slvTES_VERTEX_SPACING_EQUAL_SPACING;
-        compiler->context.inDefaultLayout.tesOrdering = slvTES_ORDERING_CCW;
+        compiler->context.inDefaultLayout.tesVertexSpacing = slvTES_VERTEX_SPACING_NONE;
+        compiler->context.inDefaultLayout.tesOrdering = slvTES_ORDERING_NONE;
         compiler->context.inDefaultLayout.tesPointMode = slvTES_POINT_MODE_NONE;
         compiler->context.inDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
         compiler->context.inDefaultLayout.gsInvocationTime = -1;
@@ -1891,8 +1891,7 @@ sloCOMPILER_CheckErrorLog(
 
     gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d ",
                   Compiler, LineNo, StringNo);
-
-    if (Compiler->log != gcvNULL)
+    if (Compiler->context.errorCount)
         status = gcvSTATUS_TRUE;
 
     gcmFOOTER_NO();
@@ -2779,7 +2778,7 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
     /* Create a new name space. */
     gcmONERROR(sloCOMPILER_CreateNameSpace(Compiler,
                                            DataType->fieldSpace ? DataType->fieldSpace->spaceName : gcvNULL,
-                                           slvNAME_SPACE_STRUCT,
+                                           slvNAME_SPACE_TYPE_STRUCT,
                                            &currentNameSpace));
     /* Duplicate field list. */
     FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, orgFieldName)
@@ -4261,6 +4260,28 @@ sloCOMPILER_GetCurrentSpace(
 }
 
 slsNAME_SPACE *
+sloCOMPILER_GetCurrentFunctionSpace(
+    IN sloCOMPILER Compiler
+)
+{
+    slsNAME_SPACE *nameSpace = Compiler->context.currentSpace;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    while(nameSpace)
+    {
+        if(nameSpace->nameSpaceType == slvNAME_SPACE_TYPE_FUNCTION)
+        {
+            break;
+        }
+        nameSpace = nameSpace->parent;
+    }
+
+    gcmFOOTER_ARG("<return>=0x%x", nameSpace);
+
+    return nameSpace;
+}
+
+slsNAME_SPACE *
 sloCOMPILER_GetGlobalSpace(
     IN sloCOMPILER Compiler
 )
@@ -4421,6 +4442,8 @@ sloCOMPILER_MergeExtLayoutId(
     IN OUT slsLAYOUT_QUALIFIER *Layout
 )
 {
+    gceSTATUS status = gcvSTATUS_OK;
+
     gcmHEADER_ARG("Compiler=0x%x, DefaultLayout=0x%x Layout=0x%x",
                   Compiler, DefaultLayout, Layout);
 
@@ -4444,8 +4467,58 @@ sloCOMPILER_MergeExtLayoutId(
         }
     }
 
+    /* If there are multiple layout declaration for TES input or TCS output, they must be matched. */
+    if ((DefaultLayout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE)   &&
+        (Layout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE)          &&
+        (DefaultLayout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE) != (Layout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "primitive mode mismatch."));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
+    if ((DefaultLayout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING)   &&
+        (Layout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING)          &&
+        (DefaultLayout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING) != (Layout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "spacing mode mismatch."));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
+    if ((DefaultLayout->ext_id & slvlAYOUT_EXT_ORERING)   &&
+        (Layout->ext_id & slvlAYOUT_EXT_ORERING)          &&
+        (DefaultLayout->ext_id & slvlAYOUT_EXT_ORERING) != (Layout->ext_id & slvlAYOUT_EXT_ORERING))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "vertex order mismatch."));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
+    if ((DefaultLayout->ext_id & slvLAYOUT_EXT_VERTICES)   &&
+        (Layout->ext_id & slvLAYOUT_EXT_VERTICES)          &&
+        (DefaultLayout->verticesNumber != Layout->verticesNumber))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "vertex count mismatch."));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
+
     gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    return status;
 }
 
 gctBOOL
@@ -4511,6 +4584,10 @@ sloCOMPILER_SetDefaultLayout(
         status = sloCOMPILER_MergeLayoutId(Compiler,
                                            defaultLayout,
                                            &Compiler->context.outDefaultLayout);
+
+        status = sloCOMPILER_MergeExtLayoutId(Compiler,
+                                              defaultLayout,
+                                              &Compiler->context.outDefaultLayout);
         break;
 
     case slvSTORAGE_QUALIFIER_IN:
@@ -4980,8 +5057,8 @@ sloCOMPILER_SetLayout(
         gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
         SetTesShaderLayout(Compiler->binary,
                            inLayout.tesPrimitiveMode == slvTES_PRIMITIVE_MODE_NONE ? 0 : (gcTessPrimitiveMode)inLayout.tesPrimitiveMode,
-                           inLayout.tesVertexSpacing == slvTES_VERTEX_SPACING_NONE ? 0 : (gcTessVertexSpacing)inLayout.tesVertexSpacing,
-                           inLayout.tesOrdering == slvTES_ORDERING_NONE ? 0 : (gcTessOrdering)inLayout.tesOrdering,
+                           inLayout.tesVertexSpacing == slvTES_VERTEX_SPACING_NONE ? (gcTessVertexSpacing)slvTES_VERTEX_SPACING_DEFAULT : (gcTessVertexSpacing)inLayout.tesVertexSpacing,
+                           inLayout.tesOrdering == slvTES_ORDERING_NONE ? (gcTessOrdering)slvTES_ORDERING_DEFAULT : (gcTessOrdering)inLayout.tesOrdering,
                            inLayout.tesPointMode == slvTES_POINT_MODE_NONE ? gcvFALSE : gcvTRUE,
                            0);
     }

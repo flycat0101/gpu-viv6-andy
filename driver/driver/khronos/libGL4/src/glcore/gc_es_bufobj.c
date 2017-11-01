@@ -652,6 +652,13 @@ GLvoid GL_APIENTRY __gles_BindBuffer(__GLcontext *gc, GLenum target, GLuint buff
 
     __GL_GET_BUFFER_TARGET_INDEX(target, targetIndex);
 
+#ifdef OPENGL40
+    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#endif
+
     __glBindBufferToGeneralPoint(gc, targetIndex, buffer);
 
     if (targetIndex == __GL_XFB_BUFFER_INDEX)
@@ -669,6 +676,13 @@ GLvoid GL_APIENTRY __gles_BindBufferBase(__GLcontext *gc, GLenum target, GLuint 
     GLuint targetIndex;
 
     __GL_HEADER();
+
+#ifdef OPENGL40
+    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#endif
 
     switch (target)
     {
@@ -732,6 +746,13 @@ GLvoid GL_APIENTRY __gles_BindBufferRange(__GLcontext *gc, GLenum target, GLuint
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#endif
 
     switch (target)
     {

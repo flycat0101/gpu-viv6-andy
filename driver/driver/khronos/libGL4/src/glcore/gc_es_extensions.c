@@ -12,12 +12,11 @@
 
 
 #include "gc_es_context.h"
-#include "gl4.h"
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
 
-extern  __GLprocInfo *__glProcInfoTable;
+extern  const __GLprocInfo __glProcInfoTable[];
 
 
 /* The extension APIs' startIndex, endIndex can be found in __GLprocID enum.
@@ -114,6 +113,9 @@ __GLextension __glExtension[] =
     {__GL_EXTID_EXT_draw_elements_base_vertex, "GL_EXT_draw_elements_base_vertex", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_texture_rg, "GL_EXT_texture_rg", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_primitive_bounding_box, "GL_EXT_primitive_bounding_box", GL_FALSE, GL_TRUE},
+    {__GL_EXTID_EXT_shader_framebuffer_fetch, "GL_EXT_shader_framebuffer_fetch", GL_FALSE, GL_TRUE },
+    {__GL_EXTID_EXT_protected_textures, "GL_EXT_protected_textures", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ANDROID_extension_pack_es31a, "GL_ANDROID_extension_pack_es31a", GL_FALSE, GL_TRUE },
 
     {__GL_EXTID_VIV_tex_direct, "GL_VIV_direct_texture", GL_FALSE, GL_FALSE},
 
@@ -123,18 +125,19 @@ __GLextension __glExtension[] =
     {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
     {__GL_EXTID_texture_compression_s3tc, "GL_EXT_texture_compression_s3tc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_half_float_pixel, "GL_ARB_half_float_pixel", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_packed_float, "GL_EXT_packed_float", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},
     {__GL_EXTID_texture_compression_latc, "GL_EXT_texture_compression_latc", GL_FALSE, GL_FALSE},
     {__GL_EXTID_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_texture_integer, "GL_EXT_texture_integer", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
     {__GL_EXTID_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
 #endif
     {__GL_EXTID_EXT_LAST, gcvNULL, GL_FALSE, GL_FALSE}
 };
@@ -310,6 +313,8 @@ static __GLextProcAlias __glExtProcAlias[] =
 };
 #endif
 
+extern const GLuint __glProcTabSize;
+
 __GLprocAddr __glGetProcAddr(const GLchar *procName)
 {
     const __GLprocInfo *procInfo = gcvNULL;
@@ -338,7 +343,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
 #endif
 
     /* Find API function's offset in __glProcInfoTable[] table */
-    for (i = 0; i < __GL_TABLE_SIZE(__glProcInfoTable); ++i)
+    for (i = 0; i < __glProcTabSize; ++i)
     {
         procInfo = &__glProcInfoTable[i];
         if (strcmp(procInfo->name, apiName) == 0)

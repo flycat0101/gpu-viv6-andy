@@ -1,16 +1,3 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
  * Copyright © 2011 Intel Corporation
  *
@@ -41,15 +28,14 @@
 #ifndef _GBM_H_
 #define _GBM_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 #define __GBM__ 1
 
 #include <stddef.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * \file gbm.h
@@ -97,6 +83,12 @@ enum gbm_bo_format {
 
 /* color index */
 #define GBM_FORMAT_C8          __gbm_fourcc_code('C', '8', ' ', ' ') /* [7:0] C */
+
+/* 8 bpp Red */
+#define GBM_FORMAT_R8          __gbm_fourcc_code('R', '8', ' ', ' ') /* [7:0] R */
+
+/* 16 bpp RG */
+#define GBM_FORMAT_GR88        __gbm_fourcc_code('G', 'R', '8', '8') /* [15:0] G:R 8:8 little endian */
 
 /* 8 bpp RGB */
 #define GBM_FORMAT_RGB332      __gbm_fourcc_code('R', 'G', 'B', '8') /* [7:0] R:G:B 3:3:2 */
@@ -152,12 +144,12 @@ enum gbm_bo_format {
 #define GBM_FORMAT_BGRA1010102 __gbm_fourcc_code('B', 'A', '3', '0') /* [31:0] B:G:R:A 10:10:10:2 little endian */
 
 /* packed YCbCr */
-#define GBM_FORMAT_YUYV                __gbm_fourcc_code('Y', 'U', 'Y', 'V') /* [31:0] Cr0:Y1:Cb0:Y0 8:8:8:8 little endian */
-#define GBM_FORMAT_YVYU                __gbm_fourcc_code('Y', 'V', 'Y', 'U') /* [31:0] Cb0:Y1:Cr0:Y0 8:8:8:8 little endian */
-#define GBM_FORMAT_UYVY                __gbm_fourcc_code('U', 'Y', 'V', 'Y') /* [31:0] Y1:Cr0:Y0:Cb0 8:8:8:8 little endian */
-#define GBM_FORMAT_VYUY                __gbm_fourcc_code('V', 'Y', 'U', 'Y') /* [31:0] Y1:Cb0:Y0:Cr0 8:8:8:8 little endian */
+#define GBM_FORMAT_YUYV        __gbm_fourcc_code('Y', 'U', 'Y', 'V') /* [31:0] Cr0:Y1:Cb0:Y0 8:8:8:8 little endian */
+#define GBM_FORMAT_YVYU        __gbm_fourcc_code('Y', 'V', 'Y', 'U') /* [31:0] Cb0:Y1:Cr0:Y0 8:8:8:8 little endian */
+#define GBM_FORMAT_UYVY        __gbm_fourcc_code('U', 'Y', 'V', 'Y') /* [31:0] Y1:Cr0:Y0:Cb0 8:8:8:8 little endian */
+#define GBM_FORMAT_VYUY        __gbm_fourcc_code('V', 'Y', 'U', 'Y') /* [31:0] Y1:Cb0:Y0:Cr0 8:8:8:8 little endian */
 
-#define GBM_FORMAT_AYUV                __gbm_fourcc_code('A', 'Y', 'U', 'V') /* [31:0] A:Y:Cb:Cr 8:8:8:8 little endian */
+#define GBM_FORMAT_AYUV        __gbm_fourcc_code('A', 'Y', 'U', 'V') /* [31:0] A:Y:Cb:Cr 8:8:8:8 little endian */
 
 /*
  * 2 plane YCbCr
@@ -166,10 +158,10 @@ enum gbm_bo_format {
  * or
  * index 1 = Cb:Cr plane, [15:0] Cb:Cr little endian
  */
-#define GBM_FORMAT_NV12                __gbm_fourcc_code('N', 'V', '1', '2') /* 2x2 subsampled Cr:Cb plane */
-#define GBM_FORMAT_NV21                __gbm_fourcc_code('N', 'V', '2', '1') /* 2x2 subsampled Cb:Cr plane */
-#define GBM_FORMAT_NV16                __gbm_fourcc_code('N', 'V', '1', '6') /* 2x1 subsampled Cr:Cb plane */
-#define GBM_FORMAT_NV61                __gbm_fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
+#define GBM_FORMAT_NV12        __gbm_fourcc_code('N', 'V', '1', '2') /* 2x2 subsampled Cr:Cb plane */
+#define GBM_FORMAT_NV21        __gbm_fourcc_code('N', 'V', '2', '1') /* 2x2 subsampled Cb:Cr plane */
+#define GBM_FORMAT_NV16        __gbm_fourcc_code('N', 'V', '1', '6') /* 2x1 subsampled Cr:Cb plane */
+#define GBM_FORMAT_NV61        __gbm_fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
 
 /*
  * 3 plane YCbCr
@@ -250,9 +242,17 @@ gbm_bo_create(struct gbm_device *gbm,
               uint32_t width, uint32_t height,
               uint32_t format, uint32_t flags);
 
+struct gbm_bo *
+gbm_bo_create_with_modifiers(struct gbm_device *gbm,
+                             uint32_t width, uint32_t height,
+                             uint32_t format,
+                             const uint64_t *modifiers,
+                             const unsigned int count);
+
 #define GBM_BO_IMPORT_WL_BUFFER         0x5501
 #define GBM_BO_IMPORT_EGL_IMAGE         0x5502
 #define GBM_BO_IMPORT_FD                0x5503
+#define GBM_BO_IMPORT_FD_MODIFIER       0x5504
 
 struct gbm_import_fd_data {
    int fd;
@@ -262,9 +262,55 @@ struct gbm_import_fd_data {
    uint32_t format;
 };
 
+struct gbm_import_fd_modifier_data {
+   uint32_t width;
+   uint32_t height;
+   uint32_t format;
+   uint32_t num_fds;
+   int fds[4];
+   int strides[4];
+   int offsets[4];
+   uint64_t modifier;
+};
+
 struct gbm_bo *
 gbm_bo_import(struct gbm_device *gbm, uint32_t type,
               void *buffer, uint32_t usage);
+
+/**
+ * Flags to indicate the type of mapping for the buffer - these are
+ * passed into gbm_bo_map(). The caller must set the union of all the
+ * flags that are appropriate.
+ *
+ * These flags are independent of the GBM_BO_USE_* creation flags. However,
+ * mapping the buffer may require copying to/from a staging buffer.
+ *
+ * See also: pipe_transfer_usage
+ */
+enum gbm_bo_transfer_flags {
+   /**
+    * Buffer contents read back (or accessed directly) at transfer
+    * create time.
+    */
+   GBM_BO_TRANSFER_READ       = (1 << 0),
+   /**
+    * Buffer contents will be written back at unmap time
+    * (or modified as a result of being accessed directly).
+    */
+   GBM_BO_TRANSFER_WRITE      = (1 << 1),
+   /**
+    * Read/modify/write
+    */
+   GBM_BO_TRANSFER_READ_WRITE = (GBM_BO_TRANSFER_READ | GBM_BO_TRANSFER_WRITE),
+};
+
+void *
+gbm_bo_map(struct gbm_bo *bo,
+           uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+           uint32_t flags, uint32_t *stride, void **map_data);
+
+void
+gbm_bo_unmap(struct gbm_bo *bo, void *map_data);
 
 uint32_t
 gbm_bo_get_width(struct gbm_bo *bo);
@@ -276,7 +322,13 @@ uint32_t
 gbm_bo_get_stride(struct gbm_bo *bo);
 
 uint32_t
+gbm_bo_get_stride_for_plane(struct gbm_bo *bo, int plane);
+
+uint32_t
 gbm_bo_get_format(struct gbm_bo *bo);
+
+uint32_t
+gbm_bo_get_offset(struct gbm_bo *bo, int plane);
 
 struct gbm_device *
 gbm_bo_get_device(struct gbm_bo *bo);
@@ -287,12 +339,21 @@ gbm_bo_get_handle(struct gbm_bo *bo);
 int
 gbm_bo_get_fd(struct gbm_bo *bo);
 
+uint64_t
+gbm_bo_get_modifier(struct gbm_bo *bo);
+
+int
+gbm_bo_get_plane_count(struct gbm_bo *bo);
+
+union gbm_bo_handle
+gbm_bo_get_handle_for_plane(struct gbm_bo *bo, int plane);
+
 int
 gbm_bo_write(struct gbm_bo *bo, const void *buf, size_t count);
 
 void
 gbm_bo_set_user_data(struct gbm_bo *bo, void *data,
-                    void (*destroy_user_data)(struct gbm_bo *, void *));
+                     void (*destroy_user_data)(struct gbm_bo *, void *));
 
 void *
 gbm_bo_get_user_data(struct gbm_bo *bo);
@@ -303,8 +364,14 @@ gbm_bo_destroy(struct gbm_bo *bo);
 struct gbm_surface *
 gbm_surface_create(struct gbm_device *gbm,
                    uint32_t width, uint32_t height,
-                  uint32_t format, uint32_t flags);
+                   uint32_t format, uint32_t flags);
 
+struct gbm_surface *
+gbm_surface_create_with_modifiers(struct gbm_device *gbm,
+                                  uint32_t width, uint32_t height,
+                                  uint32_t format,
+                                  const uint64_t *modifiers,
+                                  const unsigned int count);
 int
 gbm_surface_needs_lock_front_buffer(struct gbm_surface *surface);
 

@@ -320,6 +320,178 @@ VX_PRIVATE_API vx_bool vxoContext_CreateAllPredefinedErrorObjects(vx_context con
     return vx_true_e;
 }
 
+
+VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
+{
+    gctSTRING envctrl = gcvNULL;
+    gctUINT i;
+    char* tpFuncName[] =
+    {
+        "VIV_VX_ENABLE_TP_RESHUFFLE",
+        "VIV_VX_ENABLE_TP_SINGLE_FC",
+        "VIV_VX_ENABLE_TP_MAX_POOLING",
+        "VIV_VX_ENABLE_TP_LEAK_RELU",
+        "VIV_VX_ENABLE_TP_LEAK_RELU_MAX_POOLING",
+        "VIV_VX_ENABLE_TP_LRN",
+        "VIV_VX_ENABLE_TP_TRANSPOSE",
+        "VIV_VX_ENABLE_TP_ROI_POOLING",
+    };
+
+    /* Enable driver TP path by default if HW has this feature */
+    context->options.enableTP = 1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_TP", &envctrl)) && envctrl)
+    {
+        context->options.enableTP = atoi(envctrl);
+    }
+    /* All TP functions are enabled by default. */
+    for (i = 0; i < TP_CMD_NUM; i++)
+    {
+        context->options.flagTPFunc[i] = 1;
+        context->options.typeTPFunc[i] = 0;
+    }
+    /* Disable lrn and roi pooling by default */
+    context->options.flagTPFunc[TP_LRN] = 0;
+    context->options.flagTPFunc[TP_ROI_POOLING] = 0;
+
+    for (i = 0; i < TP_CMD_NUM; i++)
+    {
+        envctrl = gcvNULL;
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, tpFuncName[i], &envctrl)) && envctrl)
+        {
+            context->options.flagTPFunc[i] = atoi(envctrl);
+        }
+    }
+    envctrl = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_RESHUFFLE_SEQUENCE", &envctrl)) && envctrl)
+    {
+        context->options.typeTPFunc[TP_RESHUFFLE] = atoi(envctrl);
+    }
+    envctrl = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_CROSS_MAP_LRN_PROCESS", &envctrl)) && envctrl)
+    {
+        context->options.typeTPFunc[TP_LRN] = atoi(envctrl);
+    }
+    envctrl = gcvNULL;
+    context->options.enableMultiTP = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_MULTI_TP", &envctrl)) && envctrl)
+    {
+        context->options.enableMultiTP = atoi(envctrl);
+    }
+
+    /* Enable driver SRAM path by default if HW has this feature */
+    envctrl = gcvNULL;
+    context->options.enableSRAM = 1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_SRAM", &envctrl)) && envctrl)
+    {
+        context->options.enableSRAM = atoi(envctrl);
+    }
+    envctrl = gcvNULL;
+    context->options.enableSramStreamMode = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_SRAM_STREAM_MODE", &envctrl)) && envctrl)
+    {
+        context->options.enableSramStreamMode = atoi(envctrl);
+    }
+
+    /* Disable CNN performance by default */
+    envctrl = gcvNULL;
+    context->options.enableCNNPerf = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "CNN_PERF", &envctrl)) && envctrl)
+    {
+        context->options.enableCNNPerf = atoi(envctrl);
+    }
+
+    context->options.graphPerfLogFile = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &context->options.graphPerfLogFile);
+
+
+    envctrl = gcvNULL;
+    context->options.nnZeroRunLen = 6;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_ZERO_RUN_LEN", &envctrl)) && envctrl)
+    {
+        context->options.nnZeroRunLen = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.tpZeroRunLen = -1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_TP_ZERO_RUN_LEN", &envctrl)) && envctrl)
+    {
+        gctINT value = atoi(envctrl);
+        if ((value >= 0) && (value <= 9))
+        {
+            context->options.tpZeroRunLen = value;
+        }
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableNNFCAccel = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_FC_ACCEL", &envctrl)) && envctrl)
+    {
+        context->options.enableNNFCAccel = atoi(envctrl);
+    }
+
+#define FC_ACCEL_THRESHOLD      926720
+    envctrl = gcvNULL;
+    context->options.nnFCAccelThreshold = FC_ACCEL_THRESHOLD;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_FCACCEL_THRESHOLD", &envctrl)) && envctrl)
+    {
+        context->options.nnFCAccelThreshold = atoi(envctrl);
+    }
+
+#define SUSTAINED_BANDWIDTH                    2.5f
+    envctrl = gcvNULL;
+    context->options.sustainedBandwidth = SUSTAINED_BANDWIDTH;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_SUSTAINED_BW", &envctrl)) && envctrl)
+    {
+        context->options.sustainedBandwidth = (gctFLOAT) atof(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableIdealPerf = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_IDEAL_PERF", &envctrl)) && envctrl)
+    {
+        context->options.enableIdealPerf = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableNNArchPerfPrint = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_SHOW_PERF", &envctrl)) && envctrl)
+    {
+        context->options.enableNNArchPerfPrint = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableNNLayerDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_LAYER_DUMP", &envctrl)) && envctrl)
+    {
+        context->options.enableNNLayerDump = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableBrickMode = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_BRICK_MODE", &envctrl)) && envctrl)
+    {
+        context->options.enableBrickMode = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableBorderMode = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_BORDER_MODE", &envctrl)) && envctrl)
+    {
+        context->options.enableBorderMode = atoi(envctrl);
+    }
+
+    context->options.nnRoundingMode = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "NN_ROUNDING_MODE", &context->options.nnRoundingMode);
+
+    context->options.vxcShaderSourcePath = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &context->options.vxcShaderSourcePath);
+
+    context->options.fcZMax = (1<<14) - 1;
+
+
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
@@ -381,12 +553,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         context->processor.thread = vxCreateThread((vx_thread_routine_f)&vxGraphThreadRoutine, &context->processor);
 
         context->cnnAvailableEventID = 1;
-
-        gcoOS_GetEnv(gcvNULL, "CNN_PERF", &oldEnv);
-        if (oldEnv)
-            context->perfEnable = (atoi(oldEnv) == 1)?vx_true_e:vx_false_e;
-
+        vxoContext_InitOptions(context);
         context->deviceCount = 1;
+        gcoVX_GetNNConfig(&context->nnConfig);
 
         /* memory maps table lock */
         vxCreateMutex(&context->memoryMapsLock);
@@ -585,11 +754,13 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         if (context->targetTable[0].enabled)
         {
+            vx_kernel kernel = &context->targetTable[0].kernelTable[0];
             context->targetTable[0].funcs.deinitialize(&context->targetTable[0]);
 
             vxoTarget_Unload(context, 0, vx_true_e);
 
             context->targetTable[0].enabled = vx_false_e;
+            vxoKernel_InternalRelease(&kernel); /* release the first kernel object */
         }
 
         for (i = 0; i < vxmLENGTH_OF(context->accessorTable); i++)
@@ -1179,14 +1350,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxDirective(vx_reference reference, vx_enum d
 
         case VX_DIRECTIVE_DISABLE_PERFORMANCE:
             if (reference->type == VX_TYPE_CONTEXT)
-                context->perfEnable = vx_false_e;
+                context->options.enableCNNPerf = 0;
             else
                 return VX_ERROR_NOT_SUPPORTED;
 
             break;
         case VX_DIRECTIVE_ENABLE_PERFORMANCE:
             if (reference->type == VX_TYPE_CONTEXT)
-                context->perfEnable = vx_true_e;
+                context->options.enableCNNPerf = 1;
             else
                 return VX_ERROR_NOT_SUPPORTED;
             break;
@@ -1271,6 +1442,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImmediateModeTarget(vx_context context, 
     return status;
 }
 
+#if MAP_UNMAP_REFERENCE
 VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
     vx_context   context,
     vx_reference ref,
@@ -1300,8 +1472,105 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
                 //buf = (vx_uint8*)malloc(size);
                 if (size > 0)
                 {
-
                     buf = (vx_uint8_ptr)vxAllocate(size);
+                    context->memoryCount ++;
+
+                    if (buf == NULL)
+                        break;
+                }
+
+                context->memoryMaps[id].used       = vx_true_e;
+                context->memoryMaps[id].ref        = ref;
+                context->memoryMaps[id].logical    = buf;
+                context->memoryMaps[id].usage      = usage;
+                context->memoryMaps[id].mem_type   = mem_type;
+                context->memoryMaps[id].flags      = flags;
+
+                extra = (vx_memory_map_extra_s*)extra_data;
+                if (VX_TYPE_IMAGE == ref->type)
+                {
+                    context->memoryMaps[id].extra.image_data.plane_index = extra->image_data.plane_index;
+                    context->memoryMaps[id].extra.image_data.rect        = extra->image_data.rect;
+                }
+                else if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
+                {
+                    vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
+                    context->memoryMaps[id].extra.array_data.start = extra->array_data.start;
+                    context->memoryMaps[id].extra.array_data.end   = extra->array_data.end;
+                }
+
+                *ptr = buf;
+                *map_id = (vx_map_id)id;
+
+                worked = vx_true_e;
+
+                break;
+            }
+        }
+
+        /* we're done, unlock the table */
+        worked = vxReleaseMutex(context->memoryMapsLock);
+    }
+    else
+        worked = vx_false_e;
+
+    return worked;
+} /* vxoContext_MemoryMap() */
+#else
+VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
+    vx_context   context,
+    vx_reference ref,
+    vx_size      size,
+    vx_enum      usage,
+    vx_enum      mem_type,
+    vx_uint32    flags,
+    void*        extra_data,
+    void**       ptr,
+    vx_map_id*   map_id)
+{
+    vx_uint32 id;
+    vx_bool worked = vx_false_e;
+
+    /* lock the table for modification */
+    if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
+    {
+        for (id = 0u; id < vxmLENGTH_OF(context->memoryMaps); id++)
+        {
+            if (context->memoryMaps[id].used == vx_false_e)
+            {
+                vx_memory_map_extra_s* extra;
+                vx_uint8_ptr buf = 0;
+                vxError("Found free memory map slot[%u]\n", id);
+
+                /* allocate mapped buffer */
+                //buf = (vx_uint8*)malloc(size);
+                if (size > 0)
+                {
+                    if (VX_TYPE_WEIGHTS_BIASES_PARAMETER == ref->type)
+                    {
+                        buf = (vx_uint8_ptr)&((vx_weights_biases_parameter)ref)->memory.logicals[0][0] - ((vx_weights_biases_parameter)ref)->memroy_head_offset;
+                    }
+                    else if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
+                    {
+                        vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
+                        vx_size offset = extra->array_data.start * ((vx_array)ref)->itemSize;
+                        buf = (vx_uint8_ptr)&((vx_array)ref)->memory.logicals[0][offset];
+                    }
+                    else if (VX_TYPE_IMAGE == ref->type)
+                    {
+                        vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
+                        vx_image image = (vx_image)ref;
+                        vx_rectangle_t * rect = &extra->image_data.rect;
+                        vx_uint32 offset = vxComputePlaneOffset(image, rect->start_x, rect->start_y, extra->image_data.plane_index);
+                        buf = (vx_uint8_ptr)&((vx_image)ref)->memory.logicals[extra->image_data.plane_index][offset];
+                    }
+                    else if (VX_TYPE_DISTRIBUTION == ref->type)
+                    {
+                        buf = (vx_uint8_ptr)((vx_distribution)ref)->memory.logicals[0];
+                    }
+                    else {
+                        buf = (vx_uint8_ptr)vxAllocate(size);
+                    }
 
                     context->memoryCount ++;
 
@@ -1347,6 +1616,8 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
     return worked;
 } /* vxoContext_MemoryMap() */
 
+#endif
+
 VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
     vx_context   context,
     vx_reference ref,
@@ -1374,6 +1645,7 @@ VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
     return worked;
 } /* vxoContext_FindMemoryMap() */
 
+#if MAP_UNMAP_REFERENCE
 VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
 {
     vx_uint32 map_id = (vx_uint32)m_id;
@@ -1405,6 +1677,46 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
 
     return;
 } /* vxoContext_MemoryUnmap() */
+#else
+VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
+{
+    vx_uint32 map_id = (vx_uint32)m_id;
+
+    /* lock the table for modification */
+    if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
+    {
+        if (context->memoryMaps[map_id].used == vx_true_e &&
+            context->memoryMaps[map_id].logical != NULL)
+        {
+            /* freeing mapped buffer */
+            /*free(context->memoryMaps[map_id].ptr);*/
+            if ((VX_TYPE_WEIGHTS_BIASES_PARAMETER != context->memoryMaps[map_id].ref->type)
+                && (VX_TYPE_ARRAY != context->memoryMaps[map_id].ref->type)
+                && (VX_TYPE_DISTRIBUTION != context->memoryMaps[map_id].ref->type)
+                && (VX_TYPE_IMAGE != context->memoryMaps[map_id].ref->type)
+                && (VX_TYPE_LUT != context->memoryMaps[map_id].ref->type)
+                )
+            {
+                vxFree(context->memoryMaps[map_id].logical);
+            }
+
+            memset(&context->memoryMaps[map_id], 0, sizeof(vx_memory_map_s));
+            vxError("Removed memory mapping[%u]\n", map_id);
+
+            context->memoryCount --;
+        }
+
+        context->memoryMaps[map_id].used = vx_false_e;
+
+        /* we're done, unlock the table */
+        vxReleaseMutex(context->memoryMapsLock);
+    }
+    else
+        vxError("vxAcquireMutex() failed!\n");
+
+    return;
+} /* vxoContext_MemoryUnmap() */
+#endif
 
 VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelId(vx_context context, vx_enum * pKernelEnumId)
 {

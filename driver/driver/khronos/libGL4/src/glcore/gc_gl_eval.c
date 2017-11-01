@@ -357,16 +357,8 @@ GLvoid DoEvalCoord1(__GLcontext *gc, GLfloat u)
     __GLcolor color0;
     __GLevaluatorMachine em = gc->eval;
 
-    //    if (gc->modes.colorIndexMode)
-    //    {
-    //        if (gc->state.enables.eval1 & __GL_MAP1_INDEX_ENABLE)
-    //        {
-    //            DoDomain1(&em, u, &eval[__GL_I], &gc->state.current.color0.r,
-    //                      evalData[__GL_I]);
-    //            gc->vertexCache.colorChanged = GL_TRUE;
-    //        }
-    //    }
-    //    else
+    color0.r = color0.g = color0.b = color0.a = 0.0F;
+
     {
         if (gc->state.enables.eval.map1[__GL_C4])
         {
@@ -586,13 +578,10 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     __GLevaluator2 *eval = gc->eval.eval2;
     GLfloat **evalData = gc->eval.eval2Data;
     GLint vertexType;
-    GLboolean restorecolor0 = GL_FALSE;
-
-    __GLcolor color0,color;
     __GLcoord vvec,vnormal;
     __GLcoord texcoord;
     __GLevaluatorMachine em = gc->eval;
-    color = gc->state.current.color;
+
     vnormal = gc->state.current.normal;
     texcoord = __GL_ACTIVE_TEXCOORD(gc);
     if (changes)
@@ -673,21 +662,21 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
             vertexType = 3;
         }
     }
+
     {
         if (gc->state.enables.eval.map2[__GL_C4])
         {
+            __GLcolor savedColor = gc->state.current.color;
+            __GLcolor color = gc->state.current.color;
 
-            restorecolor0 = GL_TRUE;
-            color0 = gc->state.current.color;
-
-            DoDomain2(&em, u, v, &eval[__GL_C4], &color.r,
-                evalData[__GL_C4]);
-            (*gc->currentImmediateTable->Color4fv)(gc ,&color.r);
+            DoDomain2(&em, u, v, &eval[__GL_C4], &color.r, evalData[__GL_C4]);
+            (*gc->currentImmediateTable->Color4fv)(gc, &color.r);
             if (changes)
             {
                 changes->changed |= CHANGE_COLOR;
                 changes->color = color;
             }
+            gc->state.current.color = savedColor;
         }
     }
 
@@ -743,10 +732,6 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     else if (vertexType == 4)
     {
         (*gc->currentImmediateTable->Vertex4fv)(gc ,&vvec.f.x);
-    }
-    if (restorecolor0)
-    {
-        gc->state.current.color = color0;
     }
 }
 

@@ -44,6 +44,7 @@ struct wl_egl_display
     struct wl_viv * wl_viv;
     struct wl_registry * registry;
     struct wl_event_queue * wl_queue;
+    struct wl_event_queue * commit_queue;
     int swap_interval;
 };
 
@@ -70,6 +71,10 @@ struct wl_egl_window
     int32_t attached_width;
     int32_t attached_height;
 
+    /* number of buffers can commit to compositor. */
+    int32_t commit_signal;
+    pthread_mutex_t commit_mutex;
+
     struct wl_surface * surface;
     struct wl_list link;
 };
@@ -83,6 +88,7 @@ enum wl_egl_buffer_state
 
 struct wl_egl_buffer
 {
+    struct wl_egl_window *parent;
     struct
     {
         gctINT32 width;
@@ -214,8 +220,11 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
      * This is to block read & dispatch events in other threads, so that the
      * callback is with correct queue and listener when 'done' event.
      */
-    while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1)
-        wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
+    while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1 && ret != -1)
+        ret = wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
+
+    if (ret < 0)
+        return ret;
 
     callback = wl_display_sync(wl_dpy);
 
@@ -231,7 +240,7 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
     wl_display_cancel_read(wl_dpy);
 
     while (!done && ret >= 0)
-        ret = dispatch_queue(wl_dpy, wl_queue, 5);
+        ret = dispatch_queue(wl_dpy, wl_queue, 100);
 
     if (ret == -1 && !done)
         wl_callback_destroy(callback);
@@ -285,6 +294,7 @@ wl_egl_display_create(struct wl_display *wl_dpy)
 
     display->wl_dpy   = wl_dpy;
     display->wl_queue = wl_display_create_queue(wl_dpy);
+    display->commit_queue = wl_display_create_queue(wl_dpy);
     display->registry = wl_display_get_registry(wl_dpy);
 
     wl_proxy_set_queue((struct wl_proxy *)display->registry, display->wl_queue);
@@ -325,8 +335,15 @@ wl_egl_display_destroy(struct wl_egl_display *display)
             int ret = 0;
             struct wl_egl_buffer *buffer = &window->buffers[i];
 
-            while (buffer->frame_callback && ret != -1)
-                ret = dispatch_queue(display->wl_dpy, display->wl_queue, 5);
+            if (buffer->frame_callback)
+            {
+                pthread_mutex_lock(&window->commit_mutex);
+
+                while (buffer->frame_callback && ret != -1)
+                    ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+
+                pthread_mutex_unlock(&window->commit_mutex);
+            }
         }
 
         window->display = NULL;
@@ -335,10 +352,13 @@ wl_egl_display_destroy(struct wl_egl_display *display)
     pthread_mutex_unlock(&egl_window_mutex);
 
     roundtrip_queue(display->wl_dpy, display->wl_queue);
+    roundtrip_queue(display->wl_dpy, display->commit_queue);
 
     wl_registry_destroy(display->registry);
     wl_viv_destroy(display->wl_viv);
     wl_event_queue_destroy(display->wl_queue);
+
+    wl_event_queue_destroy(display->commit_queue);
 
     free(display);
 }
@@ -458,9 +478,12 @@ static void
 frame_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
 {
     struct wl_egl_buffer *buffer = data;
+    struct wl_egl_window *window = buffer->parent;
 
     buffer->frame_callback = NULL;
     wl_callback_destroy(callback);
+
+    window->commit_signal++;
 }
 
 static const struct wl_callback_listener frame_callback_listener = {
@@ -546,6 +569,7 @@ wl_egl_buffer_create(struct wl_egl_window *window,
     buffer->info.format     = (gceSURF_FORMAT) format;
     buffer->info.type       = (gceSURF_TYPE) type;
 
+    buffer->parent          = window;
     buffer->frame_callback  = NULL;
 
     buffer->wl_buf =
@@ -580,6 +604,8 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         struct wl_egl_buffer *buffer)
 {
     struct wl_egl_display *display = window->display;
+    int ret = 0;
+    int done = 0;
 
     if (!buffer->info.surface)
     {
@@ -593,26 +619,33 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         struct wl_event_queue *wl_queue = display->wl_queue;
         struct wl_egl_buffer * wrapper;
 
-        /* Use a wrapper struct to allow modifications in original one. */
-        wrapper = malloc(sizeof(*buffer));
-        memcpy(wrapper, buffer, sizeof(*buffer));
 
         /*
          * This is to block read & dispatch events in other threads, so that the
          * callback is with correct queue and listener when 'done' event.
          */
-        while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1)
-            wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
+        while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1 && ret != -1)
+            ret = wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
 
-        callback = wl_display_sync(display->wl_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)callback, display->wl_queue);
-        wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
+        if (ret >= 0)
+        {
+            /* Use a wrapper struct to allow modifications in original one. */
+            wrapper = malloc(sizeof(*buffer));
+            memcpy(wrapper, buffer, sizeof(*buffer));
 
-        wl_display_cancel_read(wl_dpy);
+            callback = wl_display_sync(display->wl_dpy);
+            wl_proxy_set_queue((struct wl_proxy *)callback, display->wl_queue);
+            wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
 
-        buffer->info.surface = gcvNULL;
+            wl_display_cancel_read(wl_dpy);
+
+            buffer->info.surface = gcvNULL;
+
+            done = 1;
+        }
     }
-    else
+
+    if (!done)
     {
         gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
@@ -704,7 +737,13 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
                 break;
             }
 
-            dispatch_queue(wl_dpy, wl_queue, 1);
+            ret = dispatch_queue(wl_dpy, wl_queue, 100);
+
+            if (ret == -1)
+            {
+                buffer = NULL;
+                break;
+            }
         }
     }
     else
@@ -717,10 +756,6 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
         window->indequeue = 0;
         return NULL;
     }
-
-    /* Should not run here because we checked buffer state already. */
-    while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(wl_dpy, wl_queue, 5);
 
     if (buffer->info.surface)
     {
@@ -792,10 +827,32 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 {
     struct wl_egl_display *display = window->display;
     struct wl_display *wl_dpy = display->wl_dpy;
-    struct wl_event_queue *wl_queue = display->wl_queue;
+    struct wl_event_queue *commit_queue = display->commit_queue;
     int x, y, width, height;
+    int ret = 0;
 
     make_bounding_box(buffer, damage, &x, &y, &width, &height);
+
+    pthread_mutex_lock(&window->commit_mutex);
+
+    /* Make sure previous frame with this buffer is done. */
+    while (buffer->frame_callback && ret != -1)
+        ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+
+    if (ret == -1)
+    {
+        /* fatal error, can not recover. */
+        goto out;
+    }
+
+    while (!window->commit_signal && ret != -1)
+        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+
+    if (ret == -1)
+    {
+        /* fatal error, can not recover. */
+        goto out;
+    }
 
     if (display->swap_interval > 0)
     {
@@ -803,11 +860,17 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
          * This is to block read & dispatch events in other threads, so that the
          * callback is with correct queue and listener when 'done' event.
          */
-        while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1)
-            wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
+        while (wl_display_prepare_read_queue(wl_dpy, commit_queue) == -1 && ret != -1)
+            ret = wl_display_dispatch_queue_pending(wl_dpy, commit_queue);
+
+        if (ret == -1)
+        {
+            /* fatal error, can not recover. */
+            goto out;
+        }
 
         buffer->frame_callback = wl_surface_frame(window->surface);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, wl_queue);
+        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
         wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
@@ -825,6 +888,8 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_surface_damage(window->surface, x, y, width, height);
     wl_surface_commit(window->surface);
 
+    window->commit_signal--;
+
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
      * to a sync callback so that we always give a chance for the compositor to
@@ -837,11 +902,16 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
          * This is to block read & dispatch events in other threads, so that the
          * callback is with correct queue and listener when 'done' event.
          */
-        while (wl_display_prepare_read_queue(wl_dpy, wl_queue) == -1)
-            wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
+        while (wl_display_prepare_read_queue(wl_dpy, commit_queue) == -1 && ret != -1)
+            ret = wl_display_dispatch_queue_pending(wl_dpy, commit_queue);
+
+        if (ret == -1)
+        {
+            goto out;
+        }
 
         buffer->frame_callback = wl_display_sync(wl_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, wl_queue);
+        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
         wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
@@ -850,7 +920,10 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     /* flush events. */
     wl_display_flush(wl_dpy);
 
-    return 0;
+out:
+    pthread_mutex_unlock(&window->commit_mutex);
+
+    return ret;
 }
 
 static int
@@ -1369,6 +1442,9 @@ _UnbindWindow(
         return EGL_FALSE;
     }
 
+    /* Do not throttle the swap thread. */
+    window->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
+
     return EGL_TRUE;
 }
 
@@ -1447,8 +1523,9 @@ _PostWindowBackBuffer(
 
     err = wl_egl_window_queue_buffer(window, BackBuffer->context, DamageHint);
 
-    if (err)
+    if (err < 0)
     {
+        fprintf(stderr, "EGL: errno=%d (%s)\n", errno, strerror(errno));
         return EGL_FALSE;
     }
 
@@ -1820,7 +1897,7 @@ _SyncToPixmap(
 
 static struct eglPlatform waylandPlatform =
 {
-    EGL_PLATFORM_WAYLAND_KHR,
+    EGL_PLATFORM_WAYLAND_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
@@ -1892,6 +1969,10 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     window->format = gcvSURF_A8R8G8B8;
     window->type   = gcvSURF_BITMAP;
 
+    window->commit_signal = 1;
+
+    pthread_mutex_init(&window->commit_mutex, NULL);
+
     p = getenv("GPU_VIV_WL_MULTI_BUFFER");
 
     if (p != NULL)
@@ -1904,8 +1985,7 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
         }
     }
 
-    window->buffers = malloc(window->nr_buffers * sizeof(struct wl_egl_buffer));
-    memset(window->buffers, 0, window->nr_buffers * sizeof(struct wl_egl_buffer));
+    window->buffers = calloc(window->nr_buffers, sizeof(struct wl_egl_buffer));
 
     wl_egl_window_register(window);
 
@@ -1931,6 +2011,8 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
          */
     }
 
+    window->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
+
     wl_egl_window_unregister(window);
 
     for (i = 0; i < window->nr_buffers; i++)
@@ -1940,8 +2022,15 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
 
         assert(!(buffer->frame_callback && !display));
 
-        while (buffer->frame_callback && ret != -1)
-            ret = dispatch_queue(display->wl_dpy, display->wl_queue, 5);
+        if (buffer->frame_callback)
+        {
+            pthread_mutex_lock(&window->commit_mutex);
+
+            while (buffer->frame_callback && ret != -1)
+                ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+
+            pthread_mutex_unlock(&window->commit_mutex);
+        }
 
         wl_egl_buffer_destroy(window, buffer);
     }
@@ -1954,6 +2043,8 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
     free(window->buffers);
     window->buffers   = NULL;
     window->signature = 0;
+
+    pthread_mutex_destroy(&window->commit_mutex);
 
     free(window);
 }

@@ -18,7 +18,6 @@
 
 extern __GLchipGlobal dpGlobalInfo;
 extern __GLformatInfo __glFormatInfoTable[];
-extern GLint __glesApiProfileMode;
 
 /***************************************************************************/
 /* Implementation for internal functions                                   */
@@ -432,18 +431,18 @@ gcChipInitExtension(
     __glExtension[__GL_EXTID_OES_EGL_image_external].bEnabled = GL_TRUE;
 #endif
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_BORDER_CLAMP) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasTxBorderClamp)
     {
         __glExtension[__GL_EXTID_EXT_texture_border_clamp].bEnabled = gcvTRUE;
         __glExtension[__GL_EXTID_OES_texture_border_clamp].bEnabled = gcvTRUE;
     }
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_VERTEX_10_10_10_2) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasVertex1010102)
     {
         __glExtension[__GL_EXTID_OES_vertex_type_10_10_10_2].bEnabled = GL_TRUE;
     }
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DXT) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasTxDXT)
     {
         __glExtension[__GL_EXTID_EXT_texture_compression_dxt1].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled = GL_TRUE;
@@ -460,7 +459,7 @@ gcChipInitExtension(
     __glExtension[__GL_EXTID_EXT_texture_sRGB_decode].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_texture_rg].bEnabled = GL_TRUE;
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ANISOTROPIC_FILTERING) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasTxAnisFilter)
     {
         __glExtension[__GL_EXTID_EXT_texture_filter_anisotropic].bEnabled = GL_TRUE;
     }
@@ -471,7 +470,7 @@ gcChipInitExtension(
     }
 
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasHalfFloatPipe)
     {
         __glExtension[__GL_EXTID_EXT_color_buffer_half_float].bEnabled = GL_TRUE;
         if (chipCtx->maxDrawRTs >= 8)
@@ -480,7 +479,7 @@ gcChipInitExtension(
         }
     }
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_INTERLOCK) == gcvSTATUS_TRUE)
+    if (chipCtx->chipFeature.hwFeature.hasPSIOInterlock)
     {
         __glExtension[__GL_EXTID_EXT_shader_framebuffer_fetch].bEnabled = GL_TRUE;
     }
@@ -491,7 +490,7 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_OES_texture_half_float].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_texture_float].bEnabled = GL_TRUE;
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_SHADING) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasMSAAshading)
         {
             __glExtension[__GL_EXTID_OES_sample_shading].bEnabled   = gcvTRUE;
             __glExtension[__GL_EXTID_OES_sample_variables].bEnabled = gcvTRUE;
@@ -500,18 +499,18 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_shader_multisample_interpolation].bGLSL    = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BLT_ENGINE) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasBlitEngine)
         {
             __glExtension[__GL_EXTID_EXT_copy_image].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_copy_image].bEnabled = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_STENCIL_TEXTURE) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasStencilTexture)
         {
             __glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled = GL_TRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SEPARATE_RT_CTRL) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasSeparateRTCtrl)
         {
             __glExtension[__GL_EXTID_EXT_draw_buffers_indexed].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_OES_draw_buffers_indexed].bEnabled = GL_TRUE;
@@ -519,15 +518,15 @@ gcChipInitExtension(
 
         if (chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_DEQP)
         {
-            if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC) &&
-                gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC_DECODE_FIX) == gcvSTATUS_TRUE)
+            if (chipCtx->chipFeature.hwFeature.hasASTC &&
+                chipCtx->chipFeature.hwFeature.hasASTCCodecFix)
             {
                 __glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled = GL_TRUE;
             }
         }
         else
         {
-            if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC) == gcvSTATUS_TRUE)
+            if (chipCtx->chipFeature.hwFeature.hasASTC)
             {
                 __glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled = GL_TRUE;
             }
@@ -540,7 +539,7 @@ gcChipInitExtension(
 
         __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_TRUE;
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasSecurity)
         {
             __glExtension[__GL_EXTID_EXT_protected_textures].bEnabled = GL_TRUE;
         }
@@ -555,7 +554,7 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_robustness].bEnabled = GL_TRUE;
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_GEOMETRY_SHADER) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasGS)
         {
             __glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_geometry_point_size].bEnabled = gcvTRUE;
@@ -563,13 +562,13 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_geometry_point_size].bEnabled = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_CUBEMAP_ARRAY) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasCubeArray)
         {
             __glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ADVANCED_SH_INST) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasAdvancedInstr)
         {
             __glExtension[__GL_EXTID_EXT_gpu_shader5].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_gpu_shader5].bGLSL = gcvTRUE;
@@ -581,12 +580,12 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_shader_io_blocks].bEnabled = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTIDRAW_INDIRECT) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasMultiDrawIndirect)
         {
             __glExtension[__GL_EXTID_EXT_multi_draw_indirect].bEnabled = GL_TRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_BUFFER) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasTextureBuffer)
         {
             __glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_texture_buffer].bGLSL = gcvTRUE;
@@ -594,7 +593,7 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_texture_buffer].bGLSL = gcvTRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TESSELLATION) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasTS)
         {
             __glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_tessellation_point_size].bEnabled = gcvTRUE;
@@ -610,13 +609,13 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_primitive_bounding_box].bGLSL    = GL_TRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasDrawElementBaseVertex)
         {
             __glExtension[__GL_EXTID_EXT_draw_elements_base_vertex].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_OES_draw_elements_base_vertex].bEnabled = GL_TRUE;
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.hwFeature.hasRobustness)
         {
             __glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled = GL_TRUE;
         }
@@ -773,63 +772,99 @@ gcChipInitChipFeature(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     /* Check whether IP can use RT tile format as texture */
-    chipFeature->indirectRTT = !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_RTT);
-
+    chipFeature->hwFeature.indirectRTT = !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_RTT);
     /* Check whether IP has correct stencil support in depth-only mode. */
-    chipFeature->hasCorrectStencil = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_CORRECT_STENCIL);
-
+    chipFeature->hwFeature.hasCorrectStencil = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_CORRECT_STENCIL);
     /* Check whether IP has tile status support. */
-    chipFeature->hasTileStatus = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_FAST_CLEAR);
-
+    chipFeature->hwFeature.hasTileStatus = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_FAST_CLEAR);
     /* Patch strip if the bug fix is not available. */
-    chipFeature->patchTriangleStrip = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP);
-    chipFeature->lineLoop = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_LINE_LOOP);
-
-    chipFeature->primitiveRestart = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PRIMITIVE_RESTART);
-
-    chipFeature->wideLine = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_WIDE_LINE);
+    chipFeature->hwFeature.patchTriangleStrip = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP);
+    chipFeature->hwFeature.lineLoop = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_LINE_LOOP);
+    chipFeature->hwFeature.primitiveRestart = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PRIMITIVE_RESTART);
+    chipFeature->hwFeature.wideLine = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_WIDE_LINE);
 
 #if gcdUSE_WCLIP_PATCH
     chipCtx->wLimitPatch = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FRUSTUM_CLIP_FIX);
 #endif
 
 #if gcdUSE_NPOT_PATCH
-    chipFeature->patchNP2Texture = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NON_POWER_OF_TWO);
+    chipFeature->hwFeature.patchNP2Texture = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NON_POWER_OF_TWO);
 #endif
-
-    chipFeature->msaaFragmentOperation = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_FRAGMENT_OPERATION);
-
+    chipFeature->hwFeature.msaaFragmentOperation = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_FRAGMENT_OPERATION);
     /* Texture features. */
-    chipFeature->hasYuv420Tiler = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_YUV420_TILER);
-    chipFeature->hasYuvAssembler = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_YUV_ASSEMBLER);
-    chipFeature->hasLinearTx = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_LINEAR);
-    chipFeature->hasTxSwizzle = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_SWIZZLE);
-    chipFeature->hasSupertiledTx = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SUPERTILED_TEXTURE);
-    chipFeature->hasTxTileStatus = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_TILE_STATUS_READ);
-    chipFeature->hasTxDecompressor = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DECOMPRESSOR);
+    chipFeature->hwFeature.hasYuv420Tiler = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_YUV420_TILER);
+    chipFeature->hwFeature.hasYuvAssembler = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_YUV_ASSEMBLER);
+    chipFeature->hwFeature.hasLinearTx = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_LINEAR);
+    chipFeature->hwFeature.hasTxSwizzle = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_SWIZZLE);
+    chipFeature->hwFeature.hasSupertiledTx = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SUPERTILED_TEXTURE);
+    chipFeature->hwFeature.hasTxTileStatus = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_TILE_STATUS_READ);
+    chipFeature->hwFeature.hasTxDecompressor = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DECOMPRESSOR);
+    chipFeature->hwFeature.attrib2101010Rev = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALTI2);
+    chipFeature->hwFeature.extendIntSign = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX);
+    chipFeature->hwFeature.hasTxDescriptor = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DESCRIPTOR);
+    chipFeature->hwFeature.hasBlitEngine = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BLT_ENGINE);
+    chipFeature->hwFeature.hasHwTFB = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HW_TFB);
+    chipFeature->hwFeature.txDefaultValueFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DEFAULT_VALUE_FIX);
+    chipFeature->hwFeature.hasCommandPrefetch = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMMAND_PREFETCH);
+    chipFeature->hwFeature.hasYuvAssembler10bit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_YUV_ASSEMBLER_10BIT);
+    chipFeature->hwFeature.supportMSAA2X = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SUPPORT_MSAA2X);
+    chipFeature->hwFeature.hasSecurity = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY);
+    chipFeature->hwFeature.hasRobustness = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS);
+    chipFeature->hwFeature.txLerpLessBit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_LERP_LESS_BIT);
+    chipFeature->hwFeature.hasTxBorderClamp = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_BORDER_CLAMP);
+    chipFeature->hwFeature.hasVertex1010102 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_VERTEX_10_10_10_2);
+    chipFeature->hwFeature.hasTxDXT = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DXT);
+    chipFeature->hwFeature.hasTxAnisFilter = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ANISOTROPIC_FILTERING);
+    chipFeature->hwFeature.hasHalfFloatPipe = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE);
+    chipFeature->hwFeature.hasPSIOInterlock = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_INTERLOCK);
+    chipFeature->hwFeature.hasMSAAshading = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_SHADING);
+    chipFeature->hwFeature.hasStencilTexture = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_STENCIL_TEXTURE);
+    chipFeature->hwFeature.hasSeparateRTCtrl = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SEPARATE_RT_CTRL);
+    chipFeature->hwFeature.hasASTC = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC);
+    chipFeature->hwFeature.hasASTCCodecFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC_DECODE_FIX);
+    chipFeature->hwFeature.hasGS = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_GEOMETRY_SHADER);
+    chipFeature->hwFeature.hasCubeArray = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_CUBEMAP_ARRAY);
+    chipFeature->hwFeature.hasAdvancedInstr = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ADVANCED_SH_INST);
+    chipFeature->hwFeature.hasMultiDrawIndirect = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTIDRAW_INDIRECT);
+    chipFeature->hwFeature.hasTextureBuffer = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_BUFFER);
+    chipFeature->hwFeature.hasTS = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TESSELLATION);
+    chipFeature->hwFeature.hasDrawElementBaseVertex = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX);
+    chipFeature->hwFeature.hasInteger32Fix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER32_FIX);
+    chipFeature->hwFeature.hasDrawIndirect = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_INDIRECT);
+    chipFeature->hwFeature.hasPatchListFetchFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_PATCHLIST_FETCH_FIX);
+    chipFeature->hwFeature.hasFEstartVertex = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_START_VERTEX_SUPPORT);
+    chipFeature->hwFeature.hasPEB2BPixelFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX);
+    chipFeature->hwFeature.hasV2MSAACoherencyFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX);
+    chipFeature->hwFeature.hasIndexFetchFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INDEX_FETCH_FIX);
+    chipFeature->hwFeature.hasComputeIndirect = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPUTE_INDIRECT);
+    chipFeature->hwFeature.hasBugFixes18 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES18);
+    chipFeature->hwFeature.hasCubeBorderLOD = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEX_CUBE_BORDER_LOD);
+    chipFeature->hwFeature.hasTxFrac6Bit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_FRAC_PRECISION_6BIT);
+    chipFeature->hwFeature.hasTxFrac8Bit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_8bit_UVFrac);
+    chipFeature->hwFeature.hasMSAAOQFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_OQ_FIX);
+    chipFeature->hwFeature.hasWideLineHelperFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_WIDELINE_HELPER_FIX);
+    chipFeature->hwFeature.needWideLineTriangleEMU = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_WIDELINE_TRIANGLE_EMU);
+    chipFeature->hwFeature.hasPEEnhancement2 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_ENHANCEMENTS2);
+    chipFeature->hwFeature.hasBugFixes7 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES7);
+    chipFeature->hwFeature.hasPEDitherFix2 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2);
+    chipFeature->hwFeature.hasCompressionV1 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1);
+    chipFeature->hwFeature.hasRSBLTMsaaDecompression = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RSBLT_MSAA_DECOMPRESSION);
+    chipFeature->hwFeature.hasAdvanceBlendPart0  = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ADVANCED_BLEND_MODE_PART0);
+    chipFeature->hwFeature.hasTxBaseLOD = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEX_BASELOD);
+    chipFeature->hwFeature.hasRADepthWrite = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE);
+    chipFeature->hwFeature.hasTxGather = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_GATHER);
+    chipFeature->hwFeature.hasTxGatherOffsets = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_GATHER_OFFSETS);
+    chipFeature->hwFeature.hasUnifiedSamplers = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_UNIFIED_SAMPLERS);
+    chipFeature->hwFeature.hasD24S8SampleStencil = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_D24S8_SAMPLE_STENCIL);
+    chipFeature->hwFeature.hasSinglePipeHalti1 = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_PIPE_HALTI1);
+    chipFeature->hwFeature.hasPSIODual16_32bpcFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_DUAL16_32bpc_FIX);
+    chipFeature->hwFeature.hasDepthBiasFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DEPTH_BIAS_FIX);
+    chipFeature->hwFeature.hasSRGBRT  = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SRGB_RT_SUPPORT);
+    chipFeature->hwFeature.hasTileFiller = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TILE_FILLER);
+    chipFeature->hwFeature.hasTxASTCMultiSliceFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_ASTC_MULTISLICE_FIX);
+    chipFeature->hwFeature.hasMultiPixelPipes = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTI_PIXELPIPES);
+    chipFeature->hwFeature.hasSingleBuffer = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_BUFFER);
 
-    chipFeature->attrib2101010Rev = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALTI2);
-    chipFeature->extendIntSign = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX);
-
-    chipFeature->hasTxDescriptor = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DESCRIPTOR);
-
-    chipFeature->hasBlitEngine = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BLT_ENGINE);
-
-    chipFeature->hasHwTFB = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HW_TFB);
-
-    chipFeature->txDefaultValueFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DEFAULT_VALUE_FIX);
-
-    chipFeature->hasCommandPrefetch = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMMAND_PREFETCH);
-
-    chipFeature->hasYuvAssembler10bit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_YUV_ASSEMBLER_10BIT);
-
-    chipFeature->supportMSAA2X = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SUPPORT_MSAA2X);
-
-    chipFeature->hasSecurity = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY);
-
-    chipFeature->hasRobustness = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS);
-
-    chipFeature->txLerpLessBit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_LERP_LESS_BIT);
 
     /* Get Halti support level */
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
@@ -1121,7 +1156,7 @@ __glChipGetDeviceConstants(
             constants->majorVersion = 2;
         }
         else
-        if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+        if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
             && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
             esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
         {
@@ -1798,7 +1833,7 @@ __glChipCreateContext(
                                                                + constants->shaderCaps.maxCmptUniformBlocks * constants->shaderCaps.maxUniformBlockSize / 4;
     }
 
-    if (chipCtx->chipFeature.wideLine)
+    if (chipCtx->chipFeature.hwFeature.wideLine)
     {
         gcmONERROR(gco3D_SetAntiAliasLine(chipCtx->engine, gcvTRUE));
     }
@@ -1878,7 +1913,7 @@ __glChipCreateContext(
 #endif
 
 #if gcdUSE_NPOT_PATCH
-    gcoHAL_SetBltNP2Texture(chipCtx->chipFeature.patchNP2Texture);
+    gcoHAL_SetBltNP2Texture(chipCtx->chipFeature.hwFeature.patchNP2Texture);
 #endif
 
 
@@ -1924,13 +1959,13 @@ __glChipCreateContext(
 
     gcmONERROR(gcChipGetSampleLocations(gc, chipCtx));
 
-    chipCtx->robust = (gc->imports.robustAccess && chipCtx->chipFeature.hasRobustness);
+    chipCtx->robust = (gc->imports.robustAccess && chipCtx->chipFeature.hwFeature.hasRobustness);
 
     chipCtx->needRTRecompile = gcvFALSE;
     chipCtx->needTexRecompile = (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) ||
-                                 chipCtx->chipFeature.patchNP2Texture ||
-                                 !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX) ||
-                                 !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER32_FIX);
+                                 chipCtx->chipFeature.hwFeature.patchNP2Texture ||
+                                 !chipCtx->chipFeature.hwFeature.extendIntSign ||
+                                 !chipCtx->chipFeature.hwFeature.hasInteger32Fix;
 
     if (gc->shareCtx != gcvNULL)
     {
@@ -1995,7 +2030,7 @@ __glChipGetGraphicsResetStatus(
         if (gcvSTATUS_TRUE == status)
         {
             /* GPU was reseted */
-            if (chipCtx->chipFeature.hasSecurity)
+            if (chipCtx->chipFeature.hwFeature.hasSecurity)
             {
                 if (innocent)
                 {

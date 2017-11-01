@@ -15,14 +15,14 @@
 
 #if VIV_HARRIS_SCORE
 vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst,
-                        vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_t borders)
+                        vx_scalar sens, vx_scalar grads, vx_scalar blocks, vx_scalar shift, vx_border_t borders)
 {
     vx_status status = VX_SUCCESS;
     if (borders.mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 block_size = 0, i = 0;
         vx_float32 k = 0.0f;
-        vx_uint32 width = 0, height = 0, scale = 0;
+        vx_uint32 width = 0, height = 0, grad = 0;
         vx_float64 s;
         gcoVX_Index indexs[]            = {
             /* index, num, shift0, shift1, mask0, mask1 */
@@ -51,13 +51,15 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
             kernelContext->uniform_num = 0;
         }
 
-        status |= vxReadScalarValue(winds, &block_size);
+        status |= vxReadScalarValue(blocks, &block_size);
         status |= vxReadScalarValue(sens, &k);
-        status |= vxReadScalarValue(scales, &scale);
+        status |= vxReadScalarValue(grads, &grad);
 
-        s = (1 / ((1 << (scale - 1)) * block_size * 255.0));
+        s = (1 / ((1 << (grad - 1)) * block_size * 255.0));
 
-        s = s * s * s * s;
+        s *= (1 << (gctINT32)shift->value->f32);
+
+        s = s * s;
 
         status |= vxQueryImage(grad_x, VX_IMAGE_WIDTH, &width, sizeof(width));
         status |= vxQueryImage(grad_x, VX_IMAGE_HEIGHT, &height, sizeof(height));
@@ -82,6 +84,8 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
         kernelContext->params.volume               = block_size;
         kernelContext->params.factor               = k;
         kernelContext->params.scale                = (vx_float32)s;
+
+        kernelContext->params.policy               = grad;/*temp for grad*/
 
         kernelContext->params.col                  = width;
         kernelContext->params.row                  = height;

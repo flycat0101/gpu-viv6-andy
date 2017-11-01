@@ -1125,7 +1125,9 @@ VivCreateScreenResources(ScreenPtr pScreen) {
 
     TRACE_EXIT(TRUE);
 }
-
+#ifdef ENABLE_VIVANTE_DRI3
+extern Bool vivanteDRI3ScreenInit(ScreenPtr pScreen);
+#endif
 static Bool
 VivScreenInit(SCREEN_INIT_ARGS_DECL)
 {
@@ -1149,7 +1151,6 @@ VivScreenInit(SCREEN_INIT_ARGS_DECL)
     /*Init the hardware in current mode*/
     if (!fbdevHWModeInit(pScrn, pScrn->currentMode)) {
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "mode initialization failed\n");
-        TRACE_EXIT(FALSE);
     }
 
     /*Mapping the Video memory*/
@@ -1441,12 +1442,20 @@ VivScreenInit(SCREEN_INIT_ARGS_DECL)
     }
 #endif
 
+#ifdef ENABLE_VIVANTE_DRI3
+    if (!vivanteDRI3ScreenInit(pScreen))
+    {
+        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,"Fail to init DRI3\n");
+    };
+#else
+
 #ifndef DISABLE_VIVANTE_DRI
     if (VivDRIScreenInit(pScreen)) {
         VivDRIFinishScreenInit(pScreen);
     }
 #endif
 
+#endif
 
     /* restore sync for FSL extension */
 #ifdef ADD_FSL_XRANDR
@@ -1467,8 +1476,14 @@ VivCloseScreen(CLOSE_SCREEN_ARGS_DECL)
 
     TRACE_ENTER();
 
+#ifdef ENABLE_VIVANTE_DRI3
+
+#else
+
 #ifndef DISABLE_VIVANTE_DRI
     VivDRICloseScreen(pScreen);
+#endif
+
 #endif
 
     if (fPtr->mFakeExa.mUseExaFlag) {

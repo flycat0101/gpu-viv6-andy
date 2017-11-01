@@ -36,6 +36,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "indirect.h"
 #include "glxclient.h"
 #include "glcore/gc_es_dispatch.h"
+#include "gc_hal_types.h"
 
 
 __GLesDispatchTable *__glXNewIndirectAPI(GLvoid)

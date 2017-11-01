@@ -82,5 +82,5 @@ install: extra_install
 .PHONY: extra_install
 extra_install:
 	@-mkdir -p $(INSTALL_DIR)
-	@-cp -f lena_gray.bmp $(INSTALL_DIR)
+	@-cp -f test_gray.bmp $(INSTALL_DIR)
 	@-cp -f $(VIVANTE_SDK_DIR)/include/CL/cl_viv_vx_ext.h $(INSTALL_DIR)

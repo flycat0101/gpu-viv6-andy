@@ -40,7 +40,7 @@ DllMain(
 
         if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
 
-        if (clgGlobalId == gcvNULL)
+        if(clgGlobalId)
         {
             gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
         }
@@ -65,7 +65,7 @@ static void _ModuleDestructor(void)
 
     if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
 
-    if (clgGlobalId == gcvNULL)
+    if(clgGlobalId)
     {
         gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
     }

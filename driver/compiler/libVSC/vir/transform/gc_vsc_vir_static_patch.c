@@ -435,7 +435,7 @@ static VSC_ErrCode _DoLocalMemAccessPatch(VIR_Shader* pShader)
     }
 
     /* Set region size. */
-    regionSize.uValue = VIR_Shader_GetLocalMemorySize(pShader);
+    regionSize.uValue = VIR_Shader_GetShareMemorySize(pShader);
 
     /*--------------begin to insert new instructions--------------*/
     /* workGroup1DIndex = WorkGroupID.X + Y_MULTIPLIER * WorkGroupID.Y */

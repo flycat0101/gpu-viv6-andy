@@ -41,6 +41,7 @@ GLvoid APIENTRY __glim_AlphaFunc(__GLcontext *gc, GLenum func, GLfloat ref)
     /* flip attribute dirty bit */
     __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_ALPHAFUNC_BIT);
 
+    __GL_FOOTER();
 }
 #endif
 GLvoid GL_APIENTRY __gles_StencilFunc(__GLcontext *gc, GLenum func, GLint ref, GLuint mask)
@@ -1129,17 +1130,9 @@ GLvoid GL_APIENTRY __gles_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-
-    if (DRAW_FRAMEBUFFER_BINDING_NAME)
+    if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
     {
-        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-        {
-            currentSamples = gc->frameBuffer.drawFramebufObj->fbSamples;
-        }
-    }
-    else
-    {
-        currentSamples = gc->modes.samples;
+        currentSamples = gc->frameBuffer.drawFramebufObj->fbSamples;
     }
 
     if (index >= currentSamples)

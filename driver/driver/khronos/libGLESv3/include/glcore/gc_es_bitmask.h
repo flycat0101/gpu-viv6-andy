@@ -44,6 +44,7 @@ typedef struct __GLbitmaskFUNCS
     GLboolean (*test) (GLbitmask_PTR Bitmask, GLuint Loc);
     GLvoid    (*set) (GLbitmask_PTR Bitmask, GLuint Loc);
     GLvoid    (*or)(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2);
+    GLvoid    (*xor)(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2);
     GLboolean (*testAndClear)(GLbitmask_PTR Bitmask,  GLuint Loc);
     GLboolean (*isAllZero)(GLbitmask_PTR Bitmask);
     GLvoid    (*init)(GLbitmask_PTR Bitmask, GLboolean AllOne);
@@ -67,6 +68,11 @@ __GL_INLINE GLvoid seMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
 __GL_INLINE GLvoid seMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
 {
     BitmaskResult->me[0] = Bitmask1->me[0] | Bitmask2->me[0];
+}
+
+__GL_INLINE GLvoid seMaskXOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+{
+    BitmaskResult->me[0] = Bitmask1->me[0] ^ Bitmask2->me[0];
 }
 
 __GL_INLINE GLboolean seMaskTestAndClear(GLbitmask_PTR Bitmask, GLuint Loc)
@@ -116,6 +122,7 @@ static GLbitmaskFUNCS seMaskFuncs =
     seMaskTest,
     seMaskSet,
     seMaskOR,
+    seMaskXOR,
     seMaskTestAndClear,
     seMaskIsAllZero,
     seMaskInit,
@@ -144,6 +151,16 @@ __GL_INLINE GLvoid meMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1,
     for (i = 0; i < minIndex; i++)
     {
         BitmaskResult->me[i] = Bitmask1->me[i] | Bitmask2->me[i];
+    }
+}
+
+__GL_INLINE GLvoid meMaskXOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+{
+    GLuint i;
+    GLuint minIndex = __GL_MIN(Bitmask1->numOfElts, Bitmask2->numOfElts);
+    for (i = 0; i < minIndex; i++)
+    {
+        BitmaskResult->me[i] = Bitmask1->me[i] ^ Bitmask2->me[i];
     }
 }
 
@@ -221,6 +238,7 @@ static GLbitmaskFUNCS meMaskFuncs =
     meMaskTest,
     meMaskSet,
     meMaskOR,
+    meMaskXOR,
     meMaskTestAndClear,
     meMaskIsAllZero,
     meMaskInit,
@@ -400,5 +418,22 @@ __glBitmaskOR2(
     (*BitmaskResult->op->or)(BitmaskResult, BitmaskResult, Bitmask);
 }
 
+/*
+** Initialize BitmaskResult with Bitmask1 xor Bitmask2
+** BitmaskResult can NOT be either of Bitmask1 or Bitmask2.
+*/
+__GL_INLINE GLvoid
+__glBitmaskInitXOR(
+    GLbitmask_PTR BitmaskResult,
+    GLbitmask_PTR Bitmask1,
+    GLbitmask_PTR Bitmask2
+)
+{
+    GLuint size = __GL_MAX(Bitmask1->size, Bitmask2->size);
+
+    __glBitmaskInitAllZero(BitmaskResult, size);
+
+    (*BitmaskResult->op->xor)(BitmaskResult, Bitmask1, Bitmask2);
+}
 #endif /*#ifndef __gc_es_bitmask_h_*/
 

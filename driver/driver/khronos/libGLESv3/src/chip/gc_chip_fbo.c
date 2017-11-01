@@ -22,7 +22,9 @@
 #      include <private/ui/android_natives_priv.h>
 #   endif
 
-#   include <gc_gralloc_priv.h>
+#if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+#      include <gc_gralloc_priv.h>
+#   endif
 #endif
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_FBO
@@ -152,7 +154,7 @@ gcChipUtilGetShadowTexView(
     /* If HW only support tiled texture while source surface if supertiled,
     ** created a tiled shadow one instead.
     */
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SUPERTILED_TEXTURE) != gcvTRUE &&
+    if (!chipCtx->chipFeature.hwFeature.hasSupertiledTx &&
         pixelPlaneView.surf->tiling != gcvTILED)
     {
         GLuint width, height;
@@ -1407,7 +1409,7 @@ gcChipBlitFramebuffer3Dblit(
 
         masterView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
-        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.indirectRTT)))
+        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.hwFeature.indirectRTT)))
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
@@ -2023,7 +2025,7 @@ __glChipRenderbufferStorage(
 
     if (drvFormat == __GL_FMT_RGBA4 &&
         (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)&&
-        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+        !chipCtx->chipFeature.hwFeature.hasPEDitherFix2)
     {
         drvFormat = __GL_FMT_RGBA8;
     }
@@ -2039,7 +2041,7 @@ __glChipRenderbufferStorage(
     }
     else if ((__GL_API_VERSION_ES20 != gc->apiVersion) &&
              (__GL_FMT_Z16 == drvFormat) &&
-             (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1) == gcvTRUE)
+             (chipCtx->chipFeature.hwFeature.hasCompressionV1)
             )
     {
         patchCase = __GL_CHIP_FMT_PATCH_CASE2;
@@ -2053,7 +2055,7 @@ __glChipRenderbufferStorage(
 
     if (drvFormat == __GL_FMT_RGBA4 &&
         (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
-        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+        !chipCtx->chipFeature.hwFeature.hasPEDitherFix2)
     {
         drvFormat = __GL_FMT_RGBA8;
     }
@@ -2592,13 +2594,13 @@ gcChipRellocShadowResource(
         }
 
         if (isFromTexture && targetFormat == gcvSURF_D16 &&
-            gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1) == gcvTRUE)
+            chipCtx->chipFeature.hwFeature.hasCompressionV1)
         {
             surfType |= gcvSURF_NO_TILE_STATUS;
         }
 
         if (targetSamples > 1 &&
-            gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RSBLT_MSAA_DECOMPRESSION) == gcvFALSE)
+            !chipCtx->chipFeature.hwFeature.hasRSBLTMsaaDecompression)
         {
             surfType |= gcvSURF_NO_COMPRESSION;
         }

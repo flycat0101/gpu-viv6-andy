@@ -131,7 +131,7 @@
                                               precision, \
                                               gcvFALSE, \
                                               1, \
-                                              (gctUINT16) -1, \
+                                              (gctUINT32) -1, \
                                               gcSHADER_SHADER_DEFAULT, \
                                               gcSHADER_GetOutputDefaultLocation(Shader), \
                                               -1, \
@@ -146,7 +146,7 @@
                                               precision, \
                                               length > 1, \
                                               length, \
-                                              (gctUINT16) -1, \
+                                              (gctUINT32) -1, \
                                               gcSHADER_SHADER_DEFAULT, \
                                               gcSHADER_GetOutputDefaultLocation(Shader), \
                                               -1, \
@@ -278,7 +278,7 @@
 
 #define FUNCTION_INPUT(func,index) \
     do { \
-        gctUINT16 temp; \
+        gctUINT32 temp; \
         gctUINT8 enable; \
         gcmONERROR(gcFUNCTION_GetArgument(func, \
                                             index, \

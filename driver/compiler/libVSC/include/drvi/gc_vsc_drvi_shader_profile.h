@@ -907,6 +907,8 @@ struct _SHADER_UAV_SLOT_MAPPING
        2 .For sizable access mode, we need know the size of fixed size part.
     */
     gctUINT                                     sizeInByte;
+    /* HW slot number, now only some inputAttachment uses this variable.  */
+    gctUINT                                     hwSamplerSlot;
 
     union
     {
@@ -1017,6 +1019,9 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
         {
             gctUINT                                      shareMemSizePerThreadGrpInByte;
             gctUINT                                      currWorkGrpNum;
+
+            gctUINT                                      privMemSizePerThreadInByte;
+            gctUINT                                      currWorkThreadNum;
 
             gctUINT                                      threadGrpDimX;
             gctUINT                                      threadGrpDimY;

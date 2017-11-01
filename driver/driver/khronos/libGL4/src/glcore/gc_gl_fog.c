@@ -16,7 +16,6 @@
 **
 */
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 
 __GL_INLINE GLvoid
@@ -105,11 +104,6 @@ GLvoid APIENTRY __glim_Fogfv(__GLcontext *gc,GLenum pname, const GLfloat *pv)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Fogfv", DT_GLenum, pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     __glFogfv(gc, pname, (GLfloat*)pv);
 }
 
@@ -117,12 +111,6 @@ GLvoid APIENTRY __glim_Fogf(__GLcontext *gc,GLenum pname, GLfloat f)
 {
     GLfloat tmpf[4];
    __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-   if(dbg_logAPIFilter)
-       dbgLogFullApi("__glim_Fogf", DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
-
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -145,11 +133,6 @@ GLvoid APIENTRY __glim_Fogiv(__GLcontext *gc,GLenum pname, const GLint *pv)
 {
     GLfloat tmpf[4];
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Fogiv", DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
 
     switch (pname) {
       case GL_FOG_COLOR:
@@ -178,12 +161,6 @@ GLvoid APIENTRY __glim_Fogi(__GLcontext *gc,GLenum pname, GLint i)
 {
     GLfloat tmpf[4];
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Fogi", DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
-
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {

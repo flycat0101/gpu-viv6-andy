@@ -255,6 +255,12 @@ typedef struct _gcsDATABASE
     /* Process ID. */
     gctUINT32                           processID;
 
+    /* Open-Close ref count */
+    gctPOINTER                          refs;
+
+    /* Already mark for delete and cannot reenter */
+    gctBOOL                             deleted;
+
     /* Sizes to query. */
     gcsDATABASE_COUNTERS                vidMem;
     gcsDATABASE_COUNTERS                nonPaged;
@@ -580,8 +586,6 @@ struct _gckKERNEL
 #if VIVANTE_PROFILER
     /* Enable profiling */
     gctBOOL                     profileEnable;
-    /* profiling sync mode*/
-    gctBOOL                     profileSyncMode;
     /* Clear profile register or not*/
     gctBOOL                     profileCleanRegister;
 #endif
@@ -641,7 +645,7 @@ struct _gckKERNEL
     gctUINT32                   lastCommitStamp;
     gctUINT32                   timer;
     gctUINT32                   restoreAddress;
-    gctINT32                   restoreMask;
+    gctINT32                    restoreMask;
 
     /* 3DBLIT */
     gckASYNC_COMMAND            asyncCommand;
@@ -651,6 +655,9 @@ struct _gckKERNEL
     gckDEVICE                   device;
 
     gctUINT                     chipID;
+
+    gctUINT32                   contiguousBaseAddress;
+    gctUINT32                   externalBaseAddress;
 };
 
 struct _FrequencyHistory
@@ -1064,6 +1071,9 @@ struct _gckVIDMEM
     /* Pointer to gckOS object. */
     gckOS                       os;
 
+    /* mdl record pointer... a kmalloc address. Process agnostic. */
+    gctPHYS_ADDR                physical;
+
     /* Information for this video memory heap. */
     gctUINT32                   baseAddress;
     gctSIZE_T                   bytes;
@@ -1088,6 +1098,9 @@ typedef struct _gcsVIDMEM_NODE
     /* Pointer to gcuVIDMEM_NODE. */
     gcuVIDMEM_NODE_PTR          node;
 
+    /* Pointer to gckKERNEL object. */
+    gckKERNEL                   kernel;
+
     /* Mutex to protect node. */
     gctPOINTER                  mutex;
 
@@ -1096,6 +1109,9 @@ typedef struct _gcsVIDMEM_NODE
 
     /* Name for client to import. */
     gctUINT32                   name;
+
+    /* dma_buf */
+    gctPOINTER                  dmabuf;
 
 #if gcdPROCESS_ADDRESS_SPACE
     /* Head of mapping list. */
@@ -1114,6 +1130,12 @@ typedef struct _gcsVIDMEM_NODE
     gcePOOL                     pool;
 
     gcsFENCE_SYNC               sync[gcvENGINE_GPU_ENGINE_COUNT];
+
+    /* For DRM usage */
+    gckVIDMEM_NODE              tsNode;
+    gctUINT32                   tilingMode;
+    gctUINT32                   tsMode;
+    gctUINT64                   clearValue;
 }
 gcsVIDMEM_NODE;
 
@@ -1170,6 +1192,7 @@ typedef struct _gcsDEVICE
     gcsCORE_INFO                coreInfoArray[gcvCORE_COUNT];
     gctUINT32                   coreNum;
     gcsCORE_LIST                map[gcvHARDWARE_NUM_TYPES];
+    gceHARDWARE_TYPE            defaultHwType;
 
     gckOS                       os;
 
@@ -1186,6 +1209,13 @@ typedef struct _gcsDEVICE
     gctPOINTER                  commitMutex;
 }
 gcsDEVICE;
+
+gceSTATUS
+gckVIDMEM_HANDLE_Allocate(
+    IN gckKERNEL Kernel,
+    IN gckVIDMEM_NODE Node,
+    OUT gctUINT32 * Handle
+    );
 
 gceSTATUS
 gckVIDMEM_HANDLE_Reference(
@@ -1225,23 +1255,38 @@ gckVIDMEM_NODE_Unlock(
     );
 
 gceSTATUS
+gckVIDMEM_NODE_Reference(
+    IN gckKERNEL Kernel,
+    IN gckVIDMEM_NODE Node
+    );
+
+gceSTATUS
 gckVIDMEM_NODE_Dereference(
     IN gckKERNEL Kernel,
     IN gckVIDMEM_NODE Node
     );
 
 gceSTATUS
+gckVIDMEM_NODE_Export(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Handle,
+    IN gctINT32 Flags,
+    OUT gctPOINTER *DmaBuf,
+    OUT gctINT32 *FD
+    );
+
+gceSTATUS
 gckVIDMEM_NODE_Name(
     IN gckKERNEL Kernel,
     IN gctUINT32 Handle,
-    IN gctUINT32 * Name
+    OUT gctUINT32 * Name
     );
 
 gceSTATUS
 gckVIDMEM_NODE_Import(
     IN gckKERNEL Kernel,
     IN gctUINT32 Name,
-    IN gctUINT32 * Handle
+    OUT gctUINT32 * Handle
     );
 
 gceSTATUS
@@ -1267,10 +1312,10 @@ gckVIDMEM_HANDLE_Lookup(
     );
 
 gceSTATUS
-gckVIDMEM_ConstructVirtualFromUserMemory(
+gckVIDMEM_NODE_WrapUserMemory(
     IN gckKERNEL Kernel,
     IN gcsUSER_MEMORY_DESC_PTR Desc,
-    OUT gcuVIDMEM_NODE_PTR * Node
+    OUT gctUINT32 * Handle
     );
 
 gceSTATUS
@@ -1281,6 +1326,13 @@ gckVIDMEM_FindVIDMEM(
     OUT gctUINT32_PTR PageTableEntryValue
     );
 
+gceSTATUS
+gckVIDMEM_QueryNodes(
+    IN gckKERNEL Kernel,
+    IN gcePOOL   Pool,
+    OUT gctINT32 *Count,
+    OUT gcuVIDMEM_NODE_PTR *Nodes
+    );
 
 #if gcdPROCESS_ADDRESS_SPACE
 gceSTATUS
@@ -1355,6 +1407,9 @@ struct _gckMMU
     struct _gckQUEUE            recentFreedAddresses;
 
     gcsADDRESS_AREA             area[gcvADDRESS_AREA_COUNT];
+
+    gctUINT32                   contiguousBaseAddress;
+    gctUINT32                   externalBaseAddress;
 };
 
 typedef struct _gcsASYNC_COMMAND

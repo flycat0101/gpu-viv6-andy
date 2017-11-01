@@ -431,6 +431,10 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     __glBitmaskInitAllZero(&gc->shaderProgram.samplerStateDirty, gc->constants.shaderCaps.maxTextureSamplers);
     __glBitmaskInitAllZero(&gc->shaderProgram.samplerStateKeepDirty ,gc->constants.shaderCaps.maxTextureSamplers);
 
+    __glBitmaskInitAllZero(&gc->shaderProgram.samplerTexelFetchDirty, gc->constants.shaderCaps.maxTextureSamplers);
+    __glBitmaskInitAllZero(&gc->shaderProgram.samplerPrevTexelFetchDirty, gc->constants.shaderCaps.maxTextureSamplers);
+
+
     gc->shaderProgram.samplerSeq = 0;
     gc->shaderProgram.mode = __GLSL_MODE_GRAPHICS;
     gc->shaderProgram.patchVertices = 3;

@@ -27,7 +27,6 @@
         gcLoadShaders*;
         gcLoadKernel*;
         gcInvokeThreadWalker*;
-        gcSHADER_SpecialHint*;
 
         gcoCL_*;
 

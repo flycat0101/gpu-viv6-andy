@@ -66,36 +66,6 @@ VX_INTERNAL_API void vxTrace(vx_trace_target_e target, char *message, ...)
     }
 }
 
-VX_INTERNAL_API void vxWarning(char *message, ...)
-{
-    va_list argList;
-    char outputBuffer[VX_TRACE_BUFFER_COUNT];
-
-    va_start(argList, message);
-
-    vsnprintf(outputBuffer, VX_TRACE_BUFFER_COUNT - 1, message, argList);
-    outputBuffer[VX_TRACE_BUFFER_COUNT - 1] = 0;
-
-    gcmTRACE(gcvLEVEL_WARNING, outputBuffer);
-
-    va_end(argList);
-}
-
-VX_INTERNAL_API void vxError(char *message, ...)
-{
-    va_list argList;
-    char outputBuffer[VX_TRACE_BUFFER_COUNT];
-
-    va_start(argList, message);
-
-    vsnprintf(outputBuffer, VX_TRACE_BUFFER_COUNT - 1, message, argList);
-    outputBuffer[VX_TRACE_BUFFER_COUNT - 1] = 0;
-
-    gcmTRACE(gcvLEVEL_ERROR, outputBuffer);
-
-    va_end(argList);
-}
-
 VX_INTERNAL_API vx_ptr vxAllocate(vx_size size)
 {
     gceSTATUS status;
@@ -361,18 +331,37 @@ VX_INTERNAL_API void vxoPerf_Initialize(vx_perf perf)
     perf->min = UINT64_MAX;
 }
 
+static vx_uint64 lastCount = 0;
 VX_INTERNAL_API void vxoPerf_Begin(vx_perf perf)
 {
     vxmASSERT(perf);
-
-    perf->beg = vxGetPerfCount();
+    if (lastCount == 0)
+    {
+        lastCount = vxGetPerfCount();
+        perf->beg = lastCount;
+    }
+    else
+    {
+        vx_uint64 cur = vxGetPerfCount();
+        if (lastCount >= cur)
+             perf->beg = lastCount + 1;
+        else
+             perf->beg = cur;
+        lastCount = perf->beg;
+    }
 }
 
 VX_INTERNAL_API void vxoPerf_End(vx_perf perf)
 {
+    vx_uint64 cur;
     vxmASSERT(perf);
 
-    perf->end = vxGetPerfCount();
+    cur = vxGetPerfCount();
+    if (cur <= perf->beg)
+        perf->end = perf->beg + 1;
+    else
+        perf->end = cur;
+
     perf->tmp = ((perf->end - perf->beg) < 1ull ? 1ull : (perf->end - perf->beg));
     perf->sum += perf->tmp;
     perf->num++;

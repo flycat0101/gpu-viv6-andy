@@ -549,6 +549,13 @@ unsigned *pped_count)
                 status = cloCOMPILER_SetBasicTypePacked(Compiler);
                 if(gcmIS_ERROR(status)) return status;
             }
+            else if (options.compare(lastPos, 22, "cl-viv-longulong-patch") == 0) {
+                gceSTATUS status;
+                pos = lastPos + 22;
+
+                status = cloCOMPILER_SetLongUlongPatch(Compiler);
+                if(gcmIS_ERROR(status)) return status;
+            }
             else if (options.compare(lastPos, 31, "cl-viv-vx-image-array-maxlevel=") == 0) {
                 lastPos += 31;
 

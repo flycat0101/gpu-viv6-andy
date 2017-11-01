@@ -15,7 +15,7 @@ LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/../../Android.mk.def
 
 #
-# libSPIRV
+# libSPIRV_viv
 #
 include $(CLEAR_VARS)
 
@@ -51,7 +51,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libGAL \
 	libVSC
 
-LOCAL_MODULE         := libSPIRV
+LOCAL_MODULE         := libSPIRV_viv
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
@@ -60,9 +60,9 @@ include $(BUILD_SHARED_LIBRARY)
 else
 
 LOCAL_SRC_FILES := \
-    $(FIXED_ARCH_TYPE)/libSPIRV.so
+    $(FIXED_ARCH_TYPE)/libSPIRV_viv.so
 
-LOCAL_MODULE         := libSPIRV
+LOCAL_MODULE         := libSPIRV_viv
 LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES

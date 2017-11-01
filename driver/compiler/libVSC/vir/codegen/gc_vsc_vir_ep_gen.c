@@ -1964,12 +1964,25 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
 
     if (pShader->shaderKind == VIR_SHADER_COMPUTE)
     {
-        pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte = VIR_Shader_GetLocalMemorySize(pShader);
+        /* Private memory set, only support OCL now. */
+        if (VIR_Shader_IsCL(pShader) && VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+        {
+            pOutSEP->exeHints.nativeHints.prvStates.gps.privMemSizePerThreadInByte = VIR_Shader_GetPrivateMemorySize(pShader);
+            pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum = VIR_Shader_GetCurrWorkThreadNum(pShader);
+            if (pOutSEP->exeHints.nativeHints.prvStates.gps.privMemSizePerThreadInByte > 0)
+            {
+                gcmASSERT(pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum > 0);
+            }
+        }
+
+        /* Local memory set. */
+        pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte = VIR_Shader_GetShareMemorySize(pShader);
         pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum = VIR_Shader_GetCurrWorkGrpNum(pShader);
         if (pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte > 0)
         {
             gcmASSERT(pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum > 0);
         }
+
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimX = pShader->shaderLayout.compute.workGroupSize[0];
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimY = pShader->shaderLayout.compute.workGroupSize[1];
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimZ = pShader->shaderLayout.compute.workGroupSize[2];
@@ -3548,8 +3561,13 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
                                                    SHADER_EXECUTABLE_PROFILE* pSep)
 {
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                               i, iaEntryIndex, channel, hwChannel;
+    gctUINT                               i, iaEntryIndex, channel, hwChannel, resArraySize;
+    gctUINT                               firstPrivUavIdxForExtraImgLayer = NOT_ASSIGNED;
     SHADER_CONSTANT_HW_LOCATION_MAPPING*  pHwDirectAddrBase;
+    SHADER_PRIV_CONSTANT_ENTRY*           pPrivCnstEntry;
+    SHADER_PRIV_UAV_ENTRY*                pPrivUavEntry;
+    VIR_Symbol*                           pImageSym;
+    VIR_Type*                             pSymType;
 
     for (i = 0; i < pIaTable->countOfEntries; i ++)
     {
@@ -3583,11 +3601,96 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
 
     /* Fill direct mem base addr constant reg */
     pHwDirectAddrBase->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
-    pHwDirectAddrBase->hwLoc.hwRegNo = pResAllocEntry->hwRegNo;
-    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+
+    if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER)
     {
-        hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
-        _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+        pUtbEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+    }
+    else
+    {
+        pHwDirectAddrBase->hwLoc.hwRegNo = pResAllocEntry->hwRegNo;
+
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
+            _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+        }
+    }
+
+    /* Set image size */
+    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
+    {
+        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
+
+        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_IMAGE_SIZE)
+        {
+            pImageSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pImageSym);
+
+            pSymType = VIR_Symbol_GetType(pImageSym);
+            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pUtbEntry->iaBinding.set &&
+                VIR_Symbol_GetBinding(pImageSym) == pUtbEntry->iaBinding.binding &&
+                resArraySize == pUtbEntry->iaBinding.arraySize)
+            {
+                pUtbEntry->pImageSize[stageIdx] = pPrivCnstEntry;
+                break;
+            }
+        }
+    }
+
+    /* Extra image layer */
+    for (i = 0; i < pSep->staticPrivMapping.privUavMapping.countOfEntries; i ++)
+    {
+        pPrivUavEntry = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
+
+        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER)
+        {
+            pImageSym = (VIR_Symbol*)pPrivUavEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pImageSym);
+
+            pSymType = VIR_Symbol_GetType(pImageSym);
+            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pUtbEntry->iaBinding.set &&
+                VIR_Symbol_GetBinding(pImageSym) == pUtbEntry->iaBinding.binding &&
+                resArraySize == pUtbEntry->iaBinding.arraySize)
+            {
+                if (pUtbEntry->pExtraLayer[stageIdx] == gcvNULL)
+                {
+                    pUtbEntry->pExtraLayer[stageIdx] = pPrivUavEntry;
+                    firstPrivUavIdxForExtraImgLayer = i;
+                }
+                else
+                {
+                    if (pPrivUavEntry->pBuffer->uavSlotIndex -
+                        pUtbEntry->pExtraLayer[stageIdx]->pBuffer->uavSlotIndex !=
+                        (i - firstPrivUavIdxForExtraImgLayer))
+                    {
+                        gcmASSERT(gcvFALSE);
+                    }
+                }
+
+                break;
+            }
+        }
     }
 
     return VSC_ERR_NONE;
@@ -4299,6 +4402,43 @@ static VSC_ErrCode _PostProcessVkStorageTable(PROG_VK_STORAGE_TABLE* pStorageTab
     return errCode;
 }
 
+static VSC_ErrCode _PostProcessVkInputAttachmentTable(PROG_VK_INPUT_ATTACHMENT_TABLE* pInputAttachmentTable, gctUINT stageIdx)
+{
+    VSC_ErrCode                          errCode = VSC_ERR_NONE;
+    PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY*pIaEntries;
+    gctUINT                              i, j;
+    SHADER_PRIV_CONSTANT_ENTRY*          pPrivCnstEntry;
+    SHADER_PRIV_UAV_ENTRY*               pPrivUavEntry;
+
+    for (i = 0; i < pInputAttachmentTable->countOfEntries; i++)
+    {
+        pIaEntries = &pInputAttachmentTable->pIaEntries[i];
+
+        /* Image size */
+        pPrivCnstEntry = pIaEntries->pImageSize[stageIdx];
+        if (pPrivCnstEntry)
+        {
+            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+        }
+
+        /* Extra image layer */
+        pPrivUavEntry = pIaEntries->pExtraLayer[stageIdx];
+        if (pPrivUavEntry)
+        {
+            for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+
+                pPrivUavEntry ++;
+            }
+        }
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _PostProcessResourceSetTables(PROGRAM_EXECUTABLE_PROFILE* pOutPEP, gctUINT stageIdx)
 {
     VSC_ErrCode                          errCode = VSC_ERR_NONE;
@@ -4317,6 +4457,9 @@ static VSC_ErrCode _PostProcessResourceSetTables(PROGRAM_EXECUTABLE_PROFILE* pOu
 
         errCode = _PostProcessVkStorageTable(&pOutPEP->u.vk.pResourceSets[set].storageTable, stageIdx);
         ON_ERROR(errCode, "Post process vk storage table");
+
+        errCode = _PostProcessVkInputAttachmentTable(&pOutPEP->u.vk.pResourceSets[set].inputAttachmentTable, stageIdx);
+        ON_ERROR(errCode, "Post process vk input attchment table");
     }
 
 OnError:

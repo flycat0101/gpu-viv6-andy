@@ -23,8 +23,11 @@ endif
 LOCAL_PATH := $(AQROOT)
 
 VIVANTE_MAKEFILES := $(LOCAL_PATH)/hal/kernel/Android.mk \
-                     $(LOCAL_PATH)/hal/user/Android.mk \
-                     $(LOCAL_PATH)/driver/android/gralloc/Android.mk
+                     $(LOCAL_PATH)/hal/user/Android.mk
+
+ifneq ($(DRM_GRALLOC),1)
+  VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc/Android.mk
+endif
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
   # Build hwcomposer for Honeycomb and later

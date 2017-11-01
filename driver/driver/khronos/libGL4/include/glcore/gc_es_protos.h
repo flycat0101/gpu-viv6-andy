@@ -843,4 +843,39 @@ extern GLvoid GL_APIENTRY __gles_MultiDrawElementsIndirectEXT(__GLcontext *gc, G
 
 extern GLvoid GL_APIENTRY __gles_GetObjectParameterivARB (__GLcontext *gc, UINT obj, GLenum pname, GLint *params);
 
+extern GLvoid GLAPIENTRY __gles_VertexAttribI1i(__GLcontext *gc, GLuint index, GLint x);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI2i(__GLcontext *gc, GLuint index, GLint x, GLint y);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI3i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z);
+
+extern GLvoid GLAPIENTRY __gles_VertexAttribI1ui(__GLcontext *gc, GLuint index, GLuint x);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI2ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI3ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z);
+
+extern GLvoid GLAPIENTRY __gles_VertexAttribI1iv(__GLcontext *gc, GLuint index, const GLint *v);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI2iv(__GLcontext *gc, GLuint index, const GLint *v);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI3iv(__GLcontext *gc, GLuint index, const GLint *v);
+
+extern GLvoid GLAPIENTRY __gles_VertexAttribI1uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI2uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+extern GLvoid GLAPIENTRY __gles_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const GLuint *v);
+
+extern GLvoid GLAPIENTRY __gles_GetUniformdv(__GLcontext *gc,  GLuint program, GLint location, GLdouble * params);
+extern GLvoid GLAPIENTRY __gles_Uniform1d(__GLcontext *gc, GLint location, GLdouble v0);
+extern GLvoid GLAPIENTRY __gles_Uniform2d(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1);
+extern GLvoid GLAPIENTRY __gles_Uniform3d(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2);
+extern GLvoid GLAPIENTRY __gles_Uniform4d(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3);
+extern GLvoid GLAPIENTRY __gles_Uniform1dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_Uniform2dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_Uniform3dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_Uniform4dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix2dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix3dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix4dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix2x3dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix3x2dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix2x4dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix4x2dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix3x4dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+extern GLvoid GLAPIENTRY __gles_UniformMatrix4x3dv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value);
+
 #endif /* __gc_es_protos_h__ */

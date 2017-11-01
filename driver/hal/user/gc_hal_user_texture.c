@@ -360,11 +360,8 @@ static gceSTATUS _uploadBlitBlt(
                 gcoHARDWARE_UnlockEx(&srcSurf->node, engine, srcSurf->type);
             }
 
-            if (srcSurf->node.u.normal.node != 0)
-            {
-                /* Free the video memory. */
-                gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurf->node));
-            }
+            /* Free the video memory. */
+            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurf->node));
 
             /* Mark the memory as freed. */
             srcSurf->node.pool = gcvPOOL_UNKNOWN;
@@ -481,8 +478,6 @@ gcoTEXTURE_ConstructEx(
 
     /* Return the gcoTEXTURE object pointer. */
     *Texture = texture;
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT, 1);
 
     /* Success. */
     gcmFOOTER_ARG("*Texture=0x%x", *Texture);
@@ -754,7 +749,6 @@ gcoTEXTURE_ConstructSized(
 
     /* Return the gcoTEXTURE object pointer. */
     *Texture = texture;
-    gcmPROFILE_GC(GLTEXTURE_OBJECT, 1);
 
     /* Success. */
     gcmFOOTER_ARG("*Texture=0x%x", *Texture);
@@ -785,8 +779,6 @@ gcoTEXTURE_Destroy(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Texture, gcvOBJ_TEXTURE);
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT, -1);
 
     /* Free all maps. */
     gcmVERIFY_OK(_DestroyMaps(Texture->maps, gcvNULL));
@@ -1088,8 +1080,6 @@ gcoTEXTURE_Upload(
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
     }
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT_BYTES, sliceSize);
 
 OnError:
     if (srcSurf != gcvNULL)
@@ -1423,8 +1413,6 @@ gcoTEXTURE_UploadSub(
                        offset,
                        map->sliceSize);
     }
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT_BYTES, sliceSize);
 
 OnError:
     /* Unlock the surface. */
@@ -2464,8 +2452,9 @@ gcoTEXTURE_Disable(
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Sampler >= 0);
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL,gcvENGINE_RENDER,gcvHWSLOT_TEXTURE, 0, Sampler);
-
+#endif
     /* Disable the texture. */
     status = gcoHARDWARE_DisableTextureSampler(gcvNULL, Sampler, DefaultInteger);
 
@@ -2947,8 +2936,6 @@ gceSTATUS gcoTEXTURE_UploadYUV(
     /* Unlock the surface. */
     gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
 
-    gcmPROFILE_GC(GLTEXTURE_OBJECT_BYTES, sliceSize);
-
     /* Return the status. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3112,8 +3099,6 @@ gcoTEXTURE_UploadCompressed(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT_BYTES, size);
 
 OnError:
     if (memory[0])
@@ -3291,8 +3276,6 @@ gcoTEXTURE_UploadCompressedSub(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
-
-    gcmPROFILE_GC(GLTEXTURE_OBJECT_BYTES, size);
 
 OnError:
     /* Unlock the surface. */
@@ -3955,6 +3938,50 @@ gcoTEXTURE_IsComplete(
     return status;
 }
 
+gceSTATUS
+gcoTEXTURE_CheckTexLevel0Attrib(
+    IN gcoTEXTURE Texture,
+    IN gctINT MaxLevel,
+    IN gctINT usedLevel
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Texture=0x%x", Texture);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Texture, gcvOBJ_TEXTURE);
+
+    if (usedLevel == 0)
+    {
+        gcsMIPMAP_PTR curr;
+        curr = Texture->maps;
+
+        if (curr == gcvNULL)
+        {
+            gcmFOOTER();
+            return gcvSTATUS_INVALID_MIPMAP;
+        }
+
+        if (curr->surface == gcvNULL)
+        {
+            gcmFOOTER();
+            return gcvSTATUS_INVALID_MIPMAP;
+        }
+
+        if (MaxLevel > 0)
+        {
+            curr = curr->next;
+            if ((curr != gcvNULL) && (curr->surface != gcvNULL))
+            {
+                status = gcvSTATUS_INVALID_MIPMAP;
+            }
+        }
+    }
+    /* Return status. */
+    gcmFOOTER();
+    return status;
+}
+
 static gceSTATUS
 _UpdateTextureDesc(
     IN gcoTEXTURE Texture,
@@ -4174,28 +4201,38 @@ _ReplaceSurfaceForBorderPatch(
     gcmASSERT(curSurf->node.pool != gcvPOOL_UNKNOWN);
     gcmASSERT(surface->node.pool != gcvPOOL_UNKNOWN);
 
-    gcmONERROR(gcoHARDWARE_LockEx(&curSurf->node, gcvENGINE_RENDER, &srcAddress, gcvNULL));
-    lockedSrcNode = &curSurf->node;
-    gcmONERROR(gcoHARDWARE_LockEx(&surface->node, gcvENGINE_RENDER, &dstAddress, gcvNULL));
-    lockedDstNode = &surface->node;
-    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->size));
-    gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, curSurf->type));
-    lockedSrcNode = gcvNULL;
-    gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, surface->type));
-    lockedDstNode = gcvNULL;
-
-    if (curSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE))
     {
-        gcmASSERT(surface->tileStatusNode.pool != gcvPOOL_UNKNOWN);
-        gcmONERROR(gcoHARDWARE_LockEx(&curSurf->tileStatusNode, gcvENGINE_RENDER, &srcAddress, gcvNULL));
-        lockedSrcNode = &curSurf->tileStatusNode;
-        gcmONERROR(gcoHARDWARE_LockEx(&surface->tileStatusNode, gcvENGINE_RENDER, &dstAddress, gcvNULL));
-        lockedDstNode = &surface->tileStatusNode;
-        gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->tileStatusNode.size));
-        gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+        gcmONERROR(gcoHARDWARE_LockEx(&curSurf->node, gcvENGINE_RENDER, &srcAddress, gcvNULL));
+        lockedSrcNode = &curSurf->node;
+        gcmONERROR(gcoHARDWARE_LockEx(&surface->node, gcvENGINE_RENDER, &dstAddress, gcvNULL));
+        lockedDstNode = &surface->node;
+        gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->size));
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, curSurf->type));
         lockedSrcNode = gcvNULL;
-        gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, surface->type));
         lockedDstNode = gcvNULL;
+
+        if (curSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+        {
+            gcmASSERT(surface->tileStatusNode.pool != gcvPOOL_UNKNOWN);
+            gcmONERROR(gcoHARDWARE_LockEx(&curSurf->tileStatusNode, gcvENGINE_RENDER, &srcAddress, gcvNULL));
+            lockedSrcNode = &curSurf->tileStatusNode;
+            gcmONERROR(gcoHARDWARE_LockEx(&surface->tileStatusNode, gcvENGINE_RENDER, &dstAddress, gcvNULL));
+            lockedDstNode = &surface->tileStatusNode;
+            gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->tileStatusNode.size));
+            gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+            lockedSrcNode = gcvNULL;
+            gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+            lockedDstNode = gcvNULL;
+        }
+    }
+    else
+    {
+        /* Finally, try memory copy. */
+        lockedSrcNode = &curSurf->node;
+        lockedDstNode = &surface->node;
+        gcoOS_MemCopy(lockedDstNode->logical, lockedSrcNode->logical, curSurf->size);
     }
 
     gcsSURF_NODE_GetFence(&curSurf->node, gcvENGINE_RENDER, gcvFENCE_TYPE_READ);
@@ -4207,6 +4244,7 @@ _ReplaceSurfaceForBorderPatch(
     Map->surface = surface;
     Map->patchStatus |= gcdTEXTURE_PATCH_STATUS_APPENDMEM;
     gcoSURF_Destroy(curSurf);
+
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 
@@ -4657,7 +4695,9 @@ gcoTEXTURE_BindTextureEx(
             samplerInfo.baseLevelSurf = baseMipMap->surface;
             samplerInfo.cacheMode = baseMipMap->surface->cacheMode;
 
+#if gcdENABLE_KERNEL_FENCE
             gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_TEXTURE, baseMipMap->surface->node.u.normal.node, Sampler);
+#endif
         }
         else
         {
@@ -5545,7 +5585,8 @@ gceSTATUS gcoTEXTURE_SetEndianHint(
 
 gceSTATUS gcoTEXTURE_Disable(
     IN gcoHAL Hal,
-    IN gctINT Sampler
+    IN gctINT Sampler,
+    IN gctBOOL DefaultInteger
     )
 {
     return gcvSTATUS_OK;
@@ -5736,6 +5777,61 @@ gcoTEXTURE_GenerateMipMap(
 {
     return gcvSTATUS_OK;
 }
+
+gceSTATUS
+gcoTEXTURE_BindTextureEx(
+    IN gcoTEXTURE Texture,
+    IN gctINT Target,
+    IN gctINT Sampler,
+    IN gcsTEXTURE_PTR Info,
+    IN gctINT textureLayer
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoTEXTURE_CheckTexLevel0Attrib(
+    IN gcoTEXTURE Texture,
+    IN gctINT MaxLevel,
+    IN gctINT usedLevel
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoTEXTURE_FlushVS(
+    IN gcoTEXTURE Texture
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoTEXTURE_GetFormatInfo(
+    IN gcoTEXTURE Texture,
+    IN gctINT preferLevel,
+    OUT gcsSURF_FORMAT_INFO_PTR * TxFormatInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS gcoTEXTURE_UploadYUV(
+    IN gcoTEXTURE Texture,
+    IN gceTEXTURE_FACE Face,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT Slice,
+    IN gctPOINTER Memory[3],
+    IN gctINT Stride[3],
+    IN gceSURF_FORMAT Format
+    )
+{
+    return gcvSTATUS_OK;
+}
+
 
 
 #endif /* gcdNULL_DRIVER < 2 */

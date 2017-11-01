@@ -14,6 +14,7 @@
 #include <gc_vx_common.h>
 #include <gc_vx_profiler.h>
 
+#if VIVANTE_PROFILER
 gctINT
 vxoProfiler_Initialize(
     vx_context context
@@ -23,72 +24,64 @@ vxoProfiler_Initialize(
     gctINT profileMode = 0;
     char *env = gcvNULL;
 
+
+    gcmHEADER_ARG("context=0x%x ", context);
+
     if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
 
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_PROFILE", &env)) && env)
     {
+        if gcmIS_SUCCESS(gcoOS_StrCmp(env, "0"))
+        {
+            gcoPROFILER_Disable();
+            context->profiler.enable = gcvFALSE;
+            context->profiler.perGraphProcess = gcvFALSE;
+            gcmFOOTER_ARG("%d", status);
+            return status;
+        }
         if gcmIS_SUCCESS(gcoOS_StrCmp(env, "1"))
         {
             profileMode = 1;
+        }
+        if gcmIS_SUCCESS(gcoOS_StrCmp(env, "2"))
+        {
+            profileMode = 2;
+            context->profiler.perGraphProcess = gcvTRUE;
         }
     }
 
     if (profileMode == 0)
     {
         context->profiler.enable = gcvFALSE;
-        context->profiler.perVxfinish = gcvFALSE;
+        context->profiler.perGraphProcess = gcvFALSE;
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
-    if(context->phal == gcvNULL)
+    if(context->halProfile == gcvNULL)
     {
-        gctPOINTER pointer = gcvNULL;
-        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                       gcmSIZEOF(struct _gcoHAL),
-                       &pointer)))
+        status = gcoPROFILER_Construct(&context->halProfile);
+        if(status < 0)
         {
-            gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
-            return status;
+            gcmUSER_DEBUG_ERROR_MSG(
+            "OVX: (Vivante Profile) Unable to create profile object.\n");
+            goto OnError;
         }
-        gcoOS_MemFill(pointer, 0, gcmSIZEOF(struct _gcoHAL));
-        context->phal = (gcoHAL) pointer;
-    }
-
-    status = gcoPROFILER_Initialize(context->phal, gcvNULL, gcvTRUE);
-    switch (status)
-    {
-        case gcvSTATUS_OK:
-            break;
-        case gcvSTATUS_MISMATCH: /*fall through*/
-        case gcvSTATUS_NOT_SUPPORTED:
-        default:
-            context->profiler.enable = gcvFALSE;
-            if(context->phal != gcvNULL)
-                gcoOS_Free(gcvNULL, context->phal);
-            return status;
     }
 
     /* Clear the profiler. */
     gcoOS_ZeroMemory(&context->profiler, gcmSIZEOF(context->profiler));
     context->profiler.enable = gcvTRUE;
+    context->halProfile->profilerClient = gcvCLIENT_OPENVX;
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VP_FRAME_NUM", &env)))
+    if (gcoPROFILER_Enable(context->halProfile) != gcvSTATUS_OK)
     {
-        if ((env != gcvNULL) && (env[0] !=0))
-        {
-            int frameNum;
-            gcoOS_StrToInt(env, &frameNum);
-            if (frameNum > 1)
-                context->profiler.frameMaxNum = (gctUINT32)frameNum;
-        }
-    }
-
-    if (profileMode == 2)
-    {
-        context->profiler.perVxfinish = gcvTRUE;
+        context->profiler.enable = gcvFALSE;
+        goto OnError;
     }
 
     {
+        gcoPROFILER Profiler = context->halProfile;
         /* Write Generic Info. */
         char* infoCompany = "Vivante Corporation";
         char* infoVersion = "1.3";
@@ -141,6 +134,9 @@ vxoProfiler_Initialize(
 
     gcoOS_GetTime(&context->profiler.frameStartTimeusec);
 
+OnError:
+    /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -149,28 +145,19 @@ vxoProfiler_Destroy(
     vx_context context
     )
 {
-    gcsHAL_INTERFACE iface;
+    gcmHEADER_ARG("context=0x%x", context);
 
     if (!vxoContext_IsValid(context)) return;
 
     if (context->profiler.enable)
     {
-        /* disable profiler in kernel. */
-        iface.ignoreTLS = gcvFALSE;
-        iface.command = gcvHAL_SET_PROFILE_SETTING;
-        iface.u.SetProfileSetting.enable = gcvFALSE;
-
-        /* Call the kernel. */
-        gcoOS_DeviceControl(gcvNULL,
-            IOCTL_GCHAL_INTERFACE,
-            &iface, gcmSIZEOF(iface),
-            &iface, gcmSIZEOF(iface));
-
+        gcoPROFILER_Destroy(context->halProfile);
         context->profiler.enable = gcvFALSE;
-        gcmVERIFY_OK(gcoPROFILER_Destroy(context->phal));
-        if(context->phal != gcvNULL)
-            gcoOS_Free(gcvNULL, context->phal);
+
     }
+
+    gcmFOOTER_NO();
+    return;
 }
 
 gctINT
@@ -181,6 +168,8 @@ vxoProfiler_Begin(
     gctINT status = gcvSTATUS_OK;
     vx_context context;
 
+    gcmHEADER_ARG("reference=0x%x ", reference);
+
     context = vxoContext_GetFromReference(reference);
 
     if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
@@ -190,10 +179,11 @@ vxoProfiler_Begin(
         return status;
     }
 
-    gcoPROFILER_Begin(context->phal, 0);
     gcoOS_GetTime(&context->profiler.frameStartTimeusec);
+    gcoPROFILER_Begin(context->halProfile, gcvCOUNTER_OP_FRAME);
 
     /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -204,6 +194,9 @@ vxoProfiler_End(
 {
     gctINT status = gcvSTATUS_OK;
     vx_context context;
+    gcoPROFILER Profiler;
+
+    gcmHEADER_ARG("reference=0x%x ", reference);
 
     context = vxoContext_GetFromReference(reference);
 
@@ -214,8 +207,10 @@ vxoProfiler_End(
         return status;
     }
 
+    Profiler = context->halProfile;
+
     gcmWRITE_COUNTER(VPG_FRAME, context->profiler.frameNumber);
-    gcoPROFILER_EndFrame(context->phal);
+    gcoPROFILER_End(context->halProfile, gcvCOUNTER_OP_FRAME, context->profiler.frameNumber);
 
     gcoOS_GetTime(&context->profiler.frameEndTimeusec);
 
@@ -225,7 +220,7 @@ vxoProfiler_End(
     gcmWRITE_CONST(VPG_END);
     gcmWRITE_CONST(VPG_END);
 
-    gcoPROFILER_Flush(context->phal);
+    gcoPROFILER_Flush(context->halProfile);
 
     gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (context->profiler.frameEndTimeusec
                      - context->profiler.frameStartTimeusec));
@@ -233,6 +228,8 @@ vxoProfiler_End(
     context->profiler.frameNumber++;
 
     /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
+#endif
 

@@ -2484,6 +2484,19 @@ vxCreateWeightsBiasesParameterFromTensors(
     vx_tensor weights,
     vx_tensor biases);
 
+VX_API_ENTRY vx_weights_biases_parameter vxCreateWeightsBiasesParameterFromTensors2(
+    vx_enum     layer_type,
+    vx_uint32   num_of_dims,
+    vx_uint32 * inputs_dims,
+    vx_uint32 * convolution_outputs_dims,
+    vx_uint32 * pool_outputs_dims,
+    vx_enum     output_format,
+    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
+    vx_size size_of_convlution_relu_pooling_params,
+    vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_tensor   weights,
+    vx_tensor   biases);
+
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseWeightsBiasesParameter(vx_weights_biases_parameter *weights_bias);
 
 VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL
@@ -2531,23 +2544,30 @@ VX_API_ENTRY vx_status VX_API_CALL
 vxConfigTarget(
     vx_context context,
     vx_int32 dp_amount,
-    vx_int32 mac_per_core,
-    vx_int32  conv_cores,
+    vx_int32 mad_per_core,
+    vx_int32 conv_cores,
     vx_int32 in_buffer_depth,
-    vx_int32 accum_buffer_height
+    vx_int32 accum_buffer_height,
+    vx_int32 l2_cache_size,
+    vx_int32 tp_cores
 );
 
-VX_API_ENTRY vx_uint32 VX_API_CALL
+VX_API_ENTRY vx_uint32* VX_API_CALL
 vxWeightsBiasesParameterToStream(
     vx_context context,
     vx_weights_biases_parameter weights_biases_parameter,
-    vx_uint32 ** weights_biases_stream
+    vx_uint32 * weights_biases_stream_size,
+    vx_bool onlyHeaderStream
 );
 
 VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL
 vxCreateWeightsBiasesParameterFromStream (
     vx_context context,
     vx_uint32 * weights_biases_stream
+);
+
+VX_API_ENTRY vx_status VX_API_CALL vxFreeWeightsBiasesParameterStream(
+    vx_uint32 *weights_biases_stream
 );
 
 #ifdef __cplusplus

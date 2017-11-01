@@ -1560,6 +1560,10 @@ void  vgDrawPath(VGPath path, VGbitfield paintModes)
     OVG_GET_CONTEXT(OVG_NO_RETVAL);
     vgmGetApiStartTime();
     vgmPROFILE(context, VGDRAWPATH, 0);
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_BEGIN, 0);
+    }
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_TYPE, (gctUINTPTR_T)VG_PATH);
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)1);
     if (paintModes & VG_STROKE_PATH)
@@ -1589,6 +1593,15 @@ void  vgDrawPath(VGPath path, VGbitfield paintModes)
     /* PSC. */
 #if vgvUSE_PSC
     _PSCManagerHit((VGint)path, &context->pscm, context->os);
+#endif
+
+#if VIVANTE_PROFILER
+    vgmPROFILE(context, VG_PROFILER_PRIMITIVE_END, 0);
+
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_END, 0);
+    }
 #endif
 
 Error:

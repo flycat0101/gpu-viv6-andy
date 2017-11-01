@@ -248,6 +248,10 @@
     VIR_INTRINSIC_INFO(image_query_lod),
     VIR_INTRINSIC_INFO(image_query_levels),
     VIR_INTRINSIC_INFO(image_query_samples),
+    VIR_INTRINSIC_INFO(image_get_width),
+    VIR_INTRINSIC_INFO(image_get_height),
+    VIR_INTRINSIC_INFO(image_get_depth),
+    VIR_INTRINSIC_INFO(image_get_array_size),
 
     /* texture load.*/
     VIR_INTRINSIC_INFO(texld),

@@ -477,6 +477,234 @@ OnError:
 }
 
 static gceSTATUS
+clfConstructImageDesc(
+    clsImageHeader * imageHeader,
+    gctUINT32 * imageDesc
+    )
+{
+    gctUINT addressMode = 0, format, tiling, type=0, componentCount=0,
+            swizzleR=0, swizzleG=0, swizzleB=0, swizzleA=0;
+
+    gctUINT shift = (unsigned int)(gcoMATH_Log((gctFLOAT)imageHeader->elementSize)/gcoMATH_Log(2.0));
+
+    imageDesc[0] = (gctUINT32 ) imageHeader->physical;
+    imageDesc[1] = imageHeader->rowPitch;
+
+    switch(imageHeader->imageType)
+    {
+        case CL_MEM_OBJECT_IMAGE1D:
+            imageDesc[2] = (imageHeader->width) | (imageHeader->width<<16);
+            type = 0;
+            break;
+        case CL_MEM_OBJECT_IMAGE2D:
+            imageDesc[2] = (imageHeader->width) | (imageHeader->height<<16);
+            type = 1;
+            break;
+        case CL_MEM_OBJECT_IMAGE3D:
+            imageDesc[2] = (imageHeader->width) | (imageHeader->height<<16);
+            type = 1;
+            break;
+        case CL_MEM_OBJECT_IMAGE1D_ARRAY:
+            imageDesc[2] = (imageHeader->width) | (imageHeader->width<<16);
+            type = 1;
+            break;
+        case CL_MEM_OBJECT_IMAGE2D_ARRAY:
+            imageDesc[2] = (imageHeader->width) | (imageHeader->height<<16);
+            type = 1;
+            break;
+        default:
+            break;
+    }
+
+    switch(imageHeader->channelDataType)
+    {
+        case CL_UNORM_INT8:
+            format = 0xF;
+            break;
+        case CL_UNORM_INT16:
+            format = 0xE;
+            break;
+        case CL_SNORM_INT8:
+            format = 0xC;
+            break;
+        case CL_SNORM_INT16:
+            format = 0xB;
+            break;
+        case CL_UNORM_SHORT_565:
+            format = 9;
+            break;
+        case CL_UNORM_SHORT_555:
+            format = 8;
+            break;
+        case CL_UNORM_INT_101010:
+            format = 0xA;
+            break;
+        case CL_SIGNED_INT8:
+            format = 4;
+            break;
+        case CL_SIGNED_INT16:
+            format = 3;
+            break;
+        case CL_SIGNED_INT32:
+            format = 2;
+            break;
+        case CL_UNSIGNED_INT8:
+            format = 7;
+            break;
+        case CL_UNSIGNED_INT16:
+            format = 6;
+            break;
+        case CL_UNSIGNED_INT32:
+            format = 5;
+            break;
+        case CL_HALF_FLOAT:
+            format = 1;
+            break;
+        case CL_FLOAT:
+        default:
+            format = 0;
+            break;
+    }
+
+    tiling = (imageHeader->tiling == gcvLINEAR ? 0 :
+        imageHeader->tiling == gcvTILED ? 1 :
+        imageHeader->tiling == gcvSUPERTILED ? 2 : 3);
+
+    switch(imageHeader->channelOrder)
+    {
+        case CL_R:
+        case CL_Rx:
+            componentCount = 1;
+            swizzleR = 0;
+            swizzleG = 4;
+            swizzleB = 4;
+            swizzleA = 5;
+            break;
+        case CL_A:
+            componentCount = 1;
+            swizzleR = 4;
+            swizzleG = 4;
+            swizzleB = 4;
+            swizzleA = 3;
+            break;
+        case CL_RG:
+        case CL_RGx:
+            componentCount = 2;
+            swizzleR = 0;
+            swizzleG = 1;
+            swizzleB = 4;
+            swizzleA = 5;
+            break;
+        case CL_RA:
+            componentCount = 2;
+            swizzleR = 0;
+            swizzleG = 4;
+            swizzleB = 4;
+            swizzleA = 3;
+            break;
+        case CL_RGB:
+            componentCount = 3;
+            swizzleR = 0;
+            swizzleG = 1;
+            swizzleB = 2;
+            swizzleA = 5;
+            break;
+        case CL_RGBA:
+            componentCount = 0;
+            swizzleR = 0;
+            swizzleG = 1;
+            swizzleB = 2;
+            swizzleA = 3;
+            break;
+        case CL_BGRA:
+            componentCount = 0;
+            swizzleR = 2;
+            swizzleG = 1;
+            swizzleB = 0;
+            swizzleA = 3;
+            break;
+        case CL_ARGB:
+            componentCount = 0;
+            swizzleR = 1;
+            swizzleG = 2;
+            swizzleB = 3;
+            swizzleA = 0;
+            break;
+        case CL_INTENSITY:
+            componentCount = 0;
+            swizzleR = 0;
+            swizzleG = 0;
+            swizzleB = 0;
+            swizzleA = 0;
+            break;
+        case CL_LUMINANCE:
+            componentCount = 0;
+            swizzleR = 0;
+            swizzleG = 0;
+            swizzleB = 0;
+            swizzleA = 5;
+            break;
+        default:
+            componentCount = 0;
+            break;
+    }
+
+    if((imageHeader->samplerValue & 0xF) == CLK_ADDRESS_CLAMP)
+    {
+        switch(imageHeader->channelOrder)
+        {
+            case CL_A:
+            case CL_INTENSITY:
+            case CL_Rx:
+            case CL_RA:
+            case CL_RGx:
+            default:
+                addressMode = 1;
+                break;
+            case CL_R:
+            case CL_RG:
+            case CL_RGB:
+            case CL_LUMINANCE:
+                addressMode = 2;
+                break;
+        }
+    }
+    else if((imageHeader->samplerValue & 0xF) == CLK_ADDRESS_CLAMP_TO_EDGE)
+    {
+        addressMode = 3;
+    }
+
+    imageDesc[3] =  shift | (addressMode<<4) | (format<<6) | (tiling<<10) | (type<<12)
+        | (componentCount<<14) | (swizzleR<<16) | (swizzleG<<20) | (swizzleB<<24) | (swizzleA<<28);
+    /*gcmSETFIELD(0, GCREG_SH_IMAGE, SHIFT, shift)
+    | gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, MULTIPLY, ONE)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, ADDRESSING, addressMode)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, CONVERSION, format)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, TILING, tiling)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, TYPE, type)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, COMPONENT_COUNT, componentCount)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_R, swizzleR)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_G, swizzleG)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_B, swizzleB)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_A, swizzleA);*/
+
+    return gcvSTATUS_OK;
+}
+
+static gctBOOL
+clfCheckRecompileImageLoad(clsImageHeader * imageHeader)
+{
+    return gcvFALSE;
+}
+
+static gctBOOL
+clfCheckRecompileImageStore(clsImageHeader * imageHeader)
+{
+    return gcvFALSE;
+}
+
+
+static gceSTATUS
 clfDynamicPatchKernel(
     cl_kernel               Kernel,
     gctUINT *               NumArgs,
@@ -487,9 +715,8 @@ clfDynamicPatchKernel(
     gceSTATUS               status;
     gctUINT                 binarySize;
     gcSHADER                kernelBinary;
-    gctUINT                 bufferSize = 0;
-    gctPOINTER              buffer = gcvNULL, pointer = gcvNULL;
-    gcsHINT_PTR             hints = gcvNULL;
+    gctPOINTER              pointer = gcvNULL;
+    gcsPROGRAM_STATE        programState = {0};
     clsKernelStates_PTR     patchedStates = gcvNULL;
     clsPatchDirective_PTR   patchDirective = gcvNULL;
     clsPatchDirective_PTR   patchDirective1 = gcvNULL;
@@ -652,6 +879,8 @@ DoReLink:
         gctFLOAT                rcpImageSize[3];
         gcSHADER_TYPE           imageType = 0;
 #endif
+        gctBOOL                 imageLoad = gcvFALSE;
+        gctBOOL                 imageStore = gcvFALSE;
 
         switch (patchDirective->kind)
         {
@@ -743,24 +972,50 @@ DoReLink:
                        CL_OUT_OF_HOST_MEMORY);
             gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
-            /* TODO - Need to handle image3D. */
+            if (clfCheckRecompileImageLoad(imageHeader))
+            {
+                gctUINT32 imageData[4];
 
-            /* Pack image's data pointer and pitch into one vector to avoid extra MOV. */
-            clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
-                        CL_OUT_OF_HOST_MEMORY);
-            SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
-            clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
-                        CL_OUT_OF_HOST_MEMORY);
-            argument = &((*Args)[oldNumArgs]);
-            bytes = sizeof(struct _imageData);
-            imageData.physical = imageHeader->physical;
-            imageData.pitch    = imageHeader->rowPitch;
-            imageData.slice    = imageHeader->slicePitch;
-            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-            gcoOS_MemCopy(argument->data, &imageData, bytes);
-            argument->uniform    = gcUniform1;
-            argument->size       = bytes;
-            argument->set        = gcvTRUE;
+                clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_IMAGE_2D, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
+                    CL_OUT_OF_HOST_MEMORY);
+
+                SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
+
+                clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
+                    CL_OUT_OF_HOST_MEMORY);
+
+                argument = &((*Args)[oldNumArgs]);
+                bytes = sizeof(imageData);
+                clfConstructImageDesc(imageHeader, imageData);
+
+                clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+
+                gcoOS_MemCopy(argument->data, imageData, bytes);
+                argument->uniform    = gcUniform1;
+                argument->size       = bytes;
+                argument->set        = gcvTRUE;
+
+                imageLoad = gcvTRUE;
+            }
+            else
+            {
+                /* Pack image's data pointer and pitch into one vector to avoid extra MOV. */
+                clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
+                            CL_OUT_OF_HOST_MEMORY);
+                SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
+                clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
+                            CL_OUT_OF_HOST_MEMORY);
+                argument = &((*Args)[oldNumArgs]);
+                bytes = sizeof(struct _imageData);
+                imageData.physical = imageHeader->physical;
+                imageData.pitch    = imageHeader->rowPitch;
+                imageData.slice    = imageHeader->slicePitch;
+                clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+                gcoOS_MemCopy(argument->data, &imageData, bytes);
+                argument->uniform    = gcUniform1;
+                argument->size       = bytes;
+                argument->set        = gcvTRUE;
+            }
 
             /* Image's size. */
             clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_size", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform2),
@@ -806,6 +1061,7 @@ DoReLink:
                                                   readImage->channelOrder & 0xF,
                                                   imageHeader->imageType,
                                                   gcvFALSE,
+                                                  imageLoad,
                                                   &gcPatchDirective),
                        CL_OUT_OF_HOST_MEMORY);
             break;
@@ -891,24 +1147,48 @@ DoReLink:
                        CL_OUT_OF_HOST_MEMORY);
             gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
-            /* TODO - Need to handle image3D. */
+            if (clfCheckRecompileImageStore(imageHeader))
+            {
+                gctUINT32 imageDesc[4];
+                clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_IMAGE_2D, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
+                            CL_OUT_OF_HOST_MEMORY);
 
-            /* Pack image's data pointer and pitch into one vector to avoid extra MOV. */
-            clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
-                        CL_OUT_OF_HOST_MEMORY);
-            SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
-            clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
-                        CL_OUT_OF_HOST_MEMORY);
-            argument = &((*Args)[oldNumArgs]);
-            bytes = sizeof(struct _imageData);
-            imageData.physical = imageHeader->physical;
-            imageData.pitch    = imageHeader->rowPitch;
-            imageData.slice    = imageHeader->slicePitch;
-            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-            gcoOS_MemCopy(argument->data, &imageData, bytes);
-            argument->uniform    = gcUniform1;
-            argument->size       = bytes;
-            argument->set        = gcvTRUE;
+                SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
+
+                clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
+                            CL_OUT_OF_HOST_MEMORY);
+
+                argument = &((*Args)[oldNumArgs]);
+                bytes = sizeof(imageDesc);
+                clfConstructImageDesc(imageHeader, imageDesc);
+
+                clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+
+                gcoOS_MemCopy(argument->data, imageDesc, bytes);
+                argument->uniform    = gcUniform1;
+                argument->size       = bytes;
+                argument->set        = gcvTRUE;
+                imageStore           = gcvTRUE;
+            }
+            else
+            {
+                /* Pack image's data pointer and pitch into one vector to avoid extra MOV. */
+                clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_data", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
+                            CL_OUT_OF_HOST_MEMORY);
+                SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
+                clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
+                            CL_OUT_OF_HOST_MEMORY);
+                argument = &((*Args)[oldNumArgs]);
+                bytes = sizeof(struct _imageData);
+                imageData.physical = imageHeader->physical;
+                imageData.pitch    = imageHeader->rowPitch;
+                imageData.slice    = imageHeader->slicePitch;
+                clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+                gcoOS_MemCopy(argument->data, &imageData, bytes);
+                argument->uniform    = gcUniform1;
+                argument->size       = bytes;
+                argument->set        = gcvTRUE;
+            }
 
             /* Image's size. */
             clmONERROR(gcSHADER_AddUniform(kernelBinary, "#image_size", gcSHADER_INTEGER_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform2),
@@ -953,6 +1233,7 @@ DoReLink:
                                                    writeImage->channelDataType & 0xF,
                                                    writeImage->channelOrder & 0xF,
                                                    writeImage->imageHeader->imageType,
+                                                   imageStore,
                                                    &gcPatchDirective),
                                                    CL_OUT_OF_HOST_MEMORY);
             break;
@@ -999,13 +1280,11 @@ DoReLink:
     /* Assume all dead code is removed by optimizer. */
     status = gcLinkKernel(kernelBinary,
                           flags,
-                          &bufferSize,
-                          &buffer,
-                          &hints);
+                          &programState);
 
     if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
     {
-        bufferSize = 0;
+        gcFreeProgramState(programState);
         gcSHADER_Destroy(kernelBinary);
         flags |= gcvSHADER_SET_INLINE_LEVEL_4;
         gcoOS_Free(gcvNULL, *Args);
@@ -1038,9 +1317,7 @@ DoReLink:
     Kernel->patchedStates           = patchedStates;
     patchedStates->binary           = (gctUINT8_PTR)kernelBinary;
     patchedStates->numArgs          = *NumArgs;
-    patchedStates->stateBuffer      = buffer;
-    patchedStates->stateBufferSize  = bufferSize;
-    patchedStates->hints            = hints;
+    patchedStates->programState     = programState;
     patchedStates->patchDirective   = RecompilePatchDirectives;
 
     for (i = 0; i < numToUpdate; i++)
@@ -5145,6 +5422,8 @@ clEnqueueNDRangeKernel(
                         samplerValue = *((gctUINT *) NDRangeKernel->args[GetImageSamplerType(imageSampler)].data);
                     }
 
+                    imageHeader->samplerValue = samplerValue;
+
                     if (CommandQueue->device->deviceInfo.computeOnlyGpu != gcvTRUE)  /*use texld*/
                     {
                         normalizedMode = samplerValue & CLK_NORMALIZED_COORDS_TRUE;
@@ -5286,17 +5565,16 @@ clEnqueueNDRangeKernel(
 
         NDRangeKernel->states = Kernel->patchedStates;
         Kernel->isPatched = gcvTRUE;
-        if((Kernel->states.hints == gcvNULL) && (Kernel->patchedStates->hints != gcvNULL))
+        if((Kernel->states.programState.hints == gcvNULL) && (Kernel->patchedStates->programState.hints != gcvNULL))
         {
-            Kernel->states.hints = Kernel->patchedStates->hints;
-            if (Kernel->states.hints->threadWalkerInPS)
+             if (Kernel->patchedStates->programState.hints->threadWalkerInPS)
             {
-                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->states.hints->fsMaxTemp)) *
+                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->patchedStates->programState.hints->fsMaxTemp)) *
                     4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
             else
             {
-                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->states.hints->vsMaxTemp)) *
+                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->patchedStates->programState.hints->vsMaxTemp)) *
                                         4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
 

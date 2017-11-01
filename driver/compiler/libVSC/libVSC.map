@@ -18,6 +18,7 @@
     gcLoadProgram;
 	gcLoadCLSingleKernel;
     gcLinkKernel;
+    gcFreeProgramState;
 
     gcSHADER_IsHaltiCompiler;
     gcSHADER_IsES31Compiler;
@@ -47,6 +48,7 @@
     gcSHADER_AddSaturation;
     gcSHADER_UpdateTargetPacked;
     gcSHADER_UpdateSourcePacked;
+	gcSHADER_UpdateResOpType;
     gcSHADER_NewTempRegs;
     gcSHADER_AddSource;
     gcSHADER_AddSourceAttribute;
@@ -366,6 +368,7 @@
     vscFinalizeHwPipelineShadersStates;
     vscCreatePrivateData;
     vscDestroyPrivateData;
+    vscGetShaderKindFromShaderHandle;
 
     vscPMP_Intialize;
     vscPMP_Finalize;
@@ -459,6 +462,7 @@
     VIR_Type_AddField;
     VIR_Type_GetVirRegCount;
     VIR_Type_GetTypeByteSize;
+	VIR_Type_CalcByteOffset;
     VIR_TypeId_Conv2Enable;
     VIR_TypeId_ComposeNonOpaqueType;
     VIR_Enable_2_Swizzle_WShift;

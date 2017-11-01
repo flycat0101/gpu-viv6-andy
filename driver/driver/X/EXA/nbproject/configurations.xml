@@ -69,12 +69,12 @@
               <pElem>src/vivante_fbdev</pElem>
               <pElem>src/vivante_gal</pElem>
               <pElem>src/vivante_util</pElem>
-              <pElem>../../Work/Drivers/projects-new/build/sdk/include</pElem>
+              <pElem>../../Work/Drivers/projects-new/hal/inc</pElem>
             </incDir>
           </cTool>
           <ccTool>
             <incDir>
-              <pElem>../../Work/Drivers/projects-new/build/sdk/include</pElem>
+              <pElem>../../Work/Drivers/projects-new/hal/inc</pElem>
             </incDir>
           </ccTool>
         </makeTool>

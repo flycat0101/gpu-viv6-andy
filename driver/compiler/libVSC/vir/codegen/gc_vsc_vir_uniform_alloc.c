@@ -48,7 +48,8 @@ void _VIR_CG_UniformColorMap_Init(
         *CodeGenUniformBase = pHwConfig->gsConstRegAddrBase;
         break;
     case VIR_SHADER_COMPUTE:
-        *CodeGenUniformBase = pHwConfig->psConstRegAddrBase;
+        *CodeGenUniformBase = pHwConfig->hwFeatureFlags.hasThreadWalkerInPS ?
+            pHwConfig->psConstRegAddrBase : pHwConfig->vsConstRegAddrBase;
         break;
     default:
         gcmASSERT(0);
@@ -663,7 +664,7 @@ static gctUINT8 _VIR_CG_SwizzleShiftWrap(
 /* mark uniform slot used */
 void VIR_CG_SetUniformUsedPacked(
     IN VIR_RA_ColorMap  *uniformColorMap,
-    IN gctINT           startIdx,
+    IN gctINT           origStartIdx,
     IN gctINT           rows,
     IN gctUINT8         enable,
     IN gctUINT          step
@@ -671,6 +672,7 @@ void VIR_CG_SetUniformUsedPacked(
 {
     VSC_BIT_VECTOR  *usedColor = &uniformColorMap->usedColor;
     gctUINT8        firstEnable = enable;
+    gctUINT         curIdx = origStartIdx;
     gctUINT         count = 0;
 
     while (rows-- > 0)
@@ -678,36 +680,36 @@ void VIR_CG_SetUniformUsedPacked(
          /* Test if x-component is available. */
         if (enable & 0x1)
         {
-             vscBV_SetBit(usedColor, startIdx * 4 + 0);
+             vscBV_SetBit(usedColor, curIdx * 4 + 0);
         }
 
         /* Test if y-component is available. */
         if (enable & 0x2)
         {
-            vscBV_SetBit(usedColor, startIdx * 4 + 1);
+            vscBV_SetBit(usedColor, curIdx * 4 + 1);
         }
 
         /* Test if z-component is available. */
         if (enable & 0x4)
         {
-            vscBV_SetBit(usedColor, startIdx * 4 + 2);
+            vscBV_SetBit(usedColor, curIdx * 4 + 2);
         }
 
         /* Test if w-component is available. */
         if (enable & 0x8)
         {
-            vscBV_SetBit(usedColor, startIdx * 4 + 3);
+            vscBV_SetBit(usedColor, curIdx * 4 + 3);
         }
 
         count ++;
-        startIdx = startIdx + count / step;
+        curIdx = origStartIdx + count / step;
         enable = _VIR_CG_EnableShiftWrap(firstEnable, count, step);;
     }
 }
 
 gctBOOL VIR_CG_UniformAvailablePacked(
     IN VIR_RA_ColorMap      *uniformColorMap,
-    IN gctINT               startIdx,
+    IN gctINT               origStartIdx,
     IN gctINT               rows,
     IN gctUINT8             enable,
     IN gctUINT              step
@@ -715,36 +717,37 @@ gctBOOL VIR_CG_UniformAvailablePacked(
 {
     VSC_BIT_VECTOR  *usedColor = &uniformColorMap->usedColor;
     gctUINT         count = 0;
+    gctUINT         curIdx = origStartIdx;
 
     while (rows-- > 0)
     {
          /* Test if x-component is available. */
-        if ((enable & 0x1) && vscBV_TestBit(usedColor, startIdx * 4 + 0))
+        if ((enable & 0x1) && vscBV_TestBit(usedColor, curIdx * 4 + 0))
         {
             return gcvFALSE;
         }
 
         /* Test if y-component is available. */
-        if ((enable & 0x2) && vscBV_TestBit(usedColor, startIdx * 4 + 1))
+        if ((enable & 0x2) && vscBV_TestBit(usedColor, curIdx * 4 + 1))
         {
             return gcvFALSE;
         }
 
         /* Test if z-component is available. */
-        if ((enable & 0x4) && vscBV_TestBit(usedColor, startIdx * 4 + 2))
+        if ((enable & 0x4) && vscBV_TestBit(usedColor, curIdx * 4 + 2))
         {
             return gcvFALSE;
         }
 
         /* Test if w-component is available. */
-        if ((enable & 0x8) && vscBV_TestBit(usedColor, startIdx * 4 + 3))
+        if ((enable & 0x8) && vscBV_TestBit(usedColor, curIdx * 4 + 3))
         {
             return gcvFALSE;
         }
 
         count++;
 
-        startIdx = startIdx + count / step;
+        curIdx = origStartIdx + count / step;
 
         enable = _VIR_CG_EnableShiftWrap(enable, count, step);
     }
@@ -1216,12 +1219,17 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_KERNEL_ARG_PRIVATE:
         case VIR_UNIFORM_SAMPLE_LOCATION:
         case VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS:
+        case VIR_UNIFORM_WORK_THREAD_COUNT:
+        case VIR_UNIFORM_WORK_GROUP_COUNT:
         case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
         case VIR_UNIFORM_CONST_BORDER_VALUE:
         case VIR_UNIFORM_SAMPLED_IMAGE:
         case VIR_UNIFORM_EXTRA_LAYER:
         case VIR_UNIFORM_PUSH_CONSTANT:
         case VIR_UNIFORM_BASE_INSTANCE:
+        case VIR_UNIFORM_TRANSFORM_FEEDBACK_BUFFER:
+        case VIR_UNIFORM_TRANSFORM_FEEDBACK_STATE:
+
             if (isSymUniformMovedToAUBO(pSym))
             {
                 retValue = gcvFALSE;
@@ -1315,6 +1323,15 @@ static gctBOOL _VIR_CG_isSamplerType(
     case VIR_TYPE_SAMPLER_BUFFER:
     case VIR_TYPE_ISAMPLER_BUFFER:
     case VIR_TYPE_USAMPLER_BUFFER:
+    case VIR_TYPE_SAMPLER_2D_RECT:
+    case VIR_TYPE_ISAMPLER_2D_RECT:
+    case VIR_TYPE_USAMPLER_2D_RECT:
+    case VIR_TYPE_SAMPLER_2D_RECT_SHADOW:
+    case VIR_TYPE_ISAMPLER_1D_ARRAY:
+    case VIR_TYPE_USAMPLER_1D_ARRAY:
+    case VIR_TYPE_ISAMPLER_1D:
+    case VIR_TYPE_USAMPLER_1D:
+    case VIR_TYPE_SAMPLER_1D_SHADOW:
         retValue = gcvTRUE;
         break;
     default:
@@ -2056,6 +2073,7 @@ VIR_UniformKind _VIR_CG_ResType2UniformKind(
     case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
     case VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE:
     case VSC_SHADER_RESOURCE_TYPE_STORAGE_TEXEL_BUFFER:
+    case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
         uniformKind = VIR_UNIFORM_NORMAL;
         break;
 
@@ -2067,9 +2085,6 @@ VIR_UniformKind _VIR_CG_ResType2UniformKind(
     case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER:
     case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC:
         uniformKind = VIR_UNIFORM_STORAGE_BLOCK_ADDRESS;
-        break;
-
-    case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
         break;
 
     default:
@@ -2190,25 +2205,50 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC:
             case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER:
             case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC:
+            /* Treat input attachment as a image. */
+            case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
             {
-                retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
-                    pHwConfig,
-                    pUniform,
-                    gcvFALSE,
-                    &uniformColorMap,
-                    codeGenUniformBase,
-                    handleDefaultUBO,
-                    unblockUniformBlock,
-                    gcvFALSE, /* treat sampler as const */
-                    gcvTRUE, /* single uniform */
-                    gcvTRUE, /* always allocate */
-                    pMM,
-                    gcvNULL);
+                if (isSymUniformTreatImageAsSampler(pSym))
+                {
+                    retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        allocateSamplerReverse,
+                        gcvTRUE, /* always allocate */
+                        maxSampler,
+                        pMM,
+                        &sampler);
+                }
+                else
+                {
+                    retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        gcvFALSE,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        gcvFALSE, /* treat sampler as const */
+                        gcvTRUE, /* single uniform */
+                        gcvTRUE, /* always allocate */
+                        pMM,
+                        gcvNULL);
+                }
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
 
                 pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                 pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
                 pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
+
+                if (isSymUniformTreatImageAsSampler(pSym))
+                {
+                    pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER;
+                }
 
                 if (resBinding.type == VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER ||
                     resBinding.type == VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC)
@@ -2247,7 +2287,6 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 break;
             }
 
-            case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
             case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
             case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
                 /* no need to assign hw reg */

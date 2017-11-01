@@ -130,6 +130,42 @@ typedef enum
     SWIZZLE_ONE           = 6,
 }SwizzleComponent;
 
+typedef enum
+{
+    HW_RESOURCEVIEW_USAGE_TX        = 1 << 0,
+    HW_RESOURCEVIEW_USAGE_SH        = 1 << 1,
+    HW_RESOURCEVIEW_USAGE_DEPTH     = 1 << 2,
+    HW_RESOURCEVIEW_USAGE_COLOR     = 1 << 3,
+}HwResourceViewUsage;
+
+typedef enum
+{
+    HW_CACHE_TEXTURE_L2       = 1 << 0,
+    HW_CACHE_TEXUTRE_L1       = 1 << 1,
+    HW_CACHE_TEXTURE_DESC     = 1 << 2,
+    HW_CACHE_VST_L2           = 1 << 3,
+    HW_CACHE_VST_L1           = 1 << 4,
+    HW_CACHE_VST_DESC         = 1 << 5,
+    HW_CACHE_SH_L1            = 1 << 6,
+    HW_CACHE_DEPTH            = 1 << 7,
+    HW_CACHE_COLOR            = 1 << 8,
+    HW_CACHE_TS               = 1 << 9,
+    HW_CACHE_INSTRUCTION      = 1 << 10,
+    HW_CACHE_TFB              = 1 << 11,
+    HW_CACHE_L2               = 1 << 12,
+    HW_CACHE_VERTEX_DATA      = 1 << 13, /* for multicluster */
+
+    /* combined mask */
+    HW_CACHE_TEXTURE_DATA     = HW_CACHE_TEXTURE_L2 | HW_CACHE_TEXUTRE_L1,
+    HW_CACHE_TEXTURE_ALL      = HW_CACHE_TEXTURE_DATA | HW_CACHE_TEXTURE_DESC,
+    HW_CACHE_VST_DATA         = HW_CACHE_VST_L2 | HW_CACHE_VST_L1,
+    HW_CACHE_VST_ALL          = HW_CACHE_VST_DATA | HW_CACHE_VST_DESC,
+    HW_CACHE_TX_DESC          = HW_CACHE_TEXTURE_DESC | HW_CACHE_VST_DESC,
+    HW_CACHE_WRITABLE         = HW_CACHE_SH_L1 | HW_CACHE_DEPTH | HW_CACHE_COLOR | HW_CACHE_TS | HW_CACHE_TFB,
+    HW_CACHE_ALL              = ~0, /* must be ~0 as core layer code which doesn't HwCacheMask definition */
+    HW_CACHE_NONE             = 0,
+}HwCacheMask;
+
 typedef struct
 {
     const VkVertexInputAttributeDescription *sortedAttributeDescPtr;
@@ -264,6 +300,8 @@ typedef struct
     HwImgDesc imgDesc[__VK_MAX_PARTS];
     uint32_t patchFormat;
     halti5_patch_key patchKey;
+    HwResourceViewUsage usedUsageMask;
+    HwSamplerDesc samplerDesc;
 } halti5_imageView;
 
 typedef struct
@@ -273,6 +311,7 @@ typedef struct
     HwSamplerDesc samplerDesc;
     uint32_t  patchFormat;
     halti5_patch_key patchKey;
+    HwResourceViewUsage usedUsageMask;
 } halti5_bufferView;
 
 enum
@@ -380,8 +419,66 @@ typedef struct halti5_vscprogram_blit
 
 } halti5_vscprogram_blit;
 
+/* host write uniform buff render pass info */
+typedef struct hwub_render_pass_info_rec
+{
+    uint8_t* ref;
+    uint8_t* rt;
+
+    uint32_t renderCount;
+    uint32_t render;
+
+}hwub_render_pass_info;
+
+typedef struct halti5_cmdbuf_tweak_info_rec
+{
+    uint32_t type;
+
+    /* rt count */
+    uint32_t curRPGet;
+    uint32_t curRPPrepare;
+    uint32_t curCmdBuf;
+    uint32_t RPperCmdBuf[16];
+    hwub_render_pass_info renderPass[32];
+
+    /* reset cmd buf */
+    VkResult (*end_render_pass)(
+        IN void *thisPointer,
+        IN __vkCommandBuffer *pCmdBuf
+        );
+
+    VkResult (*end_cmd_buf)(
+        IN void *thisPointer,
+        IN __vkCommandBuffer *pCmdBuf
+        );
+
+    /* reset cmd buf */
+    VkResult (*begin_submit_cmd_buf)(
+        IN void *thisPointer,
+        IN __vkCommandBuffer *pCmdBuf
+        );
+}halti5_cmdbuf_tweak_info;
+
+typedef struct
+{
+    /* some other info */
+
+    /* tweak info */
+    halti5_cmdbuf_tweak_info* tweakInfo;
+}halti5_instance;
+
+enum
+{
+    __VK_TWEAK_TYPE_NONE = 0,
+    __VK_TWEAK_TYPE_CUBE_USE_LOD,
+    __VK_TWEAK_TYPE_UBO48,
+    __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF,
+};
+
 typedef struct halti5_tweak_handler
 {
+    uint32_t tweakType;
+
     char reversedName[__VK_MAX_NAME_LENGTH];
 
     VkBool32 (* match)(
@@ -393,6 +490,7 @@ typedef struct halti5_tweak_handler
     VkResult (* tweak)(
         __vkDevContext *devCtx,
         __vkPipeline *pip,
+        void *createInfo,
         struct halti5_tweak_handler *handler
         );
 
@@ -492,30 +590,12 @@ enum
 };
 
 
-enum
-{
-    SEMAPHORE_STALL_PAIR_FE_BLT                      = 0,
-    SEMAPHORE_STALL_PAIR_FE_PE                       = 1,
-    SEMAPHORE_STALL_PAIR_RA_PE                       = 2,
-    SEMPAHORE_STALL_PAIR_FE_PREFETCH_BLT             = 3,
-
-    SEMAPHORE_STALL_PAIR_MAX                         = SEMPAHORE_STALL_PAIR_FE_PREFETCH_BLT + 1,
-};
-
-enum
-{
-    SEMAPHORE_STALL_PAIR_FE_BLT_BIT                      = 1 << SEMAPHORE_STALL_PAIR_FE_BLT,
-    SEMAPHORE_STALL_PAIR_FE_PE_BIT                       = 1 << SEMAPHORE_STALL_PAIR_FE_PE,
-    SEMAPHORE_STALL_PAIR_RA_PE_BIT                       = 1 << SEMAPHORE_STALL_PAIR_RA_PE,
-    SEMPAHORE_STALL_PAIR_FE_PREFETCH_BLT_BIT             = 1 << SEMPAHORE_STALL_PAIR_FE_PREFETCH_BLT,
-};
-
 typedef struct
 {
     int32_t  gfxPipelineSwitchDirtyMask;
     uint32_t memoryConfig;
     uint32_t memoryConfigMRT[gcdMAX_DRAW_BUFFERS];
-
+#if __VK_ENABLETS
     VkBool32 texHasTileStatus[gcdTXDESCRIPTORS];
     int32_t texTileStatusSlotIndex[gcdTXDESCRIPTORS];
     uint32_t textureControlAddrReg[gcdTXDESCRIPTORS];
@@ -524,6 +604,8 @@ typedef struct
     int32_t texTileStatusSlotDirty;
     int32_t txDescDirty;
     VkBool32 rt0TSEnable;
+#endif
+    HwResourceViewUsage newResourceViewUsageMask; /* It's a per-draw mask */
 } halti5_commandBuffer;
 
 enum halti_patch_type
@@ -549,7 +631,6 @@ enum
 
     HALTI5_PATCHKEY_ALL_BITS                = 0xFFFF,
 };
-
 
 typedef struct
 {
@@ -967,11 +1048,19 @@ VkResult halti5_createSampler(
     VkSampler sampler
     );
 
+VkResult halti5_endRenderPass(
+    VkCommandBuffer commandBuffer
+    );
+
 VkResult halti5_beginCommandBuffer(
     VkCommandBuffer commandBuffer
     );
 
 VkResult halti5_endCommandBuffer(
+    VkCommandBuffer commandBuffer
+    );
+
+VkResult halti5_beginSubmitCmdBuf(
     VkCommandBuffer commandBuffer
     );
 
@@ -1124,6 +1213,11 @@ VkResult halti5_setRtTileStatus(
     __vkImage *img,
     VkImageSubresourceRange* pRanges,
     uint32_t hwRtIndex
+    );
+
+VkResult halti5_initChipInstance(
+    __vkCommandBuffer *cmdBuf,
+    uint32_t type
     );
 
 #define TX_HW_DESCRIPTOR_MEM_SIZE   256
@@ -1292,7 +1386,8 @@ VkResult halti5_setMultiGpuSync(
 VkResult halti5_flushCache(
     VkDevice device,
     uint32_t **commandBuffer,
-    uint32_t *sizeInUint
+    uint32_t *sizeInUint,
+    int32_t cacheMask
     );
 
 uint32_t halti5_computeTileStatusAddr(

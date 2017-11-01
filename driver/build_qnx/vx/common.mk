@@ -75,6 +75,8 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_extension_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_internal_node_api.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_nn_extension_concat.o
 
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/extension/gc_vxc_interface.o
 # Kernels
@@ -112,6 +114,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_rpn.o
 
 
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops
 #EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/extension
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 #EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/utility

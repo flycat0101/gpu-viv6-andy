@@ -61,32 +61,36 @@ typedef struct VIR_DEFINLOOP
 {
     VSC_UNI_LIST_NODE node;
     VIR_Instruction* inst;
-    VIR_Swizzle swizzle;
+    VIR_Enable defEnable;
 } VIR_DefInLoop;
 
 #define VIR_DefInLoop_GetInst(d)            ((d)->inst)
 #define VIR_DefInLoop_SetInst(d, i)         ((d)->inst = (i))
-#define VIR_DefInLoop_GetSwizzle(d)         ((d)->swizzle)
-#define VIR_DefInLoop_SetSwizzle(d, s)      ((d)->swizzle = (s))
+#define VIR_DefInLoop_GetDefEnable(d)       ((d)->defEnable)
+#define VIR_DefInLoop_SetDefEnable(d, de)   ((d)->defEnable = (de))
 
 static void
 _VIR_DefInLoop_Init(
     VIR_DefInLoop* def,
     VIR_Instruction* inst,
-    VIR_Swizzle swizzle
+    VIR_Enable enable
     )
 {
     VIR_DefInLoop_SetInst(def, inst);
-    VIR_DefInLoop_SetSwizzle(def, swizzle);
+    VIR_DefInLoop_SetDefEnable(def, enable);
 }
 
 typedef struct VIR_LoopDU
 {
-    VSC_HASH_TABLE symToDefTable;
+    VSC_HASH_TABLE symToDefListTable;
+    gctBOOL isValid;
     VSC_MM* mm;
 } VIR_LoopDU;
 
-#define VIR_LoopDU_GetSymToDefTable(du)         (&(du)->symToDefTable)
+#define VIR_LoopDU_GetSymToDefListTable(du)     (&(du)->symToDefListTable)
+#define VIR_LoopDU_IsValid(du)                  ((du)->isValid)
+#define VIR_LoopDU_SetValid(du)                 ((du)->isValid = gcvTRUE)
+#define VIR_LoopDU_SetInValid(du)               ((du)->isValid = gcvFALSE)
 #define VIR_LoopDU_GetMM(du)                    ((du)->mm)
 #define VIR_LoopDU_SetMM(du, m)                 ((du)->mm = (m))
 
@@ -96,7 +100,8 @@ _VIR_LoopDU_Init(
     VSC_MM* mm
     )
 {
-    vscHTBL_Initialize(VIR_LoopDU_GetSymToDefTable(du), mm, vscHFUNC_Default, vscHKCMP_Default, 256);
+    vscHTBL_Initialize(VIR_LoopDU_GetSymToDefListTable(du), mm, vscHFUNC_Default, vscHKCMP_Default, 256);
+    VIR_LoopDU_SetInValid(du);
     VIR_LoopDU_SetMM(du, mm);
 }
 
@@ -109,7 +114,7 @@ _VIR_LoopDU_Final(
     VSC_DIRECT_HNODE_PAIR pair;
 
 
-    vscHTBLIterator_Init(&iter, VIR_LoopDU_GetSymToDefTable(du));
+    vscHTBLIterator_Init(&iter, VIR_LoopDU_GetSymToDefListTable(du));
     for(pair = vscHTBLIterator_DirectFirst(&iter);
         IS_VALID_DIRECT_HNODE_PAIR(&pair);
         pair = vscHTBLIterator_DirectNext(&iter))
@@ -119,23 +124,23 @@ _VIR_LoopDU_Final(
         vscMM_Free(VIR_LoopDU_GetMM(du), list);
     }
 
-    vscHTBL_Finalize(VIR_LoopDU_GetSymToDefTable(du));
+    vscHTBL_Finalize(VIR_LoopDU_GetSymToDefListTable(du));
+    VIR_LoopDU_SetInValid(du);
 }
 
 static VSC_ErrCode
 _VIR_LoopDU_AddDef(
     VIR_LoopDU* du,
     VIR_Symbol* sym,
-    VIR_Swizzle swizzle,
+    VIR_Enable enable,
     VIR_Instruction* inst
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefTable(du);
+    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefListTable(du);
     VSC_UNI_LIST* list;
     VIR_DefInLoop* def;
 
-    gcmASSERT(swizzle < VIR_CHANNEL_NUM);
     if(!vscHTBL_DirectTestAndGet(symToDefTable, sym, (void**)&list))
     {
         list = (VSC_UNI_LIST*)vscMM_Alloc(VIR_LoopDU_GetMM(du), sizeof(VSC_UNI_LIST));
@@ -154,61 +159,64 @@ _VIR_LoopDU_AddDef(
         errCode = VSC_ERR_OUT_OF_MEMORY;
         return errCode;
     }
-    _VIR_DefInLoop_Init(def, inst, swizzle);
+    _VIR_DefInLoop_Init(def, inst, enable);
     vscUNILST_Append(list, (VSC_UNI_LIST_NODE*)def);
 
     return errCode;
 }
 
-static gctUINT
-_VIR_LoopDU_SymDefCountInLoop(
+static VSC_ErrCode
+_VIR_LoopDU_RemoveDef(
     VIR_LoopDU* du,
     VIR_Symbol* sym,
-    VIR_Swizzle swizzle
+    VIR_Instruction* inst
     )
 {
-    gctUINT result = 0;
-    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefTable(du);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefListTable(du);
     VSC_UNI_LIST* list;
+    VIR_DefInLoop* def;
+    VSC_UL_ITERATOR iter;
 
-    gcmASSERT(swizzle <= 3);
-
-    if(vscHTBL_DirectTestAndGet(symToDefTable, sym, (void**)&list))
+    if(!vscHTBL_DirectTestAndGet(symToDefTable, sym, (void**)&list))
     {
-        VIR_Enable enable = VIR_Swizzle_2_Enable(swizzle);
-        VSC_UL_ITERATOR iter;
-        VIR_DefInLoop* def;
+        return errCode;
+    }
 
     vscULIterator_Init(&iter, list);
     for(def = (VIR_DefInLoop*)vscULIterator_First(&iter);
         def != gcvNULL;
         def = (VIR_DefInLoop*)vscULIterator_Next(&iter))
     {
-            VIR_Swizzle swizzle = VIR_DefInLoop_GetSwizzle(def);
-
-            if(enable & (1 << (gctUINT)swizzle))
+        if(VIR_DefInLoop_GetInst(def) == inst)
         {
-                result++;
-            }
+            vscUNILST_Remove(list, (VSC_UNI_LIST_NODE*)def);
+            vscMM_Free(VIR_LoopDU_GetMM(du), def);
+            break;
         }
     }
 
-    return result;
+    return errCode;
 }
 
-static gctBOOL
-_VIR_LoopDU_SymIsDefinedInLoop(
+#define VIR_LoopDU_SymDefCountInLoop_MAX        0
+#define VIR_LoopDU_SymDefCountInLoop_SUM        1
+
+static gctUINT
+_VIR_LoopDU_SymDefCountInLoop(
     VIR_LoopDU* du,
     VIR_Symbol* sym,
-    VIR_Swizzle swizzle
+    VIR_Enable enable,
+    gctUINT kind
     )
 {
-    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefTable(du);
+    gctUINT result = 0;
+    VSC_HASH_TABLE* symToDefTable = VIR_LoopDU_GetSymToDefListTable(du);
     VSC_UNI_LIST* list;
+    gctUINT count[VIR_CHANNEL_NUM] = {0};
 
     if(vscHTBL_DirectTestAndGet(symToDefTable, sym, (void**)&list))
     {
-        VIR_Enable enable = VIR_Swizzle_2_Enable(swizzle);
         VSC_UL_ITERATOR iter;
         VIR_DefInLoop* def;
 
@@ -217,18 +225,56 @@ _VIR_LoopDU_SymIsDefinedInLoop(
             def != gcvNULL;
             def = (VIR_DefInLoop*)vscULIterator_Next(&iter))
         {
-            VIR_Instruction* defInst = VIR_DefInLoop_GetInst(def);
-            VIR_Swizzle swizzle = VIR_DefInLoop_GetSwizzle(def);
+            VIR_Enable defEnable = VIR_DefInLoop_GetDefEnable(def);
+            gctUINT commonEnable = defEnable & enable;
 
-            if(enable & (1 << (gctUINT)swizzle) && !VIR_Inst_IsLoopInvariant(defInst))
+            if(commonEnable)
             {
-                return gcvTRUE;
+                gctUINT i;
+
+                for(i = 0; i < VIR_CHANNEL_NUM; i++)
+                {
+                    if(commonEnable & (1 << i))
+                    {
+                        count[i]++;
+                    }
                 }
             }
         }
+    }
 
-    return gcvFALSE;
+    switch(kind)
+    {
+        case VIR_LoopDU_SymDefCountInLoop_MAX:
+        {
+            gctUINT i;
+
+            for(i = 0; i < VIR_CHANNEL_NUM; i++)
+            {
+                if(count[i] > result)
+                {
+                    result = count[i];
+                }
+            }
+            break;
+        }
+        case VIR_LoopDU_SymDefCountInLoop_SUM:
+        {
+            gctUINT i;
+
+            for(i = 0; i < VIR_CHANNEL_NUM; i++)
+            {
+                result += count[i];
+            }
+            break;
+        }
+        default:
+            gcmASSERT(0);
+    }
+
+    return result;
 }
+
 
 typedef enum VIR_IV_FLAGS
 {
@@ -246,7 +292,7 @@ typedef struct VIR_INDUCTIONVARIABLE
     VIR_Instruction*                updateInst;
     VIR_Const                       factor;
     struct VIR_INDUCTIONVARIABLE*   basis;
-    VIR_Const                       diff;
+    VIR_Const                       constFactor;
     VIR_IV_Flags                    flags;
 } VIR_InductionVariable;
 
@@ -258,12 +304,13 @@ typedef VIR_InductionVariable VIR_IV;
 #define VIR_IV_SetChannel(iv, c)                    ((iv)->channel = (c))
 #define VIR_IV_GetUpdateInst(iv)                    ((iv)->updateInst)
 #define VIR_IV_SetUpdateInst(iv, i)                 ((iv)->updateInst = (i))
+#define VIR_IV_GetUpdateOpcode(iv)                  (VIR_Inst_GetOpcode((iv)->updateInst))
 #define VIR_IV_GetFactor(iv)                        (&(iv)->factor)
 #define VIR_IV_SetFactor(iv, f)                     ((iv)->factor = (f))
 #define VIR_IV_GetBasis(iv)                         ((iv)->basis)
 #define VIR_IV_SetBasis(iv, b)                      ((iv)->basis = (b))
-#define VIR_IV_GetDiff(iv)                          (&(iv)->diff)
-#define VIR_IV_SetDiff(iv, d)                       ((iv)->diff = (d))
+#define VIR_IV_GetConstFactor(iv)                   (&(iv)->constFactor)
+#define VIR_IV_SetConstFactor(iv, c)                ((iv)->constFactor = (c))
 #define VIR_IV_GetFlags(iv)                         ((iv)->flags)
 #define VIR_IV_SetFlags(iv, f)                      ((iv)->flags = (f))
 #define VIR_IV_AddFlag(iv, f)                       ((iv)->flags |= (f))
@@ -278,8 +325,10 @@ _VIR_IV_Init(
     )
 {
     VIR_Const* factor = VIR_IV_GetFactor(iv);
-    VIR_Const* diff = VIR_IV_GetDiff(iv);
+    VIR_Const* constFactor = VIR_IV_GetConstFactor(iv);
     VIR_TypeId symTypeId = VIR_Symbol_GetTypeId(sym);
+
+    gcmASSERT(channel < VIR_CHANNEL_NUM);
 
     VIR_IV_SetSym(iv, sym);
     VIR_IV_SetChannel(iv, channel);
@@ -290,22 +339,22 @@ _VIR_IV_Init(
     {
         factor->type = VIR_TYPE_FLOAT32;
         factor->value.scalarVal.fValue = 1.0;
-        diff->type = VIR_TYPE_FLOAT32;
-        diff->value.scalarVal.fValue = 0.0;
+        constFactor->type = VIR_TYPE_FLOAT32;
+        constFactor->value.scalarVal.fValue = 0.0;
     }
     else if(VIR_TypeId_isSignedInteger(symTypeId))
     {
         factor->type = VIR_TYPE_INT32;
         factor->value.scalarVal.iValue = 1;
-        diff->type = VIR_TYPE_INT32;
-        diff->value.scalarVal.iValue = 0;
+        constFactor->type = VIR_TYPE_INT32;
+        constFactor->value.scalarVal.iValue = 0;
     }
     else if(VIR_TypeId_isUnSignedInteger(symTypeId))
     {
         factor->type = VIR_TYPE_UINT32;
         factor->value.scalarVal.uValue = 1;
-        diff->type = VIR_TYPE_UINT32;
-        diff->value.scalarVal.uValue = 0;
+        constFactor->type = VIR_TYPE_UINT32;
+        constFactor->value.scalarVal.uValue = 0;
     }
     else
     {
@@ -435,7 +484,7 @@ _VIR_IVMgr_Dump(
 typedef struct VIR_LOOPUPBOUND
 {
     VIR_IV*                 iv;
-    VIR_ConditionOp         cop;
+    VIR_Instruction*        cmpInst;
     VIR_Symbol*             upboundSym;
     gctUINT                 upboundSymChannel;
     VIR_Const               upboundConst;
@@ -443,13 +492,30 @@ typedef struct VIR_LOOPUPBOUND
 
 #define VIR_LoopUpbound_GetIV(lu)                           ((lu)->iv)
 #define VIR_LoopUpbound_SetIV(lu, i)                        ((lu)->iv = (i))
-#define VIR_LoopUpbound_GetCOP(lu)                          ((lu)->cop)
-#define VIR_LoopUpbound_SetCOP(lu, c)                       ((lu)->cop = (c))
+#define VIR_LoopUpbound_GetCmpInst(lu)                      ((lu)->cmpInst)
+#define VIR_LoopUpbound_SetCmpInst(lu, c)                   ((lu)->cmpInst = (c))
+#define VIR_LoopUpbound_GetCOP(lu)                          VIR_Inst_GetConditionOp((lu)->cmpInst)
 #define VIR_LoopUpbound_GetUpboundSym(lu)                   ((lu)->upboundSym)
 #define VIR_LoopUpbound_SetUpboundSym(lu, u)                ((lu)->upboundSym = (u))
 #define VIR_LoopUpbound_GetUpboundSymChannel(lu)            ((lu)->upboundSymChannel)
 #define VIR_LoopUpbound_SetUpboundSymChannel(lu, u)         ((lu)->upboundSymChannel = (u))
 #define VIR_LoopUpbound_GetUpboundConst(lu)                 (&(lu)->upboundConst)
+#define VIR_LoopUpbound_IsConst(lu)                         ((lu)->upboundSym == gcvNULL)
+
+static VIR_TypeId
+_VIR_LoopUpbound_GetTypeId(
+    VIR_LoopUpbound* upbound
+    )
+{
+    if(VIR_LoopUpbound_IsConst(upbound))
+    {
+        return VIR_LoopUpbound_GetUpboundConst(upbound)->type;
+    }
+    else
+    {
+        return VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(VIR_LoopUpbound_GetUpboundSym(upbound)));
+    }
+}
 
 static void
 _VIR_LoopUpbound_Dump(
@@ -459,7 +525,7 @@ _VIR_LoopUpbound_Dump(
 {
     VIR_LOG(dumper, "upbound:\n");
     _VIR_IV_Dump(VIR_LoopUpbound_GetIV(upbound), dumper);
-    VIR_LOG(dumper, "cop: %d\n", VIR_LoopUpbound_GetCOP(upbound));
+    VIR_Inst_Dump(dumper, VIR_LoopUpbound_GetCmpInst(upbound));
 
     if(VIR_LoopUpbound_GetUpboundSym(upbound))
     {
@@ -506,6 +572,7 @@ typedef struct VIR_LOOPLOWBOUND
 #define VIR_LoopLowbound_GetLowboundSymChannel(ll)          ((ll)->lowboundSymChannel)
 #define VIR_LoopLowbound_SetLowboundSymChannel(ll, l)       ((ll)->lowboundSymChannel = (l))
 #define VIR_LoopLowbound_GetLowboundConst(ll)               (&(ll)->lowboundConst)
+#define VIR_LoopLowbound_IsConst(ll)                        ((ll)->lowboundSym == gcvNULL)
 
 static void
 _VIR_LoopLowbound_Dump(
@@ -544,6 +611,14 @@ For the loops we are talking about here, they have the following attributes:
     2. continue bbs are those whose successors contain loop head
     3. loop body bbs do not have to be continuours in IR. spir-v assembly can generate this kind of loop(dEQP-VK.glsl.functions.control_flow.return_in_nested_loop_vertex).
 */
+
+typedef enum
+{
+    VIR_LoopInfo_Flags_None             = 0,
+    VIR_LoopInfo_Flags_HasEmit          = 1,
+    VIR_LoopInfo_Flags_HasStore         = 2,
+} VIR_LoopInfo_Flags;
+
 typedef struct VIR_LOOPINFO
 {
     VSC_UNI_LIST_NODE       node;
@@ -557,7 +632,9 @@ typedef struct VIR_LOOPINFO
     VSC_UNI_LIST            breakBBSet;
     VSC_UNI_LIST            continueBBSet;
     VSC_UNI_LIST            backBoneSet;
+    VSC_UNI_LIST            loopEndDominatorSet;
     VIR_LoopDU*             du;
+    VIR_LoopInfo_Flags      flags;
     VIR_IVMgr*              ivMgr;
     VIR_LoopUpbound*        upbound;
     VIR_LoopLowbound*       lowbound;
@@ -586,8 +663,14 @@ typedef struct VIR_LOOPINFO
 #define VIR_LoopInfo_GetContinueBBCount(l)          (vscUNILST_GetNodeCount(&(l)->continueBBSet))
 #define VIR_LoopInfo_GetBackBoneBBSet(l)            (&(l)->backBoneSet)
 #define VIR_LoopInfo_GetBackBoneBBCount(l)          (vscUNILST_GetNodeCount(&(l)->backBoneSet))
+#define VIR_LoopInfo_GetLoopEndDominatorSet(l)      (&(l)->loopEndDominatorSet)
+#define VIR_LoopInfo_GetLoopEndDominatorCount(l)    (vscUNILST_GetNodeCount(&(l)->loopEndDominatorSet))
 #define VIR_LoopInfo_GetDU(l)                       ((l)->du)
 #define VIR_LoopInfo_SetDU(l, d)                    ((l)->du = (d))
+#define VIR_LoopInfo_GetFlags(l)                    ((l)->flags)
+#define VIR_LoopInfo_SetFlags(l, f)                 ((l)->flags = (f))
+#define VIR_LoopInfo_HasFlag(l, f)                  ((l)->flags & (f))
+#define VIR_LoopInfo_AddFlag(l, f)                  ((l)->flags |= (f))
 #define VIR_LoopInfo_GetIVMGR(l)                    ((l)->ivMgr)
 #define VIR_LoopInfo_SetIVMGR(l, i)                 ((l)->ivMgr = (i))
 #define VIR_LoopInfo_GetIVCount(l)                  (VIR_LoopInfo_GetIVMGR(l) ? VIR_IVMgr_GetIVCount(VIR_LoopInfo_GetIVMGR(l)) : 0)
@@ -614,6 +697,7 @@ _VIR_LoopInfo_Init(
     vscUNILST_Initialize(VIR_LoopInfo_GetBreakBBSet(loopInfo), gcvFALSE);
     vscUNILST_Initialize(VIR_LoopInfo_GetContinueBBSet(loopInfo), gcvFALSE);
     vscUNILST_Initialize(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), gcvFALSE);
+    vscUNILST_Initialize(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), gcvFALSE);
     vscUNILST_Initialize(VIR_LoopInfo_GetChildLoopSet(loopInfo), gcvFALSE);
     VIR_LoopInfo_SetId(loopInfo, id);
     VIR_LoopInfo_SetLoopHead(loopInfo, loopHead);
@@ -629,6 +713,7 @@ _VIR_LoopInfo_Final(
     _CommonFreeList(VIR_LoopInfo_GetBreakBBSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     _CommonFreeList(VIR_LoopInfo_GetContinueBBSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     _CommonFreeList(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
+    _CommonFreeList(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     _CommonFreeList(VIR_LoopInfo_GetChildLoopSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     if(VIR_LoopInfo_GetDU(loopInfo))
     {
@@ -990,6 +1075,54 @@ _VIR_LoopInfo_AddBackBoneBB(
 
         vscULNDEXT_Initialize(node, (void*)backBoneBB);
         vscUNILST_Append(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), CAST_ULEN_2_ULN(node));
+    }
+
+    return errCode;
+}
+
+
+static
+gctBOOL
+_VIR_LoopInfo_BBIsLoopEndDominator(
+    VIR_LoopInfo* loopInfo,
+    VIR_BASIC_BLOCK* bb
+    )
+{
+    VSC_UNI_LIST* loopEndDominatorSet = VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo);
+    VSC_UL_ITERATOR iter;
+    VSC_UNI_LIST_NODE_EXT* node;
+
+    vscULIterator_Init(&iter, loopEndDominatorSet);
+    for(node = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_First(&iter);
+        node != gcvNULL;
+        node = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_Next(&iter))
+    {
+        VIR_BB* loopEndDominator = (VIR_BB*)vscULNDEXT_GetContainedUserData(node);
+
+        if(bb == loopEndDominator)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+static
+VSC_ErrCode
+_VIR_LoopInfo_AddLoopEndDominator(
+    VIR_LoopInfo* loopInfo,
+    VIR_BASIC_BLOCK* loopEndDominator
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+
+    if(!_VIR_LoopInfo_BBIsLoopEndDominator(loopInfo, loopEndDominator))
+    {
+        VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
+
+        vscULNDEXT_Initialize(node, (void*)loopEndDominator);
+        vscUNILST_Append(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), CAST_ULEN_2_ULN(node));
     }
 
     return errCode;
@@ -1481,424 +1614,26 @@ _VIR_LoopInfo_BBIterator_Last(
 }
 
 
-static VIR_LoopDU*
-_VIR_LoopInfo_NewDU(
+static gctUINT
+_VIR_LoopInfo_GetInstCount(
     VIR_LoopInfo* loopInfo
     )
 {
-    VIR_LoopDU* du = VIR_LoopInfo_GetDU(loopInfo);
-
-    if(du)
-    {
-        _VIR_LoopDU_Final(du);
-        _VIR_LoopDU_Init(du, VIR_LoopInfo_GetMM(loopInfo));
-    }
-    else
-    {
-        du = (VIR_LoopDU*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopDU));
-        if(du)
-        {
-            _VIR_LoopDU_Init(du, VIR_LoopInfo_GetMM(loopInfo));
-        }
-    }
-
-    VIR_LoopInfo_SetDU(loopInfo, du);
-
-    return du;
-}
-
-static VSC_ErrCode
-_VIR_LoopInfo_BuildDU(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_LoopDU* du = VIR_LoopInfo_GetDU(loopInfo);
     VIR_LoopInfo_BBIterator bbIter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
     VIR_BB* bb;
-
-    gcmASSERT(du);
+    gctUINT result = 0;
 
     _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
     for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
         bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
-        VIR_Instruction* inst = BB_GET_START_INST(bb);
-
-        while(gcvTRUE)
-        {
-            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
-
-            if(VIR_OPCODE_hasDest(opcode) && VIR_Operand_isSymbol(VIR_Inst_GetDest(inst)))
-            {
-                VIR_Operand* dest = VIR_Inst_GetDest(inst);
-                VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
-                VIR_Enable enable = VIR_Operand_GetEnable(dest);
-                gctUINT i;
-
-                for(i = 0; i < VIR_CHANNEL_NUM; i++)
-                {
-                    if(enable & 1 << i)
-                {
-                        errCode = _VIR_LoopDU_AddDef(du, destSym, (VIR_Swizzle)i, inst);
-                if(errCode)
-                {
-                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
-                    return errCode;
-                }
-            }
-                }
-            }
-            if(VIR_OPCODE_isMemSt(opcode) || VIR_OPCODE_isAtom(opcode))
-            {
-                VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
-                VIR_Symbol* src0Sym = VIR_Operand_GetSymbol(src0);
-                VIR_Enable enable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src0));
-                gctUINT i;
-
-                for(i = 0; i < VIR_CHANNEL_NUM; i++)
-                {
-                    if(enable & 1 << i)
-                {
-                        errCode = _VIR_LoopDU_AddDef(du, src0Sym, (VIR_Swizzle)i, inst);
-                if(errCode)
-                {
-                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
-                    return errCode;
-                }
-            }
-                }
-            }
-
-            if(inst == BB_GET_END_INST(bb))
-            {
-                break;
-            }
-            else
-            {
-                inst = VIR_Inst_GetNext(inst);
-            }
-        }
+        result += BB_GET_LENGTH(bb);
     }
     _VIR_LoopInfo_BBIterator_Final(&bbIter);
 
-    return errCode;
+    return result;
 }
-
-static void
-_VIR_LoopInfo_DestroyDU(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    if(VIR_LoopInfo_GetDU(loopInfo))
-    {
-        _VIR_LoopDU_Final(VIR_LoopInfo_GetDU(loopInfo));
-        vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), VIR_LoopInfo_GetDU(loopInfo));
-        VIR_LoopInfo_SetDU(loopInfo, gcvNULL);
-    }
-}
-
-static VIR_IVMgr*
-_VIR_LoopInfo_NewIVMgr(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    VIR_IVMgr* ivMgr = VIR_LoopInfo_GetIVMGR(loopInfo);
-
-    if(ivMgr)
-    {
-        _VIR_IVMgr_Final(ivMgr);
-        _VIR_IVMgr_Init(ivMgr, VIR_LoopInfo_GetMM(loopInfo));
-    }
-    else
-    {
-        ivMgr = (VIR_IVMgr*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_IVMgr));
-        if(ivMgr)
-        {
-            _VIR_IVMgr_Init(ivMgr, VIR_LoopInfo_GetMM(loopInfo));
-        }
-    }
-
-    VIR_LoopInfo_SetIVMGR(loopInfo, ivMgr);
-
-    return ivMgr;
-}
-
-static VIR_LoopUpbound*
-_VIR_LoopInfo_NewUpbound(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    VIR_LoopUpbound* upbound;
-
-    if(VIR_LoopInfo_GetUpbound(loopInfo))
-    {
-        vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), VIR_LoopInfo_GetUpbound(loopInfo));
-    }
-
-    upbound = (VIR_LoopUpbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopUpbound));
-    if(upbound)
-    {
-        gcoOS_ZeroMemory(upbound, sizeof(VIR_LoopUpbound));
-    }
-    VIR_LoopInfo_SetUpbound(loopInfo, upbound);
-
-    return upbound;
-}
-
-static VIR_LoopLowbound*
-_VIR_LoopInfo_NewLowbound(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    VIR_LoopLowbound* lowbound;
-
-    if(VIR_LoopInfo_GetLowbound(loopInfo))
-    {
-        vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), VIR_LoopInfo_GetLowbound(loopInfo));
-    }
-
-    lowbound = (VIR_LoopLowbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopLowbound));
-    if(lowbound)
-    {
-        gcoOS_ZeroMemory(lowbound, sizeof(VIR_LoopLowbound));
-    }
-    VIR_LoopInfo_SetLowbound(loopInfo, lowbound);
-
-    return lowbound;
-}
-
-static void
-_VIR_LoopInfo_IdentifyBasicIVs(
-    VIR_LoopInfo* loopInfo
-    )
-{
-    VIR_IVMgr* ivMgr = _VIR_LoopInfo_NewIVMgr(loopInfo);
-    VIR_LoopInfo_BBIterator iter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
-    VIR_BB* bb;
-
-    _VIR_LoopInfo_BBIterator_Init(&iter, loopInfo, VIR_LoopInfo_BBIterator_Type_DepthFirst);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&iter);
-        bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&iter))
-    {
-        VIR_Instruction* inst;
-
-        if(BB_GET_LENGTH(bb) == 0)
-        {
-            continue;
-        }
-
-        inst = BB_GET_START_INST(bb);
-
-        while(gcvTRUE)
-        {
-            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
-
-            if(opcode == VIR_OP_ADD)
-            {
-                VIR_Operand* addDest = VIR_Inst_GetDest(inst);
-                VIR_Enable enable = VIR_Operand_GetEnable(addDest);
-                VIR_Operand* addSrc0 = VIR_Inst_GetSource(inst, 0);
-                VIR_Operand* addSrc1 = VIR_Inst_GetSource(inst, 1);
-
-                if(VIR_Operand_isSymbol(addSrc0) &&
-                   (VIR_Operand_isImm(addSrc1) || VIR_Operand_isConst(addSrc1)))
-                {
-                    gctUINT i;
-
-                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
-                    {
-                        if(enable & (1 << i))
-                {
-                            if(VIR_Operand_GetSymbol(addDest) == VIR_Operand_GetSymbol(addSrc0) &&
-                               VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(addSrc0), i) == (VIR_Swizzle)i)
-                {
-                                VIR_IV* iv = _VIR_IVMgr_FindIVAccordingToSymChannel(ivMgr, VIR_Operand_GetSymbol(addDest), i);
-
-                            if(iv)
-                            {
-                                VIR_IV_AddFlag(iv, VIR_IV_Flags_Invalid);
-                            }
-                                else
-                {
-                                    VIR_Const* diff;
-
-                                    iv = _VIR_IVMgr_AddIV(ivMgr);
-                                    _VIR_IV_Init(iv, VIR_Operand_GetSymbol(addDest), i, inst);
-                                    diff = VIR_IV_GetDiff(iv);
-                                        if(VIR_Operand_isImm(addSrc1))
-                                        {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc1)))
-                                            {
-                                            diff->type = VIR_TYPE_FLOAT32;
-                                            diff->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc1);
-                                            }
-                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
-                                            {
-                                            diff->type = VIR_TYPE_INT32;
-                                            diff->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc1);
-                                            }
-                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
-                                            {
-                                            diff->type = VIR_TYPE_UINT32;
-                                            diff->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc1);
-                                            }
-                                            else
-                                            {
-                                                gcmASSERT(0);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            /* TBD */
-                                        }
-                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
-                                    }
-                            }
-                        }
-                    }
-                }
-                                    else if(VIR_Operand_isSymbol(addSrc1) &&
-                        (VIR_Operand_isImm(addSrc0) || VIR_Operand_isConst(addSrc0)))
-                {
-                    gctUINT i;
-
-                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
-                    {
-                        if(enable & (1 << i))
-                        {
-                            if(VIR_Operand_GetSymbol(addDest) == VIR_Operand_GetSymbol(addSrc1) &&
-                                            VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(addSrc1), i) == (VIR_Swizzle)i)
-                                    {
-                                VIR_IV* iv = _VIR_IVMgr_FindIVAccordingToSymChannel(ivMgr, VIR_Operand_GetSymbol(addDest), i);
-
-                                if(iv)
-                                {
-                                    VIR_IV_AddFlag(iv, VIR_IV_Flags_Invalid);
-                                }
-                                else
-                                {
-                                    VIR_Const* diff;
-
-                                    iv = _VIR_IVMgr_AddIV(ivMgr);
-                                    _VIR_IV_Init(iv, VIR_Operand_GetSymbol(addDest), i, inst);
-                                    diff = VIR_IV_GetDiff(iv);
-                                        if(VIR_Operand_isImm(addSrc0))
-                                        {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc0)))
-                                            {
-                                            diff->type = VIR_TYPE_FLOAT32;
-                                            diff->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc0);
-                                            }
-                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
-                                            {
-                                            diff->type = VIR_TYPE_INT32;
-                                            diff->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc0);
-                                            }
-                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
-                                            {
-                                            diff->type = VIR_TYPE_UINT32;
-                                            diff->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc0);
-                                            }
-                                            else
-                                            {
-                                                gcmASSERT(0);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            /* TBD */
-                                        }
-                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
-                                    }
-                            }
-                        }
-                    }
-                }
-                                }
-            else if(opcode == VIR_OP_SUB)
-                                {
-                VIR_Operand* subDest = VIR_Inst_GetDest(inst);
-                VIR_Enable enable = VIR_Operand_GetEnable(subDest);
-                                    VIR_Operand* subSrc0 = VIR_Inst_GetSource(inst, 0);
-                                    VIR_Operand* subSrc1 = VIR_Inst_GetSource(inst, 1);
-
-                                    if(VIR_Operand_isSymbol(subSrc0) &&
-                   (VIR_Operand_isImm(subSrc1) || VIR_Operand_isConst(subSrc1)))
-                                    {
-                    gctUINT i;
-
-                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
-                                        {
-                        if(enable & (1 << i))
-                                            {
-                            if(VIR_Operand_GetSymbol(subDest) == VIR_Operand_GetSymbol(subSrc0) &&
-                               VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(subSrc0), i) == (VIR_Swizzle)i)
-                                            {
-                                VIR_IV* iv = _VIR_IVMgr_FindIVAccordingToSymChannel(ivMgr, VIR_Operand_GetSymbol(subDest), i);
-
-                                if(iv)
-                                            {
-                                    VIR_IV_AddFlag(iv, VIR_IV_Flags_Invalid);
-                                        }
-                                        else
-                                        {
-                                    VIR_Const* diff;
-
-                                    iv = _VIR_IVMgr_AddIV(ivMgr);
-                                    _VIR_IV_Init(iv, VIR_Operand_GetSymbol(subDest), i, inst);
-                                    diff = VIR_IV_GetDiff(iv);
-                                    if(VIR_Operand_isImm(subSrc1))
-                                    {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(subSrc1)))
-                                        {
-                                            diff->type = VIR_TYPE_FLOAT32;
-                                            diff->value.scalarVal.fValue = -VIR_Operand_GetImmediateFloat(subSrc1);
-                                            }
-                                        else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(subSrc1)))
-                                            {
-                                            diff->type = VIR_TYPE_INT32;
-                                            diff->value.scalarVal.iValue = -VIR_Operand_GetImmediateInt(subSrc1);
-                                            }
-                                            else
-                                            {
-                                                gcmASSERT(0);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            /* TBD */
-                                        }
-                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
-                                    }
-                                }
-                        }
-                    }
-                }
-            }
-
-            if(inst == BB_GET_END_INST(bb))
-            {
-                break;
-            }
-            else
-            {
-                inst = VIR_Inst_GetNext(inst);
-            }
-        }
-    }
-    _VIR_LoopInfo_BBIterator_Final(&iter);
-
-    VIR_IVMgr_SetBasicIdentified(ivMgr, gcvTRUE);
-
-    if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
-    {
-        _VIR_IVMgr_Dump(ivMgr, VIR_LoopInfo_GetDumper(loopInfo));
-    }
-}
-
 
 static void
 _VIR_LoopInfo_Dump(
@@ -2007,6 +1742,24 @@ _VIR_LoopInfo_Dump(
         VIR_LOG(dumper, "\n");
     }
 
+    if(VIR_LoopInfo_GetLoopEndDominatorCount(loopInfo))
+    {
+        VSC_UL_ITERATOR iter;
+        VSC_UNI_LIST_NODE_EXT* nodeExt;
+
+        VIR_LOG(dumper, "loop end dominator ids: ");
+        vscULIterator_Init(&iter, VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo));
+        for(nodeExt = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_First(&iter);
+            nodeExt != gcvNULL;
+            nodeExt = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_Next(&iter))
+        {
+            VIR_BB* bb = (VIR_BB*)vscULNDEXT_GetContainedUserData(nodeExt);
+
+            VIR_LOG(dumper, "%d ", BB_GET_ID(bb));
+        }
+        VIR_LOG(dumper, "\n");
+    }
+
     if(VIR_LoopInfo_GetIVCount(loopInfo))
     {
         _VIR_IVMgr_Dump(VIR_LoopInfo_GetIVMGR(loopInfo), VIR_LoopInfo_GetDumper(loopInfo));
@@ -2044,6 +1797,604 @@ _VIR_LoopInfo_Dump(
     }
     VIR_LOG_FLUSH(dumper);
 }
+
+static gctBOOL
+_VIR_LoopInfo_DUIsValid(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    if(VIR_LoopInfo_GetDU(loopInfo) == gcvNULL)
+    {
+        return gcvFALSE;
+    }
+
+    if(!VIR_LoopDU_IsValid(VIR_LoopInfo_GetDU(loopInfo)))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static VIR_LoopDU*
+_VIR_LoopInfo_NewDU(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_LoopDU* du = VIR_LoopInfo_GetDU(loopInfo);
+
+    if(du)
+    {
+        _VIR_LoopDU_Final(du);
+        _VIR_LoopDU_Init(du, VIR_LoopInfo_GetMM(loopInfo));
+    }
+    else
+    {
+        du = (VIR_LoopDU*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopDU));
+        if(du)
+        {
+            _VIR_LoopDU_Init(du, VIR_LoopInfo_GetMM(loopInfo));
+        }
+    }
+
+    VIR_LoopInfo_SetDU(loopInfo, du);
+
+    return du;
+}
+
+static VSC_ErrCode
+_VIR_LoopInfo_CollectDefs(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_LoopDU* du = _VIR_LoopInfo_NewDU(loopInfo);
+    VIR_LoopInfo_BBIterator bbIter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
+    VIR_BB* bb;
+
+    gcmASSERT(du);
+
+    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+        bb != gcvNULL;
+        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+    {
+        VIR_Instruction* inst = BB_GET_START_INST(bb);
+
+        while(gcvTRUE)
+        {
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+
+            if(VIR_OPCODE_IsExpr(opcode) && VIR_Operand_isSymbol(VIR_Inst_GetDest(inst)))
+            {
+                VIR_Operand* dest = VIR_Inst_GetDest(inst);
+                VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
+                VIR_Enable enable = VIR_Operand_GetEnable(dest);
+
+                if(VIR_Symbol_isVreg(destSym) && VIR_Symbol_GetVregVariable(destSym))
+                {
+                    destSym = VIR_Symbol_GetVregVariable(destSym);
+                }
+                errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
+                if(errCode)
+                {
+                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    return errCode;
+                }
+            }
+            if(VIR_OPCODE_isMemSt(opcode) || VIR_OPCODE_isAtom(opcode) || VIR_OPCODE_isImgSt(opcode))
+            {
+                VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
+                VIR_Symbol* src0Sym = VIR_Operand_GetSymbol(src0);
+                VIR_Enable enable = (VIR_Enable)(1 << (3 & VIR_Operand_GetSwizzle(src0)));
+
+                if(VIR_Symbol_isVreg(src0Sym) && VIR_Symbol_GetVregVariable(src0Sym))
+                {
+                    src0Sym = VIR_Symbol_GetVregVariable(src0Sym);
+                }
+                errCode = _VIR_LoopDU_AddDef(du, src0Sym, enable, inst);
+                if(errCode)
+                {
+                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    return errCode;
+                }
+                if(VIR_OPCODE_isMemSt(opcode))
+                {
+                    VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasStore);
+                }
+            }
+            if(opcode == VIR_OP_ATTR_ST)
+            {
+                VIR_Operand* dest = VIR_Inst_GetDest(inst);
+                VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
+                VIR_Enable enable = VIR_Operand_GetEnable(dest);
+
+                if(VIR_Symbol_isVreg(destSym) && VIR_Symbol_GetVregVariable(destSym))
+                {
+                    destSym = VIR_Symbol_GetVregVariable(destSym);
+                }
+                errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
+                if(errCode)
+                {
+                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    return errCode;
+                }
+            }
+            if(opcode == VIR_OP_CALL)
+            {
+                VIR_Function *calleeFunc = VIR_Inst_GetCallee(inst);
+                gctUINT i;
+
+                for(i = 0; i < VIR_IdList_Count(&calleeFunc->paramters); ++i)
+                {
+                    VIR_Id id = VIR_IdList_GetId(&calleeFunc->paramters, i);
+                    VIR_Symbol *parmSymInfunc = VIR_Function_GetSymFromId(calleeFunc, id);
+
+                    if(VIR_Symbol_isOutParam(parmSymInfunc))
+                    {
+                        VIR_VirRegId regId = VIR_Symbol_GetVregIndex(parmSymInfunc);
+                        VIR_Symbol* parmVregSymInShader = VIR_Shader_FindSymbolByTempIndex(VIR_LoopInfo_GetShader(loopInfo), regId);
+                        VIR_Symbol* parmVarSymInShader = VIR_Symbol_GetVregVariable(parmVregSymInShader);
+                        VIR_TypeId symTypeId = VIR_Symbol_GetTypeId(parmVarSymInShader);
+                        gctUINT channelCount = VIR_GetTypeComponents(symTypeId);
+                        VIR_Enable enable = (VIR_Enable)((1 << channelCount) - 1);
+
+                        errCode = _VIR_LoopDU_AddDef(du, parmVarSymInShader, enable, inst);
+                    }
+                }
+            }
+            if(opcode == VIR_OP_EMIT)
+            {
+                VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasEmit);
+            }
+            if(inst == BB_GET_END_INST(bb))
+            {
+                break;
+            }
+            else
+            {
+                inst = VIR_Inst_GetNext(inst);
+            }
+        }
+    }
+    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+    VIR_LoopDU_SetValid(du);
+
+    return errCode;
+}
+
+
+static VIR_IVMgr*
+_VIR_LoopInfo_NewIVMgr(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_IVMgr* ivMgr = VIR_LoopInfo_GetIVMGR(loopInfo);
+
+    if(ivMgr)
+    {
+        _VIR_IVMgr_Final(ivMgr);
+        _VIR_IVMgr_Init(ivMgr, VIR_LoopInfo_GetMM(loopInfo));
+    }
+    else
+    {
+        ivMgr = (VIR_IVMgr*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_IVMgr));
+        if(ivMgr)
+        {
+            _VIR_IVMgr_Init(ivMgr, VIR_LoopInfo_GetMM(loopInfo));
+        }
+    }
+
+    VIR_LoopInfo_SetIVMGR(loopInfo, ivMgr);
+
+    return ivMgr;
+}
+
+static VIR_LoopUpbound*
+_VIR_LoopInfo_NewUpbound(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_LoopUpbound* upbound;
+
+    if(VIR_LoopInfo_GetUpbound(loopInfo))
+    {
+        vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), VIR_LoopInfo_GetUpbound(loopInfo));
+    }
+
+    upbound = (VIR_LoopUpbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopUpbound));
+    if(upbound)
+    {
+        gcoOS_ZeroMemory(upbound, sizeof(VIR_LoopUpbound));
+    }
+    VIR_LoopInfo_SetUpbound(loopInfo, upbound);
+
+    return upbound;
+}
+
+static VIR_LoopLowbound*
+_VIR_LoopInfo_NewLowbound(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_LoopLowbound* lowbound;
+
+    if(VIR_LoopInfo_GetLowbound(loopInfo))
+    {
+        vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), VIR_LoopInfo_GetLowbound(loopInfo));
+    }
+
+    lowbound = (VIR_LoopLowbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopLowbound));
+    if(lowbound)
+    {
+        gcoOS_ZeroMemory(lowbound, sizeof(VIR_LoopLowbound));
+    }
+    VIR_LoopInfo_SetLowbound(loopInfo, lowbound);
+
+    return lowbound;
+}
+
+VSC_ErrCode
+_VIR_LoopInfo_BuildLoopEndDominators(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_LoopInfo_BBIterator bbIter = {0};
+    VIR_BB* bb;
+    VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+
+    if(VIR_LoopInfo_GetLoopEndDominatorCount(loopInfo))
+    {
+        _CommonFreeList(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
+    }
+
+    errCode = _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    if(errCode)
+    {
+        return errCode;
+    }
+
+    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+        bb != gcvNULL;
+        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+    {
+        /* new created bb from unrolling inner loop are dominators of outer loop exit */
+        if((bb->domSet.bitCount == 0) || BB_IS_DOM(bb, loopEnd))
+        {
+            errCode = _VIR_LoopInfo_AddLoopEndDominator(loopInfo, bb);
+            if(errCode)
+            {
+                return errCode;
+            }
+        }
+    }
+
+    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
+    {
+        VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "after building loop end dominator set:\n");
+        _VIR_LoopInfo_Dump(loopInfo, gcvFALSE);
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_VIR_LoopInfo_IdentifyBasicIVs(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_IVMgr* ivMgr = _VIR_LoopInfo_NewIVMgr(loopInfo);
+    VIR_LoopInfo_BBIterator iter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
+    VIR_BB* bb;
+    VSC_HASH_TABLE definedSymbols;
+
+    _VIR_LoopInfo_BuildLoopEndDominators(loopInfo);
+    vscHTBL_Initialize(&definedSymbols, VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+
+    _VIR_LoopInfo_BBIterator_Init(&iter, loopInfo, VIR_LoopInfo_BBIterator_Type_DepthFirst);
+    for(bb = _VIR_LoopInfo_BBIterator_First(&iter);
+        bb != gcvNULL;
+        bb = _VIR_LoopInfo_BBIterator_Next(&iter))
+    {
+        VIR_Instruction* inst;
+
+        if(BB_GET_LENGTH(bb) == 0)
+        {
+            continue;
+        }
+
+        inst = BB_GET_START_INST(bb);
+
+        while(gcvTRUE)
+        {
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+
+            if(VIR_OPCODE_hasDest(opcode))
+            {
+                VIR_Operand* dest = VIR_Inst_GetDest(inst);
+                VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
+                VIR_Enable enable = VIR_Operand_GetEnable(dest);
+                VIR_Enable definedEnable = VIR_ENABLE_NONE;
+                void* definedEnableFromHT;
+                VIR_Enable possibleKillingIVEnable;
+                VIR_Enable possibleNewIVEnable = enable;
+                gctUINT i;
+
+                if(vscHTBL_DirectTestAndGet(&definedSymbols, destSym, &definedEnableFromHT))
+                {
+                    definedEnable = (VIR_Enable)definedEnableFromHT;
+                    possibleNewIVEnable = (VIR_Enable)((gctUINT)possibleNewIVEnable & ~(gctUINT)definedEnable);
+
+                    if(definedEnable != enable)
+                    {
+                        definedEnable = (VIR_Enable)((gctUINT)definedEnable | (gctUINT)enable);
+                        vscHTBL_DirectSet(&definedSymbols, destSym, (void*)definedEnable);
+                    }
+                }
+                else
+                {
+                    vscHTBL_DirectSet(&definedSymbols, destSym, (void*)enable);
+                }
+
+                possibleKillingIVEnable = (VIR_Enable)((gctUINT)definedEnable & (gctUINT)enable);
+                if(possibleKillingIVEnable)
+                {
+                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
+                    {
+                        if(possibleKillingIVEnable & (1 << i))
+                        {
+                            VIR_IV* iv = _VIR_IVMgr_FindIVAccordingToSymChannel(ivMgr, destSym, i);
+
+                            if(iv)
+                            {
+                                VIR_IV_SetFlags(iv, VIR_IV_Flags_Invalid);
+                            }
+                        }
+                    }
+                }
+
+                if(possibleNewIVEnable &&
+                   _VIR_LoopInfo_BBIsLoopEndDominator(loopInfo, bb) &&
+                   (opcode == VIR_OP_ADD ||
+                    opcode == VIR_OP_SUB ||
+                    opcode == VIR_OP_MUL ||
+                    opcode == VIR_OP_RSHIFT))
+                {
+                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
+                    {
+                        if(possibleNewIVEnable & (1 << i))
+                        {
+                            switch(opcode)
+                            {
+                                case VIR_OP_ADD:
+                                {
+                                    VIR_Operand* addSrc0 = VIR_Inst_GetSource(inst, 0);
+                                    VIR_Operand* addSrc1 = VIR_Inst_GetSource(inst, 1);
+
+                                    if(VIR_Operand_isSymbol(addSrc0) &&
+                                       (VIR_Operand_isImm(addSrc1) || VIR_Operand_isConst(addSrc1)) &&
+                                       destSym == VIR_Operand_GetSymbol(addSrc0) &&
+                                       VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(addSrc0), i) == (VIR_Swizzle)i)
+                                    {
+                                        VIR_Const* constFactor;
+                                        VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+
+                                        _VIR_IV_Init(iv, destSym, i, inst);
+                                        constFactor = VIR_IV_GetConstFactor(iv);
+                                        if(VIR_Operand_isImm(addSrc1))
+                                        {
+                                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_FLOAT32;
+                                                constFactor->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc1);
+                                            }
+                                            else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_INT32;
+                                                constFactor->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc1);
+                                            }
+                                            else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_UINT32;
+                                                constFactor->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc1);
+                                            }
+                                            else
+                                            {
+                                                gcmASSERT(0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            /* TBD */
+                                        }
+                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
+                                    }
+                                    else if(VIR_Operand_isSymbol(addSrc1) &&
+                                            (VIR_Operand_isImm(addSrc0) || VIR_Operand_isConst(addSrc0)) &&
+                                            destSym == VIR_Operand_GetSymbol(addSrc1) &&
+                                            VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(addSrc1), i) == (VIR_Swizzle)i)
+                                    {
+                                        VIR_Const* constFactor;
+                                        VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        _VIR_IV_Init(iv, destSym, i, inst);
+                                        constFactor = VIR_IV_GetConstFactor(iv);
+                                        if(VIR_Operand_isImm(addSrc0))
+                                        {
+                                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc0)))
+                                            {
+                                                constFactor->type = VIR_TYPE_FLOAT32;
+                                                constFactor->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc0);
+                                            }
+                                            else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
+                                            {
+                                                constFactor->type = VIR_TYPE_INT32;
+                                                constFactor->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc0);
+                                            }
+                                            else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
+                                            {
+                                                constFactor->type = VIR_TYPE_UINT32;
+                                                constFactor->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc0);
+                                            }
+                                            else
+                                            {
+                                                gcmASSERT(0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            /* TBD */
+                                        }
+                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
+                                    }
+                                    break;
+                                }
+                                case VIR_OP_SUB:
+                                {
+                                    VIR_Operand* subSrc0 = VIR_Inst_GetSource(inst, 0);
+                                    VIR_Operand* subSrc1 = VIR_Inst_GetSource(inst, 1);
+
+                                    if(VIR_Operand_isSymbol(subSrc0) &&
+                                       (VIR_Operand_isImm(subSrc1) || VIR_Operand_isConst(subSrc1)) &&
+                                       destSym == VIR_Operand_GetSymbol(subSrc0) &&
+                                       VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(subSrc0), i) == (VIR_Swizzle)i)
+                                    {
+                                        VIR_Const* constFactor;
+
+                                        VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        _VIR_IV_Init(iv, destSym, i, inst);
+                                        constFactor = VIR_IV_GetConstFactor(iv);
+                                        if(VIR_Operand_isImm(subSrc1))
+                                        {
+                                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(subSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_FLOAT32;
+                                                constFactor->value.scalarVal.fValue = -VIR_Operand_GetImmediateFloat(subSrc1);
+                                            }
+                                            else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(subSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_INT32;
+                                                constFactor->value.scalarVal.iValue = -VIR_Operand_GetImmediateInt(subSrc1);
+                                            }
+                                            else
+                                            {
+                                                gcmASSERT(0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            /* TBD */
+                                        }
+                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
+                                    }
+                                    break;
+                                }
+                                case VIR_OP_MUL:
+                                {
+                                    VIR_Operand* mulSrc0 = VIR_Inst_GetSource(inst, 0);
+                                    VIR_Operand* mulSrc1 = VIR_Inst_GetSource(inst, 1);
+
+                                    if(VIR_Operand_isSymbol(mulSrc0) &&
+                                       (VIR_Operand_isImm(mulSrc1) || VIR_Operand_isConst(mulSrc1)) &&
+                                       destSym == VIR_Operand_GetSymbol(mulSrc0) &&
+                                       VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(mulSrc0), i) == (VIR_Swizzle)i)
+                                    {
+                                        VIR_Const* constFactor;
+
+                                        VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        _VIR_IV_Init(iv, destSym, i, inst);
+                                        constFactor = VIR_IV_GetConstFactor(iv);
+                                        if(VIR_Operand_isImm(mulSrc1))
+                                        {
+                                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(mulSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_FLOAT32;
+                                                constFactor->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(mulSrc1);
+                                            }
+                                            else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(mulSrc1)))
+                                            {
+                                                constFactor->type = VIR_TYPE_INT32;
+                                                constFactor->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(mulSrc1);
+                                            }
+                                            else
+                                            {
+                                                gcmASSERT(0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            /* TBD */
+                                        }
+                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
+                                    }
+                                    break;
+                                }
+                                case VIR_OP_RSHIFT:
+                                {
+                                    VIR_Operand* rshiftSrc0 = VIR_Inst_GetSource(inst, 0);
+                                    VIR_Operand* rshiftSrc1 = VIR_Inst_GetSource(inst, 1);
+
+                                    if(VIR_Operand_isSymbol(rshiftSrc0) &&
+                                       (VIR_Operand_isImm(rshiftSrc1) || VIR_Operand_isConst(rshiftSrc1)) &&
+                                       /* Skip signed integer because we can't handle a negative integer now. */
+                                       VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(rshiftSrc1)) &&
+                                       destSym == VIR_Operand_GetSymbol(rshiftSrc0) &&
+                                       VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(rshiftSrc0), i) == (VIR_Swizzle)i)
+                                    {
+                                        VIR_Const* constFactor;
+
+                                        VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        _VIR_IV_Init(iv, destSym, i, inst);
+                                        constFactor = VIR_IV_GetConstFactor(iv);
+                                        if(VIR_Operand_isImm(rshiftSrc1))
+                                        {
+                                            gcmASSERT(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(rshiftSrc1)));
+
+                                            constFactor->type = VIR_TYPE_UINT32;
+                                            constFactor->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(rshiftSrc1);
+                                        }
+                                        else
+                                        {
+                                            /* TBD */
+                                        }
+                                        VIR_IV_AddFlag(iv, VIR_IV_Flags_Basic);
+                                    }
+                                    break;
+                                }
+                                default:
+                                    gcmASSERT(0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if(inst == BB_GET_END_INST(bb))
+            {
+                break;
+            }
+            else
+            {
+                inst = VIR_Inst_GetNext(inst);
+            }
+        }
+    }
+    _VIR_LoopInfo_BBIterator_Final(&iter);
+    vscHTBL_Finalize(&definedSymbols);
+
+    VIR_IVMgr_SetBasicIdentified(ivMgr, gcvTRUE);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
+    {
+        _VIR_IVMgr_Dump(ivMgr, VIR_LoopInfo_GetDumper(loopInfo));
+    }
+
+    return errCode;
+}
+
 
 /************************************************************************************/
 /* VIR_LoopInfoMgr related code */
@@ -2088,13 +2439,14 @@ VIR_LoopInfoMgr_RemoveLoopInfo(
     if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
     {
         VSC_UL_ITERATOR iter;
-        VIR_LoopInfo* childLoopInfo;
+        VSC_UNI_LIST_NODE_EXT* node;
 
         vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
-        for(childLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
-            childLoopInfo != gcvNULL;
-            childLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+        for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+            node != gcvNULL;
+            node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
         {
+            VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
             VIR_LoopInfo_SetParentLoop(childLoopInfo, VIR_LoopInfo_GetParentLoop(loopInfo));
         }
     }
@@ -2832,7 +3184,8 @@ _VIR_LoopInfo_PerformLoopInversionOnLoop(
 static VSC_ErrCode
 _VIR_LoopInfo_GetPreHead(
     VIR_LoopInfo* loopInfo,
-    VIR_BB** preHead
+    VIR_BB** preHead,
+    gctBOOL connectPreheadAndHead
     )
 {
     VSC_ErrCode errCode;
@@ -2895,10 +3248,13 @@ _VIR_LoopInfo_GetPreHead(
         }
     }
 
+    if(connectPreheadAndHead)
+    {
         errCode = vscVIR_AddEdgeToCFG(BB_GET_CFG(loopHead),
                                       result,
                                       loopHead,
                                       VIR_CFG_EDGE_TYPE_ALWAYS);
+    }
 
     if(preHead)
     {
@@ -2914,15 +3270,13 @@ _VIR_LoopInfo_BuildBackBoneSet(
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_CONTROL_FLOW_GRAPH* cfg = VIR_LoopInfo_GetCFG(loopInfo);
     VIR_LoopInfo_BBIterator bbIter = {0};
     VSC_UL_ITERATOR breakBBIter;
     VIR_BB* bb;
 
-    errCode = vscVIR_BuildDOMTreePerCFG(cfg);
-    if(errCode)
+    if(VIR_LoopInfo_GetBackBoneBBCount(loopInfo))
     {
-        return errCode;
+        _CommonFreeList(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     }
 
     errCode = _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
@@ -2946,14 +3300,22 @@ _VIR_LoopInfo_BuildBackBoneSet(
         {
             VIR_BB* breakBB = (VIR_BB*)vscULNDEXT_GetContainedUserData(node);
 
-            if(!BB_IS_DOM(bb, breakBB))
+            /* if bb is new created by inner loop invariable code motion,
+             * we skip the dominator check since the dominator tree is not updated
+             * new created BB is always backbone bb for outer loop
+             */
+            if((bb->domSet.bitCount != 0) && !BB_IS_DOM(bb, breakBB))
             {
                 isBackBone = gcvFALSE;
                 break;
             }
         }
 
-        if(isBackBone && !BB_IS_DOM(bb, VIR_LoopInfo_GetLoopEnd(loopInfo)))
+        /* if bb is new created by inner loop invariable code motion
+         * we skip the dominator check since the dominator tree is not updated
+         * new created BB is always backbone bb for outer loop
+         */
+        if(isBackBone && (bb->domSet.bitCount != 0) && !BB_IS_DOM(bb, VIR_LoopInfo_GetLoopEnd(loopInfo)))
         {
             isBackBone = gcvFALSE;
         }
@@ -2966,13 +3328,6 @@ _VIR_LoopInfo_BuildBackBoneSet(
                 return errCode;
             }
         }
-    }
-
-    _VIR_LoopInfo_BBIterator_Final(&bbIter);
-    errCode = vscVIR_DestroyDOMTreePerCFG(cfg);
-    if(errCode)
-    {
-        return errCode;
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
@@ -3020,8 +3375,10 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     }
 
     /* build du */
-    _VIR_LoopInfo_NewDU(loopInfo);
-    _VIR_LoopInfo_BuildDU(loopInfo);
+    if(!_VIR_LoopInfo_DUIsValid(loopInfo))
+    {
+        _VIR_LoopInfo_CollectDefs(loopInfo);
+    }
     du = VIR_LoopInfo_GetDU(loopInfo);
     gcmASSERT(du);
 
@@ -3069,26 +3426,37 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
             {
                 if(VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(inst)) && !VIR_Inst_IsLoopInvariant(inst))
                 {
+                    /* check whether we have multiple definitions */
                     VIR_Operand* dest = VIR_Inst_GetDest(inst);
                     VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
                     VIR_Enable enable = VIR_Operand_GetEnable(dest);
-                    gctUINT i;
+                    gctBOOL defIsOK = gcvTRUE;
 
-                    for(i = 0; i < VIR_CHANNEL_NUM; i++)
+                    if(VIR_Symbol_isVreg(destSym) && VIR_Symbol_GetVregVariable(destSym))
                     {
-                        if(enable & (1 << i))
-                    {
-                            gctUINT defCount = _VIR_LoopDU_SymDefCountInLoop(du, destSym, (VIR_Swizzle)i);
+                        destSym = VIR_Symbol_GetVregVariable(destSym);
+                    }
 
+                    if(!VIR_LoopInfo_HasFlag(loopInfo, VIR_LoopInfo_Flags_HasEmit) ||
+                       !VIR_Symbol_isOutput(destSym) ||
+                       VIR_Shader_GetKind(VIR_LoopInfo_GetShader(loopInfo)) != VIR_SHADER_GEOMETRY)
+                    {
+                        gctUINT defCount = _VIR_LoopDU_SymDefCountInLoop(du, destSym, enable, VIR_LoopDU_SymDefCountInLoop_MAX);
+
+                        gcmASSERT(defCount >= 1);
                         if(defCount > 1)
                         {
-                                break;
+                            defIsOK = gcvFALSE;
                         }
                     }
+                    else
+                    {
+                        defIsOK = gcvFALSE;
                     }
 
-                    if(i >= VIR_CHANNEL_NUM)
+                    if(defIsOK)
                     {
+                        /* check whether operands have def in loop */
                         gctUINT j;
                         for(j = 0; j < VIR_Inst_GetSrcNum(inst); j++)
                         {
@@ -3099,33 +3467,44 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                                 continue;
                             }
 
+                            if(VIR_Shader_IsCL(VIR_LoopInfo_GetShader(loopInfo)) &&
+                               VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst)) &&
+                               VIR_LoopInfo_HasFlag(loopInfo, VIR_LoopInfo_Flags_HasStore))
+                            {
+                                break;
+                            }
+
                             if(VIR_Operand_isSymbol(src))
                             {
                                 VIR_Symbol* srcSym = VIR_Operand_GetSymbol(src);
                                 VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(src);
                                 VIR_Enable enable = VIR_Swizzle_2_Enable(swizzle);
-                                gctUINT k;
 
-                                for(k = 0; k < VIR_CHANNEL_NUM; k++)
+                                if(VIR_Symbol_isVreg(srcSym) && VIR_Symbol_GetVregVariable(srcSym))
                                 {
-                                    if((enable & (1 << k)) && _VIR_LoopDU_SymIsDefinedInLoop(du, srcSym, (VIR_Swizzle)k))
+                                    srcSym = VIR_Symbol_GetVregVariable(srcSym);
+                                }
+
+                                if(_VIR_LoopDU_SymDefCountInLoop(du, srcSym, enable, VIR_LoopDU_SymDefCountInLoop_SUM))
                                 {
                                         break;
-                                    }
-                                }
-                                if(k < VIR_CHANNEL_NUM)
-                                {
-                                    break;
                                 }
                             }
                         }
-                        if(j >= VIR_Inst_GetSrcNum(inst))
+                        if(j >= VIR_Inst_GetSrcNum(inst))  /* all operands have no def in loop */
                         {
                             VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
+                            VIR_Symbol* defSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
+
+                            if(VIR_Symbol_isVreg(defSym) && VIR_Symbol_GetVregVariable(defSym))
+                            {
+                                defSym = VIR_Symbol_GetVregVariable(defSym);
+                            }
 
                             vscULNDEXT_Initialize(node, inst);
                             vscUNILST_Append(&invariantInsts, CAST_ULEN_2_ULN(node));
                             VIR_Inst_SetLoopInvariant(inst, gcvTRUE);
+                            _VIR_LoopDU_RemoveDef(du, defSym, inst);
                             repeat = gcvTRUE;
 
                             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
@@ -3157,7 +3536,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         VSC_UNI_LIST_NODE_EXT* node = gcvNULL;
         VIR_Instruction* insertAfter = gcvNULL;
 
-        errCode = _VIR_LoopInfo_GetPreHead(loopInfo, &preHead);
+        errCode = _VIR_LoopInfo_GetPreHead(loopInfo, &preHead, gcvTRUE);
         if(errCode)
         {
             return errCode;
@@ -3172,7 +3551,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
             VIR_Instruction* invariantInst = (VIR_Instruction*)vscULNDEXT_GetContainedUserData(node);
 
             VIR_Function_AddCopiedInstructionAfter(VIR_LoopInfo_GetFunc(loopInfo), invariantInst, insertAfter, gcvTRUE, &insertAfter);
-            VIR_Function_ChangeInstToNop(VIR_LoopInfo_GetFunc(loopInfo), invariantInst);
+            VIR_Function_ChangeInstToNop(VIR_LoopInfo_GetFunc(loopInfo), invariantInst);    /* cannot remove here, because it may cause empty BB */
         }
 
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
@@ -3183,8 +3562,6 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     }
     _CommonFreeList(&invariantInsts, VIR_LoopInfo_GetMM(loopInfo));
     vscUNILST_Finalize(&invariantInsts);
-
-    _VIR_LoopInfo_DestroyDU(loopInfo);
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
     {
@@ -3206,9 +3583,9 @@ _VIR_LoopInfo_DetectLoopUpbound(
     if(VIR_Inst_GetOpcode(lastInst) == VIR_OP_JMPC)
     {
         if(VIR_Inst_GetPrev(lastInst) &&
-           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(lastInst)) == VIR_OP_CSELECT &&
+           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(lastInst)) == VIR_OP_SELECT &&
            VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst)) &&
-           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst))) == VIR_OP_COMPARE)
+           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst))) == VIR_OP_CMP)
         {
             VIR_Instruction* selectInst = VIR_Inst_GetPrev(lastInst);
             VIR_Instruction* cmpInst = VIR_Inst_GetPrev(selectInst);
@@ -3252,12 +3629,14 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     }
                 }
 
+                while((iv0 && iv1 == gcvNULL) || (iv1 && iv0 == gcvNULL))
+                {
                     if(iv0 && iv1 == gcvNULL)
                     {
                         VIR_LoopUpbound* upbound = _VIR_LoopInfo_NewUpbound(loopInfo);
 
                         VIR_LoopUpbound_SetIV(upbound, iv0);
-                    VIR_LoopUpbound_SetCOP(upbound, VIR_Inst_GetConditionOp(cmpInst));
+                        VIR_LoopUpbound_SetCmpInst(upbound, cmpInst);
                         if(VIR_Operand_isSymbol(cmpSrc1))
                         {
                             VIR_LoopUpbound_SetUpboundSym(upbound, cmpSym1);
@@ -3267,17 +3646,17 @@ _VIR_LoopInfo_DetectLoopUpbound(
                         {
                             VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
 
-                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(cmpSrc1)))
+                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_FLOAT32;
                                 upboundConst->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(cmpSrc1);
                             }
-                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
+                            else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_INT32;
                                 upboundConst->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(cmpSrc1);
                             }
-                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
+                            else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_UINT32;
                                 upboundConst->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(cmpSrc1);
@@ -3301,10 +3680,23 @@ _VIR_LoopInfo_DetectLoopUpbound(
                         {
                             _VIR_LoopUpbound_Dump(upbound, VIR_LoopInfo_GetDumper(loopInfo));
                         }
+                        break;
                     }
-                else if(iv1 && iv0 == gcvNULL)
+                    else if(VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(cmpInst)))
                     {
-                    /* TBD */
+                        VIR_Operand* temp;
+
+                        VIR_Inst_SetConditionOp(cmpInst, VIR_ConditionOp_Reverse(VIR_Inst_GetConditionOp(cmpInst)));
+                        temp = VIR_Inst_GetSource(cmpInst, 0);
+                        VIR_Inst_SetSource(cmpInst, 0, VIR_Inst_GetSource(cmpInst, 1));
+                        VIR_Inst_SetSource(cmpInst, 1, temp);
+                        iv0 = iv1;
+                        iv1 = gcvNULL;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -3338,12 +3730,14 @@ _VIR_LoopInfo_DetectLoopUpbound(
                 }
             }
 
+            while((iv0 && iv1 == gcvNULL) || (iv1 && iv0 == gcvNULL))
+            {
                 if(iv0 && iv1 == gcvNULL)
                 {
                     VIR_LoopUpbound* upbound = _VIR_LoopInfo_NewUpbound(loopInfo);
 
                     VIR_LoopUpbound_SetIV(upbound, iv0);
-                VIR_LoopUpbound_SetCOP(upbound, VIR_Inst_GetConditionOp(lastInst));
+                    VIR_LoopUpbound_SetCmpInst(upbound, lastInst);
                     if(VIR_Operand_isSymbol(jmpcSrc1))
                     {
                         VIR_LoopUpbound_SetUpboundSym(upbound, jmpcSym1);
@@ -3353,17 +3747,17 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     {
                         VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
 
-                    if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(jmpcSrc1)))
+                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_FLOAT32;
                             upboundConst->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(jmpcSrc1);
                         }
-                    else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
+                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_INT32;
                             upboundConst->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(jmpcSrc1);
                         }
-                    else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
+                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_UINT32;
                             upboundConst->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(jmpcSrc1);
@@ -3387,13 +3781,26 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     {
                         _VIR_LoopUpbound_Dump(upbound, VIR_LoopInfo_GetDumper(loopInfo));
                     }
+                    break;
                 }
-            else if(iv1 && iv0 == gcvNULL)
+                else if(VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(lastInst)))
                 {
-                /* TBD */
+                    VIR_Operand* temp;
+
+                    VIR_Inst_SetConditionOp(lastInst, VIR_ConditionOp_Reverse(VIR_Inst_GetConditionOp(lastInst)));
+                    temp = VIR_Inst_GetSource(lastInst, 0);
+                    VIR_Inst_SetSource(lastInst, 0, VIR_Inst_GetSource(lastInst, 1));
+                    VIR_Inst_SetSource(lastInst, 1, temp);
+                    iv0 = iv1;
+                    iv1 = gcvNULL;
                 }
+                else
+                {
+                    break;
                 }
             }
+        }
+    }
 }
 
 static void
@@ -3404,9 +3811,11 @@ _VIR_LoopInfo_DetectLoopLowbound(
 {
     VIR_Symbol* ivSym = VIR_IV_GetSym(iv);
     gctUINT ivSymChannel = VIR_IV_GetChannel(iv);
-    VIR_BB* bb = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+    VIR_BB* bb = gcvNULL;
 
-    if(BB_GET_IN_DEGREE(bb) != 2)
+    if(BB_GET_IN_DEGREE(loopHead) != 2)
     {
         return;
     }
@@ -3415,17 +3824,19 @@ _VIR_LoopInfo_DetectLoopLowbound(
         VSC_ADJACENT_LIST_ITERATOR predEdgeIter;
         VIR_CFG_EDGE* predEdge;
 
-        VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &bb->dgNode.predList);
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &loopHead->dgNode.predList);
         predEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
         for(;predEdge != gcvNULL; predEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&predEdgeIter))
         {
-            if(bb != CFG_EDGE_GET_TO_BB(predEdge))
+            if(loopEnd != CFG_EDGE_GET_TO_BB(predEdge))
             {
                 bb = CFG_EDGE_GET_TO_BB(predEdge);
                 break;
             }
         }
     }
+
+    gcmASSERT(bb);
 
     while(gcvTRUE)
     {
@@ -3547,7 +3958,8 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
     VIR_LoopInfo* loopInfo
     )
 {
-    gctINT iterations = -1;
+    VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
+    gctINT iterations;
     VIR_LoopUpbound* upbound = VIR_LoopInfo_GetUpbound(loopInfo);
     VIR_LoopLowbound* lowbound = VIR_LoopInfo_GetLowbound(loopInfo);
 
@@ -3560,7 +3972,7 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
         VIR_IV* iv = VIR_LoopUpbound_GetIV(upbound);
         VIR_Symbol* ivSym = VIR_IV_GetSym(iv);
         VIR_TypeId ivSymTypeId = VIR_Symbol_GetTypeId(ivSym);
-        VIR_Const* diff = VIR_IV_GetDiff(iv);
+        VIR_Const* constFactor = VIR_IV_GetConstFactor(iv);
         VIR_ConditionOp cop = VIR_LoopUpbound_GetCOP(upbound);
 
         gcmASSERT(iv == VIR_LoopLowbound_GetIV(lowbound));
@@ -3568,26 +3980,28 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
                   lowConst->type == upConst->type);
 
         if(VIR_TypeId_isFloat(ivSymTypeId))
-        {
-            /* TBD */
-                                return -1;
-                            }
-        else if(VIR_TypeId_isInteger(ivSymTypeId))
-        {
-            gctINT gap;
+         {
+            gctFLOAT gap;
 
+            gcmASSERT(constFactor->type == VIR_TYPE_FLOAT32);
             switch (cop)
             {
                 case VIR_COP_LESS:
                 {
-                    if(VIR_GetTypeComponentType(ivSymTypeId) == VIR_TYPE_INT32)
+                    VIR_OpCode opcode = VIR_IV_GetUpdateOpcode(iv);
+
+                    switch(opcode)
                     {
-                        if(lowConst->value.scalarVal.iValue < upConst->value.scalarVal.iValue)
+                        case VIR_OP_ADD:
+                        case VIR_OP_SUB:
                         {
-                            if(diff->type == VIR_TYPE_UINT32 || diff->value.scalarVal.iValue > 0)
+                            if((lowConst->value.scalarVal.fValue < upConst->value.scalarVal.fValue &&
+                                constFactor->value.scalarVal.fValue > 0.0) ||
+                               (lowConst->value.scalarVal.fValue > upConst->value.scalarVal.fValue &&
+                                constFactor->value.scalarVal.fValue < 0.0))
                             {
-                                gap = upConst->value.scalarVal.iValue - lowConst->value.scalarVal.iValue;
-                                iterations = gap / diff->value.scalarVal.iValue;
+                                gap = upConst->value.scalarVal.fValue - lowConst->value.scalarVal.fValue;
+                                iterations = (gctINT)ceil(gap / constFactor->value.scalarVal.fValue);
                                 return iterations == 0 ? 1 : iterations;
                             }
                             else
@@ -3595,19 +4009,181 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
                                 return -1;
                             }
                         }
+                        default:
+                        {
+                            return -1;
+                        }
+                    }
+                }
+                case VIR_COP_NOT_EQUAL:
+                {
+                    VIR_OpCode opcode = VIR_IV_GetUpdateOpcode(iv);
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_ADD:
+                        case VIR_OP_SUB:
+                        {
+                            if((lowConst->value.scalarVal.fValue < upConst->value.scalarVal.fValue &&
+                               constFactor->value.scalarVal.fValue > 0.0) ||
+                               (lowConst->value.scalarVal.fValue > upConst->value.scalarVal.fValue &&
+                               constFactor->value.scalarVal.fValue < 0.0))
+                            {
+                                gctFLOAT low = lowConst->value.scalarVal.fValue;
+                                iterations = 0;
+                                while(low != upConst->value.scalarVal.fValue)
+                                {
+                                    low += constFactor->value.scalarVal.fValue;
+                                    iterations++;
+
+                                    if(iterations > VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+                                    {
+                                        break;
+                                    }
+                                }
+                                return iterations;
+                            }
+                            else if(lowConst->value.scalarVal.fValue == upConst->value.scalarVal.fValue)
+                            {
+                                return 1;
+                            }
+                            else
+                            {
+                                return -1;
+                            }
+                        }
+                        default:
+                        {
+                            return -1;
+                        }
+                    }
+                }
+                default:
+                    return -1;
+                    break;
+            }
+        }
+        else if(VIR_TypeId_isSignedInteger(ivSymTypeId))
+        {
+            gctINT gap;
+
+            switch (cop)
+            {
+                case VIR_COP_LESS:
+                {
+                    VIR_OpCode opcode = VIR_IV_GetUpdateOpcode(iv);
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_ADD:
+                        case VIR_OP_SUB:
+                        {
+                            if((lowConst->value.scalarVal.iValue < upConst->value.scalarVal.iValue &&
+                                constFactor->value.scalarVal.iValue > 0) ||
+                               (lowConst->value.scalarVal.iValue > upConst->value.scalarVal.iValue &&
+                                constFactor->value.scalarVal.iValue < 0))
+                            {
+                                gap = upConst->value.scalarVal.iValue - lowConst->value.scalarVal.iValue;
+                                iterations = gap / constFactor->value.scalarVal.iValue;
+                                return iterations == 0 ? 1 : iterations;
+                            }
+                            else
+                            {
+                                return -1;
+                            }
+                        }
+                        case VIR_OP_MUL:
+                        {
+                            gctINT low = lowConst->value.scalarVal.iValue;
+                            iterations = 0;
+                            while(low < upConst->value.scalarVal.iValue)
+                            {
+                                low = low * constFactor->value.scalarVal.iValue;
+                                iterations++;
+
+                                if(iterations > VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+                                {
+                                    break;
+                                }
+                            }
+                            return iterations;
+                        }
+                        default:
+                        {
+                            return -1;
+                        }
+                    }
+                }
+                case VIR_COP_LESS_OR_EQUAL:
+                {
+                    if((lowConst->value.scalarVal.iValue <= upConst->value.scalarVal.iValue &&
+                        constFactor->value.scalarVal.iValue > 0) ||
+                       (lowConst->value.scalarVal.iValue >= upConst->value.scalarVal.iValue &&
+                        constFactor->value.scalarVal.iValue < 0))
+                    {
+                        gap = upConst->value.scalarVal.iValue - lowConst->value.scalarVal.iValue;
+                        iterations = gap / constFactor->value.scalarVal.iValue + 1;
+                        return iterations;
+                    }
                     else
                     {
                         return -1;
                     }
                 }
-                    else if(VIR_GetTypeComponentType(ivSymTypeId) == VIR_TYPE_UINT32)
+                default:
+                    return -1;
+                    break;
+            }
+        }
+        else if(VIR_TypeId_isUnSignedInteger(ivSymTypeId))
+        {
+            gctINT gap;
+
+            switch (cop)
+            {
+                case VIR_COP_GREATER:
+                {
+                    VIR_OpCode opcode = VIR_IV_GetUpdateOpcode(iv);
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_RSHIFT:
+                        {
+                            gctUINT low = lowConst->value.scalarVal.uValue;
+                            iterations = 0;
+                            while(low > upConst->value.scalarVal.uValue)
                             {
+                                low = low >> constFactor->value.scalarVal.uValue;
+                                iterations++;
+
+                                if(iterations > VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+                                {
+                                    break;
+                                }
+                            }
+                            return iterations;
+                        }
+                        default:
+                        {
+                            return -1;
+                        }
+                    }
+                }
+                case VIR_COP_LESS:
+                {
+                    VIR_OpCode opcode = VIR_IV_GetUpdateOpcode(iv);
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_ADD:
+                        case VIR_OP_SUB:
+                        {
                             if(lowConst->value.scalarVal.uValue < upConst->value.scalarVal.uValue)
                             {
-                            if(diff->type == VIR_TYPE_UINT32 || diff->value.scalarVal.iValue > 0)
+                                if(constFactor->type == VIR_TYPE_UINT32 || constFactor->value.scalarVal.iValue > 0)
                                 {
                                     gap = upConst->value.scalarVal.uValue - lowConst->value.scalarVal.uValue;
-                                iterations = gap / diff->value.scalarVal.iValue;
+                                    iterations = gap / constFactor->value.scalarVal.iValue;
                                     return iterations == 0 ? 1 : iterations;
                                 }
                                 else
@@ -3620,6 +4196,27 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
                                 return -1;
                             }
                         }
+                        case VIR_OP_MUL:
+                        {
+                            gctUINT low = lowConst->value.scalarVal.uValue;
+                            iterations = 0;
+                            while(low < upConst->value.scalarVal.uValue)
+                            {
+                                low = low * constFactor->value.scalarVal.uValue;
+                                iterations++;
+
+                                if(iterations > VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+                                {
+                                    break;
+                                }
+                            }
+                            return iterations;
+                        }
+                        default:
+                        {
+                            return -1;
+                        }
+                    }
                 }
                 default:
                     return -1;
@@ -3628,20 +4225,19 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
         }
     }
 
-    return iterations;
+    return -1;
 }
 
 static VSC_ErrCode
 _VIR_LoopInfo_CopyLoop(
     VIR_LoopInfo* loopInfo,
-    gctUINT copyId,
+    VIR_BB* beforeBB,
     VSC_HASH_TABLE* bbToNewBBMap
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Function* func = VIR_LoopInfo_GetFunc(loopInfo);
     VIR_LoopInfo_BBIterator bbIter = {0};
-    VIR_BB* lowerNeighbour = _VIR_LoopInfo_GetLowerNeighbour(loopInfo);
     VIR_BB* bb;
     VIR_BB* newBB;
     VIR_CFG* cfg = VIR_LoopInfo_GetCFG(loopInfo);
@@ -3653,9 +4249,8 @@ _VIR_LoopInfo_CopyLoop(
     {
         VIR_Instruction* bbInst;
         VIR_Instruction* newBBInst;
-        gctUINT i;
 
-        errCode = VIR_BB_CopyBBBefore(bb, lowerNeighbour, &newBB);
+        errCode = VIR_BB_CopyBBBefore(bb, beforeBB, &newBB);
         if(errCode)
         {
             return errCode;
@@ -3670,18 +4265,13 @@ _VIR_LoopInfo_CopyLoop(
             }
         }
 
-        for(i = 0, bbInst = BB_GET_START_INST(bb), newBBInst = BB_GET_START_INST(newBB);
-            i < BB_GET_LENGTH(bb);
-            i++, bbInst = VIR_Inst_GetNext(bbInst), newBBInst = VIR_Inst_GetNext(newBBInst))
+        bbInst = BB_GET_START_INST(bb);
+        newBBInst = BB_GET_START_INST(newBB);
+        if(VIR_Inst_GetOpcode(bbInst) == VIR_OP_LABEL)
         {
             VIR_Label* bbLabel;
             VIR_Label* newBBLabel;
 
-            if(VIR_Inst_GetOpcode(bbInst) != VIR_OP_LABEL)
-            {
-                gcmASSERT(VIR_Inst_GetOpcode(newBBInst) != VIR_OP_LABEL);
-                break;
-            }
             gcmASSERT(VIR_Inst_GetOpcode(newBBInst) == VIR_OP_LABEL);
 
             bbLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(bbInst));
@@ -3693,7 +4283,7 @@ _VIR_LoopInfo_CopyLoop(
 
     /* update cfg edges */
     bb = VIR_LoopInfo_GetLoopHead(loopInfo);
-    newBB = VIR_BB_GetFollowingBB(_VIR_LoopInfo_BBIterator_Last(&bbIter));
+    newBB = (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMap, (void*)bb);
     while(gcvTRUE)
     {
         VSC_ADJACENT_LIST_ITERATOR succEdgeIter;
@@ -3724,9 +4314,15 @@ _VIR_LoopInfo_CopyLoop(
                 VIR_Label* label = VIR_Operand_GetLabel(newBBEndDest);
                 VIR_Label* newLabel = (VIR_Label*)vscHTBL_DirectGet(labelToNewLabelMap, label);
 
-                if(newLabel)        /* break bb does not need to be modified */
+                /* Update the label only if there is a matched new label. */
+                if(newLabel != gcvNULL)
                 {
-                    VIR_Link* link;
+                    VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)newBBEnd);
+
+                    if(link)
+                    {
+                        VIR_Function_FreeLink(func, link);
+                    }
 
                     errCode = VIR_Function_NewLink(func, &link);
                     if(errCode)
@@ -3766,6 +4362,7 @@ _VIR_LoopInfo_StaticallyUnroll(
 
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+    VIR_BB* lowerNeighbour = _VIR_LoopInfo_GetLowerNeighbour(loopInfo);
     gctUINT i;
 
     gcmASSERT(copyCount > 0);
@@ -3773,12 +4370,12 @@ _VIR_LoopInfo_StaticallyUnroll(
     for(i = 0; i < copyCount; i++)
     {
         bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
-        _VIR_LoopInfo_CopyLoop(loopInfo, i, bbToNewBBMaps[i]);
-    }
+        _VIR_LoopInfo_CopyLoop(loopInfo, lowerNeighbour, bbToNewBBMaps[i]);
+    }   /* now loop order is loopInfo, newBB0, newBB1, newBB2, newBB3.... */
 
     /* orgnize unrolled loop */
     {
-        VIR_BB* bb = VIR_LoopInfo_GetLoopHead(loopInfo);
+        VIR_BB* bb = loopHead;
 
         while(gcvTRUE)
         {
@@ -3800,45 +4397,403 @@ _VIR_LoopInfo_StaticallyUnroll(
                 }
 
                 /* update the last copied loop */
-                VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[copyCount - 1], bb), _VIR_LoopInfo_GetLowerNeighbour(loopInfo), gcvNULL);
+                 VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[copyCount - 1], bb), lowerNeighbour, gcvNULL);
             }
             else if(bb == loopEnd)
             {
-                VIR_BB_RemoveBranch(bb);
+                VIR_BB_RemoveBranch(bb, gcvTRUE);
 
                 /* update copied loops except the last one */
                 {
                     gctUINT i;
-                    for(i = 0; i < copyCount - 1; i++)
+                    for(i = 0; i < copyCount; i++)
                     {
-                        VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb));
+                        VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
                     }
                 }
-
-                /* update the last copied loop */
-                VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[copyCount - 1], bb));
-            }
-
-            if(bb == VIR_LoopInfo_GetLoopEnd(loopInfo))
-    {
-    }
-
-            if(bb == VIR_LoopInfo_GetLoopEnd(loopInfo))
-        {
                 break;
             }
-            else
-            {
-                bb = VIR_BB_GetFollowingBB(bb);
-                }
-            }
+
+            bb = VIR_BB_GetFollowingBB(bb);
         }
+    }
 
     for(i = 0; i < copyCount; i++)
         {
             vscHTBL_Destroy(bbToNewBBMaps[i]);
         }
+    vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), bbToNewBBMaps);
+
+    VIR_LoopInfoMgr_RemoveLoopInfo(VIR_LoopInfo_GetLoopInfoMgr(loopInfo), loopInfo);
+
+    return errCode;
+}
+
+static gctBOOL
+_VIR_LoopInfo_CanDoDynamicallyUnroll(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+
+    VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
+
+    {
+        gctUINT loopLength = _VIR_LoopInfo_GetInstCount(loopInfo);
+        gctUINT addedLength = loopLength * VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(options);
+        gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo));
+        VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
+
+        if((addedLength > 2048) ||
+            (addedLength + shaderLength > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)))
+        {
+            return gcvFALSE;
+        }
+    }
+
+    /* check load ratio */
+    {
+        gctUINT ldCount = 0, instCount = BB_GET_LENGTH(loopHead);
+        VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
+
+        while(gcvTRUE)
+        {
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
+
+            if(VIR_OPCODE_isVX(opcode) &&
+               opcode != VIR_OP_VX_IMG_LOAD &&
+               opcode != VIR_OP_VX_IMG_LOAD_3D &&
+               opcode != VIR_OP_VX_DP16X1 &&
+               opcode != VIR_OP_VX_DP8X2 &&
+               opcode != VIR_OP_VX_DP4X4 &&
+               opcode != VIR_OP_VX_DP2X8 &&
+               opcode != VIR_OP_VX_DP32X1 &&
+               opcode != VIR_OP_VX_DP16X2 &&
+               opcode != VIR_OP_VX_DP8X4 &&
+               opcode != VIR_OP_VX_DP4X8 &&
+               opcode != VIR_OP_VX_DP2X16)
+            {
+                return gcvFALSE;
+            }
+
+            if(VIR_OPCODE_isMemLd(opcode) ||
+               VIR_OPCODE_isImgLd(opcode) ||
+               VIR_OPCODE_isTexLd(opcode))
+            {
+                ldCount++;
+            }
+
+            if(instIter == BB_GET_END_INST(loopHead))
+            {
+                break;
+            }
+            else
+            {
+                instIter = VIR_Inst_GetNext(instIter);
+            }
+        }
+
+        if(loopEnd != loopHead)
+        {
+            instIter = BB_GET_START_INST(loopEnd);
+
+            while(gcvTRUE)
+            {
+                VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
+
+                if(VIR_OPCODE_isMemLd(opcode) ||
+                   VIR_OPCODE_isTexLd(opcode))
+                {
+                    ldCount++;
+                }
+
+                if(instIter == BB_GET_END_INST(loopEnd))
+                {
+                    break;
+                }
+                else
+                {
+                    instIter = VIR_Inst_GetNext(instIter);
+                }
+            }
+            instCount += BB_GET_LENGTH(loopEnd);
+        }
+
+        if(ldCount == 0 || instCount / ldCount >= 10000)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    {
+        VIR_LoopUpbound* upbound = VIR_LoopInfo_GetUpbound(loopInfo);
+        VIR_IV* iv = VIR_LoopUpbound_GetIV(upbound);
+
+        if(VIR_IV_GetUpdateOpcode(iv) != VIR_OP_ADD &&
+           VIR_IV_GetUpdateOpcode(iv) != VIR_OP_SUB)
+        {
+            return gcvFALSE;
+        }
+
+        if(VIR_LoopUpbound_GetCOP(upbound) != VIR_COP_LESS &&
+           VIR_LoopUpbound_GetCOP(upbound) != VIR_COP_LESS_OR_EQUAL &&
+           VIR_LoopUpbound_GetCOP(upbound) != VIR_COP_GREATER &&
+           VIR_LoopUpbound_GetCOP(upbound) != VIR_COP_GREATER_OR_EQUAL)
+        {
+            return gcvFALSE;
+        }
+
+        if(!VIR_LoopUpbound_IsConst(upbound))
+        {
+            if(!_VIR_LoopInfo_DUIsValid(loopInfo))
+            {
+                _VIR_LoopInfo_CollectDefs(loopInfo);
+            }
+            if(_VIR_LoopDU_SymDefCountInLoop(VIR_LoopInfo_GetDU(loopInfo), VIR_LoopUpbound_GetUpboundSym(upbound), (VIR_Enable)VIR_LoopUpbound_GetUpboundSymChannel(upbound), VIR_LoopDU_SymDefCountInLoop_SUM))
+            {
+                return gcvFALSE;
+            }
+        }
+    }
+
+    return gcvTRUE;
+}
+
+static VSC_ErrCode
+_VIR_LoopInfo_DynamicallyUnroll(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
+    VIR_Shader* shader = VIR_LoopInfo_GetShader(loopInfo);
+    VIR_Function* func = VIR_LoopInfo_GetFunc(loopInfo);
+    VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+    VIR_BB* lowerNeighbour = _VIR_LoopInfo_GetLowerNeighbour(loopInfo);
+    VIR_BB* preHead[2];
+    VIR_Instruction* preHeadEnd;
+    gctUINT factor = VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(options);
+    VIR_LoopUpbound* upbound = VIR_LoopInfo_GetUpbound(loopInfo);
+    VIR_ConditionOp COP = VIR_LoopUpbound_GetCOP(upbound);
+    VIR_IV* iv = VIR_LoopUpbound_GetIV(upbound);
+    VIR_Symbol* ivSym = VIR_IV_GetSym(iv);
+    gctUINT ivSymChannel = VIR_IV_GetChannel(iv);
+    VIR_TypeId ivSymTypeId = VIR_Symbol_GetTypeId(ivSym);
+    VIR_VirRegId newUpboundRegId;
+    VIR_SymId newUpboundSymId;
+    VIR_OpCode newUpboundOp;
+
+    _VIR_LoopInfo_GetPreHead(loopInfo, &preHead[0], gcvFALSE);
+    preHeadEnd = BB_GET_END_INST(preHead[0]);
+
+    {
+        newUpboundRegId = VIR_Shader_NewVirRegId(shader, 1);
+        errCode = VIR_Shader_AddSymbol(shader,
+                                       VIR_SYM_VIRREG,
+                                       newUpboundRegId,
+                                       VIR_Shader_GetTypeFromId(shader, VIR_GetTypeComponentType(ivSymTypeId)),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &newUpboundSymId);
+
+        if(COP == VIR_COP_LESS || COP == VIR_COP_LESS_OR_EQUAL)
+        {
+            newUpboundOp = VIR_OP_SUB;
+        }
+        else
+        {
+            gcmASSERT(COP == VIR_COP_GREATER || COP == VIR_COP_GREATER_OR_EQUAL);
+
+            newUpboundOp = VIR_OP_ADD;
+        }
+        /* add instruction newUpbound = upbound - factor */
+        errCode = VIR_Function_AddInstructionAfter(func, newUpboundOp, VIR_GetTypeComponentType(ivSymTypeId), preHeadEnd, gcvTRUE, &preHeadEnd);
+        {
+            VIR_Operand* dest = VIR_Inst_GetDest(preHeadEnd);
+            VIR_Operand* src0 = VIR_Inst_GetSource(preHeadEnd, 0);
+            VIR_Operand* src1 = VIR_Inst_GetSource(preHeadEnd, 1);
+            VIR_TypeId upboundTypeId = _VIR_LoopUpbound_GetTypeId(upbound);
+
+            VIR_Operand_SetSymbol(dest, func, newUpboundSymId);
+            VIR_Operand_SetEnable(dest, VIR_ENABLE_X);
+
+            if(VIR_LoopUpbound_IsConst(upbound))
+            {
+                VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
+
+                switch(upboundTypeId)
+                {
+                    case VIR_TYPE_FLOAT32:
+                        VIR_Operand_SetImmediateFloat(src0, upboundConst->value.scalarVal.fValue);
+                        break;
+                    case VIR_TYPE_INT32:
+                        VIR_Operand_SetImmediateInt(src0, upboundConst->value.scalarVal.iValue);
+                        break;
+                    case VIR_TYPE_UINT32:
+                        VIR_Operand_SetImmediateUint(src0, upboundConst->value.scalarVal.uValue);
+                        break;
+                    default:
+                        gcmASSERT(0);
+                }
+            }
+            else
+            {
+                VIR_Symbol* upboundSym = VIR_LoopUpbound_GetUpboundSym(upbound);
+                gctUINT upboundSymChannel = VIR_LoopUpbound_GetUpboundSymChannel(upbound);
+
+                VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(upboundSym));
+                VIR_Operand_SetSwizzle(src0, (VIR_Swizzle)upboundSymChannel);
+            }
+
+            if(VIR_TypeId_isFloat(upboundTypeId))
+            {
+                VIR_Operand_SetImmediateFloat(src1, VIR_IV_GetConstFactor(iv)->value.scalarVal.fValue * factor);
+            }
+            else if(VIR_TypeId_isSignedInteger(upboundTypeId))
+            {
+                VIR_Operand_SetImmediateInt(src1, VIR_IV_GetConstFactor(iv)->value.scalarVal.iValue * factor);
+            }
+            else
+            {
+                gcmASSERT(VIR_TypeId_isUnSignedInteger(upboundTypeId));
+
+                VIR_Operand_SetImmediateUint(src1, VIR_IV_GetConstFactor(iv)->value.scalarVal.uValue * factor);
+            }
+        }
+
+        /* add instruction jmpc loopHead, iv, newUpbound */
+        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_JMPC, VIR_TYPE_UNKNOWN, preHeadEnd, gcvTRUE, &preHeadEnd);
+        {
+            VIR_Operand* src0 = VIR_Inst_GetSource(preHeadEnd, 0);
+            VIR_Operand* src1 = VIR_Inst_GetSource(preHeadEnd, 1);
+
+            VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(ivSym));
+            VIR_Operand_SetSwizzle(src1, VIR_Enable_2_Swizzle((VIR_Enable)(1 << ivSymChannel)));
+            VIR_Operand_SetSymbol(src1, func, newUpboundSymId);
+            VIR_Operand_SetSwizzle(src1, VIR_SWIZZLE_XXXX);
+            VIR_Inst_SetConditionOp(preHeadEnd, VIR_ConditionOp_Reverse(VIR_LoopUpbound_GetCOP(upbound)));
+        }
+
+        /* add instruction jmp.cond loopHead, upbound, newUpbound to avoid overflow/underflow */
+        _VIR_LoopInfo_GetPreHead(loopInfo, &preHead[1], gcvFALSE);
+        preHeadEnd = BB_GET_END_INST(preHead[1]);
+        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_JMPC, VIR_TYPE_UNKNOWN, preHeadEnd, gcvTRUE, &preHeadEnd);
+        VIR_Inst_SetConditionOp(preHeadEnd, newUpboundOp == VIR_OP_SUB ? VIR_COP_LESS : VIR_COP_GREATER);
+        {
+            VIR_Operand* src0 = VIR_Inst_GetSource(preHeadEnd, 0);
+            VIR_Operand* src1 = VIR_Inst_GetSource(preHeadEnd, 1);
+
+            if(VIR_LoopUpbound_IsConst(upbound))
+            {
+                VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
+
+                switch(upboundConst->type)
+                {
+                    case VIR_TYPE_FLOAT32:
+                        VIR_Operand_SetImmediateFloat(src0, upboundConst->value.scalarVal.fValue);
+                        break;
+                    case VIR_TYPE_INT32:
+                        VIR_Operand_SetImmediateInt(src0, upboundConst->value.scalarVal.iValue);
+                        break;
+                    case VIR_TYPE_UINT32:
+                        VIR_Operand_SetImmediateUint(src0, upboundConst->value.scalarVal.uValue);
+                        break;
+                    default:
+                        gcmASSERT(0);
+                }
+            }
+            else
+            {
+                VIR_Symbol* upboundSym = VIR_LoopUpbound_GetUpboundSym(upbound);
+                gctUINT upboundSymChannel = VIR_LoopUpbound_GetUpboundSymChannel(upbound);
+
+                VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(upboundSym));
+                VIR_Operand_SetSwizzle(src0, (VIR_Swizzle)upboundSymChannel);
+            }
+            VIR_Operand_SetSymbol(src1, func, newUpboundSymId);
+            VIR_Operand_SetSwizzle(src1, VIR_SWIZZLE_XXXX);
+        }
+    }
+
+    {
+        VSC_HASH_TABLE** bbToNewBBMaps = (VSC_HASH_TABLE**)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_HASH_TABLE*) * factor);
+        gctUINT i;
+
+        gcmASSERT(factor >= 2);
+
+        for(i = 0; i < factor; i++)
+        {
+            bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+            _VIR_LoopInfo_CopyLoop(loopInfo, lowerNeighbour, bbToNewBBMaps[i]);
+        }
+
+        /* orgnize unrolled loop */
+        {
+            VIR_BB* bb = loopHead;
+
+            while(gcvTRUE)
+            {
+                if(_VIR_LoopInfo_BBIsBreak(loopInfo, bb))
+                {
+                    /* nothing to do */
+                }
+                else if(_VIR_LoopInfo_BBIsContinue(loopInfo, bb))
+                {
+                    VIR_BB_ChangeSuccBBs(bb, (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[0], loopHead), gcvNULL);
+
+                    /* update copied loops except the last one */
+                    {
+                        gctUINT i;
+                        for(i = 0; i < factor - 1; i++)
+                        {
+                            VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i + 1], loopHead), gcvNULL);
+                        }
+                    }
+                }
+                else if(bb == loopEnd)
+                {
+                    VIR_Instruction* cmpInst = BB_GET_END_INST(bb);
+                    VIR_Instruction* newCmpInst = BB_GET_END_INST((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 2], bb));
+                    VIR_BB_RemoveBranch(bb, gcvTRUE);
+
+                    /* update copied loops except the last one */
+                    {
+                        gctUINT i;
+                        for(i = 0; i < factor - 2; i++)
+                        {
+                            VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
+                        }
+                    }
+
+                    while(cmpInst != VIR_LoopUpbound_GetCmpInst(upbound))
+                    {
+                        cmpInst = VIR_Inst_GetPrev(cmpInst);
+                        newCmpInst = VIR_Inst_GetPrev(newCmpInst);
+                    }
+
+                    VIR_Operand_SetSymbol(VIR_Inst_GetSource(newCmpInst, 1), func, newUpboundSymId);
+                    VIR_Operand_SetSwizzle(VIR_Inst_GetSource(newCmpInst, 1), VIR_SWIZZLE_XXXX);
+
+                    break;
+                }
+
+                bb = VIR_BB_GetFollowingBB(bb);
+            }
+
+        }
+
+        VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 2], loopEnd), loopHead, (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 1], loopHead));
+        VIR_BB_ChangeSuccBBs(preHead[0], (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 1], loopHead), preHead[1]);
+        VIR_BB_ChangeSuccBBs(preHead[1], (VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 1], loopHead), loopHead);
+
+        for(i = 0; i < factor; i++)
+        {
+            vscHTBL_Destroy(bbToNewBBMaps[i]);
+        }
         vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), bbToNewBBMaps);
+    }
+
     return errCode;
 }
 
@@ -3851,7 +4806,16 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopLowerNeighbour = _VIR_LoopInfo_GetLowerNeighbour(loopInfo);
+    gctBOOL localChanged = gcvFALSE;
+    VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
     VIR_Dumper* dumper = VIR_LoopInfo_GetDumper(loopInfo);
+    VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
+
+    /* check shader instrs number, early quit if shader program is too large */
+    if (VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo)) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
+    {
+         return errCode;
+    }
 
     if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
     {
@@ -3865,7 +4829,7 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
 
-            _VIR_LoopInfo_PerformLoopUnrollingOnLoop(childLoopInfo, changed);
+            _VIR_LoopInfo_PerformLoopUnrollingOnLoop(childLoopInfo, &localChanged);
         }
     }
 
@@ -3887,25 +4851,54 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     {
         gctINT iterations = _VIR_LoopInfo_ComputeConstLoopIterations(loopInfo);
 
-        if(iterations >= 0 && iterations <= 12)
+        if(iterations >= 0 && iterations <= VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
         {
             if(iterations <= 1)
             {
-                VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo));
+                 VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo), gcvTRUE);
             }
             else
             {
+                gctUINT loopLength = _VIR_LoopInfo_GetInstCount(loopInfo);
+                gctUINT addedLength = loopLength * (gctUINT)(iterations - 1);
+                gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo));
+
+                if((addedLength < 2048) &&
+                   (addedLength + shaderLength < VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)))
+                {
                     errCode = _VIR_LoopInfo_StaticallyUnroll(loopInfo, (gctUINT)(iterations - 1));
+
+                    localChanged = gcvTRUE;
                 }
-            VIR_LoopInfoMgr_RemoveLoopInfo(VIR_LoopInfo_GetLoopInfoMgr(loopInfo), loopInfo);
+            }
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
             {
-                VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "loop unrolling output:\n");
+                VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "full loop unrolling output:\n");
+                VIR_BasicBlock_DumpRange(dumper, loopHead, loopLowerNeighbour, gcvTRUE);
+            }
+        }
+        else if(VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(options) >= 2)
+        {
+            if(_VIR_LoopInfo_CanDoDynamicallyUnroll(loopInfo))
+            {
+                _VIR_LoopInfo_DynamicallyUnroll(loopInfo);
+
+                localChanged = gcvTRUE;
+
+                if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
+                {
+                    VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "partial loop unrolling output:\n");
                     VIR_BasicBlock_DumpRange(dumper, loopHead, loopLowerNeighbour, gcvTRUE);
                 }
             }
         }
+    }
+
+    if(changed)
+    {
+        *changed = localChanged;
+    }
 
     return errCode;
 }
@@ -3980,7 +4973,7 @@ VIR_LoopOpts_PerformOnFunction(
 
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION))
         {
-            gctBOOL localChanged;
+            gctBOOL localChanged = gcvFALSE;
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_INPUT))
             {
@@ -4001,7 +4994,7 @@ VIR_LoopOpts_PerformOnFunction(
 
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT))
         {
-            gctBOOL localChanged;
+            gctBOOL localChanged = gcvFALSE;
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_INPUT))
             {
@@ -4010,7 +5003,25 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Function_Dump(dumper, func);
             }
+
+            /* build dominator tree for whole cfg, the domintor tree is used for find backbone set of each loop.
+             * for nested loop, new bb may be created to store li instr from inner loop and the cfg of outer loop is changed.
+             * For this case, new create bb is always in the backbone set of outer loop without dominator check.
+             * Hence we don't have to update dominator tree for each loop*/
+            errCode = vscVIR_BuildDOMTreePerCFG(VIR_Function_GetCFG(func));
+            if (errCode)
+            {
+                return errCode;
+            }
+
             _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, &localChanged);
+
+            errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
+            if (errCode)
+            {
+                return errCode;
+            }
+
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_OUTPUT))
             {
                 VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
@@ -4022,7 +5033,7 @@ VIR_LoopOpts_PerformOnFunction(
 
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING))
         {
-            gctBOOL localChanged;
+            gctBOOL localChanged = gcvFALSE;
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_INPUT))
             {
@@ -4031,7 +5042,25 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Function_Dump(dumper, func);
             }
+
+            /* build dominator tree for whole cfg, the domintor tree is used for find loopEnd dominator set to find BIV.
+             * for nested loop, new bb may be created by unrolling inner loop.
+             * Now the original inner loop body bb is in the set of outer loop's loopExitDominator set and make the clone bb in the set too.
+             */
+            errCode = vscVIR_BuildDOMTreePerCFG(VIR_Function_GetCFG(func));
+            if (errCode)
+            {
+                return errCode;
+            }
+
             _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, &localChanged);
+
+            errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
+            if (errCode)
+            {
+                return errCode;
+            }
+
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_OUTPUT))
             {
                 VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
@@ -4054,6 +5083,37 @@ VIR_LoopOpts_PerformOnFunction(
     return errCode;
 }
 
+static gctUINT
+_VIR_AllowedInstNumAfterUnroll(
+    VSC_SH_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_HW_CONFIG* pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*    shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    gctUINT        maxInstCount = 8192;
+
+    if (!pHwCfg->hwFeatureFlags.hasInstCache)
+    {
+        if (VIR_Shader_GetKind(shader) == VIR_SHADER_VERTEX)
+        {
+            maxInstCount = pHwCfg->maxVSInstCount;
+        }
+        else if (VIR_Shader_GetKind(shader) == VIR_SHADER_COMPUTE)
+        {
+            maxInstCount = pHwCfg->hwFeatureFlags.hasThreadWalkerInPS ? pHwCfg->maxPSInstCount : pHwCfg->maxVSInstCount;
+        }
+        else
+        {
+            /* now only check vertex and fragment shader, any other shader type ? */
+            gcmASSERT(VIR_Shader_GetKind(shader) == VIR_SHADER_FRAGMENT);
+            maxInstCount = pHwCfg->maxPSInstCount;
+        }
+    }
+
+    return maxInstCount;
+
+}
+
 DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
@@ -4061,7 +5121,6 @@ DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
@@ -4075,6 +5134,8 @@ VIR_LoopOpts_PerformOnShader(
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
     VSC_OPTN_LoopOptsOptions* options = (VSC_OPTN_LoopOptsOptions*)pPassWorker->basePassWorker.pBaseOption;
+    /* set the max instrunction numbers after unroll */
+    gctUINT     allowedInstNumsAfterUnroll = _VIR_AllowedInstNumAfterUnroll(pPassWorker);
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_LoopOptsOptions_GetBeforeShader(options), VSC_OPTN_LoopOptsOptions_GetAfterShader(options)))
     {
@@ -4109,6 +5170,7 @@ VIR_LoopOpts_PerformOnShader(
         VIR_Function* func = func_node->function;
 
         VIR_LoopOpts_Init(&loopOpts, shader, func, options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
+        VIR_LoopOpts_SetAllowedInstNumAfterUnroll(&loopOpts, allowedInstNumsAfterUnroll);
         errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts);
         VIR_LoopOpts_Final(&loopOpts);
 

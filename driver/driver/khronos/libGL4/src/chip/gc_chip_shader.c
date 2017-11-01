@@ -147,219 +147,260 @@ gcChipIsMatrixType(
 __GLchipUniformTypeInfo g_typeInfos[] =
 {
     /*halType                                glType                                              size              */
-    {gcSHADER_FLOAT_X1,                      GL_FLOAT,                                           1*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X2,                      GL_FLOAT_VEC2,                                      2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X3,                      GL_FLOAT_VEC3,                                      3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X4,                      GL_FLOAT_VEC4,                                      4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_2X2,                     GL_FLOAT_MAT2,                                      2*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X3,                     GL_FLOAT_MAT3,                                      3*3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X4,                     GL_FLOAT_MAT4,                                      4*4*sizeof(GLfloat)},
-    {gcSHADER_BOOLEAN_X1,                    GL_BOOL,                                            1*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X2,                    GL_BOOL_VEC2,                                       2*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X3,                    GL_BOOL_VEC3,                                       3*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X4,                    GL_BOOL_VEC4,                                       4*sizeof(GLint)},
-    {gcSHADER_INTEGER_X1,                    GL_INT,                                             1*sizeof(GLint)},
-    {gcSHADER_INTEGER_X2,                    GL_INT_VEC2,                                        2*sizeof(GLint)},
-    {gcSHADER_INTEGER_X3,                    GL_INT_VEC3,                                        3*sizeof(GLint)},
-    {gcSHADER_INTEGER_X4,                    GL_INT_VEC4,                                        4*sizeof(GLint)},
-    {gcSHADER_SAMPLER_1D,                    GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_2D,                    GL_SAMPLER_2D,                                      1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_3D,                    GL_SAMPLER_3D,                                      1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_CUBIC,                 GL_SAMPLER_CUBE,                                    1*sizeof(GLint)},
-    {gcSHADER_FIXED_X1,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X2,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X3,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X4,                      GL_NONE,                                            0},
-    {gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                        4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                        4*sizeof(GLuint)},
-    {gcSHADER_SAMPLER,                       GL_NONE,                                            0},
-    {gcSHADER_FLOAT_2X3,                     GL_FLOAT_MAT2x3,                                    2*3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_2X4,                     GL_FLOAT_MAT2x4,                                    2*4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X2,                     GL_FLOAT_MAT3x2,                                    3*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X4,                     GL_FLOAT_MAT3x4,                                    3*4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X2,                     GL_FLOAT_MAT4x2,                                    4*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X3,                     GL_FLOAT_MAT4x3,                                    4*3*sizeof(GLfloat)},
-    {gcSHADER_ISAMPLER_2D,                   GL_INT_SAMPLER_2D,                                  1*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_3D,                   GL_INT_SAMPLER_3D,                                  1*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_CUBIC,                GL_INT_SAMPLER_CUBE,                                1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_2D,                   GL_UNSIGNED_INT_SAMPLER_2D,                         1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_3D,                   GL_UNSIGNED_INT_SAMPLER_3D,                         1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_CUBIC,                GL_UNSIGNED_INT_SAMPLER_CUBE,                       1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_EXTERNAL_OES,          GL_SAMPLER_EXTERNAL_OES,                            1*sizeof(GLint)},
+    {gcSHADER_FLOAT_X1,                      GL_FLOAT,                                           1*sizeof(GLfloat)},                /* 0x00 */
+    {gcSHADER_FLOAT_X2,                      GL_FLOAT_VEC2,                                      2*sizeof(GLfloat)},                /* 0x01 */
+    {gcSHADER_FLOAT_X3,                      GL_FLOAT_VEC3,                                      3*sizeof(GLfloat)},                /* 0x02 */
+    {gcSHADER_FLOAT_X4,                      GL_FLOAT_VEC4,                                      4*sizeof(GLfloat)},                /* 0x03 */
+    {gcSHADER_FLOAT_2X2,                     GL_FLOAT_MAT2,                                      2*2*sizeof(GLfloat)},              /* 0x04 */
+    {gcSHADER_FLOAT_3X3,                     GL_FLOAT_MAT3,                                      3*3*sizeof(GLfloat)},              /* 0x05 */
+    {gcSHADER_FLOAT_4X4,                     GL_FLOAT_MAT4,                                      4*4*sizeof(GLfloat)},              /* 0x06 */
+    {gcSHADER_BOOLEAN_X1,                    GL_BOOL,                                            1*sizeof(GLint)},                  /* 0x07 */
+    {gcSHADER_BOOLEAN_X2,                    GL_BOOL_VEC2,                                       2*sizeof(GLint)},                  /* 0x08 */
+    {gcSHADER_BOOLEAN_X3,                    GL_BOOL_VEC3,                                       3*sizeof(GLint)},                  /* 0x09 */
+    {gcSHADER_BOOLEAN_X4,                    GL_BOOL_VEC4,                                       4*sizeof(GLint)},                  /* 0x0A */
+    {gcSHADER_INTEGER_X1,                    GL_INT,                                             1*sizeof(GLint)},                  /* 0x0B */
+    {gcSHADER_INTEGER_X2,                    GL_INT_VEC2,                                        2*sizeof(GLint)},                  /* 0x0C */
+    {gcSHADER_INTEGER_X3,                    GL_INT_VEC3,                                        3*sizeof(GLint)},                  /* 0x0D */
+    {gcSHADER_INTEGER_X4,                    GL_INT_VEC4,                                        4*sizeof(GLint)},                  /* 0x0E */
+    {gcSHADER_SAMPLER_1D,                    GL_SAMPLER_1D,                                      1*sizeof(GLint)},                  /* 0x0F */
+    {gcSHADER_SAMPLER_2D,                    GL_SAMPLER_2D,                                      1*sizeof(GLint)},                  /* 0x10 */
+    {gcSHADER_SAMPLER_3D,                    GL_SAMPLER_3D,                                      1*sizeof(GLint)},                  /* 0x11 */
+    {gcSHADER_SAMPLER_CUBIC,                 GL_SAMPLER_CUBE,                                    1*sizeof(GLint)},                  /* 0x12 */
+    {gcSHADER_FIXED_X1,                      GL_NONE,                                            0},                                /* 0x13 */
+    {gcSHADER_FIXED_X2,                      GL_NONE,                                            0},                                /* 0x14 */
+    {gcSHADER_FIXED_X3,                      GL_NONE,                                            0},                                /* 0x15 */
+    {gcSHADER_FIXED_X4,                      GL_NONE,                                            0},                                /* 0x16 */
 
-    {gcSHADER_UINT_X1,                       GL_UNSIGNED_INT,                                    1*sizeof(GLuint)},
-    {gcSHADER_UINT_X2,                       GL_UNSIGNED_INT_VEC2,                               2*sizeof(GLuint)},
-    {gcSHADER_UINT_X3,                       GL_UNSIGNED_INT_VEC3,                               3*sizeof(GLuint)},
-    {gcSHADER_UINT_X4,                       GL_UNSIGNED_INT_VEC4,                               4*sizeof(GLuint)},
+    /* For OCL. */
+//    {gcSHADER_IMAGE_1D_T,                    GL_NONE,                                            0},                                /* 0x17 */
+//    {gcSHADER_IMAGE_1D_BUFFER_T,             GL_NONE,                                            0},                                /* 0x18 */
+//    {gcSHADER_IMAGE_1D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x19 */
+    {gcSHADER_IMAGE_2D,                      GL_NONE,                                            0},                                /* 0x1A */
+//    {gcSHADER_IMAGE_2D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x1B */
+    {gcSHADER_IMAGE_3D,                      GL_NONE,                                            0},                                /* 0x1C */
+//    {gcSHADER_VIV_GENERIC_IMAGE_T,           GL_NONE,                                            0},                                /* 0x1D */
+    {gcSHADER_SAMPLER,                     GL_NONE,                                            0},                                /* 0x1E */
 
-    {gcSHADER_SAMPLER_2D_SHADOW,             GL_SAMPLER_2D_SHADOW,                               1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_CUBE_SHADOW,           GL_SAMPLER_CUBE_SHADOW,                             1*sizeof(GLuint)},
+    {gcSHADER_FLOAT_2X3,                     GL_FLOAT_MAT2x3,                                    2*3*sizeof(GLfloat)},              /* 0x1F */
+    {gcSHADER_FLOAT_2X4,                     GL_FLOAT_MAT2x4,                                    2*4*sizeof(GLfloat)},              /* 0x20 */
+    {gcSHADER_FLOAT_3X2,                     GL_FLOAT_MAT3x2,                                    3*2*sizeof(GLfloat)},              /* 0x21 */
+    {gcSHADER_FLOAT_3X4,                     GL_FLOAT_MAT3x4,                                    3*4*sizeof(GLfloat)},              /* 0x22 */
+    {gcSHADER_FLOAT_4X2,                     GL_FLOAT_MAT4x2,                                    4*2*sizeof(GLfloat)},              /* 0x23 */
+    {gcSHADER_FLOAT_4X3,                     GL_FLOAT_MAT4x3,                                    4*3*sizeof(GLfloat)},              /* 0x24 */
+    {gcSHADER_ISAMPLER_2D,                   GL_INT_SAMPLER_2D,                                  1*sizeof(GLint)},                  /* 0x25 */
+    {gcSHADER_ISAMPLER_3D,                   GL_INT_SAMPLER_3D,                                  1*sizeof(GLint)},                  /* 0x26 */
+    {gcSHADER_ISAMPLER_CUBIC,                GL_INT_SAMPLER_CUBE,                                1*sizeof(GLint)},                  /* 0x27 */
+    {gcSHADER_USAMPLER_2D,                   GL_UNSIGNED_INT_SAMPLER_2D,                         1*sizeof(GLint)},                  /* 0x28 */
+    {gcSHADER_USAMPLER_3D,                   GL_UNSIGNED_INT_SAMPLER_3D,                         1*sizeof(GLint)},                  /* 0x29 */
+    {gcSHADER_USAMPLER_CUBIC,                GL_UNSIGNED_INT_SAMPLER_CUBE,                       1*sizeof(GLint)},                  /* 0x2A */
+    {gcSHADER_SAMPLER_EXTERNAL_OES,          GL_SAMPLER_EXTERNAL_OES,                            1*sizeof(GLint)},                  /* 0x2B */
 
-    {gcSHADER_SAMPLER_1D_ARRAY,              GL_NONE,                                            0},    /* 1DArray types are invalid in OES, while defined by compiler */
-    {gcSHADER_SAMPLER_1D_ARRAY_SHADOW,       GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_2D_ARRAY,              GL_SAMPLER_2D_ARRAY,                                1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_ARRAY,             GL_INT_SAMPLER_2D_ARRAY,                            1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_ARRAY,             GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                   1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_2D_ARRAY_SHADOW,       GL_SAMPLER_2D_ARRAY_SHADOW,                         1*sizeof(GLuint)},
+    {gcSHADER_UINT_X1,                       GL_UNSIGNED_INT,                                    1*sizeof(GLuint)},                 /* 0x2C */
+    {gcSHADER_UINT_X2,                       GL_UNSIGNED_INT_VEC2,                               2*sizeof(GLuint)},                 /* 0x2D */
+    {gcSHADER_UINT_X3,                       GL_UNSIGNED_INT_VEC3,                               3*sizeof(GLuint)},                 /* 0x2E */
+    {gcSHADER_UINT_X4,                       GL_UNSIGNED_INT_VEC4,                               4*sizeof(GLuint)},                 /* 0x2F */
 
-    {gcSHADER_SAMPLER_2D_MS,                 GL_SAMPLER_2D_MULTISAMPLE,                          1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_MS,                GL_INT_SAMPLER_2D_MULTISAMPLE,                      1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_MS,                GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,             1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_2D_MS_ARRAY,           GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,                1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_MS_ARRAY,          GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,            1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_MS_ARRAY,          GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,   1*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_2D_SHADOW,             GL_SAMPLER_2D_SHADOW,                               1*sizeof(GLuint)},                 /* 0x30 */
+    {gcSHADER_SAMPLER_CUBE_SHADOW,           GL_SAMPLER_CUBE_SHADOW,                             1*sizeof(GLuint)},                 /* 0x31 */
 
-    {gcSHADER_IIMAGE_2D,                     GL_INT_IMAGE_2D,                                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_2D,                     GL_UNSIGNED_INT_IMAGE_2D,                           4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_3D,                     GL_INT_IMAGE_3D,                                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_3D,                     GL_UNSIGNED_INT_IMAGE_3D,                           4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_CUBE,                    GL_IMAGE_CUBE,                                      4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_CUBE,                   GL_INT_IMAGE_CUBE,                                  4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_CUBE,                   GL_UNSIGNED_INT_IMAGE_CUBE,                         4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_2D_ARRAY,                GL_IMAGE_2D_ARRAY,                                  4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_2D_ARRAY,               GL_INT_IMAGE_2D_ARRAY,                              4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_2D_ARRAY,               GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                     4*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_1D_ARRAY,              GL_NONE,                                            0},    /* 1DArray types are invalid in OES, while defined by compiler *//* 0x32 */
+    {gcSHADER_SAMPLER_1D_ARRAY_SHADOW,       GL_NONE,                                            0},                                /* 0x33 */
+    {gcSHADER_SAMPLER_2D_ARRAY,              GL_SAMPLER_2D_ARRAY,                                1*sizeof(GLuint)},                 /* 0x34 */
+    {gcSHADER_ISAMPLER_2D_ARRAY,             GL_INT_SAMPLER_2D_ARRAY,                            1*sizeof(GLuint)},                 /* 0x35 */
+    {gcSHADER_USAMPLER_2D_ARRAY,             GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                   1*sizeof(GLuint)},                 /* 0x36 */
+    {gcSHADER_SAMPLER_2D_ARRAY_SHADOW,       GL_SAMPLER_2D_ARRAY_SHADOW,                         1*sizeof(GLuint)},                 /* 0x37 */
 
-    {gcSHADER_ATOMIC_UINT,                   GL_UNSIGNED_INT_ATOMIC_COUNTER,                     1*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_2D_MS,                 GL_SAMPLER_2D_MULTISAMPLE,                          1*sizeof(GLuint)},                 /* 0x38 */
+    {gcSHADER_ISAMPLER_2D_MS,                GL_INT_SAMPLER_2D_MULTISAMPLE,                      1*sizeof(GLuint)},                 /* 0x39 */
+    {gcSHADER_USAMPLER_2D_MS,                GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,             1*sizeof(GLuint)},                 /* 0x3A */
+    {gcSHADER_SAMPLER_2D_MS_ARRAY,           GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,                1*sizeof(GLuint)},                 /* 0x3B */
+    {gcSHADER_ISAMPLER_2D_MS_ARRAY,          GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,            1*sizeof(GLuint)},                 /* 0x3C */
+    {gcSHADER_USAMPLER_2D_MS_ARRAY,          GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,   1*sizeof(GLuint)},                 /* 0x3D */
 
+    //{gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                    4*sizeof(GLuint)},                     /* 0x3E */
+    {gcSHADER_IIMAGE_2D,                     GL_INT_IMAGE_2D,                                    4*sizeof(GLuint)},                 /* 0x3F */
+    {gcSHADER_UIMAGE_2D,                     GL_UNSIGNED_INT_IMAGE_2D,                           4*sizeof(GLuint)},                 /* 0x40 */
+    //{gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                    4*sizeof(GLuint)},                     /* 0x41 */
+    {gcSHADER_IIMAGE_3D,                     GL_INT_IMAGE_3D,                                    4*sizeof(GLuint)},                 /* 0x42 */
+    {gcSHADER_UIMAGE_3D,                     GL_UNSIGNED_INT_IMAGE_3D,                           4*sizeof(GLuint)},                 /* 0x43 */
+    {gcSHADER_IMAGE_CUBE,                    GL_IMAGE_CUBE,                                      4*sizeof(GLuint)},                 /* 0x44 */
+    {gcSHADER_IIMAGE_CUBE,                   GL_INT_IMAGE_CUBE,                                  4*sizeof(GLuint)},                 /* 0x45 */
+    {gcSHADER_UIMAGE_CUBE,                   GL_UNSIGNED_INT_IMAGE_CUBE,                         4*sizeof(GLuint)},                 /* 0x46 */
+    {gcSHADER_IMAGE_2D_ARRAY,                GL_IMAGE_2D_ARRAY,                                  4*sizeof(GLuint)},                 /* 0x47 */
+    {gcSHADER_IIMAGE_2D_ARRAY,               GL_INT_IMAGE_2D_ARRAY,                              4*sizeof(GLuint)},                 /* 0x48 */
+    {gcSHADER_UIMAGE_2D_ARRAY,               GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                     4*sizeof(GLuint)},                 /* 0x49 */
+//    {gcSHADER_VIV_GENERIC_GL_IMAGE,          GL_NONE,                                            4*sizeof(GLuint)},                 /* 0x4A */
+
+    {gcSHADER_ATOMIC_UINT,                   GL_UNSIGNED_INT_ATOMIC_COUNTER,                     1*sizeof(GLuint)},                 /* 0x4B */
     {gcSHADER_IMAGE_1D,                      GL_NONE,                                            0},
     {gcSHADER_IMAGE_1D_ARRAY,                GL_NONE,                                            0},
     {gcSHADER_IMAGE_1D_BUFFER,               GL_NONE,                                            0},
 
-    {gcSHADER_SAMPLER_CUBEMAP_ARRAY,         GL_SAMPLER_CUBE_MAP_ARRAY_EXT,                      1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW,  GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT,               1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_CUBEMAP_ARRAY,        GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,                  1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_CUBEMAP_ARRAY,        GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,         1*sizeof(GLuint)},
-    {gcSHADER_IMAGE_CUBEMAP_ARRAY,           GL_IMAGE_CUBE_MAP_ARRAY_EXT,                        4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_CUBEMAP_ARRAY,          GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT,                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_CUBEMAP_ARRAY,          GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT,           4*sizeof(GLuint)},
+    /* GL_EXT_texture_cube_map_array */
+    {gcSHADER_SAMPLER_CUBEMAP_ARRAY,         GL_SAMPLER_CUBE_MAP_ARRAY_EXT,                      1*sizeof(GLuint)},                 /* 0x4C */
+    {gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW,  GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT,               1*sizeof(GLuint)},                 /* 0x4D */
+    {gcSHADER_ISAMPLER_CUBEMAP_ARRAY,        GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,                  1*sizeof(GLuint)},                 /* 0x4E */
+    {gcSHADER_USAMPLER_CUBEMAP_ARRAY,        GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,         1*sizeof(GLuint)},                 /* 0x4F */
+    {gcSHADER_IMAGE_CUBEMAP_ARRAY,           GL_IMAGE_CUBE_MAP_ARRAY_EXT,                        4*sizeof(GLuint)},                 /* 0x50 */
+    {gcSHADER_IIMAGE_CUBEMAP_ARRAY,          GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT,                    4*sizeof(GLuint)},                 /* 0x51 */
+    {gcSHADER_UIMAGE_CUBEMAP_ARRAY,          GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT,           4*sizeof(GLuint)},                 /* 0x52 */
 
-    {gcSHADER_INT64_X1,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X2,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X3,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X4,                      GL_NONE,                                            0},
-    {gcSHADER_UINT64_X1,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X2,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X3,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X4,                     GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_BUFFER,                GL_SAMPLER_BUFFER_OES,                              4*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_BUFFER,               GL_INT_SAMPLER_BUFFER_OES,                          4*sizeof(GLint)},
-    {gcSHADER_USAMPLER_BUFFER,               GL_UNSIGNED_INT_SAMPLER_BUFFER_OES,                 4*sizeof(GLint)},
-    {gcSHADER_IMAGE_BUFFER,                  GL_IMAGE_BUFFER_OES,                                4*sizeof(GLint)},
-    {gcSHADER_IIMAGE_BUFFER,                 GL_INT_IMAGE_BUFFER_OES,                            4*sizeof(GLint)},
-    {gcSHADER_UIMAGE_BUFFER,                 GL_UNSIGNED_INT_IMAGE_BUFFER_OES,                   4*sizeof(GLint)},
+    {gcSHADER_INT64_X1,                      GL_NONE,                                            0},                                /* 0x53 */
+    {gcSHADER_INT64_X2,                      GL_NONE,                                            0},                                /* 0x54 */
+    {gcSHADER_INT64_X3,                      GL_NONE,                                            0},                                /* 0x55 */
+    {gcSHADER_INT64_X4,                      GL_NONE,                                            0},                                /* 0x56 */
+    {gcSHADER_UINT64_X1,                     GL_NONE,                                            0},                                /* 0x57 */
+    {gcSHADER_UINT64_X2,                     GL_NONE,                                            0},                                /* 0x58 */
+    {gcSHADER_UINT64_X3,                     GL_NONE,                                            0},                                /* 0x59 */
+    {gcSHADER_UINT64_X4,                     GL_NONE,                                            0},                                /* 0x5A */
+
+    /* texture buffer extension type. */
+    {gcSHADER_SAMPLER_BUFFER,                GL_SAMPLER_BUFFER_OES,                              4*sizeof(GLint)},                  /* 0x5B */
+    {gcSHADER_ISAMPLER_BUFFER,               GL_INT_SAMPLER_BUFFER_OES,                          4*sizeof(GLint)},                  /* 0x5C */
+    {gcSHADER_USAMPLER_BUFFER,               GL_UNSIGNED_INT_SAMPLER_BUFFER_OES,                 4*sizeof(GLint)},                  /* 0x5D */
+    {gcSHADER_IMAGE_BUFFER,                  GL_IMAGE_BUFFER_OES,                                4*sizeof(GLint)},                  /* 0x5E */
+    {gcSHADER_IIMAGE_BUFFER,                 GL_INT_IMAGE_BUFFER_OES,                            4*sizeof(GLint)},                  /* 0x5F */
+    {gcSHADER_UIMAGE_BUFFER,                 GL_UNSIGNED_INT_IMAGE_BUFFER_OES,                   4*sizeof(GLint)},                  /* 0x60 */
+//    {gcSHADER_VIV_GENERIC_GL_SAMPLER,        GL_NONE,                                            4*sizeof(GLint)},                  /* 0x61 */
+
     /* float16 */
-    { gcSHADER_FLOAT16_X1,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_X2,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_X3,  GL_NONE,                       0},      /* half3 */
-    { gcSHADER_FLOAT16_X4,  GL_NONE,                       0},      /* half4 */
-    { gcSHADER_FLOAT16_X8,  GL_NONE,                       0},      /* half8 */
-    { gcSHADER_FLOAT16_X16, GL_NONE,                       0},     /* half16 */
-    { gcSHADER_FLOAT16_X32, GL_NONE,                       0},     /* half32 */
+    { gcSHADER_FLOAT16_X1,  GL_NONE,                       0},                                                                      /* 0x62 half2 */
+    { gcSHADER_FLOAT16_X2,  GL_NONE,                       0},                                                                      /* 0x63 half2 */
+    { gcSHADER_FLOAT16_X3,  GL_NONE,                       0},                                                                      /* 0x64 half3 */
+    { gcSHADER_FLOAT16_X4,  GL_NONE,                       0},                                                                      /* 0x65 half4 */
+    { gcSHADER_FLOAT16_X8,  GL_NONE,                       0},                                                                      /* 0x66 half8 */
+    { gcSHADER_FLOAT16_X16, GL_NONE,                       0},                                                                      /* 0x67 half16 */
+    { gcSHADER_FLOAT16_X32, GL_NONE,                       0},                                                                      /* 0x68 half32 */
 
     /*  boolean  */
-
-    { gcSHADER_BOOLEAN_X8,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_X16, GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_X32, GL_NONE,                       0},
+    { gcSHADER_BOOLEAN_X8,  GL_NONE,                       0},                                                                      /* 0x69 */
+    { gcSHADER_BOOLEAN_X16, GL_NONE,                       0},                                                                      /* 0x6A */
+    { gcSHADER_BOOLEAN_X32, GL_NONE,                       0},                                                                      /* 0x6B */
 
     /* uchar vectors  */
-    { gcSHADER_UINT8_X1,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X2,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X3,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X4,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X8,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X16,   GL_NONE,                       0},
-    { gcSHADER_UINT8_X32,   GL_NONE,                       0},
+    { gcSHADER_UINT8_X1,    GL_NONE,                       0},                                                                      /* 0x6C */
+    { gcSHADER_UINT8_X2,    GL_NONE,                       0},                                                                      /* 0x6D */
+    { gcSHADER_UINT8_X3,    GL_NONE,                       0},                                                                      /* 0x6E */
+    { gcSHADER_UINT8_X4,    GL_NONE,                       0},                                                                      /* 0x6F */
+    { gcSHADER_UINT8_X8,    GL_NONE,                       0},                                                                      /* 0x70 */
+    { gcSHADER_UINT8_X16,   GL_NONE,                       0},                                                                      /* 0x71 */
+    { gcSHADER_UINT8_X32,   GL_NONE,                       0},                                                                      /* 0x72 */
 
     /* char vectors  */
-    { gcSHADER_INT8_X1,     GL_NONE,                       0},
-    { gcSHADER_INT8_X2,     GL_NONE,                       0},
-    { gcSHADER_INT8_X3,     GL_NONE,                       0},
-    { gcSHADER_INT8_X4,     GL_NONE,                       0},
-    { gcSHADER_INT8_X8,     GL_NONE,                       0},
-    { gcSHADER_INT8_X16,    GL_NONE,                       0},
-    { gcSHADER_INT8_X32,    GL_NONE,                       0},
+    { gcSHADER_INT8_X1,     GL_NONE,                       0},                                                                      /* 0x73 */
+    { gcSHADER_INT8_X2,     GL_NONE,                       0},                                                                      /* 0x74 */
+    { gcSHADER_INT8_X3,     GL_NONE,                       0},                                                                      /* 0x75 */
+    { gcSHADER_INT8_X4,     GL_NONE,                       0},                                                                      /* 0x76 */
+    { gcSHADER_INT8_X8,     GL_NONE,                       0},                                                                      /* 0x77 */
+    { gcSHADER_INT8_X16,    GL_NONE,                       0},                                                                      /* 0x78 */
+    { gcSHADER_INT8_X32,    GL_NONE,                       0},                                                                      /* 0x79 */
 
     /* ushort vectors */
-    { gcSHADER_UINT16_X1,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X2,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X3,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X4,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X8,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X16,  GL_NONE,                       0},
-    { gcSHADER_UINT16_X32,  GL_NONE,                       0},
+    { gcSHADER_UINT16_X1,   GL_NONE,                       0},                                                                      /* 0x7A */
+    { gcSHADER_UINT16_X2,   GL_NONE,                       0},                                                                      /* 0x7B */
+    { gcSHADER_UINT16_X3,   GL_NONE,                       0},                                                                      /* 0x7C */
+    { gcSHADER_UINT16_X4,   GL_NONE,                       0},                                                                      /* 0x7D */
+    { gcSHADER_UINT16_X8,   GL_NONE,                       0},                                                                      /* 0x7E */
+    { gcSHADER_UINT16_X16,  GL_NONE,                       0},                                                                      /* 0x7F */
+    { gcSHADER_UINT16_X32,  GL_NONE,                       0},                                                                      /* 0x80 */
 
     /* short vectors */
-    { gcSHADER_INT16_X1,    GL_NONE,                       0},
-    { gcSHADER_INT16_X2,    GL_NONE,                       0},
-    { gcSHADER_INT16_X3,    GL_NONE,                       0},
-    { gcSHADER_INT16_X4,    GL_NONE,                       0},
-    { gcSHADER_INT16_X8,    GL_NONE,                       0},
-    { gcSHADER_INT16_X16,   GL_NONE,                       0},
-    { gcSHADER_INT16_X32,   GL_NONE,                       0},
+    { gcSHADER_INT16_X1,    GL_NONE,                       0},                                                                      /* 0x81 */
+    { gcSHADER_INT16_X2,    GL_NONE,                       0},                                                                      /* 0x82 */
+    { gcSHADER_INT16_X3,    GL_NONE,                       0},                                                                      /* 0x83 */
+    { gcSHADER_INT16_X4,    GL_NONE,                       0},                                                                      /* 0x84 */
+    { gcSHADER_INT16_X8,    GL_NONE,                       0},                                                                      /* 0x85 */
+    { gcSHADER_INT16_X16,   GL_NONE,                       0},                                                                      /* 0x86 */
+    { gcSHADER_INT16_X32,   GL_NONE,                       0},                                                                      /* 0x87 */
 
     /* packed data type */
     /* packed float16 (2 bytes per element) */
-    { gcSHADER_FLOAT16_P2,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_P3,  GL_NONE,                       0},      /* half3 */
-    { gcSHADER_FLOAT16_P4,  GL_NONE,                       0},      /* half4 */
-    { gcSHADER_FLOAT16_P8,  GL_NONE,                       0},      /* half8 */
-    { gcSHADER_FLOAT16_P16, GL_NONE,                       0},     /* half16 */
-    { gcSHADER_FLOAT16_P32, GL_NONE,                       0},     /* half32 */
+    { gcSHADER_FLOAT16_P2,  GL_NONE,                       0},                                                                      /* 0x88 half2 */
+    { gcSHADER_FLOAT16_P3,  GL_NONE,                       0},                                                                      /* 0x89 half3 */
+    { gcSHADER_FLOAT16_P4,  GL_NONE,                       0},                                                                      /* 0x8A half4 */
+    { gcSHADER_FLOAT16_P8,  GL_NONE,                       0},                                                                      /* 0x8B half8 */
+    { gcSHADER_FLOAT16_P16, GL_NONE,                       0},                                                                      /* 0x8C half16 */
+    { gcSHADER_FLOAT16_P32, GL_NONE,                       0},                                                                      /* 0x8D half32 */
 
     /* packed boolean (1 byte per element) */
-    { gcSHADER_BOOLEAN_P2,  GL_NONE,                       0},    /* bvec2 */
-    { gcSHADER_BOOLEAN_P3,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P4,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P8,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P16, GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P32, GL_NONE,                       0},
+    { gcSHADER_BOOLEAN_P2,  GL_NONE,                       0},                                                                      /* 0x8E bool2 bvec2 */
+    { gcSHADER_BOOLEAN_P3,  GL_NONE,                       0},                                                                      /* 0x8F */
+    { gcSHADER_BOOLEAN_P4,  GL_NONE,                       0},                                                                      /* 0x90 */
+    { gcSHADER_BOOLEAN_P8,  GL_NONE,                       0},                                                                      /* 0x91 */
+    { gcSHADER_BOOLEAN_P16, GL_NONE,                       0},                                                                      /* 0x92 */
+    { gcSHADER_BOOLEAN_P32, GL_NONE,                       0},                                                                      /* 0x93 */
 
     /* uchar vectors (1 byte per element) */
-    { gcSHADER_UINT8_P2,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P3,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P4,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P8,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P16,   GL_NONE,                       0},
-    { gcSHADER_UINT8_P32,   GL_NONE,                       0},
+    { gcSHADER_UINT8_P2,    GL_NONE,                       0},                                                                      /* 0x94 */
+    { gcSHADER_UINT8_P3,    GL_NONE,                       0},                                                                      /* 0x95 */
+    { gcSHADER_UINT8_P4,    GL_NONE,                       0},                                                                      /* 0x96 */
+    { gcSHADER_UINT8_P8,    GL_NONE,                       0},                                                                      /* 0x97 */
+    { gcSHADER_UINT8_P16,   GL_NONE,                       0},                                                                      /* 0x98 */
+    { gcSHADER_UINT8_P32,   GL_NONE,                       0},                                                                      /* 0x99 */
 
     /* char vectors (1 byte per element) */
-    { gcSHADER_INT8_P2,     GL_NONE,                       0},
-    { gcSHADER_INT8_P3,     GL_NONE,                       0},
-    { gcSHADER_INT8_P4,     GL_NONE,                       0},
-    { gcSHADER_INT8_P8,     GL_NONE,                       0},
-    { gcSHADER_INT8_P16,    GL_NONE,                       0},
-    { gcSHADER_INT8_P32,    GL_NONE,                       0},
+    { gcSHADER_INT8_P2,     GL_NONE,                       0},                                                                      /* 0x9A */
+    { gcSHADER_INT8_P3,     GL_NONE,                       0},                                                                      /* 0x9B */
+    { gcSHADER_INT8_P4,     GL_NONE,                       0},                                                                      /* 0x9C */
+    { gcSHADER_INT8_P8,     GL_NONE,                       0},                                                                      /* 0x9D */
+    { gcSHADER_INT8_P16,    GL_NONE,                       0},                                                                      /* 0x9E */
+    { gcSHADER_INT8_P32,    GL_NONE,                       0},                                                                      /* 0x9F */
 
     /* ushort vectors (2 bytes per element) */
-    { gcSHADER_UINT16_P2,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P3,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P4,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P8,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P16,  GL_NONE,                       0},
-    { gcSHADER_UINT16_P32,  GL_NONE,                       0},
+    { gcSHADER_UINT16_P2,   GL_NONE,                       0},                                                                      /* 0xA0 */
+    { gcSHADER_UINT16_P3,   GL_NONE,                       0},                                                                      /* 0xA1 */
+    { gcSHADER_UINT16_P4,   GL_NONE,                       0},                                                                      /* 0xA2 */
+    { gcSHADER_UINT16_P8,   GL_NONE,                       0},                                                                      /* 0xA3 */
+    { gcSHADER_UINT16_P16,  GL_NONE,                       0},                                                                      /* 0xA4 */
+    { gcSHADER_UINT16_P32,  GL_NONE,                       0},                                                                      /* 0xA5 */
 
     /* short vectors (2 bytes per element) */
-    { gcSHADER_INT16_P2,    GL_NONE,                       0},
-    { gcSHADER_INT16_P3,    GL_NONE,                       0},
-    { gcSHADER_INT16_P4,    GL_NONE,                       0},
-    { gcSHADER_INT16_P8,    GL_NONE,                       0},
-    { gcSHADER_INT16_P16,   GL_NONE,                       0},
-    { gcSHADER_INT16_P32,   GL_NONE,                       0},
+    { gcSHADER_INT16_P2,    GL_NONE,                       0},                                                                      /* 0xA6 */
+    { gcSHADER_INT16_P3,    GL_NONE,                       0},                                                                      /* 0xA7 */
+    { gcSHADER_INT16_P4,    GL_NONE,                       0},                                                                      /* 0xA8 */
+    { gcSHADER_INT16_P8,    GL_NONE,                       0},                                                                      /* 0xA9 */
+    { gcSHADER_INT16_P16,   GL_NONE,                       0},                                                                      /* 0xAA */
+    { gcSHADER_INT16_P32,   GL_NONE,                       0},                                                                      /* 0xAB */
 
-    { gcSHADER_INTEGER_X8,   GL_NONE,                      0},
-    { gcSHADER_INTEGER_X16,  GL_NONE,                      0},
-    { gcSHADER_UINT_X8,      GL_NONE,                      0},
-    { gcSHADER_UINT_X16,     GL_NONE,                      0},
-    { gcSHADER_FLOAT_X8,     GL_NONE,                      0},
-    { gcSHADER_FLOAT_X16,    GL_NONE,                      0},
-    { gcSHADER_INT64_X8,     GL_NONE,                      0},
-    { gcSHADER_INT64_X16,    GL_NONE,                      0},
-    { gcSHADER_UINT64_X8,    GL_NONE,                      0},
-    { gcSHADER_UINT64_X16,   GL_NONE,                      0},
+    { gcSHADER_INTEGER_X8,   GL_NONE,                      0},                                                                      /* 0xAC */
+    { gcSHADER_INTEGER_X16,  GL_NONE,                      0},                                                                      /* 0xAD */
+    { gcSHADER_UINT_X8,      GL_NONE,                      0},                                                                      /* 0xAE */
+    { gcSHADER_UINT_X16,     GL_NONE,                      0},                                                                      /* 0xAF */
+    { gcSHADER_FLOAT_X8,     GL_NONE,                      0},                                                                      /* 0xB0 */
+    { gcSHADER_FLOAT_X16,    GL_NONE,                      0},                                                                      /* 0xB1 */
+    { gcSHADER_INT64_X8,     GL_NONE,                      0},                                                                      /* 0xB2 */
+    { gcSHADER_INT64_X16,    GL_NONE,                      0},                                                                      /* 0xB3 */
+    { gcSHADER_UINT64_X8,    GL_NONE,                      0},                                                                      /* 0xB4 */
+    { gcSHADER_UINT64_X16,   GL_NONE,                      0},                                                                      /* 0xB5 */
 
-    {gcSHADER_UNKONWN_TYPE,                  GL_NONE,                                            0},
+    { gcSHADER_FLOAT64_X1,   GL_DOUBLE,                    sizeof(GLdouble)},                                                                      /* 0xB6 */
+    { gcSHADER_FLOAT64_X2,   GL_DOUBLE_VEC2,               2*sizeof(GLdouble)},                                                                      /* 0xB7 */
+    { gcSHADER_FLOAT64_X3,   GL_DOUBLE_VEC3,               3*sizeof(GLdouble)},                                                                      /* 0xB8 */
+    { gcSHADER_FLOAT64_X4,   GL_DOUBLE_VEC4,               4*sizeof(GLdouble)},                                                                      /* 0xB9 */
+    { gcSHADER_FLOAT64_2X2,  GL_DOUBLE_MAT2,               2*2*sizeof(GLdouble)},                                                                      /* 0xBA */
+    { gcSHADER_FLOAT64_3X3,  GL_DOUBLE_MAT3,               3*3*sizeof(GLdouble)},                                                                      /* 0xBB */
+    { gcSHADER_FLOAT64_4X4,  GL_DOUBLE_MAT4,               4*4*sizeof(GLdouble)},                                                                      /* 0xBC */
+    { gcSHADER_FLOAT64_2X3,  GL_DOUBLE_MAT2x3,             2*3*sizeof(GLdouble)},                                                                      /* 0xBD */
+    { gcSHADER_FLOAT64_2X4,  GL_DOUBLE_MAT2x4,             2*4*sizeof(GLdouble)},                                                                      /* 0xBE */
+    { gcSHADER_FLOAT64_3X2,  GL_DOUBLE_MAT3x2,             3*2*sizeof(GLdouble)},                                                                      /* 0xBF */
+    { gcSHADER_FLOAT64_3X4,  GL_DOUBLE_MAT3x4,             3*4*sizeof(GLdouble)},                                                                      /* 0xC0 */
+    { gcSHADER_FLOAT64_4X2,  GL_DOUBLE_MAT4x2,             4*2*sizeof(GLdouble)},                                                                      /* 0xC1 */
+    { gcSHADER_FLOAT64_4X3,  GL_DOUBLE_MAT4x3,             4*3*sizeof(GLdouble)},                                                                      /* 0xC2 */
+    { gcSHADER_FLOAT64_X8,   GL_NONE,                      0},                                                                      /* 0xC3 */
+    { gcSHADER_FLOAT64_X16,  GL_NONE,                      0},                                                                      /* 0xC4 */
+
+    /* OpenGL 4.0 types  TODO */
+    { gcSHADER_SAMPLER_2D_RECT,         GL_NONE,           0},
+    { gcSHADER_ISAMPLER_2D_RECT,        GL_NONE,           0},
+    { gcSHADER_USAMPLER_2D_RECT,        GL_NONE,           0},
+    { gcSHADER_SAMPLER_2D_RECT_SHADOW,  GL_NONE,           0},
+    { gcSHADER_ISAMPLER_1D_ARRAY,       GL_NONE,           0},
+    { gcSHADER_USAMPLER_1D_ARRAY,       GL_NONE,           0},
+    { gcSHADER_ISAMPLER_1D,             GL_NONE,           0},
+    { gcSHADER_USAMPLER_1D,             GL_NONE,           0},
+    { gcSHADER_SAMPLER_1D_SHADOW,       GL_NONE,           0},
+
+    {gcSHADER_UNKONWN_TYPE,             GL_NONE,                                            0},
 };
 /* compile-time assertion if the g_typeInfos is not the same length as gcSHADER_TYPE_COUNT */
 const gctINT _verify_gTypeInfo[sizeof(g_typeInfos)/sizeof(__GLchipUniformTypeInfo) == gcSHADER_TYPE_COUNT] = { 0 };
@@ -387,6 +428,14 @@ const __GLchipNonUserDefUniformInfo nonUserDefUniformInfo[] =
     {"#NumSamples",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_SAMPLE_NUM,     gcvNULL},
     {"#TcsPatchVerticesIn",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_TCS_PATCH_VERTICES_IN,     gcvNULL},
     {"#TesPatchVerticesIn",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_TES_PATCH_VERTICES_IN,     gcvNULL},
+    { "#sh_alphaBlendEquation", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_EQUATION, gcvNULL },
+    { "#sh_alphaBlendFunction", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_FUNCTION, gcvNULL },
+    { "#sh_rt_WidthHeight", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_RT_WH, gcvNULL },
+    { "#sh_blendConstColor", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_CONSTANT_COLOR, gcvNULL },
+    { "#sh_alphablend_sampler", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER, gcvNULL },
+    { "#sh_yInvert", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_YINVERT, gcvNULL },
+    { "#sh_DepthBias", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_DEPTH_BIAS, gcvNULL },
+    { "#sh_rtImage", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE, gcvNULL },
 #ifdef OPENGL40
     { "#ModelViewMatrix",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrix"},
     { "#ProjectionMatrix",  __GL_CHIP_UNIFORM_USAGE_PROJECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrix"},
@@ -587,7 +636,6 @@ const __GLchipNonUserDefUniformInfo nonUserDefUniformInfo[] =
     { "#Fog.end",  __GL_CHIP_UNIFORM_USAGE_FOG_END,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.end"},
     { "#Fog.scale",  __GL_CHIP_UNIFORM_USAGE_FOG_SCALE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.scale"},
 #endif
-
 };
 
 /* unique program ID */
@@ -716,7 +764,8 @@ __GL_INLINE gceUNIFORMCVT
 gcChipQueryUniformConvert(
     __GLchipSLProgram *program,
     gcSHADER_TYPE      dataType,
-    gctBOOL            userDefUB
+    gctBOOL            userDefUB,
+    gctBOOL            hasIntegerSupport
     )
 {
     gceUNIFORMCVT convert = gcvUNIFORMCVT_NONE;
@@ -738,21 +787,21 @@ gcChipQueryUniformConvert(
         case gcSHADER_BOOLEAN_X2:
         case gcSHADER_BOOLEAN_X3:
         case gcSHADER_BOOLEAN_X4:
+            if (
 #if TREAT_ES20_INTEGER_AS_FLOAT
-            if (!program->isHalti)
+                !program->isHalti ||
+#endif
+                !hasIntegerSupport)
             {
                 convert = gcvUNIFORMCVT_TO_FLOAT;
             }
             else
             {
-#endif
                 if (userDefUB)
                 {
                     convert = gcvUNIFORMCVT_TO_BOOL;
                 }
-#if TREAT_ES20_INTEGER_AS_FLOAT
             }
-#endif
             break;
 
         case gcSHADER_INTEGER_X1:
@@ -762,12 +811,14 @@ gcChipQueryUniformConvert(
         case gcSHADER_SAMPLER_2D:
         case gcSHADER_SAMPLER_3D:
         case gcSHADER_SAMPLER_CUBIC:
+            if (
 #if TREAT_ES20_INTEGER_AS_FLOAT
-            if (!program->isHalti)
+                !program->isHalti ||
+#endif
+                !hasIntegerSupport)
             {
                 convert = gcvUNIFORMCVT_TO_FLOAT;
             }
-#endif
             break;
 
         default:
@@ -835,7 +886,6 @@ gcChipUtilFindUniformUsage(
         usage = __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED;
         subUsage = __GL_CHIP_UNIFORM_SUB_USAGE_LOD_MIN_MAX;
     }
-
     else if (isUniformSampleLocation(uniform))
     {
         usage = __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED;
@@ -908,7 +958,7 @@ gcChipUtilFindSsbUsage(
 
     gcmHEADER_ARG("name=%s ", name);
 
-    if (gcmIS_SUCCESS(gcoOS_StrCmp(name, "#sh_sharedVar")))
+    if (gcmIS_SUCCESS(gcoOS_StrCmp(name, _sldSharedVariableStorageBlockName)))
     {
         usage = __GL_CHIP_SSB_USAGE_SHAREDVAR;
     }
@@ -1160,6 +1210,7 @@ gcChipSSBGetPrevActiveSibling(
 __GL_INLINE GLuint
 gcChipGetUniformArrayInfo(
     gcUNIFORM uniform,
+    gctCONST_STRING name,
     gctUINT *maxNameLen,    /* max possible name len of this entry, exclude bottom-level "[0]" */
     gctBOOL *isArray,
     gctUINT *arraySize
@@ -1169,7 +1220,14 @@ gcChipGetUniformArrayInfo(
     gctUINT32 length;
     GLuint entries = 1;
 
-    gcUNIFORM_GetName(uniform, &length, gcvNULL);
+    if (name)
+    {
+        length = (gctUINT32)gcoOS_StrLen(name, gcvNULL);
+    }
+    else
+    {
+        gcUNIFORM_GetName(uniform, &length, gcvNULL);
+    }
 
     /* Multiple entries will be reported for array of arrays.
     ** If a uniform is an array, or array of array, its name length should be added
@@ -1286,9 +1344,9 @@ gcChipCountUniforms(
         }
 
         gcmVERIFY_OK(gcUNIFORM_GetName(uniform, &length, &name));
-        numEntries = gcChipGetUniformArrayInfo(uniform, &length, &isArray, gcvNULL);
-
         usage = gcChipUtilFindUniformUsage(Shader, uniform, &name, gcvNULL);
+        numEntries = gcChipGetUniformArrayInfo(uniform, name, &length, &isArray, gcvNULL);
+
         if (usage != __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED)
         {
             /* Active uniforms count separately in VS and PS */
@@ -1486,6 +1544,7 @@ gcChipProcessUniforms(
     GLint prevPrivateIndex = *PrivateIndex;
     gceSTATUS status = gcvSTATUS_OK;
     gctSTRING tmpName = gcvNULL;
+    gcSHADER_KIND shaderType = gcSHADER_TYPE_UNKNOWN;
 
     gcmHEADER_ARG("gc=0x%x programObject=0x%x Shader=0x%x Count=%d recompiled=%d UserDefIndex=0x%x "
                   "BuildInIndex=0x%x PrivateIndex=0x%x UniformHALIdx2GL=0x%x, numSampler=0x%x",
@@ -1493,6 +1552,7 @@ gcChipProcessUniforms(
                    PrivateIndex, UniformHALIdx2GL, numSamplers);
 
     stageIdx = gcChipGetShaderStage(Shader);
+    gcSHADER_GetType(Shader, &shaderType);
 
     for (i = 0; i < Count; ++i)
     {
@@ -1585,7 +1645,7 @@ gcChipProcessUniforms(
         location     = uniform->location;
         GL_ASSERT(location == -1 || location >= 0);
 
-        numEntries = gcChipGetUniformArrayInfo(uniform, &maxLen, &isArray, &arraySize);
+        numEntries = gcChipGetUniformArrayInfo(uniform, name, &maxLen, &isArray, &arraySize);
         maxLen++; /* count in null-terminator */
 
         tmpName = (gctSTRING)gc->imports.calloc(gc, maxLen, sizeof(gctCHAR));
@@ -1697,6 +1757,10 @@ gcChipProcessUniforms(
                     break;
                 case __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_STATE:
                     pgInstance->advBlendState = slot;
+                    break;
+                case __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE:
+                    GL_ASSERT(stageIdx == __GLSL_STAGE_FS);
+                    pgInstance->pLastFragData = slot;
                     break;
                 default:
                     break;
@@ -1815,6 +1879,25 @@ gcChipProcessUniforms(
 
                 switch (dataType)
                 {
+                case gcSHADER_ISAMPLER_1D:
+                case gcSHADER_USAMPLER_1D:
+                    isInteger = GL_TRUE;
+                case gcSHADER_SAMPLER_1D:
+                case gcSHADER_SAMPLER_1D_SHADOW:
+                    texDim = __GL_TEXTURE_1D_INDEX;
+                    break;
+                case gcSHADER_ISAMPLER_1D_ARRAY:
+                case gcSHADER_USAMPLER_1D_ARRAY:
+                    isInteger = GL_TRUE;
+                    texDim = __GL_TEXTURE_1D_ARRAY_INDEX;
+                    break;
+                case gcSHADER_ISAMPLER_2D_RECT:
+                case gcSHADER_USAMPLER_2D_RECT:
+                    isInteger = GL_TRUE;
+                case gcSHADER_SAMPLER_2D_RECT_SHADOW:
+                case gcSHADER_SAMPLER_2D_RECT:
+                    texDim = __GL_TEXTURE_RECTANGLE_INDEX;
+                    break;
                 case gcSHADER_ISAMPLER_2D:
                 case gcSHADER_USAMPLER_2D:
                     isInteger = GL_TRUE;
@@ -1889,9 +1972,16 @@ gcChipProcessUniforms(
                     samplers += (GLint)arraySize;
                     GL_ASSERT(binding == -1 || binding + arraySize <= gc->constants.shaderCaps.maxCombinedTextureImageUnits);
 
+                    if (isUniformUsedAsTexGatherSampler(uniform))
+                    {
+                        pgInstance->hasTXGatherSample = gcvTRUE;
+                    }
+
                     for (j = 0; j < (GLint)arraySize; ++j)
                     {
-                        GL_ASSERT(samplerIdx < (GLint) gcmCOUNTOF(program->samplerMap));
+                        GL_ASSERT(samplerIdx < (GLint)gcmCOUNTOF(program->samplerMap));
+                        program->samplerMap[samplerIdx].shaderType = shaderType;
+                        program->samplerMap[samplerIdx].type = dataType;
                         program->samplerMap[samplerIdx].slUniform = slot;
                         program->samplerMap[samplerIdx].uniform    = uniform;
                         program->samplerMap[samplerIdx].arrayIndex = j + (entryIdx * arraySize);
@@ -1903,6 +1993,7 @@ gcChipProcessUniforms(
                         program->samplerMap[samplerIdx].auxiliary = GL_FALSE;
                         program->samplerMap[samplerIdx].subUsage = subUsage;
                         program->samplerMap[samplerIdx].isInteger = isInteger;
+
                         if (binding >= 0)
                         {
                             GL_ASSERT(slot->data);
@@ -1916,6 +2007,7 @@ gcChipProcessUniforms(
                         {
                             __glBitmaskSet(&program->shadowSamplerMask, samplerIdx);
                         }
+                        programObject->maxUnit = gcmMAX(program->samplerMap[samplerIdx].unit + 1, programObject->maxUnit);
                         ++samplerIdx;
                     }
                 }
@@ -1925,7 +2017,9 @@ gcChipProcessUniforms(
                     GL_ASSERT(binding == -1 || binding + arraySize <= gc->constants.shaderCaps.maxCombinedTextureImageUnits);
                     for (j = 0; j < (GLint)arraySize; ++j)
                     {
-                        GL_ASSERT(samplerIdx < (GLint) gcmCOUNTOF(pgInstance->extraSamplerMap));
+                        GL_ASSERT(samplerIdx < (GLint)gcmCOUNTOF(pgInstance->extraSamplerMap));
+                        pgInstance->extraSamplerMap[samplerIdx].shaderType = shaderType;
+                        pgInstance->extraSamplerMap[samplerIdx].type = dataType;
                         pgInstance->extraSamplerMap[samplerIdx].uniform = uniform;
                         pgInstance->extraSamplerMap[samplerIdx].texDim = texDim;
                         pgInstance->extraSamplerMap[samplerIdx].stage = stageIdx;
@@ -1934,9 +2028,16 @@ gcChipProcessUniforms(
                         pgInstance->extraSamplerMap[samplerIdx].auxiliary = (subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_MULTILAYER_SAMPLER);
                         pgInstance->extraSamplerMap[samplerIdx].subUsage = subUsage;
                         pgInstance->extraSamplerMap[samplerIdx].isInteger = isInteger;
+                        if(subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER)
+                        {
+                            pgInstance->rtSampler = samplerIdx;
+                        }
+                        programObject->maxUnit = gcmMAX(pgInstance->extraSamplerMap[samplerIdx].unit + 1, programObject->maxUnit);
                         ++samplerIdx;
                     }
                 }
+
+                programObject->maxSampler = gcmMAX(samplerIdx, programObject->maxSampler);
             }
             /* For user-defined atomic_counter uniforms */
             else if (category == gceTK_ATOMIC && usage == __GL_CHIP_UNIFORM_USAGE_USER_DEFINED)
@@ -2042,7 +2143,7 @@ gcChipProcessUniforms(
                             pImageUnit2Uniform->numUniform++;
                         }
                     }
-                    else
+                    else if (subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_MULTILAYER_IMAGE)
                     {
                         GL_ASSERT(usage == __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED);
                         pgInstance->extraImageUniformCount += arraySize;
@@ -2284,7 +2385,7 @@ gcChipProcessUniformBlocks(
                 continue;
             }
 
-            totalEntries += gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL);
+            totalEntries += gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
         }
 
         /* Resize the index buffer if needed */
@@ -2377,7 +2478,7 @@ gcChipProcessUniformBlocks(
                     continue;
                 }
 
-                entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL);
+                entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
 
                 for (k = 0; k < entries; ++k, ++uSlotIdx)
                 {
@@ -2943,6 +3044,7 @@ gcChipProcessStorageBlocks(
     )
 {
     GLint i, j;
+    gctSTRING tmpName = gcvNULL;
     __GLSLStage stageIdx = __GLSL_STAGE_LAST;
     GLint prevUserDefIdx = *UserDefIndex;
     GLint prevPrivateIdx = *PrivateIndex;
@@ -3076,7 +3178,6 @@ gcChipProcessStorageBlocks(
                     gctUINT arraySize;
                     gctUINT entryIdx;
                     gctINT offset;
-                    gctSTRING tmpName;
 
                     gcmONERROR(gcSHADER_GetStorageBlockVariable(Shader, storageBlock, j, &variable));
 
@@ -3166,6 +3267,7 @@ gcChipProcessStorageBlocks(
                     }
 
                     gc->imports.free(gc, tmpName);
+                    tmpName = gcvNULL;
                 }
             }
 
@@ -3225,6 +3327,11 @@ gcChipProcessStorageBlocks(
     }
 
 OnError:
+    if (tmpName)
+    {
+        gc->imports.free(gc, tmpName);
+        tmpName = gcvNULL;
+    }
     gcmFOOTER_NO();
 }
 
@@ -3418,11 +3525,6 @@ gcChipPgInstanceCleanBindingInfo(
             __GLSLStage stage;
             gctBOOL emptyUniform = gcvTRUE;
 
-            if (uniform == gcvNULL)
-            {
-                continue;
-            }
-
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (uniform->halUniform[stage] != gcvNULL)
@@ -3466,6 +3568,8 @@ gcChipPgInstanceCleanBindingInfo(
     pgInstance->xfbVertexCountPerInstance = gcvNULL;
     pgInstance->xfbBufferCount = 0;
 
+    pgInstance->pLastFragData = gcvNULL;
+
     /* Free uniform blocks */
     if (pgInstance->privateUBs != gcvNULL)
     {
@@ -3504,6 +3608,7 @@ gcChipPgInstanceCleanBindingInfo(
     {
         /* Reset sampleMap table to invalid shader stage by default */
         pgInstance->extraSamplerMap[i].stage = __GLSL_STAGE_LAST;
+        pgInstance->extraSamplerMap[i].shaderType = gcSHADER_TYPE_UNKNOWN;
     }
 
     pgInstance->extraImageUniformCount = 0;
@@ -4253,10 +4358,9 @@ gcChipProgramBuildBindingInfo(
                 (gcmATTRIBUTE_isPerVertexArray(attribute) && GetATTRNameLength(attribute) > 0));
             input->isBuiltin = gcmIS_SUCCESS(gcoOS_StrNCmp(input->name, "gl_", 3));
             input->fieldIndex = GetATTRFieldIndex(attribute);
+            input->isPosition = gcmATTRIBUTE_isPosition(attribute);
+            input->isDirectPosition = gcmATTRIBUTE_isDirectPosition(attribute);
             gcmONERROR(gcATTRIBUTE_GetLocation(attribute, &input->location));
-#if gcdUSE_WCLIP_PATCH
-            gcmONERROR(gcATTRIBUTE_IsPosition(attribute, &input->isPosition, gcvNULL));
-#endif
             gcmONERROR(gcATTRIBUTE_GetPrecision(attribute, &input->precision));
             gcmONERROR(gcATTRIBUTE_IsPerPatch(attribute, &input->isPerPatch));
             gcmONERROR(gcATTRIBUTE_IsSample(attribute, &input->isSampleIn));
@@ -4769,7 +4873,9 @@ gcChipProgramBuildBindingInfo(
     /* Allocate and upload private UBOs (currently only const ones) */
     for (i = 0; i < (GLuint)masterPgInstance->privateUbCount; ++i)
     {
-        gctPOINTER data = gcvNULL;
+        gctPOINTER data[__GLSL_STAGE_LAST] = {gcvNULL};
+        __GLSLStage firstStage = __GLSL_STAGE_LAST;
+
         __GLchipSLUniformBlock *uBlock = &masterPgInstance->privateUBs[i];
 
         GL_ASSERT(uBlock->halBufObj == gcvNULL);
@@ -4779,13 +4885,25 @@ gcChipProgramBuildBindingInfo(
         {
             if (uBlock->halUB[stage])
             {
-                data = GetShaderConstUBOData(pBinaries[stage]);
-                break;
+                data[stage] = GetShaderConstUBOData(pBinaries[stage]);
+
+                if (__GLSL_STAGE_LAST == firstStage)
+                {
+                    firstStage = stage;
+                }
+                else
+                {
+                    GLuint j;
+                    for (j = 0; j < uBlock->dataSize; j++)
+                    {
+                        ((GLubyte *)data[firstStage])[j] |= ((GLubyte *)data[stage])[j];
+                    }
+                }
             }
         }
-
+        GL_ASSERT(data[firstStage]);
         gcmONERROR(gcoBUFOBJ_Construct(chipCtx->hal, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &uBlock->halBufObj));
-        gcmONERROR(gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ));
+        gcmONERROR(gcoBUFOBJ_Upload(uBlock->halBufObj, data[firstStage], 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ));
     }
 
     /* Update GLcore object binding info */
@@ -5276,6 +5394,17 @@ gcChipProgramBuildBindingInfo(
         program->aLocTexCoord = __glChipGetAttributeLocation(gc, programObject, "a_texCoord");
     }
 
+    if (program->progFlags.helperInvocationCheck)
+    {
+        program->pointXYUniform = gcChipGetUniformByName(gc, program, "u_pointXY", (gctSIZE_T)-1);
+        program->bXMajorUniform = gcChipGetUniformByName(gc, program, "u_bXMajor", (gctSIZE_T)-1);
+        program->bCheckHelperUniform = gcChipGetUniformByName(gc, program, "u_bCheckHelper", (gctSIZE_T)-1);
+        program->rtWHUniform = gcChipGetUniformByName(gc, program, "u_rtWH", (gctSIZE_T)-1);
+        program->halfLineWidthUniform = gcChipGetUniformByName(gc, program, "u_halfLineWidth", (gctSIZE_T)-1);
+
+        program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
+    }
+
     if (program->progFlags.CTSMaxUBOSize)
     {
         program->indexUniform = gcChipGetUniformByName(gc, program, "index", (gctSIZE_T)-1);
@@ -5355,6 +5484,10 @@ gcChipSetUniformData(
     case gcSHADER_UINT_X2:
     case gcSHADER_UINT_X3:
     case gcSHADER_UINT_X4:
+    case gcSHADER_FLOAT64_X1:
+    case gcSHADER_FLOAT64_X2:
+    case gcSHADER_FLOAT64_X3:
+    case gcSHADER_FLOAT64_X4:
         if (g_typeInfos[halType].glType == type)
         {
 #if __GL_CHIP_PATCH_ENABLED
@@ -5710,6 +5843,7 @@ gcChipSetUniformData(
                             }
                             programObject->samplerSeq++;
                         }
+                        programObject->maxUnit = gcmMAX(unit + 1, programObject->maxUnit);
                     }
                 }
             }
@@ -5982,6 +6116,49 @@ gcChipLTCGetUserUniformSourceValue(
             gctINT16            glUniformIndex = GetUniformGlUniformIndex(uniform);
             gctINT16            arraySize = 1;
 
+            /* If it is compile time initialzied uniform, just get the data from this uniform. */
+            if (isUniformCompiletimeInitialized(uniform))
+            {
+                /* get the data from GLUniform one component at a time */
+                for (i = 0; i < MAX_LTC_COMPONENTS; i++)
+                {
+                    gctUINT sourceComponent;
+
+                    /* get the swizzled source component for channel i (corresponding to target ith component) */
+                    sourceComponent = gcChipLTCSwizzleSourceComponent(SourceValue->sourceInfo, (gctUINT16)i);
+
+                    if (SourceValue->elementType == gcSL_FLOAT)
+                    {
+                        SourceValue->v[i].f32 = GetUniformInitializer(uniform).f32_v4[sourceComponent];
+                    }
+                    else if (SourceValue->elementType == gcSL_INTEGER)
+                    {
+                        /* integer value */
+                        SourceValue->v[i].i32 = GetUniformInitializer(uniform).i32_v4[sourceComponent];
+                    }
+                    else if (SourceValue->elementType == gcSL_UINT32)
+                    {
+                        /* uint value */
+                        SourceValue->v[i].u32 = GetUniformInitializer(uniform).u32_v4[sourceComponent];
+                    }
+                    else if (SourceValue->elementType == gcSL_BOOLEAN)
+                    {
+                        /* bool value */
+                        gctINT temp = GetUniformInitializer(uniform).u32_v4[sourceComponent];
+                        SourceValue->v[i].b = (temp == 0) ? gcvFALSE : gcvTRUE;
+                    }
+                    else
+                    {
+                        /* Error. */
+                        status = gcvSTATUS_INVALID_DATA;
+                        break;
+                    }
+                }
+                *IsUserUniform = gcvTRUE;
+                break;
+            }
+
+
             gcTYPE_GetTypeInfo(GetUniformType(uniform), &components, &rows, 0);
 
             if (uniform->arrayLengthCount > 1)
@@ -6128,8 +6305,11 @@ gcChipLTCGetUserUniformSourceValue(
 
                 if (SourceValue->elementType == gcSL_FLOAT)
                 {
+                    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+                    __GLchipFeature *chipFeature = &chipCtx->chipFeature;
+
                     /* float value */
-                    if (gcChipQueryUniformConvert(program, GetUniformType(uniform), gcvFALSE) == gcvUNIFORMCVT_TO_FLOAT)
+                    if (gcChipQueryUniformConvert(program, GetUniformType(uniform), gcvFALSE, chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0) == gcvUNIFORMCVT_TO_FLOAT)
                     {
                         SourceValue->v[i].f32 = (gctFLOAT)((GLint*)data)[index];
                     }
@@ -6403,6 +6583,7 @@ gcChipLTCStoreValueToDummyUniform(
 
     gcmASSERT(LtcUniformIndex >= 0 &&
               LtcUniformIndex < (gctINT)GetShaderUniformCount(Shader));
+    gcmASSERT(enable != gcSL_ENABLE_NONE);
 
     uniform = GetShaderUniform(Shader, LtcUniformIndex);
     glUniformIndex = GetUniformGlUniformIndex(uniform);
@@ -6800,8 +6981,9 @@ gcChipFlushSingleUniform(
         gctUINT32 columns, rows;
         gctSIZE_T arraySize;
         gctUINT32 matrixStride, arrayStride;
-        gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, uniform->dataType, gcvFALSE);
         __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+        __GLchipFeature *chipFeature = &chipCtx->chipFeature;
+        gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, uniform->dataType, gcvFALSE, chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0);
 
         gcTYPE_GetTypeInfo(uniform->dataType, &columns, &rows, gcvNULL);
 
@@ -6812,7 +6994,6 @@ gcChipFlushSingleUniform(
         for (stageIdx = 0; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
         {
             gcUNIFORM halUniform = uniform->halUniform[stageIdx];
-            gctUINT32 physicalAddress = 0;
 
             if (halUniform && isUniformUsedInShader(halUniform))
             {
@@ -6824,16 +7005,11 @@ gcChipFlushSingleUniform(
                     arraySize = GetUniformSingleLevelArraySzie(halUniform, halUniform->arrayLengthCount - 1);
                 }
 
-                if (gc->shaderProgram.boundPPO ||
-                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
+                if (gc->shaderProgram.boundPPO ||chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                       halUniform,
-                                                                      &physicalAddress));
-                }
-                else
-                {
-                    physicalAddress = uniform->stateAddress[stageIdx];
+                                                                      &uniform->stateAddress[stageIdx]));
                 }
 
                 /* For es20 and es11 shaders, compiler always uses float in the machine code.
@@ -6846,7 +7022,7 @@ gcChipFlushSingleUniform(
                     convert = gcvUNIFORMCVT_NONE;
                 }
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress + uniform->regOffset,
+                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset,
                                                       columns, rows, arraySize, gcvFALSE, matrixStride,
                                                       arrayStride, data, convert, GetUniformShaderKind(halUniform)));
                 if (gcmOPT_DUMP_UNIFORM())
@@ -6942,8 +7118,6 @@ gcChipIsLTCEnabled(
     IN __GLchipSLProgram *Program
     )
 {
-    static gctINT envChecked = 0;
-    static gctINT envValue = 0;
     GLboolean ret;
     gcePATCH_ID patchId = gcvPATCH_INVALID;
 
@@ -6951,44 +7125,22 @@ gcChipIsLTCEnabled(
 
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
-    /* Disable LTC optimization for real racing */
-    if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK)
+#if defined(ANDROID)
+    /* general disable LTC */
+    if (patchId == gcvPATCH_INVALID)
     {
+        gcmFOOTER_ARG("return=0x%04x", gcvFALSE);
+        return gcvFALSE;
+    }
+#endif
+    /* Disable LTC optimization for real racing */
+    if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK
+        || patchId == gcvPATCH_LEANBACKSCROLLING)
+    {
+        gcmFOOTER_ARG("return=0x%04x", gcvFALSE);
         return gcvFALSE;
     }
 
-    /* check the environment variable VC_ENABLE_LTC */
-    if (!envChecked) {
-        char* p = gcvNULL;
-        gcoOS_GetEnv(gcvNULL, "VC_ENABLE_LTC", &p);
-        if (p)
-        {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(p, "1")) ||
-                gcmIS_SUCCESS(gcoOS_StrCmp(p, "on")) ||
-                gcmIS_SUCCESS(gcoOS_StrCmp(p, "ON")) )
-            {
-                envValue = 1;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(p, "0")) ||
-                     gcmIS_SUCCESS(gcoOS_StrCmp(p, "off")) ||
-                     gcmIS_SUCCESS(gcoOS_StrCmp(p, "OFF")) )
-            {
-                envValue = -1;
-            }
-        }
-        envChecked = 1;
-    }
-    /* always do or not do LTC if environment var says so. */
-    if (envValue == 1)
-    {
-        gcmFOOTER_ARG("return=%d", GL_TRUE);
-        return GL_TRUE;
-    }
-    else if (envValue == -1)
-    {
-        gcmFOOTER_ARG("return=%d", GL_FALSE);
-        return GL_FALSE;
-    }
     /* by default turn on the LTC optimization */
     ret = (GLboolean)gcmOPT_EnableLTC();
     gcmFOOTER_ARG("return=0x%04x", ret);
@@ -7157,19 +7309,7 @@ gcChipPgInstanceDeinitialize(
     }
 
     /* Free any states. */
-    if (pgInstance->programState.stateBuffer != gcvNULL)
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pgInstance->programState.stateBuffer));
-        pgInstance->programState.stateBuffer = gcvNULL;
-        pgInstance->programState.stateBufferSize = 0;
-    }
-
-    if (pgInstance->programState.hints != gcvNULL)
-    {
-        gcmVERIFY_OK(gcHINTS_Destroy(pgInstance->programState.hints));
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pgInstance->programState.hints));
-        pgInstance->programState.hints = gcvNULL;
-    }
+    gcmVERIFY_OK(gcFreeProgramState(pgInstance->programState));
 
     if (pgInstance->recompilePatchInfo.recompilePatchDirectivePtr)
     {
@@ -7195,16 +7335,7 @@ gcChipProgFreeCmdInstance(
     {
         gcsPROGRAM_STATE *stateBuf = (gcsPROGRAM_STATE*)cmdInstance;
 
-        if (stateBuf->hints)
-        {
-            gcHINTS_Destroy(stateBuf->hints);
-            gcoOS_Free(gcvNULL, stateBuf->hints);
-        }
-
-        if (stateBuf->stateBuffer)
-        {
-            gcoOS_Free(gcvNULL, stateBuf->stateBuffer);
-        }
+        gcFreeProgramState(*stateBuf);
 
         gc->imports.free(gc, stateBuf);
     }
@@ -7512,8 +7643,7 @@ __glChipLinkProgram(
     __GLSLStage stage, transformFeedbackStage = __GLSL_STAGE_VS;
     gctUINT key;
     gceSTATUS  status;
-    gctUINT32  statesSize = 0;
-    gctPOINTER states = gcvNULL;
+    gcsPROGRAM_STATE programState = {0};
     gceSHADER_FLAGS flags;
     gceSHADER_SUB_FLAGS subFlags;
     gcSHADER_KIND shaderTypes[] =
@@ -7697,6 +7827,26 @@ __glChipLinkProgram(
         flags |= gcvSHADER_DISABLE_DUAL16;
     }
 
+    if (program->progFlags.VIRCGNone)
+    {
+        flags |= gcvSHADER_VIRCG_NONE;
+    }
+
+    if (program->progFlags.VIRCGOne)
+    {
+        flags |= gcvSHADER_VIRCG_ONE;
+    }
+
+    if (program->progFlags.disableInline)
+    {
+        flags |= gcvSHADER_SET_INLINE_LEVEL_0;
+    }
+
+    if (program->progFlags.deqpMinCompTime)
+    {
+        flags |= gcvSHADER_MIN_COMP_TIME;
+    }
+
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
         if (masterPgInstance->binaries[stage])
@@ -7725,9 +7875,7 @@ __glChipLinkProgram(
                              masterPgInstance->binaries,
                              flags,
                              &subFlags,
-                             &statesSize,
-                             &states,
-                             &masterPgInstance->programState.hints);
+                             &programState);
 
     if (gcmIS_ERROR(status))
     {
@@ -7737,17 +7885,14 @@ __glChipLinkProgram(
     programObject->programInfo.invalidFlags &= ~__GL_INVALID_LINK_BIT;
 
     /* Successful link must guarantee there is state buffer generated. */
-    GL_ASSERT(states && statesSize > 0);
+    GL_ASSERT(programState.stateBuffer && programState.stateBufferSize > 0);
 
     /* Only successfully link can replace the previous shader states buffer */
     if (masterPgInstance->programState.stateBuffer != gcvNULL)
     {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, masterPgInstance->programState.stateBuffer));
-        masterPgInstance->programState.stateBuffer = gcvNULL;
-        masterPgInstance->programState.stateBufferSize = 0;
+        gcFreeProgramState(masterPgInstance->programState);
     }
-    masterPgInstance->programState.stateBufferSize = statesSize;
-    masterPgInstance->programState.stateBuffer     = states;
+    masterPgInstance->programState = programState;
 
     program->stageBits = masterPgInstance->programState.hints->stageBits;
 
@@ -7771,17 +7916,13 @@ __glChipLinkProgram(
     }
 #endif
 
-    if (pgStateKey)
-    {
-        gcChipPgStateKeyFree(gc, &pgStateKey);
-    }
+    gcChipPgStateKeyFree(gc, &pgStateKey);
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     gcSHADER_AlignId();
     return GL_TRUE;
 
 OnError:
-
     if (pgStateKey)
     {
         gcChipPgStateKeyFree(gc, &pgStateKey);
@@ -7815,12 +7956,12 @@ gcChipCheckTextureConflict(
     }
 
      /* mark enable dimensions of all texture unit to be disabled */
-    for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; ++unit)
+    for (unit = 0; unit < programObject->maxUnit; ++unit)
     {
         enableDims[unit] = __GL_MAX_TEXTURE_BINDINGS;
     }
 
-    for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; ++sampler)
+    for (sampler = 0; sampler < programObject->maxSampler; ++sampler)
     {
         /* Skip the non-used sampler */
         if (program->samplerMap[sampler].stage == __GLSL_STAGE_LAST)
@@ -7853,16 +7994,13 @@ __glChipUseProgram(
     GLboolean *valid
     )
 {
-#ifdef OPENGL40
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-#endif
     gcmHEADER_ARG("gc=0x%x programObject=0x%x valid=0x%x", gc, programObject, valid);
 
 #ifdef OPENGL40
-    if (programObject == gcvNULL )
-        chipCtx->fixProgramFlag = gcvTRUE;
-    else
-        chipCtx->fixProgramFlag = gcvFALSE;
+    {
+        __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+        chipCtx->fixProgramFlag = programObject ? gcvFALSE : gcvTRUE;
+    }
 #endif
 
     if (programObject)
@@ -7876,11 +8014,11 @@ __glChipUseProgram(
         programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
         programObject->programInfo.attachedShader[__GLSL_STAGE_FS])
     {
-        gcSHADER vertexShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary;
-        gcSHADER fragmentShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary;
+        gcSHADER vertShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary;
+        gcSHADER fragShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary;
         __glChipProfilerSet(gc, GL3_PROGRAM_IN_USE_BEGIN, programObject);
-        __glChipProfilerSet(gc, GL3_PROGRAM_VERTEX_SHADER, vertexShader);
-        __glChipProfilerSet(gc, GL3_PROGRAM_FRAGMENT_SHADER, fragmentShader);
+        __glChipProfilerSet(gc, GL3_PROGRAM_VERTEX_SHADER, vertShader);
+        __glChipProfilerSet(gc, GL3_PROGRAM_FRAGMENT_SHADER, fragShader);
         __glChipProfilerSet(gc, GL3_PROGRAM_IN_USE_END, (gctHANDLE)(gctUINTPTR_T)1);
     }
 #endif
@@ -7948,8 +8086,7 @@ gcChipGetProgramBinary_V0(
     /* Get size of program binary. */
     gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
                              masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                             masterPgInstance->programState.stateBufferSize, masterPgInstance->programState.stateBuffer,
-                             masterPgInstance->programState.hints, gcvNULL, (gctUINT32 *)&size));
+                             masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
 
     if (binary)
     {
@@ -7961,8 +8098,7 @@ gcChipGetProgramBinary_V0(
         /* Save program binary. */
         gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
                                  masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                                 masterPgInstance->programState.stateBufferSize, masterPgInstance->programState.stateBuffer,
-                                 masterPgInstance->programState.hints, &binary, (gctUINT32 *)&size));
+                                 masterPgInstance->programState, &binary, (gctUINT32 *)&size));
 
     }
 
@@ -8056,7 +8192,7 @@ gcChipProgramBinary_V0(
                              (gctUINT32)length,
                              masterPgInstance->binaries[__GLSL_STAGE_VS],
                              masterPgInstance->binaries[__GLSL_STAGE_FS],
-                             gcvNULL, gcvNULL, gcvNULL));
+                             gcvNULL));
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
@@ -8101,6 +8237,27 @@ gcChipProgramBinary_V0(
     {
         flags |= gcvSHADER_DISABLE_DUAL16;
     }
+
+    if (program->progFlags.VIRCGNone)
+    {
+        flags |= gcvSHADER_VIRCG_NONE;
+    }
+
+    if (program->progFlags.VIRCGOne)
+    {
+        flags |= gcvSHADER_VIRCG_ONE;
+    }
+
+    if (program->progFlags.disableInline)
+    {
+        flags |= gcvSHADER_SET_INLINE_LEVEL_0;
+    }
+
+    if (program->progFlags.deqpMinCompTime)
+    {
+        flags |= gcvSHADER_MIN_COMP_TIME;
+    }
+
     /* determine the dual16 hp rule based on benchmark and shader detection */
     subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
 
@@ -8114,9 +8271,7 @@ gcChipProgramBinary_V0(
                            masterPgInstance->binaries,
                            flags,
                            &subFlags,
-                           &masterPgInstance->programState.stateBufferSize,
-                           &masterPgInstance->programState.stateBuffer,
-                           &masterPgInstance->programState.hints);
+                           &masterPgInstance->programState);
     if (gcmIS_ERROR(status))
     {
         programObject->programInfo.invalidFlags |= __GL_INVALID_LINK_BIT;
@@ -8142,14 +8297,10 @@ gcChipProgramBinary_V0(
     gcChipProgramCleanBindingInfo(gc, programObject);
     gcmONERROR(gcChipProgramBuildBindingInfo(gc, programObject));
 
-    if (pgStateKey)
-    {
-        gcChipPgStateKeyFree(gc, &pgStateKey);
-    }
+    gcChipPgStateKeyFree(gc, &pgStateKey);
 
     gcmFOOTER();
     return gcvSTATUS_OK;
-
 
 OnError:
     if (pgStateKey)
@@ -8567,8 +8718,6 @@ __glChipShaderBinary(
                                   length,
                                   vertexShader,
                                   fragmentShader,
-                                  gcvNULL,
-                                  gcvNULL,
                                   gcvNULL));
 
     }
@@ -8843,12 +8992,13 @@ __glChipBindFragDataLocation(
         if (i < program->outCount && arrayIdx < (gctSIZE_T)output->arraySize)
         {
             location = output->location + (gctINT)arrayIdx - output->startIndex;
-            if (location != colorNumber)
+            if (location != (GLint)colorNumber)
             {
             }
         }
     }
 
+    gcmFOOTER_NO();
 }
 
 #endif
@@ -9469,7 +9619,7 @@ __glChipBuildTexEnableDim(
         pgInstance[stage] = programs[stage] ? programs[stage]->masterPgInstance : gcvNULL;
     }
 
-    for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; ++unit)
+    for (unit = 0; unit < gc->shaderProgram.maxUnit; ++unit)
     {
         /* mark enable dimensions of all texture unit to be disabled */
         texUnitState[unit].enableDim = __GL_MAX_TEXTURE_BINDINGS;
@@ -9477,7 +9627,7 @@ __glChipBuildTexEnableDim(
         texUnit2Sampler[unit].numSamplers = 0;
     }
 
-    for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; ++sampler)
+    for (sampler = 0; sampler < gc->shaderProgram.maxSampler; ++sampler)
     {
         unit = __GL_MAX_TEXTURE_UNITS;
         enableDim = __GL_MAX_TEXTURE_BINDINGS;
@@ -9499,7 +9649,6 @@ __glChipBuildTexEnableDim(
                 enableDim = pgInstance[stage]->extraSamplerMap[sampler].texDim;
                 break;
             }
-
         }
 
         sampler2TexUnit[sampler] = unit;
@@ -9553,7 +9702,6 @@ gcChipLoadCompiler(
             gcSHADER_AddSourceAttribute,
             gcSHADER_AddSourceConstant,
             gcSHADER_AddOutput,
-            gcSHADER_AddOutputLocation,
             gcSHADER_SetCompilerVersion,
             gcSHADER_Pack,
             gcSHADER_Destroy,
@@ -9561,7 +9709,7 @@ gcChipLoadCompiler(
             gcSHADER_DynamicPatch,
             gcCreateOutputConversionDirective,
             gcCreateInputConversionDirective,
-            gcHINTS_Destroy,
+            gcFreeProgramState,
             gcSetGLSLCompiler,
             gcDestroyPatchDirective
         };
@@ -9765,17 +9913,14 @@ gcChipFlushUniformBlock(
         {
             gctUINT32 physicalAddress = 0;
 
-            if (gc->shaderProgram.boundPPO ||
-                chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
+            if (gc->shaderProgram.boundPPO || chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
             {
                 gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                   ubUniform,
-                                                                  &physicalAddress));
+                                                                  &ub->stateAddress[stageIdx]));
             }
-            else
-            {
-                physicalAddress = ub->stateAddress[stageIdx];
-            }
+
+            physicalAddress = ub->stateAddress[stageIdx];
 
             if (-1 != GetUBArrayIndex(ub->halUB[stageIdx]))
             {
@@ -9851,9 +9996,12 @@ gcChipFlushUniformBlock(
                     gctUINT32    numCols = 0, numRows = 0;
                     gctBOOL      isRowMajor = (GetUniformMatrixStride(uniform) != 0 && GetUniformIsRowMajor(uniform));
                     gctUINT8_PTR pData = logical + offset + GetUniformOffset(uniform);
+                    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+                    __GLchipFeature *chipFeature = &chipCtx->chipFeature;
                     gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, GetUniformType(uniform),
-                                                                           ub->usage == __GL_CHIP_UB_USAGE_USER_DEFINED);
-                    gctUINT32 physicalAddress = 0;
+                                                                           ub->usage == __GL_CHIP_UB_USAGE_USER_DEFINED,
+                                                                           chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0);
+                   gctUINT32 physicalAddress = 0;
 
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                       uniform,
@@ -9861,7 +10009,7 @@ gcChipFlushUniformBlock(
 
                     gcTYPE_GetTypeInfo(GetUniformType(uniform), &numCols, &numRows, gcvNULL);
 
-                    entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, &arraySize);
+                    entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, &arraySize);
                     arraySize *= entries;   /* Expand array size for array of arrays to one dimension */
 
                     gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
@@ -10187,7 +10335,7 @@ gcChipPreparePrivateUniform(
                 {
                     gctINT32 sliceSlize;
                     __GLtextureObject *texObj = imageState->texObj;
-                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, imageState->level, imageState->actualLayer);
+                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, gcvTRUE, imageState->level, imageState->actualLayer);
                     gcmVERIFY_OK(gcoSURF_GetInfo(texView.surf, gcvSURF_INFO_SLICESIZE, &sliceSlize));
                     iValues[3] = sliceSlize;
                 }
@@ -10288,6 +10436,66 @@ gcChipPreparePrivateUniform(
         }
         break;
 
+    case __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER:
+        uniform->dirty = gcvFALSE;
+        break;
+    case __GL_CHIP_UNIFORM_SUB_USAGE_YINVERT:
+        {
+
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData = chipCtx->drawYInverted ? 1.0f : 0.0f;
+            uniform->dirty = gcvTRUE;
+        }break;
+
+    case __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_CONSTANT_COLOR:
+        {
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData++ = (GLfloat)gc->state.raster.blendColor.r;
+            *pData++ = (GLfloat)gc->state.raster.blendColor.g;
+            *pData++ = (GLfloat)gc->state.raster.blendColor.b;
+            *pData++ = (GLfloat)gc->state.raster.blendColor.a;
+            uniform->dirty = gcvTRUE;
+        }
+        break;
+
+    case __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_EQUATION:
+        {
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData++ = (GLfloat)gc->state.raster.blendEquationRGB[0];
+            *pData++ = (GLfloat)gc->state.raster.blendEquationAlpha[0];
+            uniform->dirty = gcvTRUE;
+        }
+    break;
+
+    case __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_FUNCTION:
+        {
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData++ = (GLfloat)gc->state.raster.blendSrcRGB[0];
+            *pData++ = (GLfloat)gc->state.raster.blendDstRGB[0];
+            *pData++ = (GLfloat)gc->state.raster.blendSrcAlpha[0];
+            *pData++ = (GLfloat)gc->state.raster.blendDstAlpha[0];
+            uniform->dirty = gcvTRUE;
+        }
+    break;
+
+    case __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_RT_WH:
+        {
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData++ = (GLfloat)chipCtx->drawRTWidth;
+            *pData++ = (GLfloat)chipCtx->drawRTHeight;
+        }
+        break;
+
+    case __GL_CHIP_UNIFORM_SUB_USAGE_DEPTH_BIAS:
+        {
+            GLfloat * pData = (GLfloat *)uniform->data;
+            *pData++ = gc->state.polygon.factor;
+            *pData++ = gc->state.polygon.units * 2.0f / 65535.0f;
+            uniform->dirty = gcvTRUE;
+        }
+        break;
+    case __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE:
+        break;
     default:
         GL_ASSERT(0);
     }
@@ -10385,37 +10593,42 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW:
             for (y = 0; y < 4; y++) {
                 for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->matrix.matrix[x][y];
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->matrix.matrix[y][x];
                 }
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_PROJECTION:
             for (y = 0; y < 4; y++) {
                 for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.projection->matrix.matrix[x][y];
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.projection->matrix.matrix[y][x];
                 }
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MVP:
             for (y = 0; y < 4; y++) {
                 for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->mvp.matrix[x][y];
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->mvp.matrix[y][x];
                 }
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INV:
             for (y = 0; y < 4; y++) {
                 for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverse.matrix[x][y];
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverse.matrix[y][x];
                 }
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INVTRANS:
             for (y = 0; y < 4; y++) {
                 for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverseTranspose.matrix[x][y];
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverseTranspose.matrix[y][x];
                 }
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_NORMAL_SCALE:
             {
@@ -10428,81 +10641,99 @@ gcChipFlushBuiltinUniforms(
                 scale = (GLfloat)(1.0 / sqrt(scale));
                 *(GLfloat*)uniform->data = scale;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE:
             *(GLfloat*)uniform->data = gc->state.point.requestedSize;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MIN:
             *(GLfloat*)uniform->data = gc->state.point.sizeMin;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MAX:
             *(GLfloat*)uniform->data = gc->state.point.sizeMax;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_FADE_THRESHOLD_SIZE:
             *(GLfloat*)uniform->data = gc->state.point.fadeThresholdSize;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_CONST_ATTENU:
             *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[0];
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_LINEAR_ATTENU:
             *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[1];
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_QUADRATIC_ATTENU:
             *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[2];
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_EMISSION:
             ((GLfloat*)uniform->data)[0] = gc->state.light.front.emissive.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.front.emissive.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.front.emissive.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.front.emissive.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_DIFFUSE:
             ((GLfloat*)uniform->data)[0] = gc->state.light.front.diffuse.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.front.diffuse.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.front.diffuse.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.front.diffuse.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_AMBIENT:
             ((GLfloat*)uniform->data)[0] = gc->state.light.front.ambient.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.front.ambient.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.front.ambient.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.front.ambient.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SPECULAR:
             ((GLfloat*)uniform->data)[0] = gc->state.light.front.specular.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.front.specular.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.front.specular.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.front.specular.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SHININESS:
             ((GLfloat*)uniform->data)[0] = gc->state.light.front.specularExponent;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_EMISSION:
             ((GLfloat*)uniform->data)[0] = gc->state.light.back.emissive.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.back.emissive.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.back.emissive.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.back.emissive.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_DIFFUSE:
             ((GLfloat*)uniform->data)[0] = gc->state.light.back.diffuse.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.back.diffuse.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.back.diffuse.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.back.diffuse.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_AMBIENT:
             ((GLfloat*)uniform->data)[0] = gc->state.light.back.ambient.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.back.ambient.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.back.ambient.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.back.ambient.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SPECULAR:
             ((GLfloat*)uniform->data)[0] = gc->state.light.back.specular.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.back.specular.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.back.specular.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.back.specular.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SHININESS:
             ((GLfloat*)uniform->data)[0] = gc->state.light.back.specularExponent;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_AMBIENT:
@@ -10519,6 +10750,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].ambient.b;
                 ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].ambient.a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_DIFFUSE:
@@ -10535,6 +10767,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].diffuse.b;
                 ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].diffuse.a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPECULAR:
@@ -10551,6 +10784,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].specular.b;
                 ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].specular.a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_POSITION:
@@ -10567,6 +10801,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].position.f.z;
                 ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].position.f.w;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_DIRECTION:
@@ -10583,6 +10818,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].direction.f.z;
                 ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].direction.f.w;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_EXPONENT:
@@ -10596,6 +10832,7 @@ gcChipFlushBuiltinUniforms(
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT;
                 *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightExponent;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_CUTOFF:
@@ -10609,6 +10846,7 @@ gcChipFlushBuiltinUniforms(
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF;
                 *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightCutOffAngle;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_CONST_ATTENU:
@@ -10622,6 +10860,7 @@ gcChipFlushBuiltinUniforms(
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU;
                 *(GLfloat*)uniform->data = gc->state.light.source[index].constantAttenuation;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_LINEAR_ATTENU:
@@ -10635,6 +10874,7 @@ gcChipFlushBuiltinUniforms(
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU;
                 *(GLfloat*)uniform->data = gc->state.light.source[index].linearAttenuation;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_QUADRATIC_ATTENU:
@@ -10648,12 +10888,14 @@ gcChipFlushBuiltinUniforms(
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU;
                 *(GLfloat*)uniform->data = gc->state.light.source[index].quadraticAttenuation;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHTMODEL_AMBIENT:
             ((GLfloat*)uniform->data)[0] = gc->state.light.model.ambient.r;
             ((GLfloat*)uniform->data)[1] = gc->state.light.model.ambient.g;
             ((GLfloat*)uniform->data)[2] = gc->state.light.model.ambient.b;
             ((GLfloat*)uniform->data)[3] = gc->state.light.model.ambient.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHTMODEL_PRODUCT_SCENECOLOR:
             {
@@ -10664,6 +10906,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
                 ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHTMODEL_PRODUCT_SCENECOLOR:
             {
@@ -10674,6 +10917,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
                 ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_AMBIENT:
@@ -10692,6 +10936,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
                 ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_DIFFUSE:
@@ -10710,6 +10955,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
                 ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_SPECULAR:
@@ -10728,6 +10974,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
                 ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_AMBIENT:
@@ -10746,6 +10993,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
                 ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_DIFFUSE:
@@ -10764,6 +11012,7 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
                 ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_SPECULAR:
@@ -10782,24 +11031,30 @@ gcChipFlushBuiltinUniforms(
                 ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
                 ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
             }
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_COLOR:
             ((GLfloat*)uniform->data)[0] = gc->state.fog.color.r;
             ((GLfloat*)uniform->data)[1] = gc->state.fog.color.g;
             ((GLfloat*)uniform->data)[2] = gc->state.fog.color.b;
             ((GLfloat*)uniform->data)[3] = gc->state.fog.color.a;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_DENSITY:
             *(GLfloat*)uniform->data = gc->state.fog.density;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_START:
             *(GLfloat*)uniform->data = gc->state.fog.start;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_END:
             *(GLfloat*)uniform->data = gc->state.fog.end;
+            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_SCALE:
             *(GLfloat*)uniform->data = 1.0f / (gc->state.fog.end - gc->state.fog.start);
+            uniform->dirty = GL_TRUE;
             break;
 #endif
         default:
@@ -11261,7 +11516,6 @@ gcChipFlushUserDefSSBs(
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
                 gctUINT32 unsizedArrayLength = 0;
-                gctUINT32 physicalAddress = 0;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -11281,20 +11535,15 @@ gcChipFlushUserDefSSBs(
                                                          (gctINT *)&unsizedArrayLength));
                 }
 
-                if (gc->shaderProgram.boundPPO ||
-                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
+                if (gc->shaderProgram.boundPPO || chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                       sbUniform,
-                                                                      &physicalAddress));
-                }
-                else
-                {
-                    physicalAddress = sb->stateAddress[stageIdx];
+                                                                      &sb->stateAddress[stageIdx]));
                 }
 
                 gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     physicalAddress,
+                                                     sb->stateAddress[stageIdx],
                                                      physical,
                                                      pBindingPoint->bufOffset,
                                                      requiredSize,
@@ -11314,7 +11563,7 @@ gcChipFlushUserDefSSBs(
                     addressLimit[2] = unsizedArrayLength;     /* size */
 
                     gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (physicalAddress + 4),
+                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
                         3, 1, 1, gcvFALSE,
                         1,
                         4,
@@ -11323,7 +11572,7 @@ gcChipFlushUserDefSSBs(
                 else
                 {
                     gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, physicalAddress + 4,
+                        gcvNULL, sb->stateAddress[stageIdx] + 4,
                         1, 1, 1, gcvFALSE, 1,
                         1, &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
@@ -11407,7 +11656,6 @@ gcChipFlushPrivateSSBs(
             for (stageIdx = __GLSL_STAGE_VS; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
-                gctUINT32 physicalAddress = 0;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -11415,20 +11663,15 @@ gcChipFlushPrivateSSBs(
                     continue;
                 }
 
-                if (gc->shaderProgram.boundPPO ||
-                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
+                if (gc->shaderProgram.boundPPO || chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                       sbUniform,
-                                                                      &physicalAddress));
-                }
-                else
-                {
-                    physicalAddress = sb->stateAddress[stageIdx];
+                                                                      &sb->stateAddress[stageIdx]));
                 }
 
                 gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     physicalAddress,
+                                                     sb->stateAddress[stageIdx],
                                                      physical,
                                                      0,
                                                      dataSize,
@@ -11446,7 +11689,7 @@ gcChipFlushPrivateSSBs(
                     addressLimit[1] = physical + bufSize - 1; /* upper limit */
 
                     gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (physicalAddress + 4),
+                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
                         1, 1, 2, gcvFALSE,
                         1,
                         4,
@@ -11513,51 +11756,52 @@ gceSTATUS
 gcChipDynamicPatchProgram(
     __GLcontext * gc,
     __GLprogramObject* programObject,
-    gcPatchDirective* recompilePatchDirectivePtr
+    gcPatchDirective* recompilePatchDirectivePtr,
+    gctUINT32 Options
     )
 {
     __GLchipContext            *chipCtx          = CHIP_CTXINFO(gc);
     __GLchipSLProgram          *program          = (__GLchipSLProgram *)programObject->privateData;
     __GLchipSLProgramInstance  *masterPgInstance = program->masterPgInstance;
     __GLchipSLProgramInstance  *pgInstance       = program->curPgInstance;
-    gctUINT32                  statesSize        = 0;
-    gctPOINTER                 states            = gcvNULL;
+    gcsPROGRAM_STATE            programState     = {0};
     gcPatchDirective           *dynamicPatchInfo = recompilePatchDirectivePtr;
     gceSHADER_FLAGS            flags;
     gceSHADER_SUB_FLAGS        subFlags;
     gceSTATUS                  status            = gcvSTATUS_OK;
     __GLSLStage                transformFeedbackStage = __GLSL_STAGE_VS;
 
+    /* backup pre-link unpatched shaders*/
+    __GLSLStage stage;
+    gcSHADER_KIND shaderTypes[] =
+    {
+        gcSHADER_TYPE_VERTEX,
+        gcSHADER_TYPE_TCS,
+        gcSHADER_TYPE_TES,
+        gcSHADER_TYPE_GEOMETRY,
+        gcSHADER_TYPE_FRAGMENT,
+        gcSHADER_TYPE_COMPUTE,
+    };
+
     gcmHEADER_ARG("gc=0x%x programObject=0x%x recompilePatchDirectivePtr=0x%x kind=%d",
                    gc, programObject, recompilePatchDirectivePtr,
                    (recompilePatchDirectivePtr ? recompilePatchDirectivePtr->kind : 0));
 
-    /* backup pre-link unpatched shaders*/
-    if (dynamicPatchInfo)
+    gcSetGLSLCompiler(chipCtx->pfCompile);
+    for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
-        __GLSLStage stage;
-        gcSHADER_KIND shaderTypes[] =
+        GL_ASSERT(pgInstance->binaries[stage] == gcvNULL);
+        if (masterPgInstance->binaries[stage])
         {
-            gcSHADER_TYPE_VERTEX,
-            gcSHADER_TYPE_TCS,
-            gcSHADER_TYPE_TES,
-            gcSHADER_TYPE_GEOMETRY,
-            gcSHADER_TYPE_FRAGMENT,
-            gcSHADER_TYPE_COMPUTE,
-        };
-        gcSetGLSLCompiler(chipCtx->pfCompile);
-        for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
-        {
-            GL_ASSERT(pgInstance->binaries[stage] == gcvNULL);
-            if (masterPgInstance->binaries[stage])
+            gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &pgInstance->binaries[stage]));
+            gcmONERROR(gcSHADER_Copy(pgInstance->binaries[stage], masterPgInstance->binaries[stage]));
+            if (stage == __GLSL_STAGE_FS &&
+                masterPgInstance->binaries[stage]->isDual16Shader)
             {
-                gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &pgInstance->binaries[stage]));
-                gcmONERROR(gcSHADER_Copy(pgInstance->binaries[stage], masterPgInstance->binaries[stage]));
-                if (stage == __GLSL_STAGE_FS &&
-                    masterPgInstance->binaries[stage]->isDual16Shader)
-                {
-                    pgInstance->binaries[stage]->isMasterDual16Shader = gcvTRUE;
-                }
+                pgInstance->binaries[stage]->isMasterDual16Shader = gcvTRUE;
+            }
+            if (dynamicPatchInfo)
+            {
                 gcmONERROR(gcSHADER_DynamicPatch(pgInstance->binaries[stage], dynamicPatchInfo, 0));
             }
         }
@@ -11612,8 +11856,33 @@ gcChipDynamicPatchProgram(
         flags |= gcvSHADER_DISABLE_DUAL16;
     }
 
+    if (program->progFlags.VIRCGNone)
+    {
+        flags |= gcvSHADER_VIRCG_NONE;
+    }
+
+    if (program->progFlags.VIRCGOne)
+    {
+        flags |= gcvSHADER_VIRCG_ONE;
+    }
+
+    if (program->progFlags.disableInline)
+    {
+        flags |= gcvSHADER_SET_INLINE_LEVEL_0;
+    }
+
+    if (program->progFlags.deqpMinCompTime)
+    {
+        flags |= gcvSHADER_MIN_COMP_TIME;
+    }
+
     /* determine the dual16 hp rule based on benchmark and shader detection */
     subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
+
+    if (Options & __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION)
+    {
+        subFlags.dual16PrecisionRule |= Dual16_PrecisionRule_OUTPUT_HP;
+    }
 
     if (program->progFlags.robustEnabled)
     {
@@ -11625,16 +11894,11 @@ gcChipDynamicPatchProgram(
                            pgInstance->binaries,
                            flags,
                            &subFlags,
-                           &statesSize ,
-                           &states,
-                           &pgInstance->programState.hints);
+                           &programState);
 
     if (gcmIS_ERROR(status))
     {
-        if (states != gcvNULL)
-        {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, states));
-        }
+        gcmVERIFY_OK(gcFreeProgramState(programState));
         programObject->programInfo.invalidFlags |= __GL_INVALID_LINK_BIT;
         gcmFATAL("%s(%d): gcLinkProgram failed status=%d", __FUNCTION__, __LINE__, status);
     }
@@ -11643,10 +11907,9 @@ gcChipDynamicPatchProgram(
         programObject->programInfo.invalidFlags &= ~__GL_INVALID_LINK_BIT;
 
         /* Successful link must guarantee there is state buffer generated. */
-        GL_ASSERT(states && statesSize > 0);
+        GL_ASSERT(programState.stateBuffer && programState.stateBufferSize > 0);
 
-        pgInstance->programState.stateBufferSize = statesSize;
-        pgInstance->programState.stateBuffer     = states;
+        pgInstance->programState = programState;
 
         gcChipPgInstanceCleanBindingInfo(gc, pgInstance);
 

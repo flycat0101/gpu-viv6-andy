@@ -1476,7 +1476,7 @@ static gctBOOL VSC_PH_ResultInsts_CanMerge(
                     gcmASSERT(VSC_PH_ResultInstOperand_GetChannelCount(firstChannelInstOperand) == 1);
                     gcmASSERT(VSC_PH_ResultInstOperand_GetChannelCount(currentChannelInstOperand) == 1);
 
-                    if(VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand))
+                    if(VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetIsConst(currentChannelInstOperand))
                     {
                         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
                         {
@@ -1486,7 +1486,7 @@ static gctBOOL VSC_PH_ResultInsts_CanMerge(
                         break;
                     }
 
-                    if(VSC_PH_ResultInstOperand_GetBaseTypeId(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetBaseTypeId(firstChannelInstOperand))
+                    if(VSC_PH_ResultInstOperand_GetBaseTypeId(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetBaseTypeId(currentChannelInstOperand))
                     {
                         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
                         {
@@ -3999,7 +3999,7 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
 
     lshift_src1 = VIR_Inst_GetSource(lshift, 1);
     if (VIR_Operand_GetOpKind(lshift_src1) != VIR_OPND_IMMEDIATE ||
-        VIR_Operand_GetImmediateUint(lshift_src1) >= 4)
+        VIR_Operand_GetImmediateUint(lshift_src1) >= 8)
     {
         return errCode;
     }
@@ -5321,8 +5321,10 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if (opc == VIR_OP_JMPC || opc == VIR_OP_JMP_ANY || opc == VIR_OP_CMOV)
             {
-                if (VIR_Evaluate_JMPC_Condition(VSC_PH_Peephole_GetShader(ph), inst, &checkingResult))
+                if (VIR_Inst_CanGetConditionResult(inst))
                 {
+                    checkingResult = VIR_Inst_EvaluateConditionResult(inst, gcvNULL);
+
                     if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
                         VSC_OPTN_PHOptions_TRACE_RUC))
                     {
@@ -5351,16 +5353,9 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                         else
                         {
                             /*change instruction to nop*/
-                            VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
-                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                            VIR_Inst_SetSrcNum(inst, 0);
                             /* update du information */
                             _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
-                            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
-                            {
-                                VIR_Inst_FreeSource(inst, i);
-                            }
-                            VIR_Inst_SetDest(inst, gcvNULL);
+                            VIR_BB_RemoveBranch(bb, gcvTRUE);
                         }
                     }
                     else

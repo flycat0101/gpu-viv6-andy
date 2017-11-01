@@ -681,6 +681,17 @@ slGetFunctionLabel(
     );
 
 gceSTATUS
+slEmitOpCodeResType(
+    IN sloCOMPILER Compiler,
+    IN sleOPCODE_RES_TYPE OpCodeResType
+    );
+
+gceSTATUS
+slEmitCurrentCode(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
 sloCODE_EMITTER_Construct(
     IN sloCOMPILER Compiler,
     OUT sloCODE_EMITTER * CodeEmitter

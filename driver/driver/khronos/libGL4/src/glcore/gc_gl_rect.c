@@ -13,7 +13,6 @@
 
 #ifdef OPENGL40
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 
 #if defined(_WIN32)
@@ -34,81 +33,41 @@ __GL_INLINE GLvoid __glRect(__GLcontext *gc, GLfloat x0, GLfloat y0, GLfloat x1,
 
 GLvoid APIENTRY __glim_Rectd(__GLcontext *gc, GLdouble ax, GLdouble ay, GLdouble bx, GLdouble by)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectd", DT_GLdouble, ax, DT_GLdouble, ay, DT_GLdouble, bx, DT_GLdouble, by, DT_GLnull);
-#endif
-
     __glRect(gc, ax, ay, bx, by);
 }
 
 GLvoid APIENTRY __glim_Rectdv(__GLcontext *gc, const GLdouble *v1, const GLdouble *v2)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectdv", DT_GLdouble_ptr, v1, DT_GLdouble_ptr, v2, DT_GLnull);
-#endif
-
     __glRect(gc, v1[0], v1[1], v2[0], v2[1]);
 }
 
 GLvoid APIENTRY __glim_Rectf(__GLcontext *gc, GLfloat ax, GLfloat ay, GLfloat bx, GLfloat by)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectf", DT_GLfloat, ax, DT_GLfloat, ay, DT_GLfloat, bx, DT_GLfloat, by, DT_GLnull);
-#endif
-
     __glRect(gc, ax, ay, bx, by);
 }
 
 GLvoid APIENTRY __glim_Rectfv(__GLcontext *gc, const GLfloat *v1, const GLfloat *v2)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectfv", DT_GLfloat_ptr, v1, DT_GLfloat_ptr, v2, DT_GLnull);
-#endif
-
     __glRect(gc, v1[0], v1[1], v2[0], v2[1]);
 }
 
 GLvoid APIENTRY __glim_Recti(__GLcontext *gc, GLint ax, GLint ay, GLint bx, GLint by)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Recti", DT_GLint, ax, DT_GLint, ay, DT_GLint, bx, DT_GLint, by, DT_GLnull);
-#endif
-
     __glRect(gc, ax, ay, bx, by);
 }
 
 GLvoid APIENTRY __glim_Rectiv(__GLcontext *gc, const GLint *v1, const GLint *v2)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectiv", DT_GLint_ptr, v1, DT_GLint_ptr, v2, DT_GLnull);
-#endif
-
     __glRect(gc, v1[0], v1[1], v2[0], v2[1]);
 }
 
 GLvoid APIENTRY __glim_Rects(__GLcontext *gc, GLshort ax, GLshort ay, GLshort bx, GLshort by)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rects", DT_GLshort, ax, DT_GLshort, ay, DT_GLshort, bx, DT_GLshort, by, DT_GLnull);
-#endif
-
     __glRect(gc, ax, ay, bx, by);
 }
 
 GLvoid APIENTRY __glim_Rectsv(__GLcontext *gc, const GLshort *v1, const GLshort *v2)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rectsv", DT_GLshort_ptr, v1, DT_GLshort_ptr, v2, DT_GLnull);
-#endif
-
     __glRect(gc, v1[0], v1[1], v2[0], v2[1]);
 }
 

@@ -12,7 +12,6 @@
 
 
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 extern GLvoid __glSetTexEnableDimension(__GLcontext *gc, GLuint unit);
 extern GLvoid __glUpdateProgramEnableDimension(__GLcontext * gc);
@@ -23,18 +22,15 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
     __GLattributeStack *sp;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PushAttrib", DT_GLuint, mask, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     spp = gc->attribute.stackPointer;
-    if (spp < &gc->attribute.stack[gc->constants.maxAttribStackDepth]) {
-        if (!(sp = *spp)) {
-            sp = (__GLattributeStack*)
-                (*gc->imports.calloc)(gc, 1, sizeof(__GLattributeStack) );
+    if (spp < &gc->attribute.stack[gc->constants.maxAttribStackDepth])
+    {
+        sp = *spp;
+        if (!sp)
+        {
+            sp = (__GLattributeStack*)(*gc->imports.calloc)(gc, 1, sizeof(__GLattributeStack));
             *spp = sp;
         }
         gc->attribute.stackPointer = spp + 1;
@@ -45,47 +41,59 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
         */
         sp->state.enables = gc->state.enables;
 
-        if (mask & GL_ACCUM_BUFFER_BIT) {
+        if (mask & GL_ACCUM_BUFFER_BIT)
+        {
             sp->state.accum = gc->state.accum;
         }
-        if (mask & GL_COLOR_BUFFER_BIT) {
+        if (mask & GL_COLOR_BUFFER_BIT)
+        {
             sp->state.raster = gc->state.raster;
 #if GL_EXT_framebuffer_object
             /* Per spec.: Save the drawbuffer state of current FBO */
-            if(DRAW_FRAMEBUFFER_BINDING_NAME != 0){
+            if(DRAW_FRAMEBUFFER_BINDING_NAME != 0)
+            {
                 sp->state.raster.drawBuffers[0] = gc->frameBuffer.drawFramebufObj->drawBuffers[0];
             }
 #endif
         }
-        if (mask & GL_CURRENT_BIT) {
+        if (mask & GL_CURRENT_BIT)
+        {
             sp->state.current = gc->state.current;
             sp->state.rasterPos = gc->state.rasterPos;
         }
-        if (mask & GL_DEPTH_BUFFER_BIT) {
+        if (mask & GL_DEPTH_BUFFER_BIT)
+        {
             sp->state.depth = gc->state.depth;
 #if GL_EXT_depth_bounds_test
             sp->state.depthBoundTest = gc->state.depthBoundTest;
 #endif
         }
-        if (mask & GL_EVAL_BIT) {
+        if (mask & GL_EVAL_BIT)
+        {
             sp->state.evaluator = gc->state.evaluator;
         }
-        if (mask & GL_FOG_BIT) {
+        if (mask & GL_FOG_BIT)
+        {
             sp->state.fog = gc->state.fog;
         }
-        if (mask & GL_HINT_BIT) {
+        if (mask & GL_HINT_BIT)
+        {
             sp->state.hints = gc->state.hints;
         }
-        if (mask & GL_LIGHTING_BIT) {
+        if (mask & GL_LIGHTING_BIT)
+        {
             sp->state.light = gc->state.light;
         }
-        if (mask & GL_LINE_BIT) {
+        if (mask & GL_LINE_BIT)
+        {
             sp->state.line = gc->state.line;
         }
-        if (mask & GL_LIST_BIT) {
+        if (mask & GL_LIST_BIT)
+        {
             sp->state.list = gc->state.list;
         }
-        if (mask & GL_PIXEL_MODE_BIT) {
+        if (mask & GL_PIXEL_MODE_BIT)
+        {
             sp->state.pixel.readBuffer = gc->state.pixel.readBuffer;
             sp->state.pixel.readBufferReturn = gc->state.pixel.readBufferReturn;
             sp->state.pixel.transferMode = gc->state.pixel.transferMode;
@@ -102,38 +110,49 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
             sp->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state =
                 gc->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state;
         }
-        if (mask & GL_POINT_BIT) {
+        if (mask & GL_POINT_BIT)
+        {
             sp->state.point = gc->state.point;
         }
-        if (mask & GL_POLYGON_BIT) {
+        if (mask & GL_POLYGON_BIT)
+        {
             sp->state.polygon = gc->state.polygon;
         }
-        if (mask & GL_POLYGON_STIPPLE_BIT) {
+        if (mask & GL_POLYGON_STIPPLE_BIT)
+        {
             sp->state.polygonStipple = gc->state.polygonStipple;
         }
-        if (mask & GL_SCISSOR_BIT) {
+        if (mask & GL_SCISSOR_BIT)
+        {
             sp->state.scissor = gc->state.scissor;
         }
-        if (mask & GL_STENCIL_BUFFER_BIT) {
+        if (mask & GL_STENCIL_BUFFER_BIT)
+        {
             sp->state.stencil = gc->state.stencil;
         }
-        if (mask & GL_TEXTURE_BIT) {
+        if (mask & GL_TEXTURE_BIT)
+        {
             sp->state.texture = gc->state.texture;
         }
-        if (mask & GL_TRANSFORM_BIT) {
+        if (mask & GL_TRANSFORM_BIT)
+        {
             sp->state.transform = gc->state.transform;
         }
-        if (mask & GL_VIEWPORT_BIT) {
+        if (mask & GL_VIEWPORT_BIT)
+        {
             sp->state.viewport = gc->state.viewport;
         }
-        if (mask & GL_MULTISAMPLE_BIT) {
+        if (mask & GL_MULTISAMPLE_BIT)
+        {
             sp->state.multisample = gc->state.multisample;
         }
-        if (mask & GL_ENABLE_BIT){
+        if (mask & GL_ENABLE_BIT)
+        {
             sp->state.enables = gc->state.enables;
         }
     }
-    else {
+    else
+    {
         __glSetError(gc, GL_STACK_OVERFLOW);
         return;
     }
@@ -146,11 +165,6 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
     __GLattributeStack *sp;
     GLuint mask, attribMask, i;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PopAttrib", DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -821,33 +835,33 @@ GLvoid APIENTRY __glim_PushClientAttrib(__GLcontext *gc, GLbitfield mask)
     __GLclientAttribStack *sp;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PushClientAttrib", DT_GLbitfield, mask, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     spp = gc->attribute.clientStackPointer;
-    if (spp < &gc->attribute.clientStack[gc->constants.maxClientAttribStackDepth]) {
-        if (!(sp = *spp)) {
-            sp = (__GLclientAttribStack *)
-                (*gc->imports.calloc)(gc, 1, sizeof(__GLclientAttribStack) );
+    if (spp < &gc->attribute.clientStack[gc->constants.maxClientAttribStackDepth])
+    {
+        sp = *spp;
+        if (!sp)
+        {
+            sp = (__GLclientAttribStack*)(*gc->imports.calloc)(gc, 1, sizeof(__GLclientAttribStack));
             *spp = sp;
         }
         sp->mask = mask;
         gc->attribute.clientStackPointer = spp + 1;
 
-        if (mask & GL_CLIENT_PIXEL_STORE_BIT) {
+        if (mask & GL_CLIENT_PIXEL_STORE_BIT)
+        {
             sp->clientState.pixel.packModes = gc->clientState.pixel.packModes;
             sp->clientState.pixel.unpackModes = gc->clientState.pixel.unpackModes;
         }
 
-        if (mask & GL_CLIENT_VERTEX_ARRAY_BIT) {
+        if (mask & GL_CLIENT_VERTEX_ARRAY_BIT)
+        {
             sp->clientState.vertexArray = gc->vertexArray.boundVAO->vertexArray;
         }
     }
-    else {
+    else
+    {
         __glSetError(gc, GL_STACK_OVERFLOW);
         return;
     }
@@ -860,11 +874,6 @@ GLvoid APIENTRY __glim_PopClientAttrib(__GLcontext *gc)
     GLuint mask;
     GLuint i;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PopClientAttrib", DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -987,13 +996,16 @@ GLvoid __glFreeAttribStackState(__GLcontext *gc)
     ** Then it will be safe to delete stack entries
     */
     for (spp = (GLvoid **)&gc->attribute.stack[0];
-        spp < (GLvoid **)&gc->attribute.stack[gc->constants.maxAttribStackDepth];
-        spp++) {
-
-        if ((sp = *spp)) {
+         spp < (GLvoid **)&gc->attribute.stack[gc->constants.maxAttribStackDepth];
+         spp++)
+    {
+        sp = *spp;
+        if (!sp)
+        {
             (*gc->imports.free)(gc, sp);
         }
-        else {
+        else
+        {
             break;
         }
     }
@@ -1004,12 +1016,15 @@ GLvoid __glFreeAttribStackState(__GLcontext *gc)
     */
     for (spp = (GLvoid **)&gc->attribute.clientStack[0];
         spp < (GLvoid **)&gc->attribute.clientStack[gc->constants.maxClientAttribStackDepth];
-        spp++) {
-
-        if ((sp = *spp)) {
+        spp++)
+    {
+        sp = *spp;
+        if (!sp)
+        {
             (*gc->imports.free)(gc, sp);
         }
-        else {
+        else
+        {
             break;
         }
     }

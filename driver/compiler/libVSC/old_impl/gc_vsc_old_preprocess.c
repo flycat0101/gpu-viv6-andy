@@ -53,7 +53,7 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
         for(j = 0; j < 2; ++j)
         {
             gctSOURCE_t              *source             = j == 0 ? &Shader->code[i].source0 : &Shader->code[i].source1;
-            gctUINT16                *sourceIndex        = j == 0 ? &Shader->code[i].source0Index : &Shader->code[i].source1Index;
+            gctUINT32                *sourceIndex        = j == 0 ? &Shader->code[i].source0Index : &Shader->code[i].source1Index;
             gctUINT16                *sourceIndexed      = j == 0 ? &Shader->code[i].source0Indexed : &Shader->code[i].source1Indexed;
             gcSL_TYPE                 src_type;
             gcSL_FORMAT               src_format;
@@ -61,7 +61,7 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
             gctUINT                   constIndex         = 0;
             gcUNIFORM                 uniform            = gcvNULL;
             gcUNIFORM                 bindingUniform     = gcvNULL;
-            gctUINT16                 newRegNo[3];
+            gctUINT32                 newRegNo[3];
             gctUINT                   offset             = 0;
 
             struct _gcSL_INSTRUCTION  loadInst, addInst, mulInst;
@@ -108,9 +108,9 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
             memset(&addInst, 0, sizeof(addInst));
             memset(&mulInst, 0, sizeof(mulInst));
 
-            newRegNo[0] = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
-            newRegNo[1] = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
-            newRegNo[2] = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+            newRegNo[0] = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+            newRegNo[1] = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+            newRegNo[2] = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
 
             src_format = gcmSL_SOURCE_GET(*source, Format);
             if(gcmSL_SOURCE_GET(*source, Indexed) == gcSL_NOT_INDEXED)
@@ -302,6 +302,52 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
 }
 
 static gceSTATUS
+_gcUpdateResOpType(
+    IN gcSHADER     Shader
+    )
+{
+    gctUINT         i = 0;
+    gceSTATUS       status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Shader=0x%x", Shader);
+    gcmASSERT(Shader);
+
+    for (i = 0; i < Shader->lastInstruction; ++i)
+    {
+        gcSL_INSTRUCTION        pInst = &Shader->code[i];
+        gcSL_OPCODE             opCode = (gcSL_OPCODE)gcmSL_OPCODE_GET(pInst->opcode, Opcode);
+        gcSL_OPCODE_RES_TYPE    resOpType = (gcSL_OPCODE_RES_TYPE)gcmSL_OPCODE_GET(pInst->opcode, RES_TYPE);
+        gcUNIFORM               uniform = gcvNULL;
+        gcUNIFORM_RES_OP_FLAG   resOpFlag = gcUNIFORM_RES_OP_FLAG_NONE;
+
+        if (gcSL_isOpcodeTexld(opCode) &&
+            gcmSL_SOURCE_GET(pInst->source0, Type) == gcSL_UNIFORM
+            )
+        {
+            if (resOpType == gcSL_OPCODE_RES_TYPE_FETCH)
+            {
+                resOpFlag |= (gcUNIFORM_RES_OP_FLAG)gcUNIFORM_RES_OP_FLAG_FETCH;
+            }
+            else if (resOpType == gcSL_OPCODE_RES_TYPE_FETCH_MS)
+            {
+                resOpFlag |= (gcUNIFORM_RES_OP_FLAG)gcUNIFORM_RES_OP_FLAG_FETCH_MS;
+            }
+            else
+            {
+                resOpFlag |= (gcUNIFORM_RES_OP_FLAG)gcUNIFORM_RES_OP_FLAG_TEXLD;
+            }
+
+            gcmONERROR(gcSHADER_GetUniform(Shader, gcmSL_INDEX_GET(pInst->source0Index, Index), &uniform));
+            SetUniformResOpFlag(uniform, resOpFlag);
+        }
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
 _gcPreprocessHeplerInvocation(
     gcSHADER FragmentShader
     )
@@ -312,7 +358,7 @@ _gcPreprocessHeplerInvocation(
     gctBOOL               hasHelperInvocation = gcvFALSE, bInMainRoutine;
     gcATTRIBUTE           attribHelperInvocation = gcvNULL, attrib;
     gctSOURCE_t           *source;
-    gctUINT16             *sourceIndex;
+    gctUINT32             *sourceIndex;
     gctINT                attribIdx;
     gcFUNCTION            function;
     gcSL_INSTRUCTION      setCode;
@@ -395,7 +441,7 @@ _gcPreprocessHeplerInvocation(
             setCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)  |
                             gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X) |
                             gcmSL_TARGET_SET(0, Condition, gcSL_EQUAL);
-            setCode->tempIndex = (gctUINT16)tempIdx;
+            setCode->tempIndex = (gctUINT32)tempIdx;
 
             setCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)  |
                                gcmSL_SOURCE_SET(0, Format, gcSL_BOOLEAN)  |
@@ -414,7 +460,7 @@ _gcPreprocessHeplerInvocation(
             setCode->opcode = gcSL_MOV;
             setCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)  |
                             gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X);
-            setCode->tempIndex = (gctUINT16)tempIdx;
+            setCode->tempIndex = (gctUINT32)tempIdx;
 
             setCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)  |
                                gcmSL_SOURCE_SET(0, Format, gcSL_BOOLEAN)  |
@@ -452,7 +498,7 @@ _gcPreprocessHeplerInvocation(
                 }
 
                 *source = gcmSL_SOURCE_SET(*source, Type, gcSL_TEMP);
-                *sourceIndex = (gctUINT16)tempIdx;
+                *sourceIndex = (gctUINT32)tempIdx;
             }
         }
     }
@@ -885,11 +931,11 @@ _gcRemoveNOPsInMainFunction(
             /* Only if the target is below the NOP start, we need to update it. */
             if (code->tempIndex > lastNOPCodeIndex)
             {
-                code->tempIndex -= (gctUINT16)removeCodeCount;
+                code->tempIndex -= (gctUINT32)removeCodeCount;
             }
-            else if (code->tempIndex >= (gctUINT16)firstNOPCodeIndex && code->tempIndex <= (gctUINT16)lastNOPCodeIndex)
+            else if (code->tempIndex >= (gctUINT32)firstNOPCodeIndex && code->tempIndex <= (gctUINT32)lastNOPCodeIndex)
             {
-                code->tempIndex = (gctUINT16)firstNOPCodeIndex;
+                code->tempIndex = (gctUINT32)firstNOPCodeIndex;
             }
         }
 
@@ -1012,7 +1058,7 @@ _GetImageLoadFunc(
     gctCHAR*        imageLoadFuncName = "_viv_image_load_image_2d";
     gcsSHADER_VAR_INFO varInfo;
     gctINT16        variableIndex;
-    gctUINT16       newTempIndex;
+    gctUINT32       newTempIndex;
 
     gcmONERROR(gcSHADER_GetFunctionByName(Shader,
                                           imageLoadFuncName,
@@ -1030,7 +1076,7 @@ _GetImageLoadFunc(
         SetFunctionIntrinsicsKind(imageLoadFunc, gceINTRIN_image_load);
 
         /* Add image input. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_IMAGE_2D;
         varInfo.firstChild              = -1;
@@ -1064,7 +1110,7 @@ _GetImageLoadFunc(
                                           gcvFALSE));
 
         /* Add coord input. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_INTEGER_X2;
         varInfo.firstChild              = -1;
@@ -1098,7 +1144,7 @@ _GetImageLoadFunc(
                                           gcvFALSE));
 
         /* Add output. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_OUTPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_FLOAT_X4;
         varInfo.firstChild              = -1;
@@ -1152,7 +1198,7 @@ _GetImageStoreFunc(
     gctCHAR*        imageStoreFuncName = "_viv_image_store_image_2d";
     gcsSHADER_VAR_INFO varInfo;
     gctINT16        variableIndex;
-    gctUINT16       newTempIndex;
+    gctUINT32       newTempIndex;
 
     gcmONERROR(gcSHADER_GetFunctionByName(Shader,
                                           imageStoreFuncName,
@@ -1170,7 +1216,7 @@ _GetImageStoreFunc(
         SetFunctionIntrinsicsKind(imageStoreFunc, gceINTRIN_image_store);
 
         /* Add image input. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_IMAGE_2D;
         varInfo.firstChild              = -1;
@@ -1204,7 +1250,7 @@ _GetImageStoreFunc(
                                           gcvFALSE));
 
         /* Add coord input. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_INTEGER_X2;
         varInfo.firstChild              = -1;
@@ -1238,7 +1284,7 @@ _GetImageStoreFunc(
                                           gcvFALSE));
 
         /* Add data. */
-        newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
         varInfo.varCategory             = gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT;
         varInfo.type                    = gcSHADER_FLOAT_X4;
         varInfo.firstChild              = -1;
@@ -1304,11 +1350,12 @@ _UpdateLastFragData(
     gcUNIFORM       rtImage = gcvNULL;
     gcFUNCTION      imageLoadFunc = gcvNULL, imageStoreFunc = gcvNULL;
     gcSHADER_LABEL  shaderLabel;
-    gctINT          rtUsedCount = 0, rtCount = 0, rtImageIndex = 0;
-    gctINT          mainStartIndex = 0, mainEndIndex, i, j;
+    gctUINT32       rtUsedCount = 0, rtCount = 0, rtImageIndex = 0;
+    gctINT          mainStartIndex = 0, mainEndIndex;
+    gctINT          i, j;
     gctUINT         origlastInst = Shader->lastInstruction;
     gctUINT         codeCount;
-    gctUINT16       coordTempIndex, newLastFragDataTempIndex;
+    gctUINT32       coordTempIndex, newLastFragDataTempIndex;
     gctINT          outputCodeCount = 0;
     gctINT          maxOutputLocation = 32;
     gctINT          minLocation = maxOutputLocation, maxLocation = 0;
@@ -1368,12 +1415,12 @@ _UpdateLastFragData(
     gcmASSERT(rtImage);
 
     /* Create a new temp register to save the coord. */
-    coordTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
+    coordTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X2);
 
     /* Create a global variable to save the gl_LastFragData.
     ** We can't just use a temp index to save this because it may be dynamic indexed.
     */
-    newLastFragDataTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, rtCount, gcSHADER_FLOAT_X4);
+    newLastFragDataTempIndex = gcSHADER_NewTempRegs(Shader, rtCount, gcSHADER_FLOAT_X4);
 
     varInfo.varCategory             = gcSHADER_VAR_CATEGORY_NORMAL;
     varInfo.type                    = gcSHADER_FLOAT_X4;
@@ -1395,7 +1442,7 @@ _UpdateLastFragData(
     varInfo.isPointer               = gcvFALSE;
     varInfo.arraySize               = rtCount;
     varInfo.arrayCount              = rtCount > 1;
-    varInfo.arraySizeList           = rtCount > 1 ? &rtCount : gcvNULL;
+    varInfo.arraySizeList           = (gctINT *)(rtCount > 1 ? &rtCount : gcvNULL);
     varInfo.format                  = gcSL_FLOAT;
     varInfo.imageFormat             = gcIMAGE_FORMAT_DEFAULT;
 
@@ -1476,7 +1523,7 @@ _UpdateLastFragData(
                                                                         gcSL_FLOAT,
                                                                         gcSHADER_PRECISION_HIGH));
 
-    for (i = 0; i < rtUsedCount; i++)
+    for (i = 0; i < (gctINT)rtUsedCount; i++)
     {
         /* Mov parameter image. */
         gcmONERROR(gcSHADER_AddOpcodeIndexedWithPrecision(Shader,
@@ -1531,7 +1578,7 @@ _UpdateLastFragData(
         /* Mov output. */
         gcmONERROR(gcSHADER_AddOpcodeIndexedWithPrecision(Shader,
                                                           gcSL_MOV,
-                                                          newLastFragDataTempIndex + (gctUINT16)i,
+                                                          newLastFragDataTempIndex + i,
                                                           gcSL_ENABLE_XYZW,
                                                           gcSL_NOT_INDEXED,
                                                           0,
@@ -1774,6 +1821,13 @@ _gcLinkBuiltinLibs(
 
             /* after patch successfully, reset the flag */
             SetShaderNeedPatchForCentroid(Shaders[i], gcvFALSE);
+        }
+
+        if (gcmOPT_oclInt64InVIR() && gcShaderHasInt64(Shaders[i]))
+        {
+            gcmONERROR(gcSHADER_PatchInt64(Shaders[i]));
+
+            gcShaderClrHasInt64(Shaders[i]);
         }
 
         if (GetShaderHasIntrinsicBuiltin(Shaders[i]))
@@ -2199,6 +2253,9 @@ gcGetFormatFromType(
     case gcSHADER_SAMPLER_1D_ARRAY_SHADOW:
     case gcSHADER_SAMPLER_2D_ARRAY:
     case gcSHADER_SAMPLER_2D_ARRAY_SHADOW:
+    case gcSHADER_SAMPLER_2D_RECT:
+    case gcSHADER_SAMPLER_2D_RECT_SHADOW:
+    case gcSHADER_SAMPLER_1D_SHADOW:
         format = gcSL_FLOAT;
         break;
 
@@ -2208,6 +2265,9 @@ gcGetFormatFromType(
     case gcSHADER_ISAMPLER_CUBIC:
     case gcSHADER_ISAMPLER_CUBEMAP_ARRAY:
     case gcSHADER_ISAMPLER_2D_ARRAY:
+    case gcSHADER_ISAMPLER_2D_RECT:
+    case gcSHADER_ISAMPLER_1D_ARRAY:
+    case gcSHADER_ISAMPLER_1D:
         format = gcSL_INTEGER;
         break;
 
@@ -2217,6 +2277,9 @@ gcGetFormatFromType(
     case gcSHADER_USAMPLER_CUBIC:
     case gcSHADER_USAMPLER_CUBEMAP_ARRAY:
     case gcSHADER_USAMPLER_2D_ARRAY:
+    case gcSHADER_USAMPLER_2D_RECT:
+    case gcSHADER_USAMPLER_1D_ARRAY:
+    case gcSHADER_USAMPLER_1D:
         format = gcSL_UINT32;
         break;
 
@@ -2439,7 +2502,7 @@ _generateFeedbackWrite(
     for (j = 0; j < varying->arraySize; j++)
     {
         gcmONERROR(gcSHADER_GetOutputByTempIndex(VertexShader,
-                                                 VaryingRegInfo->varying->tempIndex + (gctUINT16)(j * VaryingRegInfo->tempRegCount),
+                                                 VaryingRegInfo->varying->tempIndex + (j * VaryingRegInfo->tempRegCount),
                                                  &varying));
 
         for (i = 0; i < VaryingRegInfo->tempRegCount; i ++)
@@ -2465,7 +2528,7 @@ _generateFeedbackWrite(
                  currentOffset += byteSize(tempType);
              */
             gcSHADER_AddOpcode(shader, gcSL_STORE,
-                               (gctINT16)(startIndex+i),
+                               (startIndex+i),
                                enable, format, precision, 0);
             if (BufferBaseAddress != gcvNULL)
             {
@@ -2477,7 +2540,7 @@ _generateFeedbackWrite(
             else
             {
                 gcSHADER_AddSource(shader, gcSL_TEMP,
-                                   (gctUINT16)BufferBaseAddressTempIndex,
+                                   BufferBaseAddressTempIndex,
                                    gcSL_SWIZZLE_XXXX, gcSL_INTEGER, gcSHADER_PRECISION_HIGH);
             }
             gcSHADER_AddSourceConstantFormatted(shader, (void *)&currentOffset,
@@ -2543,7 +2606,7 @@ _findVexterInstIDTemp(
                                vertexInstIDType,
                                1,
                                &size,
-                               (gctUINT16)vertexInstIDTemp,
+                               vertexInstIDTemp,
                                gcSHADER_VAR_CATEGORY_NORMAL,
                                gcSHADER_PRECISION_HIGH,
                                0,
@@ -2590,9 +2653,9 @@ _getVertexIDTemp(
         SetUniformFlag(uStartVertex, gcvUNIFORM_FLAG_COMPILER_GEN);
 
         /* vertexIndex = gl_vertexID - startVertex */
-        gcSHADER_AddOpcode(VertexShader, gcSL_SUB, (gctUINT16)vertexIDTemp1,
+        gcSHADER_AddOpcode(VertexShader, gcSL_SUB, (gctUINT32)vertexIDTemp1,
                            gcSL_ENABLE_X, format, gcSHADER_PRECISION_HIGH, 0);
-        gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)vertexIDVariable->tempIndex,
+        gcSHADER_AddSource(VertexShader, gcSL_TEMP, vertexIDVariable->tempIndex,
                            gcSL_SWIZZLE_XXXX, format, gcSHADER_PRECISION_HIGH);
         gcSHADER_AddSourceUniformFormatted(VertexShader,
                                            uStartVertex,
@@ -2629,9 +2692,9 @@ _getVertexIDTemp(
     SetUniformFlag(uTotalVtxCountPerInstance, gcvUNIFORM_FLAG_COMPILER_GEN);
 
     /* vertexIndex = vertexIndex + totalVertexCount * gl_instanceID */
-    gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT16)vertexIDTemp2,
+    gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT32)vertexIDTemp2,
                        gcSL_ENABLE_X, format, gcSHADER_PRECISION_HIGH, 0);
-    gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)instIDVariable->tempIndex,
+    gcSHADER_AddSource(VertexShader, gcSL_TEMP, instIDVariable->tempIndex,
                        gcSL_SWIZZLE_XXXX, format, gcSHADER_PRECISION_HIGH);
     gcSHADER_AddSourceUniformFormatted(VertexShader,
                                        uTotalVtxCountPerInstance,
@@ -2639,11 +2702,11 @@ _getVertexIDTemp(
                                        gcSL_NOT_INDEXED,
                                        format);
 
-    gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT16)vertexIDTemp3,
+    gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT32)vertexIDTemp3,
                        gcSL_ENABLE_X, format, gcSHADER_PRECISION_HIGH, 0);
-    gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)vertexIDTemp1,
+    gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)vertexIDTemp1,
                        gcSL_SWIZZLE_XXXX, format, gcSHADER_PRECISION_HIGH);
-    gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)vertexIDTemp2,
+    gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)vertexIDTemp2,
                        gcSL_SWIZZLE_XXXX, format, gcSHADER_PRECISION_HIGH);
 
     /* no conversion is needed if the type is integer */
@@ -2766,17 +2829,17 @@ _gcAddTransformFeedback(
         /* We don't have MAD operation in current IR, we need to do MUL and ADD */
 
         /* create MUL temp1.x, totalSize, temp[VertxID].x */
-        gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT16)temp1,
+        gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT32)temp1,
                           gcSL_ENABLE_X, gcSL_INTEGER, gcSHADER_PRECISION_HIGH, 0);
         gcSHADER_AddSourceConstantFormatted(VertexShader, (void *)&totalSize,
                                             gcSL_INTEGER);
-        gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)vertexIDTemp,
+        gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)vertexIDTemp,
                            gcSL_SWIZZLE_XXXX, gcSL_INTEGER, gcSHADER_PRECISION_HIGH);
 
         /* create ADD temp2.x, temp1.x, InterleavedBufferAddr */
-        gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT16)temp2,
+        gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT32)temp2,
                            gcSL_ENABLE_X, gcSL_INTEGER, gcSHADER_PRECISION_HIGH, 0);
-        gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)temp1,
+        gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)temp1,
                            gcSL_SWIZZLE_XXXX, gcSL_INTEGER, gcSHADER_PRECISION_HIGH);
         gcSHADER_AddSourceUniformFormatted(VertexShader,
                                            xfbkInterLeavedBuffer,
@@ -2856,18 +2919,18 @@ _gcAddTransformFeedback(
             /* We don't have MAD operation in current IR, we need to do MUL and ADD */
 
             /* create MUL temp1.x, totalSize, temp[VertxID].x */
-            gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT16)temp1,
+            gcSHADER_AddOpcode(VertexShader, gcSL_MUL, (gctUINT32)temp1,
                               gcSL_ENABLE_X, gcSL_INTEGER, gcSHADER_PRECISION_HIGH, 0);
             gcSHADER_AddSourceConstantFormatted(VertexShader,
                                                (void *)&xfbk->varRegInfos[i].streamoutSize,
                                                 gcSL_INTEGER);
-            gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)vertexIDTemp,
+            gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)vertexIDTemp,
                                gcSL_SWIZZLE_XXXX, gcSL_INTEGER, gcSHADER_PRECISION_HIGH);
 
             /* create ADD temp2.x, temp1.x, InterleavedBufferAddr */
-            gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT16)temp2,
+            gcSHADER_AddOpcode(VertexShader, gcSL_ADD, (gctUINT32)temp2,
                                gcSL_ENABLE_X, gcSL_INTEGER, gcSHADER_PRECISION_HIGH, 0);
-            gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT16)temp1,
+            gcSHADER_AddSource(VertexShader, gcSL_TEMP, (gctUINT32)temp1,
                                gcSL_SWIZZLE_XXXX, gcSL_INTEGER, gcSHADER_PRECISION_HIGH);
             gcSHADER_AddSourceUniformFormatted(VertexShader,
                                                separateBuffers[i],
@@ -3057,7 +3120,7 @@ _gcAddVertexAndInstanceIdPatch(
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_XYZW)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
                             | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
-            conCode->tempIndex = (gctUINT16)gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
+            conCode->tempIndex = gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
 
             conCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                 | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
@@ -3087,7 +3150,7 @@ _gcAddVertexAndInstanceIdPatch(
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_XYZW)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
                             | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
-            conCode->tempIndex = (gctUINT16)gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
+            conCode->tempIndex = gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
 
             conCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                 | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
@@ -3137,17 +3200,17 @@ _gcAddVertexAndInstanceIdPatch(
         addCode->temp = gcmSL_TARGET_SET(0, Format, format) |
                           gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X) |
                           gcmSL_TARGET_SET(0, Precision, gcSHADER_PRECISION_HIGH);
-        addCode->tempIndex = (gctUINT16)tempRegNo;
+        addCode->tempIndex = (gctUINT32)tempRegNo;
         addCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP) |
                              gcmSL_SOURCE_SET(0, Format, format)  |
                              gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_HIGH)  |
                              gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX);
-        addCode->source0Index = (gctUINT16)vtxIdVariable->tempIndex;
+        addCode->source0Index = vtxIdVariable->tempIndex;
         addCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM) |
                              gcmSL_SOURCE_SET(0, Format, format)  |
                              gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_HIGH)  |
                              gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX);
-        addCode->source1Index = (gctUINT16)uStartVertex->index;
+        addCode->source1Index = (gctUINT32)uStartVertex->index;
         SetUniformFlag(uStartVertex, gcvUNIFORM_FLAG_DIRECTLY_ADDRESSED);
         SetUniformFlag(uStartVertex, gcvUNIFORM_FLAG_COMPILER_GEN);
 
@@ -3155,12 +3218,12 @@ _gcAddVertexAndInstanceIdPatch(
         movCode->temp = gcmSL_TARGET_SET(0, Format, format) |
                         gcmSL_TARGET_SET(0, Precision, gcSHADER_PRECISION_HIGH) |
                           gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X);
-        movCode->tempIndex = (gctUINT16)vtxIdVariable->tempIndex;
+        movCode->tempIndex = vtxIdVariable->tempIndex;
         movCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP) |
                              gcmSL_SOURCE_SET(0, Format, format)  |
                              gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_HIGH)  |
                              gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX);
-        movCode->source0Index = (gctUINT16)tempRegNo;
+        movCode->source0Index = (gctUINT32)tempRegNo;
         gcmONERROR(gcSHADER_Pack(VertexShader));
 
         if (NeedVertexIDReversePatch)
@@ -3253,6 +3316,9 @@ gcDoPreprocess(
 
         /* Change the atomic counter uniform. */
         gcmONERROR(_gcChangeAtomicCounterUniform2BaseAddrBindingUniform(shader));
+
+        /* Update ResOpType. */
+        gcmONERROR(_gcUpdateResOpType(shader));
 
         /* Different shader stages only. */
         switch (shaderType)

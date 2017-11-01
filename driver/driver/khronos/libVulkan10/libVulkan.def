@@ -175,6 +175,13 @@ EXPORTS
         vkCreateSharedSwapchainsKHR
         vkCreateWin32SurfaceKHR
         vkGetPhysicalDeviceWin32PresentationSupportKHR
+        vkGetPhysicalDeviceFeatures2KHR
+        vkGetPhysicalDeviceFormatProperties2KHR
+        vkGetPhysicalDeviceImageFormatProperties2KHR
+        vkGetPhysicalDeviceQueueFamilyProperties2KHR
+        vkGetPhysicalDeviceMemoryProperties2KHR
+        vkGetPhysicalDeviceSparseImageFormatProperties2KHR
+        vkTrimCommandPoolKHR
         vkCreateDebugReportCallbackEXT
         vkDestroyDebugReportCallbackEXT
         vkDebugReportMessageEXT

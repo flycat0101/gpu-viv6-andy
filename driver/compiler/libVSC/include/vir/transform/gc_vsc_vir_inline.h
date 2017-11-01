@@ -57,6 +57,7 @@ typedef struct VIR_INLINER
     VIR_CALL_GRAPH              *pCG;
     VSC_HASH_TABLE              *pCandidates; /* inline candidate */
 
+    gctBOOL                     bCheckAlwaysInlineOnly;
     gctINT                      inlineBudget;
 
 } VIR_Inliner;
@@ -74,6 +75,8 @@ typedef struct VIR_INLINER
 #define VSC_IL_GetCallGraph(inliner)       ((inliner)->pCG)
 #define VSC_IL_SetCallGraph(inliner, cg)   ((inliner)->pCG = (cg))
 #define VSC_IL_GetCandidates(inliner)      ((inliner)->pCandidates)
+#define VSC_IL_GetCheckAlwaysInlineOnly(inliner)    ((inliner)->bCheckAlwaysInlineOnly)
+#define VSC_IL_SetCheckAlwaysInlineOnly(inliner, V) ((inliner)->bCheckAlwaysInlineOnly = (V))
 #define VSC_IL_GetInlineBudget(inliner)     ((inliner)->inlineBudget)
 #define VSC_IL_SetInlineBudget(inliner, bg) ((inliner)->inlineBudget = (bg))
 

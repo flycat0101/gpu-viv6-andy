@@ -102,7 +102,7 @@ typedef struct _glsHASHKEY
 {
 
 /*--- 32-bit boundary --------------------------------------------------------*/
-#if defined(USE_LENDIAN)
+#ifdef __GL_LITTLE_ENDIAN
     union
     {
         struct
@@ -281,7 +281,7 @@ typedef struct _glsHASHKEY
 /*--- 32-bit boundary --------------------------------------------------------*/
     gctUINT32   hashShadingMode                         : 1;  /* [ 0: 0] */
 
-#if defined(USE_LENDIAN)
+#ifdef __GL_LITTLE_ENDIAN
     union
     {
         struct

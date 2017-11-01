@@ -2584,7 +2584,7 @@ _EmitSourceTemp(
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
-                                                        (gctUINT16)Source->u.sourceReg.regIndex,
+                                                        Source->u.sourceReg.regIndex,
                                                         Source->u.sourceReg.swizzle,
                                                         gcSL_NOT_INDEXED,
                                                         0,
@@ -2609,7 +2609,7 @@ _EmitSourceTemp(
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
-                                                        (gctUINT16)Source->u.sourceReg.regIndex,
+                                                        Source->u.sourceReg.regIndex,
                                                         Source->u.sourceReg.swizzle,
                                                         Source->u.sourceReg.indexMode,
                                                         (gctUINT16)Source->u.sourceReg.indexRegIndex,
@@ -2693,7 +2693,7 @@ _EmitSourceTempWithFormat(
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
-                                                        (gctUINT16)Source->u.sourceReg.regIndex,
+                                                        Source->u.sourceReg.regIndex,
                                                         Source->u.sourceReg.swizzle,
                                                         gcSL_NOT_INDEXED,
                                                         0,
@@ -2718,7 +2718,7 @@ _EmitSourceTempWithFormat(
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
-                                                        (gctUINT16)Source->u.sourceReg.regIndex,
+                                                        Source->u.sourceReg.regIndex,
                                                         Source->u.sourceReg.swizzle,
                                                         Source->u.sourceReg.indexMode,
                                                         (gctUINT16)Source->u.sourceReg.indexRegIndex,
@@ -9704,6 +9704,63 @@ sloCODE_EMITTER_EndBasicBlock(
 
     status = sloCODE_EMITTER_EmitCurrentCode(Compiler, CodeEmitter);
 
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+slEmitOpCodeResType(
+    IN sloCOMPILER Compiler,
+    IN sleOPCODE_RES_TYPE OpCodeResType
+    )
+{
+    gceSTATUS               status;
+    gcSHADER                binary;
+    gcSL_OPCODE_RES_TYPE    resOpType = gcSL_OPCODE_RES_TYPE_NONE;
+
+    gcmHEADER();
+
+    gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+    switch (OpCodeResType)
+    {
+    case slvOPCODE_RES_TYPE_FETCH:
+        resOpType = gcSL_OPCODE_RES_TYPE_FETCH;
+        break;
+
+    case slvOPCODE_RES_TYPE_FETCH_MS:
+        resOpType = gcSL_OPCODE_RES_TYPE_FETCH_MS;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    status = gcSHADER_UpdateResOpType(binary,
+                                      resOpType);
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+slEmitCurrentCode(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS               status;
+    sloCODE_EMITTER         codeEmitter;
+
+    gcmHEADER();
+
+    codeEmitter = Compiler->codeEmitter;
+    gcmASSERT(codeEmitter);
+
+    status = sloCODE_EMITTER_EmitCurrentCode(Compiler, codeEmitter);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmFOOTER_NO();

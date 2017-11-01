@@ -16,7 +16,6 @@
 #define __gc_gl_pixel_h_
 
 #include "gc_es_context.h"
-#include "gl4.h"
 
 /*
 ** Pixel format not explicitly defined by the spec, but implictly suggested.
@@ -139,17 +138,6 @@ typedef struct __GLpixelTransferModeRec {
     __GLcolor postColorMatrixBias;
 } __GLpixelTransferMode;
 
-
-typedef struct __GLpixelUnpackModeRec {
-    GLuint alignment;
-    GLuint swapEndian;
-    GLuint lsbFirst;
-    GLuint lineLength;
-    GLuint skipLines;
-    GLuint skipPixels;
-    GLuint skipImages;
-    GLuint imageHeight;
-} __GLpixelUnpackMode;
 
 /*
 ** Number of convolution filter targets

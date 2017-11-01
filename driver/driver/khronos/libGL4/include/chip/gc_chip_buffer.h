@@ -59,7 +59,7 @@ typedef struct _glsCHIPBUFFEROBJECTPENDINGLIST {
     GLuint  type;
 } glsCHIPBUFFEROBJECTPENDINGLIST;
 
-#if defined(USE_LENDIAN)
+#ifdef __GL_LITTLE_ENDIAN
 struct _glsCHIPBUFFERFLAGS {
     union
     {
@@ -245,6 +245,9 @@ typedef enum {
 
     /* Force D32F to D24 to avoid shadow rendering for array types */
     __GL_CHIP_FMT_PATCH_D32F,
+
+    /* Force ASTC to RGBA8 when gcvFEATURE_TX_ASTC_MULTISLICE_FIX is false */
+    __GL_CHIP_FMT_PATCH_ASTC,
 
 } __GLchipFmtPatch;
 

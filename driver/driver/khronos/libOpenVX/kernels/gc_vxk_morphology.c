@@ -607,7 +607,7 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
     vxWriteScalarValue(pad, &pad_v);
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn max pool        CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
 
@@ -621,7 +621,7 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
     return status;
 }
 
-#ifdef WIN32
+#if defined(_WIN32) && (_MSC_VER < 1800)
 static vx_float32 round(vx_float32 x)
 {
     return (floorf((fabsf(x) + 0.5f)));
@@ -989,7 +989,7 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
     dst->itemSize = 4;
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn roi pool       CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
 
@@ -1770,7 +1770,7 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
         }
 
 #if defined(__linux__)
-        if (node->base.context->perfEnable)
+        if (node->base.context->options.enableCNNPerf)
             printf("fast rcnn lrn pool        CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
 

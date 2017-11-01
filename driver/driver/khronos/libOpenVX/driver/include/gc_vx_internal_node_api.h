@@ -21,8 +21,10 @@ EXTERN_C_BEGIN
 
 VX_INTERNAL_API vx_node vxSobelMxNNode(vx_graph graph, vx_image input, vx_scalar ws, vx_image gx, vx_image gy);
 
+VX_INTERNAL_API vx_node vxSobelMxNF16Node(vx_graph graph, vx_image input, vx_scalar ws, vx_scalar shift, vx_image gx, vx_image gy);
+
 VX_INTERNAL_API vx_node vxHarrisScoreNode(
-        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_image score);
+        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_scalar shiftSize, vx_image score);
 
 VX_INTERNAL_API vx_node vxEuclideanNonMaxNode(
         vx_graph graph, vx_image input, vx_scalar strengthThresh, vx_scalar minDistance, vx_image output);
@@ -31,6 +33,11 @@ VX_INTERNAL_API vx_node vxImageListerNode(vx_graph graph, vx_image input, vx_arr
 
 VX_INTERNAL_API vx_node vxElementwiseNormNode(
         vx_graph graph, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
+
+VX_INTERNAL_API vx_node vxElementwiseNormF16Node(
+        vx_graph graph, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
+
+VX_INTERNAL_API vx_node vxPhaseF16Node(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image orientation);
 
 VX_INTERNAL_API vx_node vxNonMaxSuppressionNode(vx_graph graph, vx_image mag, vx_image phase, vx_image edge);
 

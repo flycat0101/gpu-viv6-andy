@@ -71,13 +71,13 @@
     /* @ conditional move: dst = cond_op(s0, s1) ? s2 : dst; */
     VIR_OPINFO(CMOV, 3, HasDest|Componentwise|Expr|EPFromS2|UseCondCode, 1, AL),
     /* @ MOVAR, MOVAF, MOVAI, mov dynamic indexing value to a0 */
-    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|VIR_OPFLAG_ExpdPrecHP, 1, LM),
+    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|Expr|VIR_OPFLAG_ExpdPrecHP, 1, LM),
     /* Mov address to b0 with address calculation, b0 is used for uniform dynamic indexing
      *  addr[9:0]= base + (index<<shift) *(mul3?3:1)
      *  write the addr[9:0] to B0, where B0 is similar to A0, but one per shader group.
      *  B0 is one component S10 and use X writemask to write. There is no data conversion.
      */
-    VIR_OPINFO(MOVBIX, 2, HasDest|Componentwise|VIR_OPFLAG_ExpdPrecHP, 1, LM),
+    VIR_OPINFO(MOVBIX, 2, HasDest|Componentwise|Expr|VIR_OPFLAG_ExpdPrecHP, 1, LM),
     /* @ swizzle vector 8/16 components in src0 by the swizzle defined in src1, 16 bit enable mask in src2
      *   SWIZZLE dest, src0, src1, src2
      *   Vector 8 swizzling:
@@ -104,9 +104,9 @@
     /* @ pack a vector from SRC0, SRC1, SRC2, */
     VIR_OPINFO(PACK, 3, HasDest|Expr|EPFromHighest, 1, LM),
     /* move long/ulong data */
-    VIR_OPINFO(MOV_LONG, 2, HasDest|Componentwise|EPFromHighest, 1, AL),
+    VIR_OPINFO(MOV_LONG, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
     /* copy data, COPY dest, source, byteSize */
-    VIR_OPINFO(COPY, 2, HasDest|Componentwise|EPFromS0, 1, AL),
+    VIR_OPINFO(COPY, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
 
     /**
      ** type conversion
@@ -515,22 +515,22 @@
      **/
     VIR_OPINFO(LOAD_S, 2, HasDest|Loads|Expr, 1, AL),
     VIR_OPINFO(STORE_S, 3, HasDest|Stores, 1, AL),
-    VIR_OPINFO(ATOMADD_S, 3, HasDest|Loads|Stores, 1, AL),
+    VIR_OPINFO(ATOMADD_S, 3, HasDest|Loads|Stores|Expr, 1, AL),
 
     /* local memory load/store and atomic operations */
     VIR_OPINFO(LOAD_L, 2, HasDest|Loads|Expr, 1, AL),
     VIR_OPINFO(STORE_L, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, AL),
 
-    VIR_OPINFO(ATOMADD_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMSUB_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMXCHG_L, 3, HasDest | Loads | Stores, 1, AL),
+    VIR_OPINFO(ATOMADD_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMSUB_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMXCHG_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
     /* For ATOMCMPXCHG, the Value is saved in the x channel of src2, the Comparator is saved in the y channel of src2. */
-    VIR_OPINFO(ATOMCMPXCHG_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMMIN_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMMAX_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMOR_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMAND_L, 3, HasDest | Loads | Stores, 1, AL),
-    VIR_OPINFO(ATOMXOR_L, 3, HasDest | Loads | Stores, 1, AL),
+    VIR_OPINFO(ATOMCMPXCHG_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMMIN_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMMAX_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMOR_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMAND_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMXOR_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
 
     VIR_OPINFO(IMG_SAMPLER, 2, HasDest|Loads|Expr, 1, HL),
 
@@ -546,7 +546,7 @@
     **      src2.x[ 9: 5] S05 relative y offset
     ** The source3 is image sampler if presents (not undef)
     */
-    VIR_OPINFO(IMG_LOAD, 4, HasDest|EPFromS0, 1, AL),
+    VIR_OPINFO(IMG_LOAD, 4, HasDest|Expr|EPFromS0, 1, AL),
 
     /* IMG_LOAD_3D instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -563,7 +563,7 @@
     **      src2.x[14:10] S05 relative z offset
     ** The source3 is image sampler if presents (not undef)
     */
-    VIR_OPINFO(IMG_LOAD_3D, 4, HasDest|Loads|EPFromS0, 1, AL),
+    VIR_OPINFO(IMG_LOAD_3D, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
 
     /* IMG_STORE instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -590,19 +590,19 @@
     ** The source1.xy holds the x/y coordinates (integer).
     ** The source2.x holds the relativeOffset if needed (integer).
     */
-    VIR_OPINFO(IMG_ADDR, 3, HasDest, 1, AL),
-    VIR_OPINFO(IMG_ADDR_3D, 3, HasDest, 1, AL),
+    VIR_OPINFO(IMG_ADDR, 3, HasDest|Expr, 1, AL),
+    VIR_OPINFO(IMG_ADDR_3D, 3, HasDest|Expr, 1, AL),
 
     /* IMG_QUERY instructions:
     ** The source0 holds the vector 4 image descriptor.
     ** The source1 holds the query type(It is a imm), the data type is UINT32.
     ** The source2 holds the extra data(e.g.LOD/COORD).
     */
-    VIR_OPINFO(IMG_QUERY, 3, HasDest|EPFromHighest, 1, NM),
+    VIR_OPINFO(IMG_QUERY, 3, HasDest|Expr|EPFromHighest, 1, NM),
 
     /* src0: value, src1: max, src2: delta
        DST = MIN(MAX(SRC0 + delta(SRC2), 0), SRC1) */
-    VIR_OPINFO(CLAMP0MAX, 3, HasDest, 1, AL),
+    VIR_OPINFO(CLAMP0MAX, 3, HasDest|Expr, 1, AL),
 
     /* register array access */
     /* indexed array load:  LDARR dest, src0, src1 ==> dest = src0[src1] */
@@ -616,41 +616,41 @@
     /* fragment discard if the condition is true */
     VIR_OPINFO(KILL, 2, NoDest, 0, AL),
     /* texture lookup with optional bias, lod, gradient  */
-    VIR_OPINFO(TEXLD, 4, HasDest|Loads|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLD, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
     /* texture lookup with optional bias, lod, gradient  */
-    VIR_OPINFO(TEXLD_U, 4, HasDest|Loads|EPFromS0, 1, AL),
-    VIR_OPINFO(TEXLD_U_F_L, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x4B */
-    VIR_OPINFO(TEXLD_U_F_B, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7B */
-    VIR_OPINFO(TEXLD_U_S_L, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x49 */
-    VIR_OPINFO(TEXLD_U_U_L, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x4A */
+    VIR_OPINFO(TEXLD_U, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLD_U_F_L, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x4B */
+    VIR_OPINFO(TEXLD_U_F_B, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7B */
+    VIR_OPINFO(TEXLD_U_S_L, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x49 */
+    VIR_OPINFO(TEXLD_U_U_L, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x4A */
     /* projection texture lookup with optional bias, lod, gradient  */
-    VIR_OPINFO(TEXLDPROJ, 4, HasDest|Loads|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLDPROJ, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
     /* percentage close filtering texture lookup with optional bias, lod, gradient */
-    VIR_OPINFO(TEXLDPCF, 4, HasDest|Loads|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLDPCF, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
     /* projection percentage close filtering texture lookup with optional bias, lod, gradient   */
-    VIR_OPINFO(TEXLDPCFPROJ, 4, HasDest|Loads|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLDPCFPROJ, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
 
-    VIR_OPINFO(TEXLD_BIAS, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x18 */
-    VIR_OPINFO(TEXLD_BIAS_PCF, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x18 */
-    VIR_OPINFO(TEXLD_PLAIN, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x18 */
-    VIR_OPINFO(TEXLD_PCF, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x18 */
-    VIR_OPINFO(TEXLDB, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLDD, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLD_G, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLDL, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLDP, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLD_LOD, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x6F */
-    VIR_OPINFO(TEXLD_LOD_PCF, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x6F */
-    VIR_OPINFO(TEXLD_G_PCF, 4, HasDest|Loads|EPFromS0, 1, LM),
-    VIR_OPINFO(TEXLD_U_PLAIN, 3, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7B */
-    VIR_OPINFO(TEXLD_U_LOD, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7B */
-    VIR_OPINFO(TEXLD_U_BIAS, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7B */
-    VIR_OPINFO(TEXLD_GATHER, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7D */
-    VIR_OPINFO(TEXLD_GATHER_PCF, 4, HasDest|Loads|EPFromS0, 1, LM),/* Extended from 0x7D */
+    VIR_OPINFO(TEXLD_BIAS, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x18 */
+    VIR_OPINFO(TEXLD_BIAS_PCF, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x18 */
+    VIR_OPINFO(TEXLD_PLAIN, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x18 */
+    VIR_OPINFO(TEXLD_PCF, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x18 */
+    VIR_OPINFO(TEXLDB, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLDD, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLD_G, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLDL, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLDP, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLD_LOD, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x6F */
+    VIR_OPINFO(TEXLD_LOD_PCF, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x6F */
+    VIR_OPINFO(TEXLD_G_PCF, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLD_U_PLAIN, 3, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7B */
+    VIR_OPINFO(TEXLD_U_LOD, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7B */
+    VIR_OPINFO(TEXLD_U_BIAS, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7B */
+    VIR_OPINFO(TEXLD_GATHER, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7D */
+    VIR_OPINFO(TEXLD_GATHER_PCF, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),/* Extended from 0x7D */
 
     /* Use integer texture coordinate P to lookup a single texel from sampler.
        The array layer comes from the last component of P for the array forms.*/
-    VIR_OPINFO(TEXLD_FETCH_MS, 4, HasDest|Loads|EPFromS0, 1, LM),
+    VIR_OPINFO(TEXLD_FETCH_MS, 4, HasDest|Loads|Expr|EPFromS0, 1, LM),
 
     /* fragment shader only, get current quad lod,
        same group as dsx/dsy, need HW support */
@@ -667,26 +667,26 @@
 
         TEXQUERY dest, sampler, attribute
      */
-    VIR_OPINFO(TEXQUERY, 2, HasDest, 1, NU),
+    VIR_OPINFO(TEXQUERY, 2, HasDest|Expr, 1, NU),
 
     /* LODQ instructions:
     ** The source0 holds the sampler.
     ** The source1 holds the coord.
     ** The source2 holds the BIAS.
     */
-    VIR_OPINFO(LODQ, 3, HasDest, 1, LM),
-    VIR_OPINFO(LODQ_G, 2, HasDest, 1, LM),
+    VIR_OPINFO(LODQ, 3, HasDest|Expr, 1, LM),
+    VIR_OPINFO(LODQ_G, 2, HasDest|Expr, 1, LM),
 
     /* GET_SAMPLER_IDX:
     *  Get the sampler physical index for a texture.
     ** The source0 holds the texture.
     ** The source1 holds the offset.
     */
-    VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest|EPFromS0, 1, AL),
-    VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest, 1, AL),
-    VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest|Expr|EPFromS0, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest|Expr, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest|Expr, 1, AL),
     /* Get the levels and samples of a sampler. */
-    VIR_OPINFO(GET_SAMPLER_LS, 2, HasDest, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LS, 2, HasDest|Expr, 1, AL),
 
     /* combining separate samplers and textures:
      *    uniform sampler s[4];    // a handle to filtering information
@@ -701,13 +701,13 @@
      ** surface instructions
      **/
     /* surface load */
-    VIR_OPINFO(SURLD, 2, HasDest, 1, NU),
+    VIR_OPINFO(SURLD, 2, HasDest|Expr, 1, NU),
     /* surface store */
     VIR_OPINFO(SURSTORE, 2, HasDest, 0, NU),
     /* surface reduction */
     VIR_OPINFO(SURRED, 2, HasDest, 1, NU),
     /* surface query */
-    VIR_OPINFO(SURQUERY, 2, HasDest, 1, NU),
+    VIR_OPINFO(SURQUERY, 2, HasDest|Expr, 1, NU),
 
     /* synchronization and atomic operations */
     VIR_OPINFO(BARRIER, 1, NoDest, 0, AL), /*   */
@@ -719,16 +719,16 @@
                                                    *   bit2: Invalidate texture cache.*/
 
     /* atomic operations */
-    VIR_OPINFO(ATOMADD, 3, HasDest|Loads|Stores, 1, AL), /* atomic add */
-    VIR_OPINFO(ATOMSUB, 3, HasDest|Loads|Stores, 1, AL), /* atomic sub */
-    VIR_OPINFO(ATOMXCHG, 3, HasDest|Loads|Stores, 1, AL), /* atomic exchange */
+    VIR_OPINFO(ATOMADD, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atomic add */
+    VIR_OPINFO(ATOMSUB, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atomic sub */
+    VIR_OPINFO(ATOMXCHG, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atomic exchange */
     /* For ATOMCMPXCHG, the Value is saved in the x channel of src2, the Comparator is saved in the y channel of src2. */
-    VIR_OPINFO(ATOMCMPXCHG, 3, HasDest|Loads|Stores, 1, AL), /* atmoic compare and exchange */
-    VIR_OPINFO(ATOMMIN, 3, HasDest|Loads|Stores, 1, AL), /* atmoic min */
-    VIR_OPINFO(ATOMMAX, 3, HasDest|Loads|Stores, 1, AL), /* atomic max */
-    VIR_OPINFO(ATOMOR, 3, HasDest|Loads|Stores, 1, AL), /* atmoic or */
-    VIR_OPINFO(ATOMAND, 3, HasDest|Loads|Stores, 1, AL), /* atmoic and */
-    VIR_OPINFO(ATOMXOR, 3, HasDest|Loads|Stores, 1, AL), /* atomic xor */
+    VIR_OPINFO(ATOMCMPXCHG, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atmoic compare and exchange */
+    VIR_OPINFO(ATOMMIN, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atmoic min */
+    VIR_OPINFO(ATOMMAX, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atomic max */
+    VIR_OPINFO(ATOMOR, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atmoic or */
+    VIR_OPINFO(ATOMAND, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atmoic and */
+    VIR_OPINFO(ATOMXOR, 3, HasDest|Loads|Stores|Expr, 1, AL), /* atomic xor */
 
     /* extended precision arithmetic instrucitons */
     VIR_OPINFO(ADDC, 2, HasDest|Componentwise|Expr, 1, NU), /* add with carrier bit */
@@ -764,9 +764,9 @@
      */
 
     /* implicit cast for vx_inst parameter */
-    VIR_OPINFO(VX_ICASTP, 1, HasDest|EPFromS0|VX1, 1, NM),
+    VIR_OPINFO(VX_ICASTP, 1, HasDest|EPFromS0|Expr|VX1, 1, NM),
     /* implicit cast for vx_inst dest */
-    VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|VX1, 1, NM),
+    VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|Expr|VX1, 1, NM),
 
     /* VX_IMG_LOAD instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -780,7 +780,7 @@
     **      src2.x[ 9: 5] S05 relative y offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* VX_IMG_LOAD_3D instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -797,7 +797,7 @@
     **      src2.x[14:10] S05 relative z offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* IMG_STORE instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -1162,8 +1162,8 @@
 
     /* Tesselation Geometry Shader extension. */
     VIR_OPINFO(STORE_ATTR, 3, HasDest|OnlyUseEnable|Stores, 0, LM), /* STORE_ATTR  RemapAddr, AttributeIndex, Value */
-    VIR_OPINFO(LOAD_ATTR, 3, HasDest|Loads, 1, LM), /* LOAD_ATTR  dest, Remap.xyzw, RemapIndex, AttributeIndex */
-    VIR_OPINFO(LOAD_ATTR_O, 3, HasDest|Loads, 1, LM), /* LOAD_ATTR_O  dest, Remap.xyzw, RemapIndex, AttributeIndex
+    VIR_OPINFO(LOAD_ATTR, 3, HasDest|Loads|Expr, 1, LM), /* LOAD_ATTR  dest, Remap.xyzw, RemapIndex, AttributeIndex */
+    VIR_OPINFO(LOAD_ATTR_O, 3, HasDest|Loads|Expr, 1, LM), /* LOAD_ATTR_O  dest, Remap.xyzw, RemapIndex, AttributeIndex
                                                                       Only for TCS to load attribute from output */
     VIR_OPINFO(ATTR_ST, 3, HasDest|Stores, 1, HM), /* ATTR_ST  Output, InvocationIndex, offset, value */
     VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|Loads|Expr, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */

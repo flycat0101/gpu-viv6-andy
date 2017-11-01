@@ -219,7 +219,7 @@ typedef struct __GLProgramStringResultRec {
     GLuint  nativeParameters;
     GLuint  nativeAttribs;
     GLuint  nativeAddrRegisters;
-}__GLProgramStringResult;
+} __GLProgramStringResult;
 #endif
 /* Program object holds program related information */
 typedef struct __GLprogramObjectRec
@@ -247,7 +247,11 @@ typedef struct __GLprogramObjectRec
     GLuint xfbVaryingNum;
     GLchar **ppXfbVaryingNames;
 
+    GLuint maxSampler;
+    GLuint maxUnit;
+
     GLvoid *privateData;
+
 #ifdef OPENGL40
     __GLProgramStringResult compiledResult;
 #endif
@@ -356,8 +360,11 @@ typedef struct __GLshaderProgramMachineRec
     /* Input patch vertex number for TCS input */
     GLint                   patchVertices;
 
+    GLuint                  maxSampler;
+    GLuint                  maxUnit;
+
 #ifdef OPENGL40
-        GLboolean vertShaderEnable;     /* current enable */
+    GLboolean vertShaderEnable;     /* current enable */
     GLboolean geomShaderEnable;
     GLboolean fragShaderEnable;
 

@@ -400,6 +400,14 @@ public:
         return m_Contiguous.bytes;
     }
 
+    gctUINT32
+    GetContiguousBase(
+        void
+        )
+    {
+        return m_Contiguous.physical.LowPart;
+    }
+
     gctPHYS_ADDR
     GetContiguousPhysical(
         void

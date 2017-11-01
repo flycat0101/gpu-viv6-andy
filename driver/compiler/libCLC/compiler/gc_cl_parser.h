@@ -843,13 +843,13 @@ clParseNamedType(
 void
 clParseStructDeclBegin(
     IN cloCOMPILER Compiler,
+    IN clsLexToken * StartToken,
     IN clsLexToken * Identifier
     );
 
 clsDATA_TYPE *
 clParseStructDeclEnd(
     IN cloCOMPILER Compiler,
-    IN clsLexToken * StartToken,
     IN clsLexToken * Identifier,
     IN clsATTRIBUTE *Attr,
     IN gceSTATUS ParsingStatus

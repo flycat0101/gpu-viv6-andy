@@ -187,26 +187,26 @@ int DoCreateContext(__GLXclientState *cl, GLXContextID gcId,
     ** for multithreaded servers, we don't do this.
     */
     if (shareList == None) {
-    shareGC = 0;
+        shareGC = gcvNULL;
     } else {
-    shareglxc = (__GLXcontext *) LookupIDByType(shareList, __glXContextRes);
-    if (!shareglxc) {
-        client->errorValue = shareList;
-        return __glXBadContext;
-    }
-    if (shareglxc->isDirect) {
-        /*
-        ** NOTE: no support for sharing display lists between direct
-        ** contexts, even if they are in the same address space.
-        */
-    } else {
-        /*
-        ** Create an indirect context regardless of what the client asked
-        ** for; this way we can share display list space with shareList.
-        */
-        isDirect = GL_FALSE;
-    }
-    shareGC = shareglxc->gc;
+        shareglxc = (__GLXcontext *) LookupIDByType(shareList, __glXContextRes);
+        if (!shareglxc) {
+            client->errorValue = shareList;
+            return __glXBadContext;
+        }
+        if (shareglxc->isDirect) {
+            /*
+            ** NOTE: no support for sharing display lists between direct
+            ** contexts, even if they are in the same address space.
+            */
+        } else {
+            /*
+            ** Create an indirect context regardless of what the client asked
+            ** for; this way we can share display list space with shareList.
+            */
+            isDirect = GL_FALSE;
+        }
+        shareGC = shareglxc->gc;
     }
 
     /*
@@ -214,7 +214,7 @@ int DoCreateContext(__GLXclientState *cl, GLXContextID gcId,
     */
     glxc = (__GLXcontext *) __glXMalloc(sizeof(__GLXcontext));
     if (!glxc) {
-    return BadAlloc;
+        return BadAlloc;
     }
     __glXMemset(glxc, 0, sizeof(__GLXcontext));
 
@@ -234,8 +234,7 @@ int DoCreateContext(__GLXclientState *cl, GLXContextID gcId,
     */
     imports.other = (GLvoid *)glxc;
     imports.config = (void *)modes;
-/*  glxc->gc = (*pGlxScreen->createContext)(&imports, glxc->modes, shareGC);*/
-    glxc->gc = (__GLcontextInterface *)__glCreateContext(0x20, &imports, gcvNULL);
+    glxc->gc = (__GLcontextInterface*)__glCreateContext(0x140, &imports, shareGC);
     if (!glxc->gc) {
         __glXFree(glxc);
         client->errorValue = gcId;

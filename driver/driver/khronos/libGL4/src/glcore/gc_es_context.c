@@ -82,20 +82,18 @@ extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __
 #ifdef OPENGL40
 extern GLuint __glInitVertexInputState(__GLcontext *gc);
 extern GLvoid __glFreeVertexInputState(__GLcontext *gc);
+extern GLvoid __glFreeTransformState(__GLcontext *gc);
+extern GLvoid __glFreeEvaluatorState(__GLcontext *gc);
 extern GLvoid __glFreeDlistState(__GLcontext *gc);
-#endif
-
-extern __GLformatInfo __glFormatInfoTable[];
-
-#ifdef OPENGL40
 extern GLvoid __glFreeAttribStackState(__GLcontext *gc);
 extern GLvoid __glInitEvaluatorState(__GLcontext *gc);
 extern GLfloat __glClampWidth(GLfloat width, __GLdeviceConstants *constants);
 extern GLvoid __glComputeClipBox(__GLcontext *gc);
 #endif
 
+extern __GLformatInfo __glFormatInfoTable[];
+
 gceTRACEMODE __glesApiTraceMode = gcvTRACEMODE_NONE;
-GLint __glesApiProfileMode = -1;
 
 
 #define __GL_NOOP(fp)      *(GLvoid (**)())&(fp) = __glNoop;
@@ -207,6 +205,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
 
     constants->maxTextureBufferSize = 65536;
     constants->textureBufferOffsetAlignment = 256;
+
 #ifdef OPENGL40
     constants->numberOfClipPlanes = 6;
     constants->maxModelViewStackDepth = 32;
@@ -424,12 +423,9 @@ GLvoid __glInitHintState(__GLcontext *gc)
 
 GLvoid __glInitRasterState(__GLcontext *gc)
 {
-    __GLrasterState *fs = &gc->state.raster;
     GLint i;
-#ifdef OPENGL40
-    fs->alphaFunction = GL_ALWAYS;
-    fs->alphaReference = 0;
-#endif
+    __GLrasterState *fs = &gc->state.raster;
+
     fs->blendColor.r = 0.0;
     fs->blendColor.g = 0.0;
     fs->blendColor.b = 0.0;
@@ -455,19 +451,23 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     }
 
 #ifdef OPENGL40
-    if (gc->modes.doubleBufferMode) {
-#endif
-    gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
-    fs->drawBuffers[0] = GL_BACK;
-    fs->readBuffer = GL_BACK;
-#ifdef OPENGL40
-    } else {
+    if (!gc->modes.doubleBufferMode)
+    {
         gc->flags |= __GL_CONTEXT_DRAW_TO_FRONT;
         fs->drawBuffers[0] = GL_FRONT;
     }
+    else
 #endif
+    {
+        gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
+        fs->drawBuffers[0] = GL_BACK;
+        fs->readBuffer = GL_BACK;
+    }
 
 #ifdef OPENGL40
+    fs->alphaFunction = GL_ALWAYS;
+    fs->alphaReference = 0;
+
     gc->state.rasterPos.rPos.winPos.f.x = 0.0;
     gc->state.rasterPos.rPos.winPos.f.y = 0.0;
     gc->state.rasterPos.rPos.winPos.f.z = 0.0;
@@ -496,7 +496,8 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].b = 0.0;
     gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].a = 1.0;
 
-    for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++) {
+    for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++)
+    {
         gc->state.rasterPos.rPos.texture[i].fTex.s = 0.0;
         gc->state.rasterPos.rPos.texture[i].fTex.t = 0.0;
         gc->state.rasterPos.rPos.texture[i].fTex.r = 0.0;
@@ -505,8 +506,8 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     gc->state.rasterPos.rPos.clipW = 1.0;
     gc->state.rasterPos.validRasterPos = GL_TRUE;
     gc->state.rasterPos.rPos.eyeDistance = 1.0;
-    fs->clampFragColor = GL_FIXED_ONLY_ARB;
-    fs->clampReadColor = GL_FIXED_ONLY_ARB;
+    fs->clampFragColor = GL_FIXED_ONLY;
+    fs->clampReadColor = GL_FIXED_ONLY;
 #endif
 }
 
@@ -561,6 +562,7 @@ GLvoid __glInitLineState(__GLcontext *gc)
 GLvoid __glInitPolygonState(__GLcontext *gc)
 {
     __GLpolygonState *ps = &gc->state.polygon;
+
     ps->cullFace  = GL_BACK;
     ps->frontFace = GL_CCW;
     ps->factor    = 0.0;
@@ -739,7 +741,6 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     __GLdrawablePrivate *glDrawable = gcvNULL;
     gcoSURF accumSurf;
 
-
     if (!eglDrawable || !eglDrawable->config)
     {
         return gcvNULL;
@@ -778,7 +779,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
 
     /* If the drawable was current but resized, need to detach old surface before updating new ones. */
     if (glDrawable->gc &&
-        (glDrawable->rtHandle      != eglDrawable->rtHandle    ||
+        (glDrawable->rtHandles[0]  != eglDrawable->rtHandles[0] ||
          glDrawable->depthHandle   != eglDrawable->depthHandle ||
          glDrawable->stencilHandle != eglDrawable->stencilHandle
         )
@@ -844,19 +845,17 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
 
 
 #ifdef OPENGL40
-    for(i = 0 ; i < __GL_MAX_DRAW_BUFFERS; i++)
-    {
-        glDrawable->rtHandle[i] = eglDrawable->rtHandle[i];
-    }
-    if(eglDrawable->accumHandle)
+    if (eglDrawable->accumHandle)
     {
         accumSurf = (gcoSURF)eglDrawable->accumHandle;
         (*gc->dp.createAccumBufferInfo)(gc, accumSurf,glDrawable);
     }
-#else
-    glDrawable->rtHandle = eglDrawable->rtHandle;
 #endif
-    glDrawable->prevRtHandle = eglDrawable->prevRtHandle;
+    for (i = 0 ; i < __GL_MAX_DRAW_BUFFERS; i++)
+    {
+        glDrawable->rtHandles[i] = eglDrawable->rtHandles[i];
+        glDrawable->prevRtHandles[i] = eglDrawable->prevRtHandles[i];
+    }
 
     /* Get the depth stencil format Info, see EGL::veglGetFormat() */
     if (eglDrawable->depthHandle)
@@ -920,8 +919,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
         glDrawable->flags &= ~__GL_DRAWABLE_FLAG_ZERO_WH;
     }
 
-
-    __glDevicePipe.devUpdateDrawable(glDrawable, glDrawable->rtHandle, glDrawable->depthHandle, glDrawable->stencilHandle);
+    __glDevicePipe.devUpdateDrawable(glDrawable);
 
     return glDrawable;
 }
@@ -1386,10 +1384,7 @@ GLvoid __glInitPattern(__GLcontext *gc)
 
 GLvoid __glInitGlobals(__GLApiVersion apiVersion)
 {
-    gctSTRING tracemode = gcvNULL;
-#if VIVANTE_PROFILER
-    gctSTRING profilemode = gcvNULL;
-#endif
+    gctSTRING mode = gcvNULL;
 
     /* Initialize dpGlobalInfo and device entry functions */
     if (__glDpInitialize(&__glDevicePipe) == GL_FALSE)
@@ -1397,25 +1392,25 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
         return;
     }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &mode)) && mode)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "0")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
             __glesApiTraceMode = gcvTRACEMODE_NONE;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "1")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
             __glesApiTraceMode = gcvTRACEMODE_FULL;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "2")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
             __glesApiTraceMode = gcvTRACEMODE_LOGGER;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
             __glesApiTraceMode = gcvTRACEMODE_PRE;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "4")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "4")))
         {
             __glesApiTraceMode = gcvTRACEMODE_POST;
         }
@@ -1430,23 +1425,24 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
             __glesApiTraceMode = gcvTRACEMODE_NONE;
         }
     }
+
 #if VIVANTE_PROFILER
-    __glesApiProfileMode = -1;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode)) && profilemode)
+    mode = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &mode)) && mode)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "0")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
             __glesApiProfileMode = 0;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "1")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
             __glesApiProfileMode = 1;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "2")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
             __glesApiProfileMode = 2;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "3")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
             __glesApiProfileMode = 3;
         }
@@ -1475,7 +1471,8 @@ GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
 GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawableChange)
 {
     GLboolean retVal;
-    GLsizei width, height;
+    __GLframebufferObject *defaultDrawFBO = &gc->frameBuffer.defaultDrawFBO;
+    __GLframebufferObject *defaultReadFBO = &gc->frameBuffer.defaultReadFBO;
 
     __glSetDrawable(gc, drawable, readable);
 #ifdef OPENGL40
@@ -1483,6 +1480,8 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
 #endif
     if (gc->flags & __GL_CONTEXT_UNINITIALIZED)
     {
+        GLsizei width, height;
+
         if (gc->drawablePrivate)
         {
             width = gc->drawablePrivate->width;
@@ -1506,6 +1505,32 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
 #endif
 
         gc->flags &= ~(__GL_CONTEXT_UNINITIALIZED);
+    }
+
+    if (drawable)
+    {
+        defaultDrawFBO->flag = (__GL_FRAMEBUFFER_IS_CHECKED | __GL_FRAMEBUFFER_IS_COMPLETE);
+        defaultDrawFBO->checkCode = GL_FRAMEBUFFER_COMPLETE;
+        defaultDrawFBO->fbSamples = drawable->modes.samples;
+    }
+    else
+    {
+        defaultDrawFBO->flag = __GL_FRAMEBUFFER_IS_CHECKED;
+        defaultDrawFBO->checkCode = GL_FRAMEBUFFER_UNDEFINED;
+        defaultDrawFBO->fbSamples = 0;
+    }
+
+    if (readable)
+    {
+        defaultReadFBO->flag = (__GL_FRAMEBUFFER_IS_CHECKED | __GL_FRAMEBUFFER_IS_COMPLETE);
+        defaultReadFBO->checkCode = GL_FRAMEBUFFER_COMPLETE;
+        defaultReadFBO->fbSamples = readable->modes.samples;
+    }
+    else
+    {
+        defaultReadFBO->flag = __GL_FRAMEBUFFER_IS_CHECKED;
+        defaultReadFBO->checkCode = GL_FRAMEBUFFER_UNDEFINED;
+        defaultReadFBO->fbSamples = 0;
     }
 
     /*
@@ -1586,19 +1611,51 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     __GL_HEADER();
 
-#if defined(_LINUX_) && defined(OPENGL40)
-    /* Initialize dpGlobalInfo and device entry functions */
-    if (__glDpInitialize(&__glDevicePipe) == GL_FALSE)
-    {
-        return gcvNULL;
-    }
-    clientVersion = (GLint)__glDevice->devGetESVersion();
-#endif
-
     /* Record the context version: sometime es20 and es30 may have different rule
     */
     switch (clientVersion)
     {
+#ifdef OPENGL40
+    case 0x10:
+        apiVersion = __GL_API_VERSION_OGL10;
+        break;
+    case 0x11:
+        apiVersion = __GL_API_VERSION_OGL11;
+        break;
+    case 0x12:
+        apiVersion = __GL_API_VERSION_OGL12;
+        break;
+    case 0x13:
+        apiVersion = __GL_API_VERSION_OGL13;
+        break;
+    case 0x14:
+        apiVersion = __GL_API_VERSION_OGL14;
+        break;
+    case 0x15:
+        apiVersion = __GL_API_VERSION_OGL15;
+        break;
+    case 0x20:
+        apiVersion = __GL_API_VERSION_OGL20;
+        break;
+    case 0x21:
+        apiVersion = __GL_API_VERSION_OGL21;
+        break;
+    case 0x30:
+        apiVersion = __GL_API_VERSION_OGL30;
+        break;
+    case 0x31:
+        apiVersion = __GL_API_VERSION_OGL31;
+        break;
+    case 0x32:
+        apiVersion = __GL_API_VERSION_OGL32;
+        break;
+    case 0x33:
+        apiVersion = __GL_API_VERSION_OGL33;
+        break;
+    case 0x40:
+        apiVersion = __GL_API_VERSION_OGL40;
+        break;
+#else
     case 0x20:
         apiVersion = __GL_API_VERSION_ES20;
         break;
@@ -1611,6 +1668,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     case 0x32:
         apiVersion = __GL_API_VERSION_ES32;
         break;
+#endif
     default:
         GL_ASSERT(0);
         __GL_ERROR_EXIT2();
@@ -1620,34 +1678,6 @@ GLvoid *__glCreateContext(GLint clientVersion,
     {
         __glInitGlobals(apiVersion);
         initialized = GL_TRUE;
-    }
-    else
-    {
-#if VIVANTE_PROFILER
-        /* Need to re-init profiler mode
-        */
-        gctSTRING profilemode = gcvNULL;
-        __glesApiProfileMode = -1;
-        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode)) && profilemode)
-        {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "0")))
-            {
-                __glesApiProfileMode = 0;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "1")))
-            {
-                __glesApiProfileMode = 1;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "2")))
-            {
-                __glesApiProfileMode = 2;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "3")))
-            {
-                __glesApiProfileMode = 3;
-            }
-        }
-#endif
     }
 
     /* Allocate memory for core GL context.
@@ -1689,8 +1719,8 @@ GLvoid *__glCreateContext(GLint clientVersion,
     gc->exports.makeCurrent    = __glMakeCurrent;
     gc->exports.loseCurrent    = __glLoseCurrent;
     gc->exports.getThreadData  = __eglGetThreadEsPrivData;
-    gc->apiVersion = apiVersion;
-    gc->shareCtx   = (__GLcontext*)sharedCtx;
+    gc->apiVersion   = apiVersion;
+    gc->shareCtx     = (__GLcontext*)sharedCtx;
 
     /* Initialize the device constants with GL defaults.
     */

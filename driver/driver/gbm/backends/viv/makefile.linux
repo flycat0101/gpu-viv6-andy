@@ -31,6 +31,9 @@ INSTALL_DIR = $(SDK_DIR)/drivers
 CFLAGS += -fPIC -Werror
 
 CFLAGS += -I../../main \
+          -I$(AQROOT)/hal/inc \
+          -I$(AQROOT)/sdk/inc \
+          -I$(AQROOT)/driver/khronos/libEGL/inc \
           -I$(ROOTFS)/usr/include/libdrm
 
 ################################################################################
@@ -41,7 +44,7 @@ LDFLAGS := $(LFLAGS) -Wl,-z,defs
 ################################################################################
 # Supply necessary libraries.
 
-LDLIBS += -ldrm
+LDLIBS += -ldrm -lGAL
 
 ################################################################################
 # Describe object files.

@@ -421,56 +421,6 @@ __gldevDeinitialize()
 }
 #endif
 
-#if defined(_LINUX_) && defined(OPENGL40)
-GLuint __gldevGetESVersion()
-{
-    gctBOOL tsAvailable;
-    gctBOOL gsAvailable = gcvFALSE;
-    gceCHIPMODEL chipModel;
-    gctUINT32 chipRevision;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-    gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
-    gcmVERIFY_OK(gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL));
-    tsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TESSELLATION));
-    gsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_GEOMETRY_SHADER));
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5) &&
-        tsAvailable &&
-        gsAvailable)
-    {
-        return 0x32;
-    }
-    else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
-        (chipModel == gcv900 && chipRevision == 0x5250))
-    {
-        return 0x31;
-    }
-    else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
-    {
-#if defined(ANDROID)
-#if (ANDROID_SDK_VERSION < 19)
-        if (patchId == gcvPATCH_OESCTS)
-#else
-        if ((patchId == gcvPATCH_OESCTS) && !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2))
-#endif
-        {
-             return 0x20;
-        }
-        else
-#endif
-        {
-            return 0x20;
-        }
-    }
-    else
-    {
-            return 0x20;
-    }
-    return 0x20;
-}
-#endif
-
-
 GLboolean
 __glDpInitialize(
     __GLdeviceStruct *deviceEntry
@@ -483,22 +433,17 @@ __glDpInitialize(
     deviceEntry->devUpdateDrawable  = __glChipUpdateDrawable;
     deviceEntry->devDestroyDrawable = __glChipDestroyDrawable;
 
+    deviceEntry->devInitialize    = __gldevInitialize;
+    deviceEntry->devDeinitialize    = __gldevDeinitialize;
 #ifdef _LINUX_
     deviceEntry->devCreateDrawable = __glChipCreateDrawable;
-    deviceEntry->devInitialize    = __gldevInitialize;
-    deviceEntry->devDeinitialize    = __gldevDeinitialize;
 #else
-    deviceEntry->devInitialize    = __gldevInitialize;
-    deviceEntry->devDeinitialize    = __gldevDeinitialize;
     deviceEntry->devDescribePixelFormat = __glDpDescribePixelFormat;
     deviceEntry->devSetPixelFormat = __glDpSetPixelFormat;
-
 #endif
 
-#if defined(_LINUX_) && defined(OPENGL40)
+#if defined(OPENGL40)
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-
-    deviceEntry->devGetESVersion = __gldevGetESVersion;
 #endif
 
     __GL_MEMZERO(&dpGlobalInfo, sizeof(__GLchipGlobal));

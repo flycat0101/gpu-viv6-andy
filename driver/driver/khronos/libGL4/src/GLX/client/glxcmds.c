@@ -1410,7 +1410,8 @@ static char *combine_strings( const char *cext_string, const char *sext_string )
 {
     int clen, slen;
     char *combo_string, *token, *s1;
-     const char *s2, *end;
+    char *saveptr;
+    const char *s2, *end;
 
     /*
     ** String can't be longer than min(cstring, sstring)
@@ -1434,7 +1435,7 @@ static char *combine_strings( const char *cext_string, const char *sext_string )
     combo_string[0] = '\0';
 
     /* Get first extension token */
-    token = strtok( s1, SEPARATOR);
+    token = strtok_r( s1, SEPARATOR,&saveptr);
     while ( token != NULL ) {
         /*
         ** if token in second string then save it
@@ -1452,7 +1453,7 @@ static char *combine_strings( const char *cext_string, const char *sext_string )
         }
 
         /* Get next extension token */
-        token = strtok( NULL, SEPARATOR);
+        token = strtok_r( NULL, SEPARATOR, &saveptr);
    }
    Xfree(s1);
    return combo_string;

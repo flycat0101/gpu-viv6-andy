@@ -1159,8 +1159,6 @@ OnError:
     return;
 }
 
-#ifdef EGL_API_DRI
-
 #if gcdENABLE_VG
 static gceSTATUS
 _ResolveRectVG(
@@ -1197,7 +1195,7 @@ _ResolveRectVG(
  * DRI verision.
  */
 static EGLBoolean
-_eglSwapBuffersRegion(
+_eglSwapBuffersRegionDRI(
     EGLDisplay Dpy,
     EGLSurface Draw,
     struct eglRegion * SwapRegion,
@@ -1207,7 +1205,7 @@ _eglSwapBuffersRegion(
     EGLBoolean result = EGL_TRUE;
     VEGLThreadData  thread;
     VEGLDisplay dpy;
-    VEGLSurface draw;
+    VEGLSurface draw = gcvNULL;
     VEGLPlatform platform;
     gctUINT width, height;
     gcoSURF resolveTarget = gcvNULL;
@@ -1337,7 +1335,31 @@ _eglSwapBuffersRegion(
         height = draw->config.height;
 
         VEGL_DUMP_SWAP_TAG(draw, resolveTarget);
+#if gcdDUMP_2DVG
+        {
+            gctUINT32 physical[3] = {0};
+            gctPOINTER logical[3] = {gcvNULL};
+            gctINT stride;
+            gctUINT width, height;
 
+            gcoHAL_Flush(gcvNULL);
+            gcoSURF_Lock(draw->renderTarget, physical, logical);
+            gcoSURF_GetAlignedSize(draw->renderTarget, &width, &height, &stride);
+
+            gcoHAL_Commit(gcvNULL,gcvTRUE);
+            gcmDUMP(gcvNULL,
+                "@[swap 0x%08X %dx%d +%u]",
+                physical[0],
+                width, height,
+                stride);
+            gcmDUMP_BUFFER(gcvNULL,
+                "framebuffer",
+                physical[0],logical[0],
+                0,
+                stride*height);
+            gcoSURF_Unlock(draw->renderTarget, logical[0]);
+        }
+#endif
 #if gcdENABLE_VG
         if ( thread->openVGpipe && (thread->api == EGL_OPENVG_API) )
         {
@@ -1368,8 +1390,8 @@ _eglSwapBuffersRegion(
         VEGL_DUMP_TGA(thread, draw);
 
         /* Check for window resize. */
-        if ((draw->config.width != width) ||
-            (draw->config.height != height))
+        if ((draw->config.width != (EGLint)width) ||
+            (draw->config.height != (EGLint)height))
         {
             if (gcmIS_ERROR(veglResizeSurface(dpy, draw, width, height)))
             {
@@ -1420,7 +1442,6 @@ _eglSwapBuffersRegion(
     return result;
 }
 
-#else /* !EGL_API_DRI */
 
 /*
  * Compute valid swap region.
@@ -1937,6 +1958,31 @@ _SwapBuffersRegion(
             }
 
             VEGL_DUMP_SWAP_TAG(draw, backBuffer.surface);
+#if gcdDUMP_2DVG
+            {
+                gctUINT32 physical[3] = {0};
+                gctPOINTER logical[3] = {gcvNULL};
+                gctINT stride;
+                gctUINT width, height;
+
+                gcoSURF_Lock(backBuffer.surface, physical, logical);
+                gcoSURF_GetAlignedSize(backBuffer.surface, &width, &height, &stride);
+
+                gcoHAL_Flush(gcvNULL);
+                gcoHAL_Commit(gcvNULL,gcvTRUE);
+                gcmDUMP(gcvNULL,
+                    "@[swap 0x%08X %dx%d +%u]",
+                    physical[0],
+                    width, height,
+                    stride);
+                gcmDUMP_BUFFER(gcvNULL,
+                    "framebuffer",
+                    physical[0],logical[0],
+                    0,
+                    stride*height);
+                gcoSURF_Unlock(backBuffer.surface, logical[0]);
+            }
+#endif
 #endif
         }
 
@@ -2363,13 +2409,6 @@ _eglSwapBuffersRegion(
 #if VIVANTE_PROFILER
     if (_ProfilerCallback(thread, 0, 0))
     {
-        EGLBoolean sync = _ProfilerCallback(thread, 13, 0);
-        if(sync == EGL_TRUE)
-        {
-            /* Suspend the thread. */
-            veglSuspendSwapWorker(dpy);
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL,gcvTRUE));
-        }
         if (thread->api == EGL_OPENGL_ES_API)
         {
             if (MAJOR_API_VER(thread->context->client) == 1)
@@ -2387,18 +2426,12 @@ _eglSwapBuffersRegion(
         {
             _ProfilerCallback(thread, 10, 0);
         }
-        if(sync == EGL_TRUE)
-        {
-            /* Resume the thread. */
-            veglResumeSwapWorker(dpy);
-        }
     }
 #endif
 
     gcmFOOTER_ARG("%d", result);
     return result;
 }
-#endif /* EGL_API_DRI */
 
 static EGLBoolean
 veglSwapBuffers(
@@ -2409,6 +2442,9 @@ veglSwapBuffers(
     )
 {
     EGLBoolean result = EGL_FALSE;
+
+    VEGLDisplay dpy = veglGetDisplay(Dpy);
+
 
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SKIP_SWAP && gcdDEBUG_OPTION_SKIP_FRAMES
@@ -2429,7 +2465,14 @@ veglSwapBuffers(
 #endif
 
 
-    result = _eglSwapBuffersRegion(Dpy, Draw, SwapRegion, DamageHint);
+    if(dpy && dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
+    {
+        result = _eglSwapBuffersRegionDRI(Dpy, Draw, gcvNULL, gcvNULL);
+    }
+    else
+    {
+        result = _eglSwapBuffersRegion(Dpy, Draw, SwapRegion, DamageHint);
+    }
 
 
 #if gcdGC355_PROFILER
@@ -3066,10 +3109,6 @@ eglGetRenderBufferv0VIV(
 
         if (draw->backBuffer.context == gcvNULL)
         {
-            /*
-             *VIV: [TODO] Get window back buffer without bound.
-             * This case is when 'draw' is not made current.
-             */
             EGLBoolean result;
 
             result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
@@ -3183,10 +3222,6 @@ eglGetRenderBufferVIV(
 
         if (draw->backBuffer.context == gcvNULL)
         {
-            /*
-             *VIV: [TODO] Get window back buffer without bound.
-             * This case is when 'draw' is not made current.
-             */
             EGLBoolean result;
 
             result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);

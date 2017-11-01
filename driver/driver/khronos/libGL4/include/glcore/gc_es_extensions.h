@@ -13,6 +13,9 @@
 
 #ifndef __gc_es_extensions_h__
 #define __gc_es_extensions_h__
+#ifdef OPENGL40
+#include "gc_hal_types.h"
+#endif
 
 typedef enum
 {
@@ -107,6 +110,9 @@ typedef enum
     __GL_EXTID_EXT_draw_elements_base_vertex,
     __GL_EXTID_EXT_texture_rg,
     __GL_EXTID_EXT_primitive_bounding_box,
+    __GL_EXTID_EXT_shader_framebuffer_fetch,
+    __GL_EXTID_EXT_protected_textures,
+    __GL_EXTID_ANDROID_extension_pack_es31a,
 
     /* Vendor extensions */
     __GL_EXTID_VIV_tex_direct,
@@ -129,6 +135,7 @@ typedef enum
     __GL_EXTID_ARB_texture_array,
     __GL_EXTID_EXT_framebuffer_object,
     __GL_EXTID_ARB_framebuffer_object,
+    __GL_EXTID_EXT_timer_query,
 #endif
     __GL_EXTID_EXT_LAST,
 

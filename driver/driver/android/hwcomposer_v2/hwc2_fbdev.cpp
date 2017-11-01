@@ -147,24 +147,6 @@ static int setup_sw_vsync(__hwc2_device_t *device, fbdev_display_t *display)
     return HWC2_ERROR_NONE;
 }
 
-static void close_sw_vsync(__hwc2_device_t *device, fbdev_display_t *display)
-{
-    sw_vsync_t *vsync = &display->vsync;
-
-    if (!vsync) {
-        return;
-    }
-
-    pthread_mutex_lock(&vsync->mutex);
-
-    vsync->done = 1;
-    vsync->enabled = 1;
-
-    pthread_cond_broadcast(&vsync->cond);
-    pthread_mutex_unlock(&vsync->mutex);
-
-    pthread_join(vsync->pid, NULL);
-}
 
 static int32_t /*hwc2_error_t*/ set_sw_vsync_enabled(
         hwc2_device_t *device, hwc2_display_t display,

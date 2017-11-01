@@ -12,6 +12,7 @@
 
 
 #include "gc_hal_user_hardware_precomp_vg.h"
+#include "gc_feature_database.h"
 
 #if gcdENABLE_VG
 
@@ -227,7 +228,23 @@ _ConvertFormat(
         *ImageFormat = 0x7;
         break;
 
+   case gcvSURF_NV16:
+        *ImageFormat = 0xA;
+        break;
+   case gcvSURF_NV12:
+       *ImageFormat = 0xB;
+        break;
+   case gcvSURF_YUY2:
+       *ImageFormat = 0x8;
+        break;
+
 #if gcdVG_ONLY
+   case gcvSURF_AYUY2:
+       *ImageFormat = 0xF;
+        break;
+   case gcvSURF_ANV12:
+       *ImageFormat = 0xE;
+        break;
     /* Index Color states. */
         /* Index format does not stay in regular format register. */
     case gcvSURF_INDEX1:
@@ -305,7 +322,18 @@ _ConvertFormat(
         *Swizzle = 0x3;
         break;
 
+    case gcvSURF_YUY2:
+    case gcvSURF_NV12:
+    case gcvSURF_NV16:
+        *Swizzle = 0x4;
+        break;
+
 #if gcdVG_ONLY
+    case gcvSURF_AYUY2:
+    case gcvSURF_ANV12:
+        *Swizzle = 0x4;
+        break;
+
         /* Index Color states */
     case gcvSURF_INDEX1:
     case gcvSURF_INDEX2:
@@ -531,6 +559,66 @@ _SetSampler(
             address : gcmFIXADDRESS(address),
             gcvFALSE
             ));
+
+        if ((Image->format == gcvSURF_NV12) || (Image->format == gcvSURF_NV16)
+#if gcdVG_ONLY
+            || (Image->format == gcvSURF_AYUY2)
+#endif
+
+            )
+        {
+            gctUINT32 address1[3] = {0};
+
+            gcoSURF_Lock(Image, address1, NULL);
+            gcmERR_BREAK(gcoVGHARDWARE_SplitAddress(
+                Hardware,
+                address1[1],
+                &pool, &offset));
+
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                Hardware,
+                (0x02940 >> 2) + Sampler,
+                (pool == gcvPOOL_VIRTUAL) ?
+                address1[1] : gcmFIXADDRESS(address1[1]),
+                gcvFALSE
+                ));
+            gcoSURF_Unlock(Image, NULL);
+        }
+#if gcdVG_ONLY
+        else if (Image->format == gcvSURF_ANV12)
+        {
+            gctUINT32 address1[3] = {0};
+
+            gcoSURF_Lock(Image, address1, NULL);
+            gcmERR_BREAK(gcoVGHARDWARE_SplitAddress(
+                Hardware,
+                address1[1],
+                &pool, &offset));
+
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                Hardware,
+                (0x02940 >> 2) + Sampler,
+                (pool == gcvPOOL_VIRTUAL) ?
+                address1[1] : gcmFIXADDRESS(address1[1]),
+                gcvFALSE
+                ));
+
+            gcmERR_BREAK(gcoVGHARDWARE_SplitAddress(
+                Hardware,
+                address1[2],
+                &pool, &offset));
+
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                Hardware,
+                (0x02948 >> 2) + Sampler,
+                (pool == gcvPOOL_VIRTUAL) ?
+                address1[2] : gcmFIXADDRESS(address1[2]),
+                gcvFALSE
+                ));
+
+            gcoSURF_Unlock(Image,NULL);
+        }
+#endif
 
         gcmERR_BREAK(gcoVGHARDWARE_SetState(
             Hardware,
@@ -1511,15 +1599,15 @@ gcoVGHARDWARE_SetVgTarget(
             Hardware,
             0x0284C >> 2,
               ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0))) | (((gctUINT32) ((gctUINT32) (Target->requestW) & ((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0)))
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (Target->requestW) & ((gctUINT32) ((((1 ?
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (Target->requestH) & ((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))),
+ 29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
+ 29:16) + 1))))))) << (0 ? 29:16))) | (((gctUINT32) ((gctUINT32) (Target->requestH) & ((gctUINT32) ((((1 ?
+ 29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
+ 29:16) + 1))))))) << (0 ? 29:16))),
             gcvFALSE
             ));
 
@@ -4067,7 +4155,9 @@ gcoVGHARDWARE_SetTessellation(
         /*
             VG states first.
         */
-
+#if gcdDUMP_2DVG
+        gcmDUMP(gcvNULL, "@[memory 0x%08X 0x%08X]", gcmFIXADDRESS(TessellationBuffer->tsBufferPhysical), TessellationBuffer->allocatedSize);
+#endif
         gcmERR_BREAK(gcoVGHARDWARE_SetState(
             Hardware,
             0x0286C >> 2,
@@ -4099,22 +4189,37 @@ gcoVGHARDWARE_SetTessellation(
             gcvFALSE
             ));
 
-        gcmERR_BREAK(gcoVGHARDWARE_SetState(
-            Hardware,
-            0x028CC >> 2,
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (gcoVGHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_VG_RESOLUTION_8K))
+        {
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                Hardware,
+                0x02AC8 >> 2,
+                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:0) - (0 ? 16:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:0) - (0 ? 16:0) + 1))))))) << (0 ?
+ 16:0))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->stride) & ((gctUINT32) ((((1 ?
+ 16:0) - (0 ? 16:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:0) - (0 ? 16:0) + 1))))))) << (0 ?
+ 16:0))),
+                gcvFALSE
+                ));
+        }
+        else
+        {
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                Hardware,
+                0x028CC >> 2,
+                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->stride) & ((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
  18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->shift) & ((gctUINT32) ((((1 ?
  18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
  18:16) + 1))))))) << (0 ? 18:16))),
-            gcvFALSE
-            ));
-
+                gcvFALSE
+                ));
+        }
 #if gcdMOVG
         gcmERR_BREAK(gcoVGHARDWARE_SetState(
             Hardware,
@@ -4193,36 +4298,51 @@ gcoVGHARDWARE_SetTessellation(
                 gcvFALSE
                 ));
 
-            gcmERR_BREAK(gcoVGHARDWARE_SetState(
-                Hardware,
-                0x028E0 >> 2,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (gcoVGHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_VG_RESOLUTION_8K))
+            {
+                gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                    Hardware,
+                    0x02AC4 >> 2,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:0) - (0 ? 16:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:0) - (0 ? 16:0) + 1))))))) << (0 ?
+ 16:0))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->stride) & ((gctUINT32) ((((1 ?
+ 16:0) - (0 ? 16:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:0) - (0 ? 16:0) + 1))))))) << (0 ?
+ 16:0))),
+                    gcvFALSE
+                    ));
+            }
+            else
+            {
+                gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                    Hardware,
+                    0x028E0 >> 2,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->stride) & ((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
  18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) ((gctUINT32) (TessellationBuffer->shift) & ((gctUINT32) ((((1 ?
  18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
  18:16) + 1))))))) << (0 ? 18:16))),
-                gcvFALSE
-                ));
-
+                    gcvFALSE
+                    ));
+            }
 #if gcdMOVG
             gcmERR_BREAK(gcoVGHARDWARE_SetState(
                 Hardware,
                 0x028E4 >> 2,
                   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:0) - (0 ? 11:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:0) - (0 ? 11:0) + 1))))))) << (0 ?
- 11:0))) | (((gctUINT32) ((gctUINT32) (TsX) & ((gctUINT32) ((((1 ? 11:0) - (0 ?
- 11:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:0) - (0 ? 11:0) + 1))))))) << (0 ?
- 11:0)))
+ 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0))) | (((gctUINT32) ((gctUINT32) (TsX) & ((gctUINT32) ((((1 ? 12:0) - (0 ?
+ 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 27:16) - (0 ? 27:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:16) - (0 ?
- 27:16) + 1))))))) << (0 ? 27:16))) | (((gctUINT32) ((gctUINT32) (TsY) & ((gctUINT32) ((((1 ?
- 27:16) - (0 ? 27:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:16) - (0 ?
- 27:16) + 1))))))) << (0 ? 27:16))),
+ 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (TsY) & ((gctUINT32) ((((1 ?
+ 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ? 28:16))),
                 gcvFALSE
                 ));
 #else
@@ -4230,15 +4350,15 @@ gcoVGHARDWARE_SetTessellation(
                 Hardware,
                 0x028E4 >> 2,
                   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:0) - (0 ? 11:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:0) - (0 ? 11:0) + 1))))))) << (0 ?
- 11:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 11:0) - (0 ?
- 11:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:0) - (0 ? 11:0) + 1))))))) << (0 ?
- 11:0)))
+ 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 12:0) - (0 ?
+ 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 27:16) - (0 ? 27:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:16) - (0 ?
- 27:16) + 1))))))) << (0 ? 27:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 27:16) - (0 ? 27:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:16) - (0 ?
- 27:16) + 1))))))) << (0 ? 27:16))),
+ 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ? 28:16))),
                 gcvFALSE
                 ));
 #endif
@@ -4247,15 +4367,15 @@ gcoVGHARDWARE_SetTessellation(
                 Hardware,
                 0x028E8 >> 2,
                   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0))) | (((gctUINT32) ((gctUINT32) (TargetWidth) & ((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0)))
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (TargetWidth) & ((gctUINT32) ((((1 ?
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (TargetHeight) & ((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))),
+ 29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
+ 29:16) + 1))))))) << (0 ? 29:16))) | (((gctUINT32) ((gctUINT32) (TargetHeight) & ((gctUINT32) ((((1 ?
+ 29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
+ 29:16) + 1))))))) << (0 ? 29:16))),
                 gcvFALSE
                 ));
 
@@ -6270,12 +6390,15 @@ gcoVGHARDWARE_Construct(
 
         gcmERR_BREAK(halInterface.status);
 
-        hardware->chipModel          = halInterface.u.QueryChipIdentity.chipModel;
-        hardware->chipRevision       = halInterface.u.QueryChipIdentity.chipRevision;
         hardware->chipFeatures       = halInterface.u.QueryChipIdentity.chipFeatures;
         hardware->chipMinorFeatures  = halInterface.u.QueryChipIdentity.chipMinorFeatures;
         hardware->chipMinorFeatures2 = halInterface.u.QueryChipIdentity.chipMinorFeatures2;
 
+        hardware->features           = gcQueryFeatureDB(halInterface.u.QueryChipIdentity.chipModel,
+                                                        halInterface.u.QueryChipIdentity.chipRevision,
+                                                        halInterface.u.QueryChipIdentity.productID,
+                                                        halInterface.u.QueryChipIdentity.ecoID,
+                                                        halInterface.u.QueryChipIdentity.customerID);
         /* Query the command buffer attributes. */
         halInterface.command = gcvHAL_QUERY_COMMAND_BUFFER;
         halInterface.ignoreTLS = gcvFALSE;
@@ -6630,13 +6753,13 @@ gceSTATUS gcoVGHARDWARE_QueryChipIdentity(
     /* Return chip model. */
     if (ChipModel != gcvNULL)
     {
-        *ChipModel = Hardware->chipModel;
+        *ChipModel = (gceCHIPMODEL)Hardware->features->chipID;
     }
 
     /* Return revision number. */
     if (ChipRevision != gcvNULL)
     {
-        *ChipRevision = Hardware->chipRevision;
+        *ChipRevision = Hardware->features->chipVersion;
     }
 
     gcmFOOTER_NO();
@@ -10171,236 +10294,144 @@ gcoVGHARDWARE_IsFeatureAvailable(
     {
     /* Generic features. */
     case gcvFEATURE_PIPE_2D:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 9:9) & ((gctUINT32) ((((1 ?
- 9:9) - (0 ? 9:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:9) - (0 ? 9:9) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 9:9) - (0 ? 9:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:9) - (0 ? 9:9) + 1)))))));
-
+        available = Hardware->features->REG_Pipe2D;
         break;
 
     case gcvFEATURE_PIPE_3D:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 2:2) & ((gctUINT32) ((((1 ?
- 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1)))))));
-
+        available = Hardware->features->REG_Pipe3D;
         break;
 
     case gcvFEATURE_PIPE_VG:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 26:26) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
- 26:26) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 26:26) - (0 ? 26:26) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1)))))));
+        available = Hardware->features->REG_PipeVG;
         break;
 
     case gcvFEATURE_DC:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 8:8) & ((gctUINT32) ((((1 ?
- 8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1)))))));
-
+        available = Hardware->features->REG_DC;
         break;
 
     case gcvFEATURE_HIGH_DYNAMIC_RANGE:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 12:12) & ((gctUINT32) ((((1 ?
- 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1)))))));
+        available = Hardware->features->REG_HighDynamicRange;
         break;
 
     case gcvFEATURE_MODULE_CG:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 14:14) & ((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:14) - (0 ?
- 14:14) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 14:14) - (0 ? 14:14) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1)))))));
+        available = Hardware->features->REG_ModuleCG;
         break;
 
     case gcvFEATURE_MIN_AREA:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 15:15) & ((gctUINT32) ((((1 ?
- 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
- 15:15) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 15:15) - (0 ? 15:15) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1)))))));
+        available = Hardware->features->REG_MinArea;
         break;
 
     case gcvFEATURE_BUFFER_INTERLEAVING:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 18:18) & ((gctUINT32) ((((1 ?
- 18:18) - (0 ? 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ?
- 18:18) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 18:18) - (0 ? 18:18) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:18) - (0 ? 18:18) + 1)))))));
+        available = Hardware->features->REG_BufferInterleaving;
         break;
 
     case gcvFEATURE_BYTE_WRITE_2D:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 19:19) & ((gctUINT32) ((((1 ?
- 19:19) - (0 ? 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ?
- 19:19) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 19:19) - (0 ? 19:19) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1)))))));
+        available = Hardware->features->REG_ByteWrite2D;
         break;
 
     case gcvFEATURE_ENDIANNESS_CONFIG:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 2:2) & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 2:2) - (0 ? 2:2) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 2:2) - (0 ?
- 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1)))))));
+        available = Hardware->features->REG_EndiannessConfig;
         break;
 
     case gcvFEATURE_DUAL_RETURN_BUS:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 1:1) & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 1:1) - (0 ? 1:1) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 1:1) - (0 ?
- 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1)))))));
+        available = Hardware->features->REG_DualReturnBus;
         break;
 
     case gcvFEATURE_DEBUG_MODE:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 4:4) & ((gctUINT32) ((((1 ?
- 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1)))))));
-
+        available = Hardware->features->REG_DebugMode;
         break;
 
     case gcvFEATURE_YUY2_RENDER_TARGET:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 24:24) & ((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 24:24) - (0 ? 24:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1)))))));
+        available = Hardware->features->REG_YUY2RenderTarget;
         break;
 
     /* Resolve. */
     case gcvFEATURE_FAST_CLEAR:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 0:0) & ((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1)))))));
-
+        available = Hardware->features->REG_FastClear;
         break;
 
     case gcvFEATURE_YUV420_TILER:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 13:13) & ((gctUINT32) ((((1 ?
- 13:13) - (0 ? 13:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:13) - (0 ?
- 13:13) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 13:13) - (0 ? 13:13) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 13:13) - (0 ? 13:13) + 1)))))));
+        available = Hardware->features->REG_YUV420Tiler;
         break;
 
     case gcvFEATURE_YUY2_AVERAGING:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 21:21) & ((gctUINT32) ((((1 ?
- 21:21) - (0 ? 21:21) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:21) - (0 ?
- 21:21) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 21:21) - (0 ? 21:21) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 21:21) - (0 ? 21:21) + 1)))))));
+        available = Hardware->features->REG_YUY2Averaging;
         break;
 
     case gcvFEATURE_FLIP_Y:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 0:0) & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 0:0) - (0 ? 0:0) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1)))))));
+        available = Hardware->features->REG_FlipY;
         break;
 
     /* Depth. */
     case gcvFEATURE_EARLY_Z:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 16:16) & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1)))))) == (0x0  & ((gctUINT32) ((((1 ? 16:16) - (0 ? 16:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1)))))));
+        available = !Hardware->features->REG_NoEZ;
         break;
 
     case gcvFEATURE_COMPRESSION:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 5:5) & ((gctUINT32) ((((1 ?
- 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1)))))));
-
+        available = Hardware->features->REG_ZCompression;
         break;
 
     /* MSAA. */
     case gcvFEATURE_MSAA:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 7:7) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1)))))));
-
+        available = Hardware->features->REG_MSAA;
         break;
 
     case gcvFEATURE_SPECIAL_ANTI_ALIASING:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 1:1) & ((gctUINT32) ((((1 ?
- 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1)))))));
-
+        available = Hardware->features->REG_SpecialAntiAliasing;
         break;
 
     case gcvFEATURE_SPECIAL_MSAA_LOD:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 5:5) & ((gctUINT32) ((((1 ? 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 5:5) - (0 ? 5:5) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 5:5) - (0 ?
- 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1)))))));
+        available = Hardware->features->REG_SpecialMsaaLod;
         break;
 
     /* Texture. */
     case gcvFEATURE_422_TEXTURE_COMPRESSION:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 17:17) & ((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1)))))) == (0x0  & ((gctUINT32) ((((1 ? 17:17) - (0 ? 17:17) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 17:17) - (0 ? 17:17) + 1)))))));
+        available = !Hardware->features->REG_No422Texture;
         break;
 
     case gcvFEATURE_DXT_TEXTURE_COMPRESSION:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 3:3) & ((gctUINT32) ((((1 ?
- 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1)))))));
-
+        available = Hardware->features->REG_DXTTextureCompression;
         break;
 
     case gcvFEATURE_ETC1_TEXTURE_COMPRESSION:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 10:10) & ((gctUINT32) ((((1 ?
- 10:10) - (0 ? 10:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:10) - (0 ?
- 10:10) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 10:10) - (0 ? 10:10) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 10:10) - (0 ? 10:10) + 1)))))));
+        available = Hardware->features->REG_ETC1TextureCompression;
         break;
 
     case gcvFEATURE_CORRECT_TEXTURE_CONVERTER:
-#if defined(GC_FEATURES_CORRECT_TEXTURE_CONVERTER)
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) & ((gctUINT32) ((((1 ?
- GC_FEATURES_CORRECT_TEXTURE_CONVERTER) - (0 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) - (0 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) + 1)))))) == (GC_FEATURES_CORRECT_TEXTURE_CONVERTER_AVAILABLE  & ((gctUINT32) ((((1 ?
- GC_FEATURES_CORRECT_TEXTURE_CONVERTER) - (0 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) - (0 ? GC_FEATURES_CORRECT_TEXTURE_CONVERTER) + 1)))))));
-
-#else
-        available = gcvFALSE;
-#endif
+        available = Hardware->features->REG_CorrectTextureConverter;
         break;
 
     case gcvFEATURE_TEXTURE_8K:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 3:3) & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 3:3) - (0 ? 3:3) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 3:3) - (0 ?
- 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1)))))));
+        available = Hardware->features->REG_Texture8K;
         break;
 
     /* Filter Blit. */
     case gcvFEATURE_SCALER:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 20:20) & ((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
- 20:20) + 1)))))) == (0x0  & ((gctUINT32) ((((1 ? 20:20) - (0 ? 20:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1)))))));
+        available = !Hardware->features->REG_NoScaler;
         break;
 
     case gcvFEATURE_YUV420_SCALER:
-        available = ((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 6:6) & ((gctUINT32) ((((1 ?
- 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ?
- 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1)))))));
-
+        available = Hardware->features->REG_YUV420Filter;
         break;
 
     case gcvFEATURE_VG20:
-        available = Hardware->vg20;
+        available = Hardware->features->REG_VG20;
         break;
 
     case gcvFEATURE_VG21:
-        available = Hardware->vg21;
+        available = Hardware->features->REG_VG21;
         break;
 
     case gcvFEATURE_VG_FILTER:
-        available = Hardware->vgFilter;
+        available = Hardware->features->REG_VGFilter;
         break;
 
     case gcvFEATURE_MC20:
-        available = ((((gctUINT32) (Hardware->chipMinorFeatures)) >> (0 ?
- 22:22) & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 22:22) - (0 ? 22:22) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 22:22) - (0 ?
- 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1)))))));
+        available = Hardware->features->REG_MC20;
+        break;
+
+    case gcvFEATURE_VG_RESOLUTION_8K:
+        available = Hardware->features->VG_RESOLUTION_8K;
         break;
 
     default:
@@ -10432,7 +10463,7 @@ gcoVGHARDWARE_GetProductName(
     gcoOS_ZeroMemory(pointer, 32);
 
     chipName = (gctSTRING) pointer;
-    chipID = Hardware->chipModel;
+    chipID = Hardware->features->chipID;
 
     *chipName++ = 'G';
     *chipName++ = 'C';

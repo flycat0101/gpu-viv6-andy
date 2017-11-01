@@ -24,7 +24,10 @@ void VKAPI_CALL __vk_DestroySwapchainKHR(
     )
 {
     __vkSwapchainKHR *sc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSwapchainKHR *, swapchain);
-    sc->DestroySwapchain(device, swapchain, pAllocator);
+    if (sc)
+    {
+        sc->DestroySwapchain(device, swapchain, pAllocator);
+    }
 }
 
 VkResult VKAPI_CALL __vk_GetSwapchainImagesKHR(

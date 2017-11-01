@@ -507,7 +507,6 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
 
         node->childGraph = graph;
 
-
         vxoReference_Increment(&graph->base, VX_REF_INTERNAL);
     }
 

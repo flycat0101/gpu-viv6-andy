@@ -179,6 +179,14 @@
     vkApiMacro(GetDisplayPlaneCapabilitiesKHR) \
     vkApiMacro(CreateDisplayPlaneSurfaceKHR) \
     vkApiMacro(CreateSharedSwapchainsKHR) \
+    vkApiMacro(GetPhysicalDeviceFeatures2KHR) \
+    vkApiMacro(GetPhysicalDeviceProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceFormatProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceImageFormatProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceQueueFamilyProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceMemoryProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceSparseImageFormatProperties2KHR) \
+    vkApiMacro(TrimCommandPoolKHR) \
     vkApiMacro(CreateDebugReportCallbackEXT) \
     vkApiMacro(DestroyDebugReportCallbackEXT) \
     vkApiMacro(DebugReportMessageEXT)
@@ -448,6 +456,19 @@ extern VKAPI_ATTR void     VKAPI_CALL __vk_DebugReportMessageEXT(VkInstance inst
  VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object,
  size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage);
 
+/* VK_KHR_get_physical_device_properties2 */
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceFeatures2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2KHR* pFeatures);
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties2KHR* pProperties);
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties2KHR(VkPhysicalDevice physicalDevice, VkFormat format, VkFormatProperties2KHR* pFormatProperties);
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2KHR*  pImageFormatInfo, VkImageFormatProperties2KHR* pImageFormatProperties);
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2KHR* pQueueFamilyProperties);
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties2KHR* pMemoryProperties);
+extern VKAPI_ATTR void     VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice,
+ const VkPhysicalDeviceSparseImageFormatInfo2KHR* pFormatInfo, uint32_t* pPropertyCount,
+ VkSparseImageFormatProperties2KHR* pProperties);
+
+/* VK_KHR_maintenance1 */
+extern VKAPI_ATTR void     VKAPI_CALL __vk_TrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlagsKHR flags);
 
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateXlibSurfaceKHR(VkInstance instance, Display* dpy, Window window, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface);

@@ -14,7 +14,6 @@
 #include "gc_es_context.h"
 #include "g_asmoff.h"
 #include "api/gc_gl_api_inline.c"
-#include "gc_gl_debug.h"
 
 extern GLuint fmtIndex2InputIndex[];
 extern GLvoid __glSwitchToNorVertEntriesFunc(__GLcontext *gc);
@@ -282,15 +281,15 @@ GLuint edgeFlagInputMask[] =
     ~__GL_INPUT_EDGEFLAG,                     /* GL_LINES              */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_LOOP          */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_STRIP         */
-    ~0,                                       /* GL_TRIANGLES          */
+    (GLuint)~0,                                       /* GL_TRIANGLES          */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_STRIP     */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_FAN       */
-    ~0,                                       /* GL_QUADS              */
+    (GLuint)~0,                                       /* GL_QUADS              */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_QUAD_STRIP         */
-    ~0,                                       /* GL_POLYGON            */
+    (GLuint)~0,                                       /* GL_POLYGON            */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_LINES_ADJACENCY_EXT */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_STRIP_ADJACENCY_EXT */
-    ~0,                                       /* GL_TRIANGLES_ADJACENCY_EXT */
+    (GLuint)~0,                                       /* GL_TRIANGLES_ADJACENCY_EXT */
     ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_STRIP_ADJACENCY_EXT */
 };
 
@@ -1988,13 +1987,6 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
 
 GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Begin", DT_GLenum, mode, DT_GLnull);
-#endif
-
     if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
     {
         __glSetError(gc,GL_INVALID_ENUM);
@@ -2031,19 +2023,11 @@ GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
 
 GLvoid APIENTRY __glim_End(__GLcontext *gc )
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_End", DT_GLnull);
-#endif
-
     if (gc->input.inconsistentFormat == GL_FALSE)
     {
         gc->input.primitiveFormat = gc->input.preVertexFormat;
         gc->input.preVertexFormat = 0;
     }
-
 
     if (gc->input.indexPrimEnabled) {
         __glGenerateVertexIndex(gc);
@@ -2071,13 +2055,6 @@ GLvoid APIENTRY __glim_End(__GLcontext *gc )
 
 GLvoid APIENTRY __glim_End_Error(__GLcontext *gc)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_End_Error", DT_GLnull);
-#endif
-
     if (gc->input.beginMode != __GL_IN_BEGIN)
     {
         __glSetError(gc,GL_INVALID_OPERATION);

@@ -36,44 +36,29 @@ vscDumper_PrintStrSafe(
     ...
     )
 {
-    va_list arguments;
-
+    gctARGUMENTS arguments;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT   offset;
     /* Verify the arguments. */
     gcmASSERT(pDumper->pBuffer != gcvNULL);
     gcmASSERT(pDumper->pOffset != gcvNULL);
     gcmASSERT(pFormat != gcvNULL);
 
     /* Get the pointer to the variable arguments. */
-    va_start(arguments, pFormat);
+    /* Route through gcoOS_PrintStrVSafe. */
+    gcmARGUMENTS_START(arguments, pFormat);
+    offset = (gctUINT)*pDumper->pOffset;
+    gcmONERROR(gcoOS_PrintStrVSafe(pDumper->pBuffer, pDumper->bufferSize,
+                                   &offset,
+                                   pFormat, arguments));
+    *pDumper->pOffset = (gctSIZE_T)offset;
 
-#if defined(_WINDOWS) || (defined(_WIN32) || defined(WIN32))
-    /* Format the string. */
-    *pDumper->pOffset += vsprintf_s(pDumper->pBuffer + *pDumper->pOffset,
-                                    pDumper->bufferSize - *pDumper->pOffset,
-                                    pFormat,
-                                    arguments);
-#else
-#if defined(__i386__) || defined(__x86_64__) || !defined(__STRICT_ANSI__)
-    if (*pDumper->pOffset < pDumper->bufferSize)
-    {
-        /* Format the string. */
-        gctINT n = vsnprintf(pDumper->pBuffer + *pDumper->pOffset,
-                             pDumper->bufferSize - *pDumper->pOffset,
-                             pFormat,
-                             arguments);
-
-        if (n > 0)
-        {
-            *pDumper->pOffset += n;
-        }
-    }
-#endif
-#endif
+OnError:
     /* Delete the pointer to the variable arguments. */
-    va_end(arguments);
+    gcmARGUMENTS_END(arguments);
 
     /* Success. */
-    return VSC_ERR_NONE;
+    return status == gcvSTATUS_OK ? VSC_ERR_NONE : VSC_ERR_INVALID_ARGUMENT;
 }
 
 void

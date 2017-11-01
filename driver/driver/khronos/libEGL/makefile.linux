@@ -19,7 +19,6 @@
 # Include common definitions.
 
 include $(AQROOT)/makefile.linux.def
-USE_VIV_WAYLAND := 1
 
 ################################################################################
 # Define target module name.
@@ -62,6 +61,13 @@ ifeq ($(EGL_API_DRI),1)
              -I$(AQROOT)/driver/X/DRI/src
 endif
 
+ifeq ($(X11_DRI3),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include \
+             -I$(X11_ARM_DIR)/include/X11/extensions \
+             -I$(ROOTFS_USR)/include/libdrm \
+             -I$(AQROOT)/driver/X/DRI/src
+endif
+
 ifeq ($(EGL_API_GBM),1)
   ifneq ($(GBM_LIBS),)
     INCLUDE += $(GBM_CFLAGS)
@@ -72,13 +78,8 @@ ifeq ($(EGL_API_GBM),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
-ifeq ($(USE_VIV_WAYLAND),1)
   INCLUDE += -I$(AQROOT)/driver/wayland \
              -I$(WAYLAND_DIR)/include
-else
-  INCLUDE += -I$(AQROOT)/driver/wl \
-             -I$(WAYLAND_DIR)/include
-endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -93,12 +94,15 @@ CFLAGS  += $(INCLUDE)
 
 ################################################################################
 # Add extra flags for object files.
-
-ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI) $(X11_DRI3)),)
   CFLAGS += -DX11
 endif
 
 ifeq ($(EGL_API_DRI), 1)
+  CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+endif
+
+ifeq ($(X11_DRI3), 1)
   CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 endif
 
@@ -108,12 +112,6 @@ ifneq ($(USE_ARMCC),1)
   # These header files don't follow ansi.
   ifeq ($(filter 1,$(EGL_API_WL) $(EGL_API_DFB) $(EGL_API_GBM)),)
     CFLAGS += -ansi
-  endif
-endif
-
-ifeq ($(EGL_API_WL),1)
-  ifeq ($(USE_VIV_WAYLAND),1)
-    CFLAGS += -DUSE_VIV_WAYLAND=1
   endif
 endif
 
@@ -156,6 +154,10 @@ endif
 
 ifeq ($(EGL_API_DRI),1)
   LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
+endif
+
+ifeq ($(X11_DRI3),1)
+  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lX11-xcb -lXext -ldrm -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -203,17 +205,16 @@ ifeq ($(EGL_API_DRI),1)
   OBJECTS += $(OBJ_DIR)/XF86dri.o
 endif
 
-ifeq ($(EGL_API_WL),1)
+ifeq ($(X11_DRI3),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_dri.o
+  OBJECTS += $(OBJ_DIR)/XF86dri.o
+  OBJECTS += $(OBJ_DIR)/gc_egl_dri3.o
+endif
 
-  ifeq ($(USE_VIV_WAYLAND),1)
-    OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
-               $(OBJ_DIR)/gc_egl_wayland_server.o \
-               $(OBJ_DIR)/wayland-viv-protocol.o
-  else
-    OBJECTS += $(OBJ_DIR)/gc_egl_wayland_legacy.o \
-               $(OBJ_DIR)/gc_wayland_protocol.o \
-               $(OBJ_DIR)/wayland-viv-protocol.o
-  endif
+ifeq ($(EGL_API_WL),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
+             $(OBJ_DIR)/gc_egl_wayland_server.o \
+             $(OBJ_DIR)/wayland-viv-protocol.o
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -279,12 +280,13 @@ ifeq ($(EGL_API_DRI),1)
   vpath %.c ../../X/DRI/src
 endif
 
+ifeq ($(X11_DRI3),1)
+  vpath %.c ../../X/DRI/src
+endif
+
+
 ifeq ($(EGL_API_WL),1)
-  ifeq ($(USE_VIV_WAYLAND),1)
-    vpath %.c ../../wayland
-  else
-    vpath %.c ../../wl
-  endif
+  vpath %.c ../../wayland
 endif
 
 $(OBJ_DIR)/%.o: %.c

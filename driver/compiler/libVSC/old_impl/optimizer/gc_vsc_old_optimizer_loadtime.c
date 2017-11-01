@@ -230,7 +230,7 @@ _isTempRegisterALoadtimeConstant(
        IN gctTempRegisterList  LTCTempRegList)
 {
     gcSL_INSTRUCTION    inst = &Code->instruction;
-    gctUINT16           target = inst->tempIndex;
+    gctUINT32           target = inst->tempIndex;
     gcOPT_LIST          dependencies;
     gcSL_ENABLE         enable = gcGetUsedComponents(inst, SourceNo);
     gcOPT_LIST          dep, depIter;
@@ -369,7 +369,7 @@ _isSourceHasIndexedAssigment(
 {
     gcSL_INSTRUCTION        inst = &Code->instruction;
     gctSOURCE_t             source;
-    gctUINT16               index;
+    gctUINT32               index;
     gctBOOL                 sourceIsLTC = gcvTRUE;
 
     gcmASSERT(SourceNo == 0 || SourceNo == 1);
@@ -414,7 +414,7 @@ _isLoadtimeConstant(
     */
     gcSL_INSTRUCTION        inst = &Code->instruction;
     gctSOURCE_t             source;
-    gctUINT16               index;
+    gctUINT32               index;
     gctBOOL                 sourceIsLTC = gcvFALSE;
     gcSL_FORMAT             format;
 
@@ -607,7 +607,7 @@ _RemoveTargetFromLTCTempRegList(
        IN gctBOOL              ScanAllUsers)
 {
     gcSL_INSTRUCTION    inst = &Code->instruction;
-    gctUINT16           target = inst->tempIndex;
+    gctUINT32           target = inst->tempIndex;
     gcSL_ENABLE         enable = (gcSL_ENABLE) gcmSL_TARGET_GET(inst->temp,
                                                                 Enable);
     gcOPT_FUNCTION      function = gcvNULL;
@@ -690,7 +690,7 @@ _addInstructionToLTCList(
     gceSTATUS status = gcvSTATUS_TRUE;
     gcOPT_CODE           code = Code;
     gcSL_INSTRUCTION     inst;
-    gctUINT16            target;
+    gctUINT32            target;
     gctUINT16            enabled;
     gcSL_OPCODE          opcode;
     do
@@ -1150,7 +1150,7 @@ _checkJmpControlFlowAllCanBeLTC(
             /* Update the jump target on LTC. */
             gctINT newTarget = (gctINT)code->instruction.tempIndex;
             newTarget -= offset;
-            code->instruction.tempIndex = (gctUINT16)newTarget;
+            code->instruction.tempIndex = newTarget;
         }
         _addInstructionToLTCList(Optimizer, code, gcvTRUE);
     }
@@ -1551,7 +1551,7 @@ _CreateMoveAndChangeDependencies(
     gceSTATUS            status = gcvSTATUS_OK;
     gcSL_INSTRUCTION     inst = &Code->instruction;
     gctSOURCE_t          source;
-    gctUINT16            index;
+    gctUINT32            index;
     gctUINT16            indexRegister;
     gcOPT_LIST           list;
     gcSL_SWIZZLE         swizzle;
@@ -1682,7 +1682,7 @@ _CloneLTCExpressionToShader(
     gctUINT32            mappedIndex;
     gcOPT_LIST           users;
     gcOPT_CODE           code;
-    gctUINT16            temp;
+    gctUINT32            temp;
     gctCHAR *            processedSourceMap;  /* used to record which source in the
                                                * instruction is already processed */
     gcmHEADER();
@@ -1753,7 +1753,7 @@ _CloneLTCExpressionToShader(
         }
 
         /* change the tempIndex to i */
-        inst->tempIndex = (gctUINT16)mappedIndex;
+        inst->tempIndex = mappedIndex;
         /* find all the uses of the temp by going through its users */
         users = code->users;
         for (users = code->users; users; users = users->next)
@@ -1782,23 +1782,23 @@ _CloneLTCExpressionToShader(
                     if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP )
                     {
                         /* check the source index register */
-                        gctUINT16 * index = (j == 0) ? &use_inst->source0Index
+                        gctUINT32 * index = (j == 0) ? &use_inst->source0Index
                                                      : &use_inst->source1Index;
                         if (*index == temp &&
                             !isSourceProcessed(processedSourceMap,
                                            ltcArrayIdx, j) )
                         {
                             /* the user uses the temp, change it to mappedIndex */
-                            *index = (gctUINT16)mappedIndex;
+                            *index = (gctUINT32)mappedIndex;
                             setSourceProcessed(processedSourceMap,
                                                ltcArrayIdx, j);
                         }
                         /* check the source indexed register */
                         if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
                         {
-                            index = (j == 0) ? &use_inst->source0Indexed
-                                             : &use_inst->source1Indexed;
-                            if (*index == temp &&
+                            gctUINT16 *indexed = (j == 0) ? &use_inst->source0Indexed
+                                                          : &use_inst->source1Indexed;
+                            if (*indexed == temp &&
                                 !isSourceIndexProcessed(processedSourceMap,
                                                           ltcArrayIdx, j))
                             {
@@ -1815,15 +1815,15 @@ _CloneLTCExpressionToShader(
                         /* check the source indexed register */
                         if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
                         {
-                            gctUINT16 * index = (j == 0) ? &use_inst->source0Indexed
-                                                         : &use_inst->source1Indexed;
-                            if (*index == temp &&
+                            gctUINT16 * indexed = (j == 0) ? &use_inst->source0Indexed
+                                                           : &use_inst->source1Indexed;
+                            if (*indexed == temp &&
                                 !isSourceIndexProcessed(processedSourceMap,
                                                           ltcArrayIdx, j))
                             {
                                 /* the user uses the temp for its indexed register,
                                  * change it to mappedIndex */
-                                *index = (gctUINT16)mappedIndex;
+                                *indexed = (gctUINT16)mappedIndex;
                                 setSourceIndexProcessed(processedSourceMap,
                                                           ltcArrayIdx, j);
                             }
@@ -2146,25 +2146,25 @@ gcOPT_OptimizeLoadtimeConstant(
 
             for (code = Optimizer->codeHead; code; code = code->next)
             {
-                if (code->instruction.tempIndex < (gctUINT16)list->index ||
-                    code->instruction.tempIndex > (gctUINT16)(list->index + 3))
+                if (code->instruction.tempIndex < (gctUINT32)list->index ||
+                    code->instruction.tempIndex > (gctUINT32)(list->index + 3))
                 {
                     continue;
                 }
-                if (code->instruction.tempIndex > (gctUINT16)list->index &&
+                if (code->instruction.tempIndex > (gctUINT32)list->index &&
                     !matrixExisted[0])
                 {
                     break;
                 }
 
-                matrixExisted[code->instruction.tempIndex - (gctUINT16)list->index] = gcvTRUE;
+                matrixExisted[code->instruction.tempIndex - (gctUINT32)list->index] = gcvTRUE;
 
-                if (code->instruction.tempIndex == (gctUINT16)list->index)
+                if (code->instruction.tempIndex == (gctUINT32)list->index)
                 {
                     if (gcmSL_SOURCE_GET(code->instruction.source0, Type) == gcSL_UNIFORM &&
                         gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_MOV)
                     {
-                        uniformIndex = (gctUINT16)code->instruction.source0Index;
+                        uniformIndex = (gctINT32)code->instruction.source0Index;
                     }
                 }
             }
@@ -3459,7 +3459,7 @@ _LTCGetSourceValue(
 {
     gceSTATUS                  status = gcvSTATUS_OK;
     gctSOURCE_t                source;
-    gctUINT16                  index;
+    gctUINT32                  index;
     gcSL_FORMAT                format;
     gctINT                     i;
     gcSL_OPCODE                opcode = gcmSL_OPCODE_GET(Instruction->opcode, Opcode);

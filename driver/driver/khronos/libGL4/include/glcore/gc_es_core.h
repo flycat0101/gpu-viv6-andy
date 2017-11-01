@@ -19,12 +19,6 @@
 #include "win2unix.h"
 #endif
 
-
-#if defined(__arm__) || defined(i386) || defined(__i386__) || defined(__x86__) || defined(_M_IX86)\
- || defined(__x86_64__) || defined(_M_AMD64) || defined (_M_X64) || defined(__e2k__) || defined(_LITTLE_ENDIAN)|| defined(__arm64) || defined(__arm64__)
-#define USE_LENDIAN
-#endif
-
 typedef struct __GLcontextRec __GLcontext;
 typedef struct __GLmipMapLevelRec __GLmipMapLevel;
 typedef struct __GLtextureObjectRec __GLtextureObject;
@@ -61,9 +55,6 @@ typedef struct __GLscreenPrivateRec {
 
     /* Point to device specific information that returned from XF86DRIGetDeviceInfo() */
     GLvoid *pDevInfo;
-
-    /* Drm file descriptor */
-    GLint fd;
 
     /* Frame buffer base virtual address */
     GLvoid *baseFBLinearAddress;
@@ -301,14 +292,11 @@ typedef enum
 
     __GL_FMT_RGBX8,
     __GL_FMT_BGRX8,
- /*LUIMANCE ALPHA*/
+    /*LUIMANCE ALPHA*/
 
     __GL_FMT_A32F,
-
     __GL_FMT_L32F,
-
     __GL_FMT_LA32F,
-
 
 #ifdef OPENGL40
     __GL_FMT_A16,
@@ -378,6 +366,10 @@ typedef struct __GLformatInfoRec
     /* For compressed formats, it's bitsPerBlock */
     GLint       bitsPerPixel;
 
+    /* Compression block size, non-conpressed size is 1 */
+    GLint       blockWidth;
+    GLint       blockHeight;
+
     GLint       redSize;
     GLint       greenSize;
     GLint       blueSize;
@@ -405,12 +397,6 @@ typedef struct __GLformatInfoRec
 
     /* Buffer encoding */
     GLint       encoding;
-#ifdef OPENGL40
-    GLint       luminanceType;
-    GLint       intensityType;
-    GLint       luminanceSize;
-    GLint       intensitySize;
-#endif
 } __GLformatInfo;
 
 
@@ -513,13 +499,23 @@ struct __GLdrawablePrivateRec
     GLint xWOrigin;
     GLint yWOrigin;
 
-
     GLint width;
     GLint height;
 
     /* width & height of Window */
     GLint wWidth;
     GLint wHeight;
+
+    void * rtHandles[__GL_MAX_DRAW_BUFFERS];
+    void * prevRtHandles[__GL_MAX_DRAW_BUFFERS];
+    void * depthHandle;
+    void * stencilHandle;
+
+    __GLformatInfo * rtFormatInfo;
+    __GLformatInfo * dsFormatInfo;
+
+    GLuint flags;
+    GLvoid *privateData;
 
 #ifdef OPENGL40
     /* Back buffer information */
@@ -539,7 +535,7 @@ struct __GLdrawablePrivateRec
     GLboolean bFocus;
     GLboolean bExclusiveModeChanged;
 
-/* possibly the next fields are not needed for ES core, Fix me */
+    /* possibly the next fields are not needed for ES core, Fix me */
     union {
         struct {
             /* 0: front_left, 1: front_right, 2: back_left, 3:back_right */
@@ -559,23 +555,8 @@ struct __GLdrawablePrivateRec
     __GLdrawableBuffer frontBuffer2; /* For secondary front buffer in SAMM mode */
     __GLdrawableBuffer depthBuffer;
     __GLdrawableBuffer stencilBuffer;
-#endif
-
-
-#ifdef OPENGL40
     __GLdrawableBuffer accumBuffer;
-    void * rtHandle[__GL_MAX_DRAW_BUFFERS];
-#else
-    void * rtHandle;
-#endif
-    void * prevRtHandle;
-    void * depthHandle;
-    void * stencilHandle;
 
-    __GLformatInfo * rtFormatInfo;
-    __GLformatInfo * dsFormatInfo;
-
-#ifdef OPENGL40
     /* Device specific drawable information attached to "privateData" */
     struct {
         GLvoid *privateData;
@@ -610,16 +591,12 @@ struct __GLdrawablePrivateRec
     GLvoid (*free)(GLvoid *addr);
     GLvoid *(*addSwapHintRectWIN)(__GLdrawablePrivate *, GLint, GLint, GLsizei, GLsizei);
     GLvoid (*clearSwapHintRectWIN)(__GLdrawablePrivate *);
-#endif
 
-    GLuint flags;
     __GLdrawableType type;
     __GLpBufferTexture *pbufferTex;
     GLvoid *lock;        /* the actual lock for this drawablePrivate */
-    GLvoid *privateData;
     GLvoid *other;
 
-#ifdef OPENGL40
     /* internal formats for drawable buffers */
     GLenum internalFormatColorBuffer;
     GLenum internalFormatDepthBuffer;

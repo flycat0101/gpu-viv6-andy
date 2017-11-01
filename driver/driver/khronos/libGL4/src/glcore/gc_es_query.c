@@ -315,6 +315,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.minorVersion;
         break;
 #ifdef OPENGL40
+    case GL_CONTEXT_FLAGS:
+        *ip++ = gc->imports.contextFlags;
+        break;
     case GL_ALPHA_TEST:
     case GL_COLOR_MATERIAL:
     case GL_FOG:
@@ -1118,7 +1121,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_TEX0_INDEX + index].usr_stride;
         break;
     case GL_EDGE_FLAG_ARRAY_STRIDE:
-        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_EDGEFLAG + index].usr_stride;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_EDGEFLAG].usr_stride;
         break;
     case GL_FEEDBACK_BUFFER_SIZE:
         *ip++ = gc->feedback.resultLength;
@@ -1387,37 +1390,23 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.numProgramBinaryFormats;
         break;
     case GL_SAMPLE_BUFFERS:
-        if (DRAW_FRAMEBUFFER_BINDING_NAME)
+        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
         {
-            if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-            {
-                *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples ? 1 : 0;
-            }
-            else
-            {
-                __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
-            }
+            *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples ? 1 : 0;
         }
         else
         {
-            *ip++ = gc->modes.sampleBuffers;
+            __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
         }
         break;
     case GL_SAMPLES:
-        if (DRAW_FRAMEBUFFER_BINDING_NAME)
+        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
         {
-            if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-            {
-                *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples;
-            }
-            else
-            {
-                __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
-            }
+            *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples;
         }
         else
         {
-            *ip++ = gc->modes.samples;
+            __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
         }
         break;
     case GL_SAMPLE_COVERAGE_VALUE:
@@ -1461,8 +1450,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
     case GL_IMPLEMENTATION_COLOR_READ_TYPE:
         {
+            __GLformatInfo *formatInfo = gcvNULL;
             __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-            __GLformatInfo * formatInfo = gcvNULL;
+
             if (!gc->dp.isFramebufferComplete(gc, readFBO))
             {
                 __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
@@ -1489,8 +1479,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 
     case GL_IMPLEMENTATION_COLOR_READ_FORMAT:
         {
+            __GLformatInfo *formatInfo = gcvNULL;
             __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-            __GLformatInfo * formatInfo = gcvNULL;
+
             if (!gc->dp.isFramebufferComplete(gc, readFBO))
             {
                 __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
@@ -2657,6 +2648,18 @@ GLvoid GL_APIENTRY __gles_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
 
     switch (target)
     {
+#ifdef OPENGL40
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+        break;
+    case GL_TIME_ELAPSED_EXT:
+        if (!__glExtension[__GL_EXTID_EXT_timer_query].bEnabled)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        targetIndex = __GL_QUERY_TIME_ELAPSED;
+        break;
+#endif
     case GL_ANY_SAMPLES_PASSED:
         targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
         break;
@@ -2683,6 +2686,10 @@ GLvoid GL_APIENTRY __gles_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
     if (gc->query.currQuery[targetIndex] ||
         (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE]) ||
         (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED])
+#ifdef OPENGL40
+        || (gc->query.currQuery[__GL_QUERY_OCCLUSION] && (gc->query.currQuery[__GL_QUERY_OCCLUSION]->name == id)) ||
+        (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED] && (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED]->name == id))
+#endif
        )
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
@@ -2791,6 +2798,10 @@ GLvoid GL_APIENTRY __gles_GetQueryiv(__GLcontext *gc, GLenum target, GLenum pnam
     switch (target)
     {
     case GL_ANY_SAMPLES_PASSED:
+#ifdef OPENGL40
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+#endif
         targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
         break;
     case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
@@ -2823,6 +2834,11 @@ GLvoid GL_APIENTRY __gles_GetQueryiv(__GLcontext *gc, GLenum target, GLenum pnam
             *params = 0;
         }
         break;
+#ifdef OPENGL40
+    case GL_QUERY_COUNTER_BITS:
+        *params = gc->constants.numberofQueryCounterBits;
+        return;
+#endif
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }

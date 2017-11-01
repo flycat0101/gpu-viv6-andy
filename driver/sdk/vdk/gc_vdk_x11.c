@@ -360,6 +360,9 @@ vdkGetDisplayByIndex(
 
     if (dpy == NULL)
     {
+        fprintf(stderr,
+                "Can not open display: %s\n", getenv("DISPLAY"));
+
         return NULL;
     }
 

@@ -55,7 +55,7 @@ typedef struct _cl_event
     gctINT                  executionStatus;
     gctBOOL                 executionStatusSet;
     gctBOOL                 userEvent;
-    gctBOOL                 fromUserCommand;
+    gctBOOL                 dominateByUser;
     cl_command_type         commandType;
     clsEventCallback_PTR    callback;
     gctPOINTER              callbackMutex;
@@ -150,6 +150,11 @@ clfRetainEvent(
 
 gctINT
 clfReleaseEvent(
+    cl_event Event
+    );
+
+gctINT
+clfAddEventToEventList(
     cl_event Event
     );
 

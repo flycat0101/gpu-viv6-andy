@@ -2367,6 +2367,39 @@ gcoHARDWARE_FlushDrawID(
     return status;
 }
 
+static gceSTATUS _CheckTargetDeferDither(
+    IN gcoHARDWARE Hardware
+    )
+{
+    /* If the draw required dither, while PE cannot support, defer until resolve time.
+    ** If the draw didn't require, do not reset the flag, unless we are sure it's the
+    ** draw can overwrite all of the surface.
+    */
+    gcsCOLOR_TARGET *pColorTarget = &Hardware->PEStates->colorStates.target[0];
+    gcoSURF rtSurf = pColorTarget->surface;
+    gctBOOL fakeFmt = rtSurf && rtSurf->formatInfo.fakedFormat;
+
+    /* Disable dither for fake formats */
+    if (!Hardware->features[gcvFEATURE_PE_DITHER_FIX] &&
+        Hardware->PEStates->ditherEnable &&
+        !fakeFmt)
+    {
+        gctUINT32 i;
+
+        if (rtSurf)
+        {
+            rtSurf->deferDither3D = gcvTRUE;
+        }
+
+        for (i = 1; i < Hardware->PEStates->colorOutCount; ++i)
+        {
+            gcmASSERT(Hardware->PEStates->colorStates.target[i].surface);
+            Hardware->PEStates->colorStates.target[i].surface->deferDither3D = gcvTRUE;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
 
 static gceSTATUS gcoHARDWARE_FlushStates(
     IN gcoHARDWARE Hardware,
@@ -2381,6 +2414,9 @@ static gceSTATUS gcoHARDWARE_FlushStates(
     Hardware->flushedColor = gcvFALSE;
     Hardware->flushedDepth = gcvFALSE;
 
+    /* if PE dither enable and trigger draw(go though PE pipe), we need do dither in PE or resolve, no matter RT changed or not.*/
+    _CheckTargetDeferDither(Hardware);
+
     if (Hardware->PEDirty->depthConfigDirty ||
         Hardware->PEDirty->colorConfigDirty ||
         Hardware->MsaaDirty->msaaConfigDirty  ||
@@ -2392,7 +2428,7 @@ static gceSTATUS gcoHARDWARE_FlushStates(
     }
 
     /*If hardware support R8 format, these codes can be discarded.*/
-    if (1)
+    if (!Hardware->features[gcvFEATURE_R8_UNORM])
     {
         gctUINT32 i;
 
@@ -2496,11 +2532,11 @@ static gceSTATUS gcoHARDWARE_FlushStates(
     {
         /* Flush shader states. */
         gcmONERROR(gcoHARDWARE_FlushShaders(Hardware, Type, Memory));
-    }
 
-    if (Hardware->features[gcvFEATURE_SH_INSTRUCTION_PREFETCH])
-    {
-        gcmONERROR(gcoHARDWARE_FlushPrefetchInst(Hardware, Memory));
+        if (Hardware->features[gcvFEATURE_SH_INSTRUCTION_PREFETCH])
+        {
+            gcmONERROR(gcoHARDWARE_FlushPrefetchInst(Hardware, Memory));
+        }
     }
 
     if (Hardware->TXDirty->textureDirty)
@@ -2526,10 +2562,12 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory));
     }
 
+#if gcdDEBUG
     if (Hardware->features[gcvFEATURE_DRAW_ID])
     {
         gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, Memory));
     }
+#endif
 
 #if gcdENABLE_TRUST_APPLICATION
     if (Hardware->features[gcvFEATURE_SECURITY] && Hardware->GPUProtecedModeDirty)
@@ -4126,7 +4164,7 @@ OnError:
 #endif  /* gcdENABLE_2D */
 
 #if gcdENABLE_3D
-static gceSTATUS
+static gcmINLINE gceSTATUS
 _InternalTFBSwitch(
     gcoHARDWARE Hardware,
     gctBOOL Enable,
@@ -4327,7 +4365,7 @@ OnError:
 }
 
 
-static gceSTATUS
+static gcmINLINE gceSTATUS
 _SinglePEPipeSwitch(
     gcoHARDWARE Hardware,
     gctBOOL Single,

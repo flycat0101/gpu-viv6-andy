@@ -188,6 +188,7 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_vir_static_patch.o \
 	$(OBJ_DIR)/gc_vsc_vir_vectorization.o \
 	$(OBJ_DIR)/gc_vsc_vir_loop.o \
+	$(OBJ_DIR)/gc_vsc_vir_param_opts.o \
 	$(OBJ_DIR)/gc_vsc_debug.o \
 
 endif

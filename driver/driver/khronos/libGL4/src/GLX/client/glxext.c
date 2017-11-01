@@ -883,7 +883,7 @@ FilterGlContextModes( __GLcontextModes ** server_modes,
  *          the client-side driver on success, or \c NULL on failure.
  */
 static GLvoid *
-CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
+CallCreateNewScreen_dri1(Display *dpy, int scrn, __DRIscreen *psc,
             __DRIdisplay * driDpy,
             CreateNewScreenFunc createNewScreen)
 {
@@ -915,6 +915,7 @@ CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
     dri_version.major = driDpy->private->driMajor;
     dri_version.minor = driDpy->private->driMinor;
     dri_version.patch = driDpy->private->driPatch;
+    dri_version.dri3 = driDpy->private->dri3;
 
     err_msg = "XF86DRIOpenConnection";
     err_extra = NULL;
@@ -1104,6 +1105,113 @@ CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
     }
 
     return psp;
+}
+
+#ifdef X11_DRI3
+
+#include <X11/Xlib-xcb.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/extensions/Xdamage.h>
+#include <xcb/xcb.h>
+#include <xcb/dri3.h>
+#include <xcb/present.h>
+#include "vivante_bo.h"
+
+static int
+dri3_open(Display *dpy,
+          Window root,
+          CARD32 provider)
+{
+   xcb_dri3_open_cookie_t       cookie;
+   xcb_dri3_open_reply_t        *reply;
+   xcb_connection_t             *c = XGetXCBConnection(dpy);
+   int                          fd;
+
+   cookie = xcb_dri3_open(c,
+                          root,
+                          None);
+
+   reply = xcb_dri3_open_reply(c, cookie, NULL);
+   if (!reply)
+      return -1;
+
+   if (reply->nfd != 1) {
+      free(reply);
+      return -1;
+   }
+
+   fd = xcb_dri3_open_reply_fds(c, reply)[0];
+   fcntl(fd, F_SETFD, FD_CLOEXEC);
+
+   return fd;
+}
+static GLvoid *
+CallCreateNewScreen_dri3(Display *dpy, int scrn, __DRIscreen *psc,
+            __DRIdisplay * driDpy,
+            CreateNewScreenFunc createNewScreen)
+{
+    __DRIscreenPrivate *psp = NULL;
+    __DRIversion   ddx_version;
+    __DRIversion   dri_version;
+    __DRIversion   drm_version;
+
+    int api_ver = 1.0;
+    int fd;
+
+    dri_version.major = driDpy->private->driMajor;
+    dri_version.minor = driDpy->private->driMinor;
+    dri_version.patch = driDpy->private->driPatch;
+    dri_version.dri3 = driDpy->private->dri3;
+    {
+        __GLcontextModes * driver_modes = NULL;
+        __GLXscreenConfigs *configs = psc->screenConfigs;
+        fd = dri3_open(dpy, RootWindow(dpy, scrn), None);
+        psp = (*createNewScreen)(dpy, scrn,
+                     psc,
+                     configs->configs,
+                     & ddx_version,
+                     & dri_version,
+                     & drm_version,
+                     NULL,
+                     NULL,
+                     fd,
+                     api_ver,
+                     & driver_modes );
+        FilterGlContextModes( & configs->configs, driver_modes );
+        __glContextModesDestroy( driver_modes );
+    }
+
+
+    if ( psp == NULL ) {
+        fprintf(stderr, "libGL error: reverting to (slow) indirect rendering\n");
+    }
+
+    return psp;
+}
+#else
+static GLvoid *
+CallCreateNewScreen_dri3(Display *dpy, int scrn, __DRIscreen *psc,
+            __DRIdisplay * driDpy,
+            CreateNewScreenFunc createNewScreen)
+{
+    return NULL;
+}
+#endif
+
+
+static GLvoid *
+CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
+            __DRIdisplay * driDpy,
+            CreateNewScreenFunc createNewScreen)
+{
+    gcmASSERT((driDpy != gcvNULL));
+
+    if (driDpy->private->dri3)
+    {
+        return CallCreateNewScreen_dri3(dpy, scrn, psc, driDpy, createNewScreen);
+    }
+
+    return CallCreateNewScreen_dri1(dpy, scrn, psc, driDpy, createNewScreen);
 }
 
 
@@ -1316,27 +1424,32 @@ GLvoid __glXInteruptHandler(GLvoid)
     __DRIscreenPrivate *psp;
     int i, screens;
 
+    gcmASSERT(__glXExtensionPrivate);
+
     priv = (__GLXdisplayPrivate*)__glXExtensionPrivate->private_data;
     psc = priv->screenConfigs;
     screens = ScreenCount(priv->dpy);
     for (i = 0; i < screens; i++, psc++) {
         if (psc->driScreen.private) {
             psp = (__DRIscreenPrivate *)(psc->driScreen.private);
+            if (psp->dri3) continue;
 #if USE_DRM_MAP
             (GLvoid)drmUnmap(psp->pLogicalAddr, psp->fbSize);
 #else
             munmap(psp->pLogicalAddr, psp->fbSize);
 #endif
 
+#ifdef X11_DRI3
+            if (psp->dri3)
+            {
+                drm_vivante_close(psp->drm);
+            }
+#endif
             (GLvoid)drmUnmap((drmAddress)psp->pSAREA, SAREA_MAX);
             (GLvoid)drmClose(psp->fd);
             break;
         }
     }
-
-    /* Skip __glXFreeDisplayPrivate() in __glXFinalCleanUp() function.
-     */
-    __glXExtensionPrivate = NULL;
 
     printf("Process termination by interupt!\n");
 

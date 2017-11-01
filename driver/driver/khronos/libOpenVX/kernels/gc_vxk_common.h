@@ -245,6 +245,7 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     );
 
 vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image output);
+vx_status vxPhase_F16(vx_node node, vx_image grad_x, vx_image grad_y, vx_image output);
 vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, vx_border_t *borders, vx_image output);
 
 vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype, vx_border_t *bordermode, vx_float64 *interm, vx_size size);
@@ -260,14 +261,16 @@ vx_status vxWarpAffine(vx_node node, vx_image src_image, vx_matrix matrix, vx_sc
 
 /* internal kernel function */
 vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode);
+vx_status vxSobelMxN_F16(vx_node node, vx_image input, vx_scalar win, vx_scalar shift, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode);
 vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
+vx_status vxNorm_F16(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
 vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders);
 
 vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold threshold, vx_image output);
 vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag);
 vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output);
 
-vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_t borders);
+vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_scalar shift, vx_border_t borders);
 vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr, vx_scalar rad, vx_image dst);
 
 vx_status vxImageLister(vx_node node, vx_image src, vx_array arrays, vx_scalar num, vx_reference* staging);
@@ -331,11 +334,12 @@ vx_status vxNNExecute(vx_node node,
                       vx_tensor inputs, vx_uint32 inputOffset,
                       vx_tensor outputs, vx_uint32 outputOffset);
 
-vx_status vxTPExecute(vx_node node,
-                      vx_array cmd_buf,
-                      vx_weights_biases_parameter weights_biases,
-                      vx_tensor inputs,
-                      vx_tensor outputs);
+vx_status vxTPExecute(vx_node node, vx_uint32 op_num,
+                      vx_array cmd_buf, vx_uint32 cmdOffset, vx_uint32 cmdSize,
+                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset, vx_uint32 wbSize,
+                      vx_tensor inputs, vx_uint32 inputOffset, vx_uint32 inputSize,
+                      vx_tensor outputs, vx_uint32 outputOffset, vx_uint32 outputSize,
+                      vx_array buffer);
 
 #ifdef __cplusplus
 }

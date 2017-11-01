@@ -368,6 +368,69 @@ GCHAL::GCHAL(
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(m_Os, &m_Device));
 
+    /* Setup contiguous vidmem */
+    if (m_Contiguous.physical.LowPart != ~0U)
+    {
+        /* Construct the contiguous memory heap. */
+        gcmkONERROR(gckVIDMEM_Construct(
+            m_Os,
+            m_Contiguous.physical.LowPart,
+            m_Contiguous.bytes,
+            64,
+            0,
+            &m_ContiguousHeap));
+
+        m_Contiguous.type      = gcvPHYSICAL_TYPE_RESERVED_PHYSICAL;
+        m_Contiguous.attr     |= gcvPHYSICAL_ATTR_CONTIGUOUS;
+        m_Contiguous.reference = 1;
+    }
+    else
+    {
+        // Try to allocate contiguous memory, starting at the specified value,
+        // decreasing 4MB each time until we proceed.
+        for (; m_Contiguous.bytes > 0; m_Contiguous.bytes -= 4 << 20)
+        {
+            // Allocate contiguous memory. */
+            if (AllocateMemory(m_Contiguous.bytes,
+                               m_Contiguous.logical,
+                               m_Contiguous.physical))
+            {
+                /* Construct the contiguous memory heap. */
+                gceSTATUS status = gckVIDMEM_Construct(m_Os,
+                                                     m_Contiguous.physical.LowPart |
+                                                     m_SystemMemoryBaseAddress,
+                                                     m_Contiguous.bytes,
+                                                     64,
+                                                     0,
+                                                     &m_ContiguousHeap);
+
+                if (gcmIS_SUCCESS(status))
+                {
+
+                    m_Contiguous.type      = gcvPHYSICAL_TYPE_PHYSICAL;
+                    m_Contiguous.attr     |= gcvPHYSICAL_ATTR_CONTIGUOUS;
+                    m_Contiguous.reference = 1;
+
+                    /* Success, abort loop. */
+                    break;
+                }
+
+                /* Free allocated contiguous memory. */
+                FreeMemory(m_Contiguous.bytes, m_Contiguous.logical, m_Contiguous.physical);
+            }
+        }
+
+        if (m_Contiguous.bytes == 0)
+        {
+            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
+        }
+        else
+        {
+            gcmkONERROR(status);
+        }
+    }
+
+
     if (m_InterruptIDs[gcvCORE_MAJOR] != INVALID_IRQ_NO)
     {
         gckDEVICE_AddCore(m_Device, gcvCORE_MAJOR, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_MAJOR]);
@@ -558,67 +621,6 @@ GCHAL::GCHAL(
 #endif
             m_External.reference = 1;
             gcmkASSERT(m_External.logical != gcvNULL);
-        }
-    }
-
-    if (m_Contiguous.physical.LowPart != ~0U)
-    {
-        /* Construct the contiguous memory heap. */
-        gcmkONERROR(gckVIDMEM_Construct(
-            m_Os,
-            m_Contiguous.physical.LowPart,
-            m_Contiguous.bytes,
-            64,
-            0,
-            &m_ContiguousHeap));
-
-        m_Contiguous.type      = gcvPHYSICAL_TYPE_RESERVED_PHYSICAL;
-        m_Contiguous.attr     |= gcvPHYSICAL_ATTR_CONTIGUOUS;
-        m_Contiguous.reference = 1;
-    }
-    else
-    {
-        // Try to allocate contiguous memory, starting at the specified value,
-        // decreasing 4MB each time until we proceed.
-        for (; m_Contiguous.bytes > 0; m_Contiguous.bytes -= 4 << 20)
-        {
-            // Allocate contiguous memory. */
-            if (AllocateMemory(m_Contiguous.bytes,
-                               m_Contiguous.logical,
-                               m_Contiguous.physical))
-            {
-                /* Construct the contiguous memory heap. */
-                gceSTATUS status = gckVIDMEM_Construct(m_Os,
-                                                     m_Contiguous.physical.LowPart |
-                                                     m_SystemMemoryBaseAddress,
-                                                     m_Contiguous.bytes,
-                                                     64,
-                                                     0,
-                                                     &m_ContiguousHeap);
-
-                if (gcmIS_SUCCESS(status))
-                {
-
-                    m_Contiguous.type      = gcvPHYSICAL_TYPE_PHYSICAL;
-                    m_Contiguous.attr     |= gcvPHYSICAL_ATTR_CONTIGUOUS;
-                    m_Contiguous.reference = 1;
-
-                    /* Success, abort loop. */
-                    break;
-                }
-
-                /* Free allocated contiguous memory. */
-                FreeMemory(m_Contiguous.bytes, m_Contiguous.logical, m_Contiguous.physical);
-            }
-        }
-
-        if (m_Contiguous.bytes == 0)
-        {
-            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-        }
-        else
-        {
-            gcmkONERROR(status);
         }
     }
 

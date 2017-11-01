@@ -3,8 +3,8 @@
 #Build Configuration
 #-------------------
 export AQROOT=$PWD/../../..
-export LDFLAGSVIV="${AQROOT}/build/sdk/drivers -lGAL -lm -ldl"
-export CFLAGS='-I${AQROOT}/build/sdk/include -L${LDFLAGSVIV}'
+export LDFLAGSVIV="${AQROOT}/hal/user/$(OBJ_DIR) -lGAL -lm -ldl"
+export CFLAGS='-I${AQROOT}/hal/inc -L${LDFLAGSVIV}'
 
 ./autogen.sh --prefix=/usr --libdir '/usr/lib'  --disable-static
 

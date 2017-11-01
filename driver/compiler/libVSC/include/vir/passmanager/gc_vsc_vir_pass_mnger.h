@@ -66,6 +66,13 @@ typedef union _VSC_PASS_RES_DESTROY_REQ_FLAG
         gctUINT                           bInvalidateWeb    : 1;
         gctUINT                           bInvalidateLvFlow : 1;
 
+        gctUINT                           bCgUnmodified     : 1;
+        gctUINT                           bCfgUnmodified    : 1;
+        gctUINT                           bRdFlowUnmodified : 1;
+        gctUINT                           bDuUnmodified     : 1;
+        gctUINT                           bWebUnmodified    : 1;
+        gctUINT                           bLvFlowUnmodified : 1;
+
         gctUINT                           reserved          : 26;
     } s;
 

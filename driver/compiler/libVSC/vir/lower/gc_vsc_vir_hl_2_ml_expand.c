@@ -1402,9 +1402,20 @@ _isNotCubeSampler(
     return gcvTRUE;
 }
 
+static gctBOOL
+_isLODQFixAndNotCubeSampler(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    return (Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasLODQFix
+            &&
+            _isNotCubeSampler(Context, Inst));
+}
+
 /* LODQ has precision issue when calculating the LOD for a samplerCube, so skip it. */
 static VIR_PatternMatchInst _intrinQueryLodPatInst0[] = {
-    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isNotCubeSampler }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isLODQFixAndNotCubeSampler }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _intrinQueryLodRepInst0[] = {
@@ -1838,6 +1849,10 @@ static VIR_Pattern* _intrisicPatterns[] = {
     _intrinQueryLodPattern, /* image_query_lod */
     _intrinQueryLevelsPattern, /* image_query_levels */
     _intrinQuerySamplesPattern, /* image_query_samples */
+    gcvNULL, /* image_get_width */
+    gcvNULL, /* image_get_height */
+    gcvNULL, /* image_get_depth */
+    gcvNULL, /* image_get_array_size */
 
     _intrinTexldPattern, /* texld */
     _intrinTexldpcfPattern, /* texldpcf */
@@ -2476,6 +2491,22 @@ _processEvisIntrinsic(
         default:
             break;
         }
+    }
+
+    if (opCode == VIR_OP_VX_DP16X1_B ||
+        opCode == VIR_OP_VX_DP8X2_B  ||
+        opCode == VIR_OP_VX_DP4X4_B  ||
+        opCode == VIR_OP_VX_DP2X8_B  ||
+        opCode == VIR_OP_VX_DP32X1_B ||
+        opCode == VIR_OP_VX_DP16X2_B ||
+        opCode == VIR_OP_VX_DP8X4_B  ||
+        opCode == VIR_OP_VX_DP4X8_B  ||
+        opCode == VIR_OP_VX_DP2X16_B)
+    {
+        /* set the src0 to be higher part of temp 256 register pair */
+        VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 0), VIR_OPNDFLAG_TEMP256_HIGH);
+        /* set the src1 to be lower part of temp 256 register pair */
+        VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 1), VIR_OPNDFLAG_TEMP256_LOW);
     }
 
 OnError:

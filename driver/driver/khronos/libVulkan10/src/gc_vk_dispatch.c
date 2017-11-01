@@ -22,19 +22,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetImageSparseMemoryRequirements(
 {
 }
 
-VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties(
-    VkPhysicalDevice physicalDevice,
-    VkFormat format,
-    VkImageType type,
-    VkSampleCountFlagBits samples,
-    VkImageUsageFlags usage,
-    VkImageTiling tiling,
-    uint32_t* pPropertyCount,
-    VkSparseImageFormatProperties* pProperties
-    )
-{
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueBindSparse(
     VkQueue queue,
     uint32_t bindInfoCount,

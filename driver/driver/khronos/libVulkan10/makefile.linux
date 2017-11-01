@@ -130,7 +130,7 @@ LDLIBS := \
     -lm \
     -L$(SDK_DIR)/drivers \
     -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
-    -L$(AQROOT)/compiler/libSPIRV/$(OBJ_DIR) -lSPIRV \
+    -L$(AQROOT)/compiler/libSPIRV/$(OBJ_DIR) -lSPIRV_viv \
     -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
     -L$(AQROOT)/compiler/libGLSLC/entry/$(OBJ_DIR) -lGLSLC
 
@@ -164,7 +164,7 @@ else
 # module dependencies
 $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so) \
-                  $(wildcard $(AQROOT)/compiler/libSPIRV/$(OBJ_DIR)/libSPIRV.so) \
+                  $(wildcard $(AQROOT)/compiler/libSPIRV/$(OBJ_DIR)/libSPIRV_viv.so) \
                   $(wildcard $(AQROOT)/compiler/libGLSLC/entry/$(OBJ_DIR)/libGLSLC.so)
 
 $(TARGET_MODULE): $(OBJECTS)

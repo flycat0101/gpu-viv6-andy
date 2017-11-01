@@ -1,0 +1,167 @@
+From abf3f5d194d4016c1f67398479c8133355c5170a Mon Sep 17 00:00:00 2001
+From: Zongzong Yan <zongzong.yan@verisilicon.com>
+Date: Thu, 24 Aug 2017 21:45:43 +0800
+Subject: [PATCH] use vivante fbdev backend on weston 1.7
+
+Signed-off-by: Zongzong Yan <zongzong.yan@verisilicon.com>
+
+diff --git a/Makefile.am b/Makefile.am
+index 1864b70..b327456 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -296,10 +296,11 @@ endif
+ if ENABLE_FBDEV_COMPOSITOR
+ module_LTLIBRARIES += fbdev-backend.la
+ fbdev_backend_la_LDFLAGS = -module -avoid-version
+ fbdev_backend_la_LIBADD =			\
+ 	$(COMPOSITOR_LIBS)			\
++	$(EGL_LIBS)                             \
+ 	$(FBDEV_COMPOSITOR_LIBS)		\
+ 	$(INPUT_BACKEND_LIBS)			\
+ 	libsession-helper.la			\
+ 	libshared.la
+ fbdev_backend_la_CFLAGS =			\
+diff --git a/src/compositor-fbdev.c b/src/compositor-fbdev.c
+index eedf252..1399310 100644
+--- a/src/compositor-fbdev.c
++++ b/src/compositor-fbdev.c
+@@ -52,10 +52,13 @@ struct fbdev_compositor {
+ 
+ 	struct udev *udev;
+ 	struct udev_input input;
+ 	int use_pixman;
+ 	struct wl_listener session_listener;
++#ifdef ENABLE_EGL
++	NativeDisplayType display;
++#endif
+ };
+ 
+ struct fbdev_screeninfo {
+ 	unsigned int x_resolution; /* pixels, visible area */
+ 	unsigned int y_resolution; /* pixels, visible area */
+@@ -86,10 +89,14 @@ struct fbdev_output {
+ 	/* pixman details. */
+ 	pixman_image_t *hw_surface;
+ 	pixman_image_t *shadow_surface;
+ 	void *shadow_buf;
+ 	uint8_t depth;
++#ifdef ENABLE_EGL
++	NativeDisplayType display;
++	NativeWindowType  window;
++#endif
+ };
+ 
+ struct fbdev_parameters {
+ 	int tty;
+ 	char *device;
+@@ -490,10 +497,17 @@ fbdev_frame_buffer_destroy(struct fbdev_output *output)
+ 	if (munmap(output->fb, output->fb_info.buffer_length) < 0)
+ 		weston_log("Failed to munmap frame buffer: %s\n",
+ 		           strerror(errno));
+ 
+ 	output->fb = NULL;
++
++#ifdef ENABLE_EGL
++	if (output->window)
++		fbDestroyWindow(output->window);
++	if (output->display)
++		fbDestroyDisplay(output->display);
++#endif
+ }
+ 
+ static void fbdev_output_destroy(struct weston_output *base);
+ static void fbdev_output_disable(struct weston_output *base);
+ 
+@@ -621,18 +635,34 @@ fbdev_output_create(struct fbdev_compositor *compositor,
+ 
+ 	if (compositor->use_pixman) {
+ 		if (pixman_renderer_output_create(&output->base) < 0)
+ 			goto out_shadow_surface;
+ 	} else {
++#ifdef ENABLE_EGL
++		setenv("HYBRIS_EGLPLATFORM", "wayland", 1);
++		output->window = fbCreateWindow(compositor->display, -1, -1, 0, 0);
++		if (output->window == NULL) {
++			fprintf(stderr, "failed to create window\n");
++			return 0;
++		}
++		if (gl_renderer->output_create(&output->base,
++					       (EGLNativeWindowType)output->window,
++					       gl_renderer->opaque_attribs,
++					       NULL) < 0) {
++			weston_log("gl_renderer_output_create failed.\n");
++			goto out_shadow_surface;
++		}
++#else
+ 		setenv("HYBRIS_EGLPLATFORM", "wayland", 1);
+ 		if (gl_renderer->output_create(&output->base,
+ 					       (EGLNativeWindowType)NULL,
+ 					       gl_renderer->opaque_attribs,
+ 					       NULL) < 0) {
+ 			weston_log("gl_renderer_output_create failed.\n");
+ 			goto out_shadow_surface;
+ 		}
++#endif
+ 	}
+ 
+ 
+ 	loop = wl_display_get_event_loop(compositor->base.wl_display);
+ 	output->finish_frame_timer =
+@@ -923,16 +953,31 @@ fbdev_compositor_create(struct wl_display *display, int *argc, char *argv[],
+ 		if (!gl_renderer) {
+ 			weston_log("could not load gl renderer\n");
+ 			goto out_launcher;
+ 		}
+ 
++#ifdef ENABLE_EGL
++		compositor->display = fbGetDisplay(compositor->base.wl_display);
++		if (compositor->display == NULL) {
++			weston_log("fbGetDisplay failed.\n");
++			goto out_launcher;
++		}
++
++		if (gl_renderer->create(&compositor->base, compositor->display,
++					gl_renderer->opaque_attribs,
++					NULL) < 0) {
++			weston_log("gl_renderer_create failed.\n");
++			goto out_launcher;
++		}
++#else
+ 		if (gl_renderer->create(&compositor->base, EGL_DEFAULT_DISPLAY,
+ 					gl_renderer->opaque_attribs,
+ 					NULL) < 0) {
+ 			weston_log("gl_renderer_create failed.\n");
+ 			goto out_launcher;
+ 		}
++#endif
+ 	}
+ 
+ 	if (fbdev_output_create(compositor, param->device) < 0)
+ 		goto out_pixman;
+ 
+@@ -965,17 +1010,21 @@ backend_init(struct wl_display *display, int *argc, char *argv[],
+ 	/* TODO: Ideally, available frame buffers should be enumerated using
+ 	 * udev, rather than passing a device node in as a parameter. */
+ 	struct fbdev_parameters param = {
+ 		.tty = 0, /* default to current tty */
+ 		.device = "/dev/fb0", /* default frame buffer */
++#ifdef ENABLE_EGL
++		.use_gl = 1,
++#else
+ 		.use_gl = 0,
++#endif
+ 	};
+ 
+ 	const struct weston_option fbdev_options[] = {
+ 		{ WESTON_OPTION_INTEGER, "tty", 0, &param.tty },
+ 		{ WESTON_OPTION_STRING, "device", 0, &param.device },
+-		{ WESTON_OPTION_BOOLEAN, "use-gl", 0, &param.use_gl },
++		{ WESTON_OPTION_INTEGER, "use-gl", 0, &param.use_gl },
+ 	};
+ 
+ 	parse_options(fbdev_options, ARRAY_LENGTH(fbdev_options), argc, argv);
+ 
+ 	return fbdev_compositor_create(display, argc, argv, config, &param);
+-- 
+1.9.1
+

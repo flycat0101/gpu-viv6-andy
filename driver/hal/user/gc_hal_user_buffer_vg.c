@@ -3187,6 +3187,9 @@ gcoVGBUFFER_Commit(
             /* Make sure all commands have been executed. */
             if (Stall && (Buffer->completionPrevious != gcvVACANT_BUFFER))
             {
+#if gcdDUMP_2DVG
+                gcmDUMP(gcvNULL, "@[stall]");
+#endif
                 /* Report current location. */
                 gcmLOG_LOCATION();
 
@@ -3313,40 +3316,6 @@ gcoVGBUFFER_Commit(
 
         /* Determine the length of the queue. */
         queueLength = (gctUINT32)(Buffer->queueCurrent - Buffer->queueFirst + 1);
-
-        /* Dump the command buffer. */
-        if (Buffer->hal->dump != gcvNULL)
-        {
-            gctUINT i;
-            gcsVGCMDQUEUE_PTR queueTemp;
-            gcsCMDBUFFER_PTR commandBuffer;
-            gctUINT8_PTR data;
-
-            /* Start scanning from the first queue entry. */
-            queueTemp = Buffer->queueFirst;
-
-            /* Scan the queue. */
-            for (i = 0; i < queueLength; i++)
-            {
-                /* Get the command buffer pointer. */
-                commandBuffer = queueTemp->commandBuffer;
-
-                /* Determine the data logical pointer. */
-                data
-                    = (gctUINT8_PTR) commandBuffer
-                    + commandBuffer->bufferOffset;
-
-                /* Dump it. */
-                gcmVERIFY_OK(gcoDUMP_DumpData(
-                    Buffer->hal->dump, gcvTAG_COMMAND,
-                    0, commandBuffer->offset, data
-                    ));
-
-                /* Advance to the next entry. */
-                queueTemp += 1;
-            }
-        }
-
         gcmBUFFER_TRACE(
             gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
             "%s: queue length=%d, task couint=%d\n",
@@ -3363,15 +3332,58 @@ gcoVGBUFFER_Commit(
         halInterface.u.VGCommit.taskTable  = gcmPTR_TO_UINT64(&Buffer->taskTable);
 
         /* Call kernel service. */
-        gcmERR_BREAK(gcoOS_DeviceControl(
+         gcmERR_BREAK(gcoOS_DeviceControl(
             Buffer->os,
             IOCTL_GCHAL_INTERFACE,
             &halInterface, gcmSIZEOF(halInterface),
             &halInterface, gcmSIZEOF(halInterface)
             ));
-
         /* Verify the result. */
         gcmERR_BREAK(halInterface.status);
+#if gcdDUMP_2DVG
+        {
+            gctUINT i;
+            gcsVGCMDQUEUE_PTR queueTemp;
+            gcsCMDBUFFER_PTR commandBuffer;
+            gctUINT8_PTR data;
+            gcsCOMMAND_BUFFER_INFO_PTR bufferInfo;
+            gctUINT commandAlignment;
+            gctUINT bufferDataSize;
+
+            bufferInfo = &Buffer->bufferInfo;
+            commandAlignment  = bufferInfo->commandAlignment;
+            /* Start scanning from the first queue entry. */
+            queueTemp = Buffer->queueFirst;
+
+            /* The first entry is always the context buffer, so dump from the second queue entry */
+            queueTemp += 1;
+            /* Scan the queue. */
+            for (i = 0; i < queueLength - 1; i++)
+            {
+                /* Get the command buffer pointer. */
+                commandBuffer = queueTemp->commandBuffer;
+
+                /* Determine the data logical pointer. */
+                data
+                    = (gctUINT8_PTR) commandBuffer
+                    + commandBuffer->bufferOffset;
+
+
+                bufferDataSize = commandBuffer->dataCount * commandAlignment;
+                /* Dump it. */
+                gcmDUMP_BUFFER(gcvNULL,
+                    "command",
+                    commandBuffer->address,
+                    data,
+                    0,
+                    bufferDataSize);
+
+                /* Advance to the next entry. */
+                queueTemp += 1;
+            }
+        }
+        gcmDUMP(gcvNULL, "@[commit]");
+#endif
 
         /* Report current location. */
         gcmLOG_LOCATION();
@@ -3383,6 +3395,10 @@ gcoVGBUFFER_Commit(
 
             /* Report current location. */
             gcmLOG_LOCATION();
+
+#if gcdDUMP_2DVG
+            gcmDUMP(gcvNULL, "@[stall]");
+#endif
 
             /* Wait until the buffer is executed. */
             gcmERR_BREAK(_WaitForComplete(Buffer, Buffer->completionPrevious));

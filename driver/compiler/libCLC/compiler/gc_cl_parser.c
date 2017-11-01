@@ -685,7 +685,7 @@ union yyalloc
 /* YYNNTS -- Number of nonterminals. */
 #define YYNNTS  111
 /* YYNRULES -- Number of rules. */
-#define YYNRULES  325
+#define YYNRULES  326
 /* YYNRULES -- Number of states. */
 #define YYNSTATES  559
 
@@ -781,14 +781,14 @@ static const unsigned short yyprhs[] =
      710,   712,   714,   716,   718,   720,   722,   724,   726,   728,
      730,   732,   734,   736,   738,   740,   742,   744,   746,   747,
      755,   756,   763,   764,   772,   773,   780,   782,   785,   789,
-     791,   795,   798,   802,   804,   806,   810,   814,   817,   822,
-     823,   826,   828,   829,   833,   837,   840,   842,   844,   846,
-     848,   850,   852,   854,   856,   859,   862,   865,   868,   869,
-     874,   876,   878,   881,   882,   887,   889,   892,   894,   897,
-     903,   909,   911,   914,   916,   920,   923,   926,   927,   932,
-     936,   938,   939,   946,   954,   955,   961,   964,   967,   971,
-     973,   974,   978,   983,   987,   992,   995,   998,  1001,  1005,
-    1009,  1010,  1013,  1015,  1017,  1019
+     791,   795,   796,   799,   803,   805,   807,   811,   815,   818,
+     823,   824,   827,   829,   830,   834,   838,   841,   843,   845,
+     847,   849,   851,   853,   855,   857,   860,   863,   866,   869,
+     870,   875,   877,   879,   882,   883,   888,   890,   893,   895,
+     898,   904,   910,   912,   915,   917,   921,   924,   927,   928,
+     933,   937,   939,   940,   947,   955,   956,   962,   965,   968,
+     972,   974,   975,   979,   984,   988,   993,   996,   999,  1002,
+    1006,  1010,  1011,  1014,  1016,  1018,  1020
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS. */
@@ -873,30 +873,30 @@ static const short yyrhs[] =
      244,   322,    -1,    -1,   331,   320,   162,   243,   335,   337,
      244,    -1,    -1,   331,   320,   243,   336,   337,   244,    -1,
      338,    -1,   337,   338,    -1,   327,   339,   249,    -1,   340,
-      -1,   339,   246,   340,    -1,   310,   322,    -1,   310,   312,
-     322,    -1,   243,    -1,   290,    -1,   341,   343,   244,    -1,
-     341,   343,   193,    -1,   344,   342,    -1,   343,   246,   344,
-     342,    -1,    -1,   345,   248,    -1,   347,    -1,    -1,   345,
-     346,   347,    -1,   241,   293,   242,    -1,   245,   170,    -1,
-     298,    -1,   351,    -1,   350,    -1,   348,    -1,   357,    -1,
-     358,    -1,   364,    -1,   370,    -1,   162,   247,    -1,     1,
-     249,    -1,     1,   244,    -1,   243,   244,    -1,    -1,   243,
-     352,   356,   244,    -1,   354,    -1,   350,    -1,   243,   244,
-      -1,    -1,   243,   355,   356,   244,    -1,   349,    -1,   356,
-     349,    -1,   249,    -1,   292,   249,    -1,   202,   239,   292,
-     240,   363,    -1,   203,   239,   268,   240,   361,    -1,   360,
-      -1,   359,   360,    -1,   349,    -1,   204,   293,   247,    -1,
-     205,   247,    -1,   243,   244,    -1,    -1,   243,   362,   359,
-     244,    -1,   349,   201,   349,    -1,   349,    -1,    -1,   198,
-     365,   239,   292,   240,   353,    -1,   200,   349,   198,   239,
-     292,   240,   249,    -1,    -1,   199,   366,   367,   369,   353,
-      -1,   239,   357,    -1,   239,   348,    -1,   239,     1,   249,
-      -1,   292,    -1,    -1,   368,   249,   240,    -1,   368,   249,
-     292,   240,    -1,     1,   249,   240,    -1,     1,   249,   292,
-     240,    -1,   195,   249,    -1,   194,   249,    -1,   196,   249,
-      -1,   196,   292,   249,    -1,   197,   162,   249,    -1,    -1,
-     371,   372,    -1,   373,    -1,   298,    -1,   249,    -1,   299,
-     354,    -1
+      -1,   339,   246,   340,    -1,    -1,   310,   322,    -1,   310,
+     312,   322,    -1,   243,    -1,   290,    -1,   341,   343,   244,
+      -1,   341,   343,   193,    -1,   344,   342,    -1,   343,   246,
+     344,   342,    -1,    -1,   345,   248,    -1,   347,    -1,    -1,
+     345,   346,   347,    -1,   241,   293,   242,    -1,   245,   170,
+      -1,   298,    -1,   351,    -1,   350,    -1,   348,    -1,   357,
+      -1,   358,    -1,   364,    -1,   370,    -1,   162,   247,    -1,
+       1,   249,    -1,     1,   244,    -1,   243,   244,    -1,    -1,
+     243,   352,   356,   244,    -1,   354,    -1,   350,    -1,   243,
+     244,    -1,    -1,   243,   355,   356,   244,    -1,   349,    -1,
+     356,   349,    -1,   249,    -1,   292,   249,    -1,   202,   239,
+     292,   240,   363,    -1,   203,   239,   268,   240,   361,    -1,
+     360,    -1,   359,   360,    -1,   349,    -1,   204,   293,   247,
+      -1,   205,   247,    -1,   243,   244,    -1,    -1,   243,   362,
+     359,   244,    -1,   349,   201,   349,    -1,   349,    -1,    -1,
+     198,   365,   239,   292,   240,   353,    -1,   200,   349,   198,
+     239,   292,   240,   249,    -1,    -1,   199,   366,   367,   369,
+     353,    -1,   239,   357,    -1,   239,   348,    -1,   239,     1,
+     249,    -1,   292,    -1,    -1,   368,   249,   240,    -1,   368,
+     249,   292,   240,    -1,     1,   249,   240,    -1,     1,   249,
+     292,   240,    -1,   195,   249,    -1,   194,   249,    -1,   196,
+     249,    -1,   196,   292,   249,    -1,   197,   162,   249,    -1,
+      -1,   371,   372,    -1,   373,    -1,   298,    -1,   249,    -1,
+     299,   354,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
@@ -927,14 +927,14 @@ static const unsigned short yyrline[] =
      858,   860,   862,   864,   866,   868,   870,   872,   874,   876,
      878,   880,   882,   884,   886,   888,   892,   894,   900,   899,
      904,   903,   908,   907,   912,   911,   918,   922,   935,   942,
-     944,   949,   951,   956,   978,   980,   982,   987,   989,   994,
-     995,  1008,  1011,  1010,  1019,  1032,  1048,  1053,  1055,  1060,
-    1062,  1064,  1066,  1068,  1070,  1072,  1076,  1083,  1086,  1085,
-    1092,  1094,  1099,  1102,  1101,  1108,  1110,  1115,  1117,  1122,
-    1124,  1129,  1131,  1136,  1138,  1140,  1145,  1148,  1147,  1154,
-    1156,  1164,  1163,  1167,  1170,  1169,  1176,  1178,  1180,  1187,
-    1190,  1194,  1196,  1198,  1204,  1213,  1215,  1217,  1219,  1221,
-    1227,  1228,  1232,  1233,  1235,  1239
+     944,   949,   950,   952,   957,   979,   981,   983,   988,   990,
+     995,   996,  1009,  1012,  1011,  1020,  1033,  1049,  1054,  1056,
+    1061,  1063,  1065,  1067,  1069,  1071,  1073,  1077,  1084,  1087,
+    1086,  1093,  1095,  1100,  1103,  1102,  1109,  1111,  1116,  1118,
+    1123,  1125,  1130,  1132,  1137,  1139,  1141,  1146,  1149,  1148,
+    1155,  1157,  1165,  1164,  1168,  1171,  1170,  1177,  1179,  1181,
+    1188,  1191,  1195,  1197,  1199,  1205,  1214,  1216,  1218,  1220,
+    1222,  1228,  1229,  1233,  1234,  1236,  1240
 };
 #endif
 
@@ -1097,14 +1097,14 @@ static const unsigned short yyr1[] =
      330,   330,   330,   330,   330,   330,   330,   330,   330,   330,
      330,   330,   330,   330,   330,   330,   331,   331,   333,   332,
      334,   332,   335,   332,   336,   332,   337,   337,   338,   339,
-     339,   340,   340,   341,   342,   342,   342,   343,   343,   344,
-     344,   345,   346,   345,   347,   347,   348,   349,   349,   350,
-     350,   350,   350,   350,   350,   350,   350,   351,   352,   351,
-     353,   353,   354,   355,   354,   356,   356,   357,   357,   358,
-     358,   359,   359,   360,   360,   360,   361,   362,   361,   363,
-     363,   365,   364,   364,   366,   364,   367,   367,   367,   368,
-     368,   369,   369,   369,   369,   370,   370,   370,   370,   370,
-     371,   371,   372,   372,   372,   373
+     339,   340,   340,   340,   341,   342,   342,   342,   343,   343,
+     344,   344,   345,   346,   345,   347,   347,   348,   349,   349,
+     350,   350,   350,   350,   350,   350,   350,   350,   351,   352,
+     351,   353,   353,   354,   355,   354,   356,   356,   357,   357,
+     358,   358,   359,   359,   360,   360,   360,   361,   362,   361,
+     363,   363,   365,   364,   364,   366,   364,   367,   367,   367,
+     368,   368,   369,   369,   369,   369,   370,   370,   370,   370,
+     370,   371,   371,   372,   372,   372,   373
 };
 
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
@@ -1135,14 +1135,14 @@ static const unsigned char yyr2[] =
        1,     1,     1,     1,     1,     1,     1,     1,     1,     1,
        1,     1,     1,     1,     1,     1,     1,     1,     0,     7,
        0,     6,     0,     7,     0,     6,     1,     2,     3,     1,
-       3,     2,     3,     1,     1,     3,     3,     2,     4,     0,
-       2,     1,     0,     3,     3,     2,     1,     1,     1,     1,
-       1,     1,     1,     1,     2,     2,     2,     2,     0,     4,
-       1,     1,     2,     0,     4,     1,     2,     1,     2,     5,
-       5,     1,     2,     1,     3,     2,     2,     0,     4,     3,
-       1,     0,     6,     7,     0,     5,     2,     2,     3,     1,
-       0,     3,     4,     3,     4,     2,     2,     2,     3,     3,
-       0,     2,     1,     1,     1,     2
+       3,     0,     2,     3,     1,     1,     3,     3,     2,     4,
+       0,     2,     1,     0,     3,     3,     2,     1,     1,     1,
+       1,     1,     1,     1,     1,     2,     2,     2,     2,     0,
+       4,     1,     1,     2,     0,     4,     1,     2,     1,     2,
+       5,     5,     1,     2,     1,     3,     2,     2,     0,     4,
+       3,     1,     0,     6,     7,     0,     5,     2,     2,     3,
+       1,     0,     3,     4,     3,     4,     2,     2,     2,     3,
+       3,     0,     2,     1,     1,     1,     2
 };
 
 /* YYDEFACT[STATE-NAME] -- Default rule to reduce with in state
@@ -1150,15 +1150,15 @@ static const unsigned char yyr2[] =
    means the default is an error.  */
 static const unsigned short yydefact[] =
 {
-     320,     0,     1,   212,   215,   213,   214,   229,   221,   222,
+     321,     0,     1,   212,   215,   213,   214,   229,   221,   222,
      223,   224,   225,   228,   226,   227,   233,   234,   230,   231,
      232,   216,   217,   218,   219,   220,   235,   198,   199,   200,
      205,   206,   201,   202,   203,   204,   173,   207,     0,   236,
-     237,   156,     0,     0,     0,   324,   210,   211,   323,   164,
+     237,   156,     0,     0,     0,   325,   210,   211,   324,   164,
        0,   117,   116,     0,     0,   155,     0,     0,   141,   194,
-     208,     0,   209,   321,   322,     0,   173,   174,     0,     0,
+     208,     0,   209,   322,   323,     0,   173,   174,     0,     0,
        0,    98,     0,     0,   205,   206,   210,   211,     0,   209,
-       0,   113,     0,   283,   325,   115,     0,   137,   138,   129,
+       0,   113,     0,   284,   326,   115,     0,   137,   138,   129,
      118,     0,   131,     0,   139,   195,     0,   111,     0,     0,
      147,     0,   143,     0,   149,   173,   142,   196,    97,   240,
        0,   114,     0,     0,     0,   171,   164,   157,     0,   109,
@@ -1167,7 +1167,7 @@ static const unsigned short yydefact[] =
       43,    48,    47,     5,    11,    13,    35,    15,     0,    31,
        0,     0,    49,    30,     0,    53,    56,    59,    64,    67,
       69,    71,    73,    75,    77,    79,    81,    94,   193,     0,
-     188,   112,   282,     0,   119,   130,   132,   133,     0,   135,
+     188,   112,   283,     0,   119,   130,   132,   133,     0,   135,
        0,   127,   173,     0,     0,     0,   145,   144,   148,   123,
      151,   173,   165,   238,     0,     0,   244,     0,     0,     0,
      175,     0,     0,   106,   105,     0,     0,     0,   125,    28,
@@ -1177,35 +1177,35 @@ static const unsigned short yydefact[] =
       91,    92,    93,    88,    83,     0,    42,    30,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,   197,
-       0,   190,     0,     2,     0,     0,     0,     0,   301,   304,
-       0,     0,     0,   278,   287,     0,   266,   269,   285,   268,
-     267,     0,   270,   271,   272,   273,   134,   136,    96,     0,
+       0,   190,     0,     2,     0,     0,     0,     0,   302,   305,
+       0,     0,     0,   279,   288,     0,   267,   270,   286,   269,
+     268,     0,   271,   272,   273,   274,   134,   136,    96,     0,
      128,   173,   158,     0,   124,   150,   146,   152,     0,   151,
-     166,   167,     0,     0,     0,   246,   242,     0,   126,     0,
+     166,   167,     0,   251,     0,   246,   242,     0,   126,     0,
      121,   180,   185,     0,     0,     0,     0,     0,   187,     0,
      176,   102,   101,   110,   108,     0,   104,   103,     0,     0,
       12,    26,     0,    17,     0,    20,    16,    25,    32,    22,
       34,    33,    82,    50,    51,    52,    55,    54,    57,    58,
       62,    63,    60,    61,    65,    66,    68,    70,    72,    74,
-      76,    78,     0,    95,     0,     0,   276,   275,   274,   316,
-     315,   317,     0,     0,     0,     0,     0,     0,     0,   277,
-       0,   288,   284,   286,   140,   159,   160,   120,   153,     0,
+      76,    78,     0,    95,     0,     0,   277,   276,   275,   317,
+     316,   318,     0,     0,     0,     0,     0,     0,     0,   278,
+       0,   289,   285,   287,   140,   159,   160,   120,   153,     0,
      169,     0,     0,   173,     0,   249,   173,   247,     0,     0,
      122,     0,     0,     0,     0,     0,     0,     0,   177,   100,
-      99,     0,    38,    27,    14,     0,   189,     0,   318,   319,
+      99,     0,    38,    27,    14,     0,   189,     0,   319,   320,
        0,     0,     0,     0,     0,     0,     0,   162,     0,   154,
-       0,   253,   254,   259,   168,   173,   173,   251,     0,   248,
+       0,   254,   255,   260,   168,   173,   173,   252,   251,   248,
      241,     0,   245,     0,     0,     0,     0,     0,     0,   172,
-       0,    27,     0,    80,   191,     0,     0,   307,   306,     0,
-     309,     0,     0,     0,     0,     0,   279,     0,   161,   170,
-       0,     0,     0,     0,   262,   261,   239,   252,   250,   243,
-     186,   179,   181,     0,     0,     0,   178,     0,     0,   308,
-       0,     0,   281,   305,   280,     0,   300,   289,   297,   290,
-     163,     0,   265,   256,   255,   259,   257,   260,     0,     0,
-       0,     0,   192,   302,   313,     0,   311,     0,     0,     0,
-     296,     0,   264,     0,   263,     0,     0,     0,   314,   312,
-     303,   299,     0,     0,   293,     0,   291,   258,     0,     0,
-       0,     0,   295,   298,   292,   182,   183,   184,   294
+       0,    27,     0,    80,   191,     0,     0,   308,   307,     0,
+     310,     0,     0,     0,     0,     0,   280,     0,   161,   170,
+       0,     0,     0,     0,   263,   262,   239,   253,   250,   243,
+     186,   179,   181,     0,     0,     0,   178,     0,     0,   309,
+       0,     0,   282,   306,   281,     0,   301,   290,   298,   291,
+     163,     0,   266,   257,   256,   260,   258,   261,     0,     0,
+       0,     0,   192,   303,   314,     0,   312,     0,     0,     0,
+     297,     0,   265,     0,   264,     0,     0,     0,   315,   313,
+     304,   300,     0,     0,   294,     0,   292,   259,     0,     0,
+       0,     0,   296,   299,   293,   182,   183,   184,   295
 };
 
 /* YYDEFGOTO[NTERM-NUM]. */
@@ -1309,7 +1309,7 @@ static const short yypgoto[] =
    positive, shift that token.  If negative, reduce the rule which
    number is the opposite.  If zero, do what YYDEFACT says.
    If YYTABLE_NINF, syntax error.  */
-#define YYTABLE_NINF -311
+#define YYTABLE_NINF -312
 static const short yytable[] =
 {
       46,    47,   153,   386,    62,   100,    67,   168,   187,    82,
@@ -1370,7 +1370,7 @@ static const short yytable[] =
        8,     9,    10,    11,    12,    13,    14,    15,    16,    17,
       18,    19,    20,   313,   298,   298,   298,     0,     0,     0,
        0,   298,   134,     0,   135,     0,     0,   213,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,  -310,   137,   138,
+       0,     0,     0,     0,     0,     0,     0,  -311,   137,   138,
      139,   140,   141,     0,     0,     0,     0,     0,     0,   142,
       27,    28,    29,    74,    75,    32,    33,    34,    35,     0,
       37,     0,    21,    22,    23,    24,    25,   273,    26,   126,
@@ -3915,42 +3915,42 @@ yyreduce:
 
   case 238:
 #line 900 "gc_cl.y"
-    { clParseStructDeclBegin(Compiler, &yyvsp[-1].token); ;}
+    { clParseStructDeclBegin(Compiler, &yyvsp[-2].token,  &yyvsp[-1].token); ;}
     break;
 
   case 239:
 #line 902 "gc_cl.y"
-    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-6].token, &yyvsp[-5].token, yyvsp[0].attr, yyvsp[-2].status); ;}
+    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-5].token, yyvsp[0].attr, yyvsp[-2].status); ;}
     break;
 
   case 240:
 #line 904 "gc_cl.y"
-    { clParseStructDeclBegin(Compiler, gcvNULL); ;}
+    { clParseStructDeclBegin(Compiler, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 241:
 #line 906 "gc_cl.y"
-    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-5].token, gcvNULL, yyvsp[0].attr, yyvsp[-2].status); ;}
+    { yyval.dataType = clParseStructDeclEnd(Compiler, gcvNULL, yyvsp[0].attr, yyvsp[-2].status); ;}
     break;
 
   case 242:
 #line 908 "gc_cl.y"
-    { clParseStructDeclBegin(Compiler, &yyvsp[-1].token); ;}
+    { clParseStructDeclBegin(Compiler, &yyvsp[-3].token, &yyvsp[-1].token); ;}
     break;
 
   case 243:
 #line 910 "gc_cl.y"
-    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-6].token, &yyvsp[-4].token, yyvsp[-5].attr, yyvsp[-1].status); ;}
+    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-4].token, yyvsp[-5].attr, yyvsp[-1].status); ;}
     break;
 
   case 244:
 #line 912 "gc_cl.y"
-    { clParseStructDeclBegin(Compiler, gcvNULL); ;}
+    { clParseStructDeclBegin(Compiler, &yyvsp[-2].token, gcvNULL); ;}
     break;
 
   case 245:
 #line 914 "gc_cl.y"
-    { yyval.dataType = clParseStructDeclEnd(Compiler, &yyvsp[-5].token, gcvNULL, yyvsp[-4].attr, yyvsp[-1].status); ;}
+    { yyval.dataType = clParseStructDeclEnd(Compiler, gcvNULL, yyvsp[-4].attr, yyvsp[-1].status); ;}
     break;
 
   case 246:
@@ -3991,17 +3991,22 @@ yyreduce:
     break;
 
   case 251:
-#line 950 "gc_cl.y"
-    { yyval.fieldDecl = clParseFieldDecl(Compiler, &yyvsp[-1].token, gcvNULL, yyvsp[0].attr); ;}
+#line 949 "gc_cl.y"
+    { yyval.fieldDecl = clParseFieldDecl(Compiler, gcvNULL, gcvNULL, gcvNULL); ;}
     break;
 
   case 252:
-#line 952 "gc_cl.y"
-    { yyval.fieldDecl = clParseFieldDecl(Compiler, &yyvsp[-2].token, yyvsp[-1].expr, yyvsp[0].attr); ;}
+#line 951 "gc_cl.y"
+    { yyval.fieldDecl = clParseFieldDecl(Compiler, &yyvsp[-1].token, gcvNULL, yyvsp[0].attr); ;}
     break;
 
   case 253:
-#line 957 "gc_cl.y"
+#line 953 "gc_cl.y"
+    { yyval.fieldDecl = clParseFieldDecl(Compiler, &yyvsp[-2].token, yyvsp[-1].expr, yyvsp[0].attr); ;}
+    break;
+
+  case 254:
+#line 958 "gc_cl.y"
     {
            cloIR_TYPECAST_ARGS typeCastArgs;
            gceSTATUS status;
@@ -4021,38 +4026,38 @@ yyreduce:
         ;}
     break;
 
-  case 254:
-#line 979 "gc_cl.y"
+  case 255:
+#line 980 "gc_cl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
-  case 255:
-#line 981 "gc_cl.y"
-    { yyval.expr = yyvsp[-1].expr; ;}
-    break;
-
   case 256:
-#line 983 "gc_cl.y"
+#line 982 "gc_cl.y"
     { yyval.expr = yyvsp[-1].expr; ;}
     break;
 
   case 257:
-#line 988 "gc_cl.y"
-    { yyval.expr = clParseInitializerList(Compiler, yyvsp[-2].expr, yyvsp[-1].declOrDeclList, yyvsp[0].expr); ;}
+#line 984 "gc_cl.y"
+    { yyval.expr = yyvsp[-1].expr; ;}
     break;
 
   case 258:
-#line 990 "gc_cl.y"
-    { yyval.expr = clParseInitializerList(Compiler, yyvsp[-3].expr, yyvsp[-1].declOrDeclList, yyvsp[0].expr); ;}
+#line 989 "gc_cl.y"
+    { yyval.expr = clParseInitializerList(Compiler, yyvsp[-2].expr, yyvsp[-1].declOrDeclList, yyvsp[0].expr); ;}
     break;
 
   case 259:
-#line 994 "gc_cl.y"
-    { yyval.declOrDeclList = gcvNULL; ;}
+#line 991 "gc_cl.y"
+    { yyval.expr = clParseInitializerList(Compiler, yyvsp[-3].expr, yyvsp[-1].declOrDeclList, yyvsp[0].expr); ;}
     break;
 
   case 260:
-#line 996 "gc_cl.y"
+#line 995 "gc_cl.y"
+    { yyval.declOrDeclList = gcvNULL; ;}
+    break;
+
+  case 261:
+#line 997 "gc_cl.y"
     {
            gceSTATUS status;
            status = cloCOMPILER_PushDesignationScope(Compiler,
@@ -4064,25 +4069,25 @@ yyreduce:
         ;}
     break;
 
-  case 261:
-#line 1009 "gc_cl.y"
+  case 262:
+#line 1010 "gc_cl.y"
     { yyval.declOrDeclList = yyvsp[0].declOrDeclList; ;}
     break;
 
-  case 262:
-#line 1011 "gc_cl.y"
+  case 263:
+#line 1012 "gc_cl.y"
     {
            yyval.token.type = T_EOF;
         ;}
     break;
 
-  case 263:
-#line 1015 "gc_cl.y"
+  case 264:
+#line 1016 "gc_cl.y"
     { yyval.declOrDeclList = yyvsp[0].declOrDeclList; ;}
     break;
 
-  case 264:
-#line 1020 "gc_cl.y"
+  case 265:
+#line 1021 "gc_cl.y"
     {
           clsLexToken *token;
 
@@ -4097,8 +4102,8 @@ yyreduce:
         ;}
     break;
 
-  case 265:
-#line 1033 "gc_cl.y"
+  case 266:
+#line 1034 "gc_cl.y"
     {
           clsLexToken *token;
 
@@ -4113,258 +4118,249 @@ yyreduce:
         ;}
     break;
 
-  case 266:
-#line 1049 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
-    break;
-
   case 267:
-#line 1054 "gc_cl.y"
-    { yyval.statement = clParseCompoundStatementAsStatement(Compiler, yyvsp[0].statements); ;}
+#line 1050 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 268:
-#line 1056 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
+#line 1055 "gc_cl.y"
+    { yyval.statement = clParseCompoundStatementAsStatement(Compiler, yyvsp[0].statements); ;}
     break;
 
   case 269:
-#line 1061 "gc_cl.y"
+#line 1057 "gc_cl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 270:
-#line 1063 "gc_cl.y"
+#line 1062 "gc_cl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 271:
-#line 1065 "gc_cl.y"
+#line 1064 "gc_cl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 272:
-#line 1067 "gc_cl.y"
+#line 1066 "gc_cl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 273:
-#line 1069 "gc_cl.y"
+#line 1068 "gc_cl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 274:
-#line 1071 "gc_cl.y"
-    { yyval.statement = clParseStatementLabel(Compiler, &yyvsp[-1].token); ;}
+#line 1070 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 275:
-#line 1073 "gc_cl.y"
-    { yyclearin;
-          yyerrok;
-          yyval.statement = gcvNULL; ;}
+#line 1072 "gc_cl.y"
+    { yyval.statement = clParseStatementLabel(Compiler, &yyvsp[-1].token); ;}
     break;
 
   case 276:
-#line 1077 "gc_cl.y"
+#line 1074 "gc_cl.y"
     { yyclearin;
           yyerrok;
           yyval.statement = gcvNULL; ;}
     break;
 
   case 277:
-#line 1084 "gc_cl.y"
-    { yyval.statements = gcvNULL; ;}
-    break;
-
-  case 278:
-#line 1086 "gc_cl.y"
-    { clParseCompoundStatementBegin(Compiler); ;}
-    break;
-
-  case 279:
-#line 1088 "gc_cl.y"
-    { yyval.statements = clParseCompoundStatementEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
-    break;
-
-  case 280:
-#line 1093 "gc_cl.y"
-    { yyval.statement = clParseCompoundStatementNoNewScopeAsStatementNoNewScope(Compiler, yyvsp[0].statements); ;}
-    break;
-
-  case 281:
-#line 1095 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
-    break;
-
-  case 282:
-#line 1100 "gc_cl.y"
-    { yyval.statements = gcvNULL; ;}
-    break;
-
-  case 283:
-#line 1102 "gc_cl.y"
-    { clParseCompoundStatementNoNewScopeBegin(Compiler); ;}
-    break;
-
-  case 284:
-#line 1104 "gc_cl.y"
-    { yyval.statements = clParseCompoundStatementNoNewScopeEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
-    break;
-
-  case 285:
-#line 1109 "gc_cl.y"
-    { yyval.statements = clParseStatementList(Compiler, yyvsp[0].statement); ;}
-    break;
-
-  case 286:
-#line 1111 "gc_cl.y"
-    { yyval.statements = clParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
-    break;
-
-  case 287:
-#line 1116 "gc_cl.y"
-    { yyval.statement = gcvNULL; ;}
-    break;
-
-  case 288:
-#line 1118 "gc_cl.y"
-    { yyval.statement = clParseExprAsStatement(Compiler, yyvsp[-1].expr); ;}
-    break;
-
-  case 289:
-#line 1123 "gc_cl.y"
-    { yyval.statement = clParseIfStatement(Compiler, &yyvsp[-4].token, yyvsp[-2].expr, yyvsp[0].ifStatementPair); ;}
-    break;
-
-  case 290:
-#line 1125 "gc_cl.y"
-    { yyval.statement = clParseSwitchStatement(Compiler, &yyvsp[-4].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
-    break;
-
-  case 291:
-#line 1130 "gc_cl.y"
-    { yyval.statements = clParseStatementList(Compiler, yyvsp[0].statement); ;}
-    break;
-
-  case 292:
-#line 1132 "gc_cl.y"
-    { yyval.statements = clParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
-    break;
-
-  case 293:
-#line 1137 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
-    break;
-
-  case 294:
-#line 1139 "gc_cl.y"
-    { yyval.statement = clParseCaseStatement(Compiler, &yyvsp[-2].token, yyvsp[-1].expr); ;}
-    break;
-
-  case 295:
-#line 1141 "gc_cl.y"
-    { yyval.statement = clParseDefaultStatement(Compiler, &yyvsp[-1].token); ;}
-    break;
-
-  case 296:
-#line 1146 "gc_cl.y"
-    { yyval.statement = gcvNULL; ;}
-    break;
-
-  case 297:
-#line 1148 "gc_cl.y"
-    { clParseSwitchBodyBegin(Compiler); ;}
-    break;
-
-  case 298:
-#line 1150 "gc_cl.y"
-    { yyval.statement = clParseSwitchBodyEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
-    break;
-
-  case 299:
-#line 1155 "gc_cl.y"
-    { yyval.ifStatementPair = clParseIfSubStatements(Compiler, yyvsp[-2].statement, yyvsp[0].statement); ;}
-    break;
-
-  case 300:
-#line 1157 "gc_cl.y"
-    { yyval.ifStatementPair = clParseIfSubStatements(Compiler, yyvsp[0].statement, gcvNULL); ;}
-    break;
-
-  case 301:
-#line 1164 "gc_cl.y"
-    { clParseWhileStatementBegin(Compiler); ;}
-    break;
-
-  case 302:
-#line 1166 "gc_cl.y"
-    { yyval.statement = clParseWhileStatementEnd(Compiler, &yyvsp[-5].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
-    break;
-
-  case 303:
-#line 1168 "gc_cl.y"
-    { yyval.statement = clParseDoWhileStatement(Compiler, &yyvsp[-6].token, yyvsp[-5].statement, yyvsp[-2].expr); ;}
-    break;
-
-  case 304:
-#line 1170 "gc_cl.y"
-    { clParseForStatementBegin(Compiler); ;}
-    break;
-
-  case 305:
-#line 1172 "gc_cl.y"
-    { yyval.statement = clParseForStatementEnd(Compiler, &yyvsp[-4].token, yyvsp[-2].statement, yyvsp[-1].forExprPair, yyvsp[0].statement); ;}
-    break;
-
-  case 306:
-#line 1177 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
-    break;
-
-  case 307:
-#line 1179 "gc_cl.y"
-    { yyval.statement = yyvsp[0].statement; ;}
-    break;
-
-  case 308:
-#line 1181 "gc_cl.y"
+#line 1078 "gc_cl.y"
     { yyclearin;
           yyerrok;
           yyval.statement = gcvNULL; ;}
     break;
 
+  case 278:
+#line 1085 "gc_cl.y"
+    { yyval.statements = gcvNULL; ;}
+    break;
+
+  case 279:
+#line 1087 "gc_cl.y"
+    { clParseCompoundStatementBegin(Compiler); ;}
+    break;
+
+  case 280:
+#line 1089 "gc_cl.y"
+    { yyval.statements = clParseCompoundStatementEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
+    break;
+
+  case 281:
+#line 1094 "gc_cl.y"
+    { yyval.statement = clParseCompoundStatementNoNewScopeAsStatementNoNewScope(Compiler, yyvsp[0].statements); ;}
+    break;
+
+  case 282:
+#line 1096 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
+    break;
+
+  case 283:
+#line 1101 "gc_cl.y"
+    { yyval.statements = gcvNULL; ;}
+    break;
+
+  case 284:
+#line 1103 "gc_cl.y"
+    { clParseCompoundStatementNoNewScopeBegin(Compiler); ;}
+    break;
+
+  case 285:
+#line 1105 "gc_cl.y"
+    { yyval.statements = clParseCompoundStatementNoNewScopeEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
+    break;
+
+  case 286:
+#line 1110 "gc_cl.y"
+    { yyval.statements = clParseStatementList(Compiler, yyvsp[0].statement); ;}
+    break;
+
+  case 287:
+#line 1112 "gc_cl.y"
+    { yyval.statements = clParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
+    break;
+
+  case 288:
+#line 1117 "gc_cl.y"
+    { yyval.statement = gcvNULL; ;}
+    break;
+
+  case 289:
+#line 1119 "gc_cl.y"
+    { yyval.statement = clParseExprAsStatement(Compiler, yyvsp[-1].expr); ;}
+    break;
+
+  case 290:
+#line 1124 "gc_cl.y"
+    { yyval.statement = clParseIfStatement(Compiler, &yyvsp[-4].token, yyvsp[-2].expr, yyvsp[0].ifStatementPair); ;}
+    break;
+
+  case 291:
+#line 1126 "gc_cl.y"
+    { yyval.statement = clParseSwitchStatement(Compiler, &yyvsp[-4].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
+    break;
+
+  case 292:
+#line 1131 "gc_cl.y"
+    { yyval.statements = clParseStatementList(Compiler, yyvsp[0].statement); ;}
+    break;
+
+  case 293:
+#line 1133 "gc_cl.y"
+    { yyval.statements = clParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
+    break;
+
+  case 294:
+#line 1138 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
+    break;
+
+  case 295:
+#line 1140 "gc_cl.y"
+    { yyval.statement = clParseCaseStatement(Compiler, &yyvsp[-2].token, yyvsp[-1].expr); ;}
+    break;
+
+  case 296:
+#line 1142 "gc_cl.y"
+    { yyval.statement = clParseDefaultStatement(Compiler, &yyvsp[-1].token); ;}
+    break;
+
+  case 297:
+#line 1147 "gc_cl.y"
+    { yyval.statement = gcvNULL; ;}
+    break;
+
+  case 298:
+#line 1149 "gc_cl.y"
+    { clParseSwitchBodyBegin(Compiler); ;}
+    break;
+
+  case 299:
+#line 1151 "gc_cl.y"
+    { yyval.statement = clParseSwitchBodyEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements, &yyvsp[0].token); ;}
+    break;
+
+  case 300:
+#line 1156 "gc_cl.y"
+    { yyval.ifStatementPair = clParseIfSubStatements(Compiler, yyvsp[-2].statement, yyvsp[0].statement); ;}
+    break;
+
+  case 301:
+#line 1158 "gc_cl.y"
+    { yyval.ifStatementPair = clParseIfSubStatements(Compiler, yyvsp[0].statement, gcvNULL); ;}
+    break;
+
+  case 302:
+#line 1165 "gc_cl.y"
+    { clParseWhileStatementBegin(Compiler); ;}
+    break;
+
+  case 303:
+#line 1167 "gc_cl.y"
+    { yyval.statement = clParseWhileStatementEnd(Compiler, &yyvsp[-5].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
+    break;
+
+  case 304:
+#line 1169 "gc_cl.y"
+    { yyval.statement = clParseDoWhileStatement(Compiler, &yyvsp[-6].token, yyvsp[-5].statement, yyvsp[-2].expr); ;}
+    break;
+
+  case 305:
+#line 1171 "gc_cl.y"
+    { clParseForStatementBegin(Compiler); ;}
+    break;
+
+  case 306:
+#line 1173 "gc_cl.y"
+    { yyval.statement = clParseForStatementEnd(Compiler, &yyvsp[-4].token, yyvsp[-2].statement, yyvsp[-1].forExprPair, yyvsp[0].statement); ;}
+    break;
+
+  case 307:
+#line 1178 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
+    break;
+
+  case 308:
+#line 1180 "gc_cl.y"
+    { yyval.statement = yyvsp[0].statement; ;}
+    break;
+
   case 309:
-#line 1188 "gc_cl.y"
-    { yyval.expr = yyvsp[0].expr; ;}
+#line 1182 "gc_cl.y"
+    { yyclearin;
+          yyerrok;
+          yyval.statement = gcvNULL; ;}
     break;
 
   case 310:
-#line 1190 "gc_cl.y"
-    { yyval.expr = gcvNULL; ;}
+#line 1189 "gc_cl.y"
+    { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 311:
-#line 1195 "gc_cl.y"
-    { yyval.forExprPair = clParseForControl(Compiler, yyvsp[-2].expr, gcvNULL); ;}
+#line 1191 "gc_cl.y"
+    { yyval.expr = gcvNULL; ;}
     break;
 
   case 312:
-#line 1197 "gc_cl.y"
-    { yyval.forExprPair = clParseForControl(Compiler, yyvsp[-3].expr, yyvsp[-1].expr); ;}
+#line 1196 "gc_cl.y"
+    { yyval.forExprPair = clParseForControl(Compiler, yyvsp[-2].expr, gcvNULL); ;}
     break;
 
   case 313:
-#line 1199 "gc_cl.y"
-    {
-          clsForExprPair nullPair = {gcvNULL, gcvNULL};
-          yyclearin;
-          yyerrok;
-          yyval.forExprPair = nullPair; ;}
+#line 1198 "gc_cl.y"
+    { yyval.forExprPair = clParseForControl(Compiler, yyvsp[-3].expr, yyvsp[-1].expr); ;}
     break;
 
   case 314:
-#line 1205 "gc_cl.y"
+#line 1200 "gc_cl.y"
     {
           clsForExprPair nullPair = {gcvNULL, gcvNULL};
           yyclearin;
@@ -4373,37 +4369,46 @@ yyreduce:
     break;
 
   case 315:
-#line 1214 "gc_cl.y"
-    { yyval.statement = clParseJumpStatement(Compiler, clvCONTINUE, &yyvsp[-1].token, gcvNULL); ;}
+#line 1206 "gc_cl.y"
+    {
+          clsForExprPair nullPair = {gcvNULL, gcvNULL};
+          yyclearin;
+          yyerrok;
+          yyval.forExprPair = nullPair; ;}
     break;
 
   case 316:
-#line 1216 "gc_cl.y"
-    { yyval.statement = clParseJumpStatement(Compiler, clvBREAK, &yyvsp[-1].token, gcvNULL); ;}
+#line 1215 "gc_cl.y"
+    { yyval.statement = clParseJumpStatement(Compiler, clvCONTINUE, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 317:
-#line 1218 "gc_cl.y"
-    { yyval.statement = clParseJumpStatement(Compiler, clvRETURN, &yyvsp[-1].token, gcvNULL); ;}
+#line 1217 "gc_cl.y"
+    { yyval.statement = clParseJumpStatement(Compiler, clvBREAK, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 318:
-#line 1220 "gc_cl.y"
-    { yyval.statement = clParseJumpStatement(Compiler, clvRETURN, &yyvsp[-2].token, yyvsp[-1].expr); ;}
+#line 1219 "gc_cl.y"
+    { yyval.statement = clParseJumpStatement(Compiler, clvRETURN, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 319:
-#line 1222 "gc_cl.y"
+#line 1221 "gc_cl.y"
+    { yyval.statement = clParseJumpStatement(Compiler, clvRETURN, &yyvsp[-2].token, yyvsp[-1].expr); ;}
+    break;
+
+  case 320:
+#line 1223 "gc_cl.y"
     { yyval.statement = clParseGotoStatement(Compiler, &yyvsp[-2].token, &yyvsp[-1].token); ;}
     break;
 
-  case 323:
-#line 1234 "gc_cl.y"
+  case 324:
+#line 1235 "gc_cl.y"
     { clParseExternalDecl(Compiler, yyvsp[0].statement); ;}
     break;
 
-  case 325:
-#line 1240 "gc_cl.y"
+  case 326:
+#line 1241 "gc_cl.y"
     { clParseFuncDef(Compiler, yyvsp[-1].funcName, yyvsp[0].statements); ;}
     break;
 
@@ -4411,7 +4416,7 @@ yyreduce:
     }
 
 /* Line 991 of yacc.c.  */
-#line 4436 "gc_cl_parser.c"
+#line 4441 "gc_cl_parser.c"
 
   yyvsp -= yylen;
   yyssp -= yylen;
@@ -4622,7 +4627,7 @@ yyreturn:
 }
 
 
-#line 1243 "gc_cl.y"
+#line 1244 "gc_cl.y"
 
 
 

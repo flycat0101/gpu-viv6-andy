@@ -188,7 +188,8 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
         vx_status   status = VX_SUCCESS;
         vx_node     node = nodes[index];
 
-        vxoPerf_Begin(&node->perf);
+        if (target->base.context->options.enableCNNPerf)
+            vxoPerf_Begin(&node->perf);
 
         if (!isGPUNode(node))
         {
@@ -276,7 +277,12 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
         node->executed = vx_true_e;
         node->status = status;
 
-        vxoPerf_End(&node->perf);
+        if (target->base.context->options.enableCNNPerf)
+        {
+            gcfVX_Flush(gcvTRUE); /* flush GPU command to get correct node execution time */
+            vxoPerf_End(&node->perf);
+        }
+
 #if VIVANTE_PROFILER
         vxoProfiler_End((vx_reference)target);
 #endif

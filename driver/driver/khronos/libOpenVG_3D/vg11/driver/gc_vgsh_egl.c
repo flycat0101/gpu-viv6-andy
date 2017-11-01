@@ -226,7 +226,7 @@ veglCreateContext(
 #if VIVANTE_PROFILER
         /* Construct chip name. */
         _ConstructChipName(context);
-        InitializeVGProfiler(context);
+        _vgshProfilerInitialize(context);
 #endif
 
         /* Create gcoVERTEX object. */
@@ -428,7 +428,7 @@ veglSetContext(
         {
             gcmERR_BREAK(SetTarget(context, Draw, Read, Depth));
 
-            context->hardware.core.states           = gcvNULL;
+            context->hardware.core.programState.stateBuffer = gcvNULL;
             context->hardware.core.invalidCache     = gcvTRUE;
 
         }
@@ -489,7 +489,7 @@ veglSetContext(
             }
 
 
-            context->hardware.core.states       = gcvNULL;
+            context->hardware.core.programState.stateBuffer   = gcvNULL;
             context->hardware.core.invalidCache = gcvTRUE;
             context->hardware.core.draw         = Draw;
 
@@ -1036,7 +1036,13 @@ veglProfiler(
     )
 {
 #if VIVANTE_PROFILER
-    return vgProfiler(Profiler, Enum, Value);
+    _VGContext      *context;
+    context = vgshGetCurrentContext();
+    if (context == gcvNULL)
+    {
+        return gcvFALSE;
+    }
+    return _vgshProfilerSet(context, Enum, Value);
 #else
     return gcvFALSE;
 #endif

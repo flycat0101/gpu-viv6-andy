@@ -353,7 +353,15 @@ typedef struct _gcLINKTREE_TEMP
     gctUINT                         isPaired64BitUpper : 1;
 
     /* Usage flags for the temporary register. */
-    gctUINT8                        usage;
+    gctUINT8                        usage   : 8;
+    /* Format. */
+    gcSL_FORMAT                     format   : 12;
+    /* Precision. */
+    gcSL_PRECISION                  precision : 8;
+    /* Physical register this temporary register is assigned to. */
+    gctINT                          assigned  : 8;
+    gctUINT                         swizzle   : 8;
+    gctINT                          shift     : 8;
 
 
     /* Instruction locations that defines the temporary register. */
@@ -374,10 +382,6 @@ typedef struct _gcLINKTREE_TEMP
     /* A linked list of all registers using this temporary register. */
     gcsLINKTREE_LIST_PTR            users;
 
-    /* Physical register this temporary register is assigned to. */
-    gctINT                          assigned;
-    gctUINT8                        swizzle;
-    gctINT                          shift;
 
     /* Function arguments. */
     gctPOINTER                      owner;
@@ -386,11 +390,6 @@ typedef struct _gcLINKTREE_TEMP
 
     /* Variable in shader's symbol table. */
     gcVARIABLE                      variable;
-
-    /* Format. */
-    gcSL_FORMAT                     format;
-    /* Precision. */
-    gcSL_PRECISION                  precision;
 
     /* The function list that this temp register must allocate before them. */
     gcsCROSS_FUNCTION_LIST_PTR      crossFuncList;
@@ -474,11 +473,11 @@ typedef struct _gcVaryingPacking
 
 typedef struct _gcArgumentPacking
 {
-    gctBOOL needPacked;
-    gctBOOL isPacked;
-    gcComponentsMapping mapping;
+    gctBOOL needPacked          : 2;
+    gctBOOL isPacked            : 2;
+    gcComponentsMapping mapping : 4;
+    gctUINT32 newIndex          : 26;
     gcsFUNCTION_ARGUMENT argument;
-    gctUINT16 newIndex;
 } gcArgumentPacking;
 
 typedef struct _gcsCODE_CALLER    *gcsCODE_CALLER_PTR;
@@ -695,9 +694,7 @@ gcLINKTREE_GenerateStates(
     IN gceSHADER_FLAGS                  Flags,
     IN gcsSL_USAGE_PTR                  UniformUsage,
     IN gcsSL_CONSTANT_TABLE_PTR         ConstUsage,
-    IN OUT gctUINT32 *                  StateBufferSize,
-    IN OUT gctPOINTER *                 StateBuffer,
-    OUT gcsHINT_PTR *                   Hints
+    IN OUT gcsPROGRAM_STATE             *ProgramState
     );
 
 void gcCGUpdateMaxRegister(
@@ -1285,6 +1282,11 @@ gcSHADER_FindLibFunction(
 
 gceSTATUS
 gcSHADER_PatchCentroidVaryingAsCenter(
+    IN OUT gcSHADER         Shader
+    );
+
+gceSTATUS
+gcSHADER_PatchInt64(
     IN OUT gcSHADER         Shader
     );
 

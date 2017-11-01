@@ -1,5 +1,5 @@
-store lena_gray.bmp and vx_tutorial2 in the same directory
+store test_gray.bmp and vx_tutorial2 in the same directory
 
 go to that directory and execute vx_tutiral2 without any parameters
 
-if everything goes well, a lena_sobel.bmp will be generated in current folder
+if everything goes well, a test_out.bmp will be generated in current folder

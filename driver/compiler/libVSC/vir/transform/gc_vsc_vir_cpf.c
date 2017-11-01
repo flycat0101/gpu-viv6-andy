@@ -14,26 +14,32 @@
 #include "vir/transform/gc_vsc_vir_cpf.h"
 
 /******************************************************************************
-            constant propagation and folding
-    Conditional constant propagtion worklist algorithm is uesd. The pesudo
-    alogorithm:
+            Conditional constant propagtion worklist algorithm is used.
+
+    This optimization keeps its own constant data flow. It does not update
+    the du info. Thus it should be called before du is built
+    (or rebuilt du afterward).
+
+    The pesudo alogorithm:
 
     while worklist is not empty
       get n from worklist
       IN[n] = AND OUT[p] p is all the executable predcessors of n
-      if n is an assignment (n: A = B op C)
-        OUT[n] = fn (IN[n])
-        mark outgoing edges as excutable
-        if (OUT[n]) changed then add executable Succ(n) to the worklist
-      else
-       evaluate the condition (true/false/not constant)
-       OUT[n] = fn (IN[n])
-       mark appropriate edge as executable/not executable
-       if (OUT[n]) changed then add executable Succ(n) to the worklist
+      go through all instructions to do analysis
+      evaluate the condition of n (true/false/not constant)
+      mark appropriate edge as executable/not executable
+      if (OUT[n]) changed then add executable Succ(n) to the worklist
 
-    This phase keeps its own constant data flow. It does not update
-    the du info. Thus it should be called before du is built
-    (or rebuilt du afterward).
+   algorithm for analyzing instruction:
+    if pInst is an assignment (A = B op C)
+       A = VSC_CPF_NOT_CONSTANT if B == VSC_CPF_NOT_CONSTANT or C == VSC_CPF_NOT_CONSTANT
+       A = VSC_CPF_UNDEFINE if B == VSC_CPF_UNDEFINE or C == VSC_CPF_UNDEFINE
+       A = VSC_CPF_CONSTANT (A = Cb op Cc) if B == VSC_CPF_CONSTANT and C == VSC_CPF_CONSTANT
+    if pInst is LDARR/STARR
+        const index, then check whether base[const_index] is VSC_CPF_CONSTANT or not
+    if pInst is cmov
+    if pInst is not assignment (e.g., jmpc L, B, C)
+       if B or C is constant then propagate the constant to B or C
 
 ******************************************************************************/
 
@@ -859,7 +865,6 @@ _VSC_CPF_AndFlow(
     gctUINT i;
     gctBOOL changed = gcvFALSE;
 
-    /* to-do optimize this case */
     for (i = 0; i < pCPF->flowSize; i ++)
     {
         if (_VSC_CPF_DF_GetLattice(dstFlow, i) == VSC_CPF_NOT_CONSTANT)
@@ -928,7 +933,7 @@ _VSC_CPF_GetVRegNo(
 {
     VIR_OperandInfo opndInfo;
     VIR_Shader*     pShader = VIR_Inst_GetShader(pInst);
-    gctUINT         orgTempCount = VIR_Shader_GetOrgRegCount(VIR_Inst_GetShader(pInst));
+    gctUINT         orgTempCount = VIR_Shader_GetOrgRegCount(pShader);
 
     VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
 
@@ -943,7 +948,7 @@ _VSC_CPF_GetVRegNo(
         return VIR_INVALID_ID;
     }
     else if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
-        opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
+             opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
     {
         return (opndInfo.u1.virRegInfo.virReg - 256);
     }
@@ -1347,22 +1352,40 @@ _VSC_CPF_FoldConst_LDARR(
     case VIR_SYM_VIRREG:
     {
         VIR_Symbol *varSym = VIR_Symbol_GetVregVariable(src0Sym);
-        VIR_Symbol *newSym = gcvNULL;
-        gctUINT    varOffset = VIR_Symbol_GetVregIndex(src0Sym) - VIR_Symbol_GetVregIndex(varSym);
         symType = VIR_Symbol_GetType(varSym);
         if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
             VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
         {
         }
 
-        if (src1Const + varOffset < VIR_Symbol_GetIndexRange(varSym) - VIR_Symbol_GetVregIndex(varSym))
+        if (VIR_Symbol_isField(varSym))
         {
-            newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVregIndex(varSym) + src1Const + varOffset);
-            VIR_Operand_SetSymbol(src0Opnd, VIR_Inst_GetFunction(pInst), newSym->index);
+            VIR_Symbol *newSym = gcvNULL;
+
+            if (src1Const < VIR_Symbol_GetIndexRange(src0Sym) - VIR_Symbol_GetVregIndex(src0Sym))
+            {
+                newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVregIndex(src0Sym) + src1Const);
+                VIR_Operand_SetSymbol(src0Opnd, VIR_Inst_GetFunction(pInst), newSym->index);
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+            }
         }
         else
         {
-            gcmASSERT(gcvFALSE);
+            VIR_Symbol *newSym = gcvNULL;
+            gctUINT    varOffset = VIR_Symbol_GetVregIndex(src0Sym) - VIR_Symbol_GetVregIndex(varSym);
+
+            if (src1Const + varOffset < VIR_Symbol_GetIndexRange(varSym) - VIR_Symbol_GetVregIndex(varSym))
+            {
+                newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVregIndex(varSym) + src1Const + varOffset);
+                VIR_Operand_SetSymbol(src0Opnd, VIR_Inst_GetFunction(pInst), newSym->index);
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+            }
         }
         break;
     }
@@ -1389,19 +1412,22 @@ _VSC_CPF_FoldConst_LDARR(
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
     case VIR_SYM_IMAGE:
-      {
+    {
+        VIR_TypeId  baseTypeId;
         symType = VIR_Symbol_GetType(src0Sym);
-        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
-            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        baseTypeId = VIR_Type_GetBaseTypeId(symType);
+
+        if (VIR_Type_isArray(symType) &&
+            VIR_Type_isMatrix(symType))
         {
             gcmASSERT(gcvFALSE);
             break;
         }
 
-        if ((VIR_Type_GetKind(symType) == VIR_TY_ARRAY && src1Const < VIR_Type_GetArrayLength(symType))
-            ||
-            (VIR_Type_GetKind(symType) == VIR_TY_MATRIX && src1Const < VIR_GetTypeRows(VIR_Type_GetIndex(symType)))
-            )
+        if ((VIR_Type_isArray(symType) && src1Const < VIR_Type_GetArrayLength(symType)) ||
+            (VIR_Type_isMatrix(symType) && src1Const < VIR_GetTypeRows(VIR_Type_GetIndex(symType))) ||
+            (VIR_GetTypeTypeKind(baseTypeId) == VIR_TY_MATRIX && src1Const < VIR_GetTypeRows(baseTypeId)) ||
+            (VIR_Symbol_HasFlag(src0Sym, VIR_SYMFLAG_IS_FIELD) && src1Const <= (gctUINT)(VIR_Uniform_GetLastIndexingIndex(VIR_Symbol_GetUniform(src0Sym)) - VIR_Uniform_GetGCSLIndex(VIR_Symbol_GetUniform(src0Sym)))))
         {
             VIR_Operand_SetIsConstIndexing(src0Opnd, gcvTRUE);
             VIR_Operand_SetRelIndex(src0Opnd, src1Const);
@@ -1505,7 +1531,6 @@ gctBOOL                 allConst
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
     case VIR_SYM_IMAGE:
-        /* to-do */
         gcmASSERT(gcvFALSE);
         break;
     default:
@@ -1612,7 +1637,6 @@ _VSC_CPF_PropagateConst(
 
         gcmASSERT(srcType < VIR_TYPE_LAST_PRIMITIVETYPE);
 
-        VIR_Operand_SetTypeId(pOpnd, VIR_GetTypeComponentType(srcType));
         VIR_Operand_SetOpKind(pOpnd, VIR_OPND_IMMEDIATE);
         /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
         opCode = VIR_Inst_GetOpcode(pInst);
@@ -1642,418 +1666,6 @@ _VSC_CPF_PropagateConst(
         VIR_LOG_FLUSH(pDumper);
         VIR_LOG(pDumper, "\n");
         VIR_LOG_FLUSH(pDumper);
-    }
-}
-
-static gctBOOL
-_VSC_CPF_GetConditionResult(
-    VIR_ConditionOp condOp,
-    VSC_CPF_Const* constVal0,
-    VSC_CPF_Const* constVal1,
-    gctBOOL* result
-    )
-{
-    gcmASSERT(constVal0 && result);
-
-    switch(constVal0->type)
-    {
-        case VIR_TYPE_FLOAT16:
-        case VIR_TYPE_FLOAT32:
-        case VIR_TYPE_INT32:
-        case VIR_TYPE_INT16:
-        case VIR_TYPE_INT8:
-        case VIR_TYPE_UINT32:
-        case VIR_TYPE_UINT16:
-        case VIR_TYPE_UINT8:
-        case VIR_TYPE_BOOLEAN:
-            break;
-        default:
-            gcmASSERT(0);
-            return gcvFALSE;
-    }
-
-    switch(condOp)
-    {
-        case VIR_COP_ALWAYS:
-            *result = gcvTRUE;
-            return gcvTRUE;
-        case VIR_COP_GREATER:
-        {
-            gcmASSERT(constVal1);
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 > f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value > (gctINT32)constVal1->value;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value > constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_LESS:
-        {
-            gcmASSERT(constVal1);
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 < f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value < (gctINT32)constVal1->value;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value < constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_GREATER_OR_EQUAL:
-        {
-            gcmASSERT(constVal1);
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 >= f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value >= (gctINT32)constVal1->value;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value >= constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_LESS_OR_EQUAL:
-        {
-            gcmASSERT(constVal1);
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 <= f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value <= (gctINT32)constVal1->value;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value <= constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_EQUAL:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 == f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value == constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_NOT_EQUAL:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
-                    *result = f0 != f1;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value != constVal1->value;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_AND:
-        {
-            gcmASSERT(constVal1);
-            gcmASSERT(constVal0->type != VIR_TYPE_FLOAT32);
-            *result = constVal0->value & constVal1->value;
-            return gcvTRUE;
-        }
-        case VIR_COP_OR:
-        {
-            gcmASSERT(constVal1);
-            gcmASSERT(constVal0->type != VIR_TYPE_FLOAT32);
-            *result = constVal0->value | constVal1->value;
-            return gcvTRUE;
-        }
-        case VIR_COP_XOR:
-        {
-            gcmASSERT(constVal1);
-            gcmASSERT(constVal0->type != VIR_TYPE_FLOAT32);
-            *result = constVal0->value ^ constVal1->value;
-            return gcvTRUE;
-        }
-        case VIR_COP_NOT:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    *result = f0 == 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value == 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_NOT_ZERO:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-                    *result = f0 != 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value != 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_GREATER_OR_EQUAL_ZERO:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-
-                    *result = f0 >= 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value >= 0;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = (gctINT32)constVal0->value >= 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_GREATER_ZERO:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-
-                    *result = f0 > 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value > 0;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value > 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_LESS_OREQUAL_ZERO:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-
-                    *result = f0 <= 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value <= 0;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = constVal0->value <= 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_LESS_ZERO:
-        {
-            switch(constVal0->type)
-            {
-                case VIR_TYPE_FLOAT16:
-                case VIR_TYPE_FLOAT32:
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
-
-                    *result = f0 < 0.0;
-                    return gcvTRUE;
-                }
-                case VIR_TYPE_INT32:
-                case VIR_TYPE_INT16:
-                case VIR_TYPE_INT8:
-                    *result = (gctINT32)constVal0->value < 0;
-                    return gcvTRUE;
-                case VIR_TYPE_UINT32:
-                case VIR_TYPE_UINT16:
-                case VIR_TYPE_UINT8:
-                case VIR_TYPE_BOOLEAN:
-                    *result = (gctINT32)constVal0->value < 0;
-                    return gcvTRUE;
-                default:
-                    gcmASSERT(0);
-                    return gcvFALSE;
-            }
-        }
-        case VIR_COP_FINITE:
-        case VIR_COP_INFINITE:
-        case VIR_COP_NAN:
-        case VIR_COP_NORMAL:
-        {
-            gcmASSERT(constVal0->type == VIR_TYPE_FLOAT32);
-            gcmASSERT(0);
-            return gcvFALSE;
-        }
-        case VIR_COP_ANYMSB:
-        case VIR_COP_ALLMSB:
-        {
-            gcmASSERT(0);
-            return gcvFALSE;
-        }
-        case VIR_COP_SELMSB:
-        {
-            *result = constVal0->value & 0x8000;
-            return gcvTRUE;
-        }
-        case VIR_COP_UCARRY:
-        case VIR_COP_HELPER:
-        case VIR_COP_NOTHELPER:
-        default:
-            gcmASSERT(0);
-            return gcvFALSE;
     }
 }
 
@@ -2092,33 +1704,13 @@ _VSC_CPF_EvaluateConst(
             break;
         }
         case VIR_OP_ADD:
-        {
-            if (VIR_TypeId_isFloat(dstType))
-            {
-                gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
-                gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
-
-                resultVal->value = gcoMATH_FloatAsUInt(f0 + f1);
-            }
-            else
-            {
-                resultVal->value = constVal[0].value + constVal[1].value;
-            }
-            break;
-        }
         case VIR_OP_AND_BITWISE:
-        {
-            resultVal->value = constVal[0].value & constVal[1].value;
-            break;
-        }
+        case VIR_OP_MUL:
         case VIR_OP_OR_BITWISE:
-        {
-            resultVal->value = constVal[0].value | constVal[1].value;
-            break;
-        }
+        case VIR_OP_SUB:
         case VIR_OP_XOR_BITWISE:
         {
-            resultVal->value = constVal[0].value ^ constVal[1].value;
+            resultVal->value = VIR_OpCode_EvaluateOneChannelConstant(opcode, constVal[0].value, dstType, constVal[1].value, dstType, gcvNULL);
             break;
         }
         case VIR_OP_NOT_BITWISE:
@@ -2165,52 +1757,6 @@ _VSC_CPF_EvaluateConst(
             else
             {
                 resultVal->value = constVal[0].value % constVal[1].value;
-            }
-            break;
-        }
-        case VIR_OP_SUB:
-        {
-            if(srcLattice[0] == VSC_CPF_CONSTANT)
-            {
-                gcmASSERT(srcLattice[1] == VSC_CPF_CONSTANT);   /* otherwise we cannot evaluate */
-                if(VIR_TypeId_isFloat(dstType))
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
-
-                    resultVal->value = gcoMATH_FloatAsUInt(f0 - f1);
-                }
-                else
-                {
-                    resultVal->value = constVal[0].value - constVal[1].value;
-                }
-            }
-            else
-            {
-                gcmASSERT(srcLattice[1] != VSC_CPF_CONSTANT);   /* must be a = b - b */
-                resultVal->value = 0;
-            }
-            break;
-        }
-        case VIR_OP_MUL:
-        {
-            if(srcLattice[0] != VSC_CPF_CONSTANT || srcLattice[1] != VSC_CPF_CONSTANT)
-            {
-                resultVal->value = 0;
-            }
-            else
-            {
-                if(VIR_TypeId_isFloat(dstType))
-                {
-                    gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
-                    gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
-
-                    resultVal->value = gcoMATH_FloatAsUInt(f0 * f1);
-                }
-                else
-                {
-                    resultVal->value = constVal[0].value * constVal[1].value;
-                }
             }
             break;
         }
@@ -2268,12 +1814,8 @@ _VSC_CPF_EvaluateConst(
         }
         case VIR_OP_COMPARE:
         {
-            gctBOOL cmpResult = gcvFALSE;
+            gctBOOL cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal[0].value, constVal[0].type, constVal[1].value, constVal[1].type);
 
-            if(!_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal[0], &constVal[1], &cmpResult))
-            {
-                gcmASSERT(0);
-            }
             if(VIR_TypeId_isFloat(dstType))
             {
                 resultVal->value = gcoMATH_FloatAsUInt(cmpResult ? 1.0f : 0.0f);
@@ -2295,11 +1837,8 @@ _VSC_CPF_EvaluateConst(
         case VIR_OP_CSELECT:
         case VIR_OP_SELECT:
         {
-            gctBOOL cmpResult = gcvFALSE;
-            if(!_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal[0], &constVal[1], &cmpResult))
-            {
-                gcmASSERT(0);
-            }
+            gctBOOL cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal[0].value, constVal[0].type, constVal[1].value, constVal[1].type);
+
             if(cmpResult)
             {
                 resultVal->value = constVal[1].value;
@@ -2539,19 +2078,15 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                 case 2:
                 {
                     gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
-                    gctBOOL cmpResult = gcvFALSE;
+                    gctBOOL cmpResult;
+
                     if(!isConst)
                     {
                         gcmASSERT(0);
                     }
-                    if(_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal0, gcvNULL, &cmpResult))
-                    {
-                        return ((srcID == 1) ? gcvTRUE : gcvFALSE) ^ cmpResult;
-                    }
-                    else
-                    {
-                        return gcvFALSE;
-                    }
+                    cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal0.value, constVal0.type, 0, VIR_TYPE_UNKNOWN);
+
+                    return ((srcID == 1) ? gcvTRUE : gcvFALSE) ^ cmpResult;
                 }
             }
             break;
@@ -2567,19 +2102,15 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                     if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
-                        gctBOOL cmpResult = gcvFALSE;
+                        gctBOOL cmpResult;
+
                         if(!isConst)
                         {
                             gcmASSERT(0);
                         }
-                        if(_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal0, gcvNULL, &cmpResult))
-                        {
-                            return !cmpResult;
-                        }
-                        else
-                        {
-                            return gcvFALSE;
-                        }
+                        cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal0.value, constVal0.type, 0, VIR_TYPE_UNKNOWN);
+
+                        return !cmpResult;
                     }
                     else if(VIR_ConditionOp_DoubleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
@@ -2591,24 +2122,21 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                     if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
-                        gctBOOL cmpResult = gcvFALSE;
+                        gctBOOL cmpResult;
+
                         if(!isConst)
                         {
                             gcmASSERT(0);
                         }
-                        if(_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal0, gcvNULL, &cmpResult))
-                        {
-                            return cmpResult;
-                        }
-                        else
-                        {
-                            return gcvFALSE;
-                        }
+                        cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal0.value, constVal0.type, 0, VIR_TYPE_UNKNOWN);
+
+                        return cmpResult;
                     }
                     else if(VIR_ConditionOp_DoubleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
-                        gctBOOL cmpResult = gcvFALSE;
+                        gctBOOL cmpResult;
+
                         if(!isConst)
                         {
                             gcmASSERT(0);
@@ -2618,14 +2146,9 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                         {
                             gcmASSERT(0);
                         }
-                        if(_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal0, &constVal1, &cmpResult))
-                        {
-                            return cmpResult;
-                        }
-                        else
-                        {
-                            return gcvFALSE;
-                        }
+                        cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(VIR_Inst_GetConditionOp(pInst), constVal0.value, constVal0.type, constVal1.value, constVal1.type);
+
+                        return cmpResult;
                     }
                 }
 
@@ -2703,7 +2226,9 @@ _VSC_CPF_PerformOnInst(
             {
                 VSC_CPF_Const vecVal[VIR_MAX_SRC_NUM];
                 VSC_CPF_LATTICE srcLattic[VIR_MAX_SRC_NUM] =
-                {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
+                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
+
+                memset(vecVal, 0, sizeof(VSC_CPF_Const) * VIR_MAX_SRC_NUM);
 
                 if (!(dstEnable & (1 << channel)))
                 {
@@ -2715,9 +2240,7 @@ _VSC_CPF_PerformOnInst(
                     srcOpnd = VIR_Inst_GetSource(pInst, i);
 
                     if (_VSC_CPF_GetVRegNo(pInst, srcOpnd) != VIR_INVALID_ID ||
-                        (VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_SYMBOL && VIR_Symbol_isUniform(VIR_Operand_GetSymbol(srcOpnd)) && isSymUniformCompiletimeInitialized(VIR_Operand_GetSymbol(srcOpnd))) ||
-                        VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_IMMEDIATE ||
-                        VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_CONST)
+                        VIR_Operand_ContainsConstantValue(srcOpnd))
                     {
                         gctBOOL isConst;
                         isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow, &vecVal[i], &srcLattic[i]);
@@ -2803,6 +2326,9 @@ _VSC_CPF_PerformOnInst(
         gctBOOL validIndex = gcvFALSE;
         gctUINT opndOffset = 0;
 
+        vecVal[0].value = vecVal[1].value = 0;
+        vecVal[0].type = vecVal[1].type = VIR_TYPE_UNKNOWN;
+
         if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
         {
             VIR_Swizzle src1Swizzle = VIR_Operand_GetSwizzle(src1Opnd);
@@ -2813,10 +2339,22 @@ _VSC_CPF_PerformOnInst(
             if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
             {
                 validIndex = gcvTRUE;
-                if (_VSC_CPF_isTypeINT(vecVal[1].type) && ((gctINT)(vecVal[1].value) < 0))
+                if ((_VSC_CPF_isTypeINT(vecVal[1].type) && ((gctINT)(vecVal[1].value) < 0))
+                    ||
+                    (vecVal[1].type == VIR_TYPE_FLOAT32 && (*(gctFLOAT*) &(vecVal[1].value) < 0)))
                 {
                     validIndex = gcvFALSE;
                 }
+            }
+
+            /* constant could be float32 type */
+            if (VIR_TypeId_isFloat(vecVal[1].type))
+            {
+                opndOffset = (gctUINT) *(gctFLOAT*) &(vecVal[1].value);
+            }
+            else
+            {
+                opndOffset = vecVal[1].value;
             }
 
             if (validIndex)
@@ -2826,16 +2364,6 @@ _VSC_CPF_PerformOnInst(
                     if (!(dstEnable & (1 << channel)))
                     {
                         continue;
-                    }
-
-                    /* constant could be float32 type */
-                    if (vecVal[1].type == VIR_TYPE_FLOAT32)
-                    {
-                        opndOffset = (gctUINT) *(gctFLOAT*) &(vecVal[1].value);
-                    }
-                    else
-                    {
-                        opndOffset = vecVal[1].value;
                     }
 
                     if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, opndOffset, tmpFlow, &vecVal[0], &srcLattic[0]))
@@ -2859,7 +2387,7 @@ _VSC_CPF_PerformOnInst(
                     else
                     {
                         /* change to MOV */
-                        _VSC_CPF_FoldConst_LDARR(pCPF, vecVal[1].value, pInst);
+                        _VSC_CPF_FoldConst_LDARR(pCPF, opndOffset, pInst);
                     }
                 }
             }
@@ -2898,7 +2426,9 @@ _VSC_CPF_PerformOnInst(
             if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, 0, tmpFlow, &vecVal[0], &srcLattic[0]))
             {
                 validIndex = gcvTRUE;
-                if (_VSC_CPF_isTypeINT(vecVal[0].type) && ((gctINT)(vecVal[0].value) < 0))
+                if ((_VSC_CPF_isTypeINT(vecVal[0].type) && ((gctINT)(vecVal[0].value) < 0))
+                    ||
+                    (vecVal[0].type == VIR_TYPE_FLOAT32 && (*(gctFLOAT*) &(vecVal[0].value) < 0)))
                 {
                     validIndex = gcvFALSE;
                 }
@@ -2948,6 +2478,96 @@ _VSC_CPF_PerformOnInst(
                     {
                         _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
                     }
+                }
+            }
+        }
+    }
+    else if (opcode == VIR_OP_CMOV && conditionOp != VIR_COP_ALLMSB && conditionOp != VIR_COP_ANYMSB)
+    {
+        gctUINT i;
+        VIR_Operand *srcOpnd = gcvNULL;
+        VIR_Operand *dstOpnd = VIR_Inst_GetDest(pInst);
+        VIR_Enable  dstEnable = VIR_Operand_GetEnable(dstOpnd);
+
+        gctUINT8    channel;
+        gctUINT     channelCount = 0;
+        gctUINT     constChannelCount = 0;
+        gctUINT     nopChannelCount = 0;
+        gctBOOL     singleCond = VIR_ConditionOp_SingleOperand(conditionOp);
+
+        if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
+        {
+            VSC_CPF_Const resultVal[VIR_CHANNEL_NUM];
+
+            /* for each channel, check whether all src is constant.
+               if yes, then set the dst's corresponding channel to be constant */
+            for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
+            {
+                VSC_CPF_Const vecVal[VIR_MAX_SRC_NUM];
+                VSC_CPF_LATTICE srcLattic[VIR_MAX_SRC_NUM] =
+                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
+
+                if (!(dstEnable & (1 << channel)))
+                {
+                    continue;
+                }
+
+                for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+                {
+                    srcOpnd = VIR_Inst_GetSource(pInst, i);
+
+                    if (_VSC_CPF_GetVRegNo(pInst, srcOpnd) != VIR_INVALID_ID ||
+                        VIR_Operand_ContainsConstantValue(srcOpnd))
+                    {
+                        _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow, &vecVal[i], &srcLattic[i]);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if((singleCond && srcLattic[0] == VSC_CPF_CONSTANT) ||
+                   (!singleCond && srcLattic[0] == VSC_CPF_CONSTANT && srcLattic[1] == VSC_CPF_CONSTANT))
+                {
+                    gctBOOL cmpResult = VIR_ConditionOp_EvaluateOneChannelConstantCondition(conditionOp, vecVal[0].value, vecVal[0].type, vecVal[1].value, vecVal[1].type);
+
+                    if(cmpResult)
+                    {
+                        if(srcLattic[2] == VSC_CPF_CONSTANT)
+                        {
+                            resultVal[channel] = vecVal[2];
+                            _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]);
+                            constChannelCount++;
+                        }
+                        else
+                        {
+                            _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                        }
+                    }
+                    else
+                    {
+                        nopChannelCount++;
+                    }
+                }
+                else
+                {
+                    _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                }
+
+                channelCount++;
+            }
+
+            if(!analysisOnly)
+            {
+                if (constChannelCount == channelCount)
+                {
+                    /* constant folding */
+                    _VSC_CPF_FoldConst(pCPF, srcBBId, pInst);
+                }
+                else if(nopChannelCount == channelCount)
+                {
+                    VIR_Function_ChangeInstToNop(VIR_Inst_GetFunction(pInst), pInst);
                 }
             }
         }
@@ -3232,10 +2852,10 @@ _VSC_CPF_AnalysisOnBlock(
                 gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_JMPC ||
                           VIR_Inst_GetOpcode(inst) == VIR_OP_JMP_ANY);
 
-                if (VIR_Evaluate_JMPC_Condition(VSC_CPF_GetShader(pCPF),
-                        inst, &checkingResult))
+                if (VIR_Inst_CanGetConditionResult(inst))
                 {
                     constCondition = gcvTRUE;
+                    checkingResult = VIR_Inst_EvaluateConditionResult(inst, gcvNULL);
                 }
             }
 
@@ -3401,7 +3021,6 @@ _VSC_CPF_PerformOnShader(
         VIR_Shader_Dump(gcvNULL, "Shader before Constant Propagation and Folding", pShader, gcvTRUE);
     }
 
-    /* to-do: go through the call chain for the inter-procedure */
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for(func_node = VIR_FuncIterator_First(&func_iter);
         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))

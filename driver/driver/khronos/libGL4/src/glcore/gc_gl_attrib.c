@@ -12,18 +12,12 @@
 
 
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 extern GLvoid __glWriteHitRecord(__GLcontext *gc);
 
 GLvoid APIENTRY __glim_PolygonMode(__GLcontext *gc, GLenum face, GLenum mode)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PolygonMode", DT_GLenum, face, DT_GLenum, mode, DT_GLnull);
-#endif
 
     if (((GL_FRONT != face) && (GL_BACK != face) && (GL_FRONT_AND_BACK != face)) ||
         ((GL_POINT != mode) && (GL_LINE != mode) && (GL_FILL != mode))) {
@@ -58,11 +52,6 @@ GLvoid APIENTRY __glim_ShadeModel(__GLcontext *gc,GLenum sm)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ShadeModel", DT_GLenum, sm, DT_GLnull);
-#endif
-
     if ((sm != GL_FLAT) && (sm != GL_SMOOTH)) {
         __glSetError(gc, GL_INVALID_ENUM);
         return;
@@ -83,11 +72,6 @@ GLvoid APIENTRY __glim_ClearAccum(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat
 {
     GLfloat one = __glOne, minusOne = __glMinusOne;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ClearAccum", DT_GLfloat, r, DT_GLfloat, g, DT_GLfloat, b, DT_GLfloat, a, DT_GLnull);
-#endif
 
     if (r < minusOne)
         r = minusOne;
@@ -122,11 +106,6 @@ GLvoid APIENTRY __glim_ClearIndex(__GLcontext *gc, GLfloat val)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ClearIndex", DT_GLfloat, val, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     /* Update GL state */
@@ -138,7 +117,7 @@ GLvoid APIENTRY __glim_ClearIndex(__GLcontext *gc, GLfloat val)
 
 GLvoid APIENTRY __glim_ClearDepth(__GLcontext *gc, GLdouble z)
 {
-    __gles_ClearDepthf(gc, z);
+    __gles_ClearDepthf(gc, (GLfloat)z);
 }
 
 GLvoid APIENTRY __glim_DepthRange(__GLcontext *gc, GLdouble zNear, GLdouble zFar)
@@ -149,11 +128,6 @@ GLvoid APIENTRY __glim_DepthRange(__GLcontext *gc, GLdouble zNear, GLdouble zFar
 GLvoid APIENTRY __glim_IndexMask(__GLcontext *gc, GLuint mask)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_IndexMask", DT_GLuint, mask, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -168,11 +142,6 @@ GLint APIENTRY __glim_RenderMode(__GLcontext *gc, GLenum mode)
 {
     GLint    rv = 0;
     __GL_SETUP_NOT_IN_BEGIN_RET(gc, 0);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_RenderMode",DT_GLenum, mode, DT_GLnull);
-#endif
 
     switch (mode) {
       case GL_RENDER:
@@ -259,11 +228,6 @@ GLvoid APIENTRY __glim_ClipPlane(__GLcontext *gc, GLenum pi, const GLdouble *pv)
     __GLcoord mvEqu, eyeEqu;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ClipPlane", DT_GLenum, pi, DT_GLdouble_ptr, pv, DT_GLnull);
-#endif
-
     pi -= GL_CLIP_PLANE0;
     /* pi is GLenum type, unsigned, no need for negative check*/
     if ( (pi >= gc->constants.numberOfClipPlanes)) {
@@ -317,11 +281,6 @@ GLvoid APIENTRY __glim_PointSize(__GLcontext *gc, GLfloat size)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PointSize", DT_GLfloat, size, DT_GLnull);
-#endif
-
     if (size <= 0.0) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
@@ -341,11 +300,6 @@ GLvoid APIENTRY __glim_PointSize(__GLcontext *gc, GLfloat size)
 GLvoid APIENTRY __glim_PointParameterf(__GLcontext *gc, GLenum pname, GLfloat param)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PointParameterf", DT_GLenum, pname, DT_GLfloat, param, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -375,11 +329,6 @@ GLvoid APIENTRY __glim_PointParameterf(__GLcontext *gc, GLenum pname, GLfloat pa
 GLvoid APIENTRY __glim_PointParameterfv(__GLcontext *gc, GLenum pname, const GLfloat *params)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PointParameterfv", DT_GLenum, pname, DT_GLfloat_ptr, params, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -416,11 +365,6 @@ GLvoid APIENTRY __glim_PointParameteri(__GLcontext *gc, GLenum pname, GLint para
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PointParameteri", DT_GLenum, pname, DT_GLint, param, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     switch (pname) {
@@ -449,11 +393,6 @@ GLvoid APIENTRY __glim_PointParameteri(__GLcontext *gc, GLenum pname, GLint para
 GLvoid APIENTRY __glim_PointParameteriv(__GLcontext *gc, GLenum pname, const GLint *params)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PointParameteriv", DT_GLenum, pname, DT_GLint_ptr, params, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -490,11 +429,6 @@ GLvoid APIENTRY __glim_LineStipple(__GLcontext *gc, GLint factor, GLushort stipp
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LineStipple", DT_GLint, factor, DT_GLushort, stipple, DT_GLnull);
-#endif
-
     if (factor < 1)
         factor = 1;
     if (factor > 256)
@@ -517,11 +451,6 @@ GLvoid APIENTRY __glim_PolygonStipple(__GLcontext *gc, const GLubyte *mask)
     GLubyte stipple[4*32];
 
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PolygonStipple", DT_GLubyte_ptr, mask, DT_GLnull);
-#endif
 
     __glFillImage(gc, 32, 32, GL_COLOR_INDEX, GL_BITMAP, mask, stipple);
 

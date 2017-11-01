@@ -132,65 +132,28 @@ OnError:
 |*                         Vivante Profile functions                          *|
 \*****************************************************************************/
 #if VIVANTE_PROFILER
-#define gcmWRITE_CONST(ConstValue) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = ConstValue; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_VALUE(IntData) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = IntData; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_COUNTER(Counter, Value) \
-    gcmWRITE_CONST(Counter); \
-    gcmWRITE_VALUE(Value)
-
-/* Write a string value (char*). */
-#define gcmWRITE_STRING(String) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 length; \
-        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, gcmSIZEOF(length), &length)); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profilerObj, length, String)); \
-    } \
-    while (gcvFALSE)
-
 gctINT
 clfInitializeProfiler(
-    clsContext_PTR Context
+    clsCommandQueue_PTR CommandQueue
     )
 {
     gctINT status = gcvSTATUS_OK;
     gctINT profileMode = 0;
     gctCHAR *env = gcvNULL;
-#ifdef ANDROID
-    gctBOOL matchResult = gcvFALSE;
-#endif
 
-    gcmHEADER_ARG("Context=0x%x ", Context);
+    gcmHEADER_ARG("CommandQueue=0x%x ", CommandQueue);
 
-    clmCHECK_ERROR(Context == gcvNULL ||
-                   Context->objectType != clvOBJECT_CONTEXT,
-                   CL_INVALID_CONTEXT);
+    clmCHECK_ERROR(CommandQueue == gcvNULL ||
+                   CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE,
+                   CL_INVALID_COMMAND_QUEUE);
 
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_CL_PROFILE", &env)) && env)
     {
         if gcmIS_SUCCESS(gcoOS_StrCmp(env, "0"))
         {
-            gcoPROFILER_NEW_Disable();
-            Context->profiler.enable = gcvFALSE;
-            Context->profiler.perClfinish = gcvFALSE;
+            gcoPROFILER_Disable();
+            CommandQueue->profiler.enable = gcvFALSE;
+            CommandQueue->profiler.perClfinish = gcvFALSE;
             gcmFOOTER_ARG("%d", status);
             return status;
         }
@@ -201,21 +164,21 @@ clfInitializeProfiler(
         if gcmIS_SUCCESS(gcoOS_StrCmp(env, "2"))
         {
             profileMode = 2;
-            Context->profiler.perClfinish = gcvTRUE;
+            CommandQueue->profiler.perClfinish = gcvTRUE;
         }
     }
 
     if (profileMode == 0)
     {
-        Context->profiler.enable = gcvFALSE;
-        Context->profiler.perClfinish = gcvFALSE;
+        CommandQueue->profiler.enable = gcvFALSE;
+        CommandQueue->profiler.perClfinish = gcvFALSE;
         gcmFOOTER_ARG("%d", status);
         return status;
     }
 
-    if(Context->halProfile == gcvNULL)
+    if(CommandQueue->halProfile == gcvNULL)
     {
-        status = gcoPROFILER_NEW_Construct(&Context->halProfile);
+        status = gcoPROFILER_Construct(&CommandQueue->halProfile);
         if(status < 0)
         {
             gcmUSER_DEBUG_ERROR_MSG(
@@ -224,47 +187,23 @@ clfInitializeProfiler(
         }
     }
 
-    status = (gctINT)gcoPROFILER_NEW_Enable(Context->halProfile);
-    if ( status < 0)
+    /* Clear the profiler. */
+    gcoOS_ZeroMemory(&CommandQueue->profiler, gcmSIZEOF(CommandQueue->profiler));
+    CommandQueue->profiler.enable = gcvTRUE;
+    CommandQueue->halProfile->profilerClient = gcvCLIENT_OPENCL;
+
+    status = (gctINT)gcoPROFILER_Enable(CommandQueue->halProfile);
+
+    if (status < 0)
     {
-        Context->profiler.enable = gcvFALSE;
+        CommandQueue->profiler.enable = gcvFALSE;
         gcmUSER_DEBUG_ERROR_MSG(
-        "OCL: (Vivante Profile) Unable to create profile object.\n");
+            "OCL: (Vivante Profile) Unable to create profile object.\n");
         goto OnError;
     }
 
-    /* Clear the profiler. */
-    gcoOS_ZeroMemory(&Context->profiler, gcmSIZEOF(Context->profiler));
-    Context->profiler.enable = gcvTRUE;
-
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VP_FRAME_NUM", &env)))
     {
-        if ((env != gcvNULL) && (env[0] !=0))
-        {
-            int frameNum;
-            gcoOS_StrToInt(env, &frameNum);
-            if (frameNum > 1)
-                Context->profiler.frameMaxNum = (gctUINT32)frameNum;
-        }
-    }
-
-    gcoOS_GetEnv(gcvNULL, "VP_OUTPUT", &env);
-    if ((env != gcvNULL) && *env != '\0')
-    {
-        Context->halProfile->fileName = env;
-    }
-
-#ifdef ANDROID
-    gcoOS_GetEnv(gcvNULL, "VP_PROCESS_NAME", &env);
-    if ((env != gcvNULL) && (env[0] != 0)) matchResult = (gcoOS_DetectProcessByName(env) ? gcvTRUE : gcvFALSE);
-    if (matchResult != gcvTRUE) {
-        gcmFOOTER();
-        return gcvSTATUS_MISMATCH;
-    }
-#endif
-
-    {
-        gcoPROFILER profilerObj = Context->halProfile;
+        gcoPROFILER Profiler = CommandQueue->halProfile;
         /* Write Generic Info. */
         char* infoCompany = "Vivante Corporation";
         char* infoVersion = "1.3";
@@ -275,7 +214,7 @@ clfInitializeProfiler(
         gctUINT offset = 0;
         gctSTRING productName = gcvNULL;
 
-        chipRevision = Context->devices[0]->deviceInfo.chipRevision;
+        chipRevision = CommandQueue->context->devices[0]->deviceInfo.chipRevision;
 
         #define BCD(digit)      ((chipRevision >> (digit * 4)) & 0xF)
         gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
@@ -322,14 +261,14 @@ OnError:
 
 void
 clfDestroyProfiler(
-    clsContext_PTR Context
+    clsCommandQueue_PTR CommandQueue
     )
 {
-    gcmHEADER_ARG("Context=0x%x", Context);
-    if (Context->profiler.enable)
+    gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    if (CommandQueue->profiler.enable)
     {
-        Context->profiler.enable = gcvFALSE;
-        gcoPROFILER_NEW_Destroy(Context->halProfile);
+        CommandQueue->profiler.enable = gcvFALSE;
+        gcoPROFILER_Destroy(CommandQueue->halProfile);
     }
 
     gcmFOOTER_NO();
@@ -342,7 +281,6 @@ clfBeginProfiler(
     )
 {
     gctINT status = gcvSTATUS_OK;
-    clsContext_PTR      Context;
 
     gcmHEADER_ARG("CommandQueue=0x%x ", CommandQueue);
 
@@ -351,20 +289,15 @@ clfBeginProfiler(
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    Context = CommandQueue->context;
-    if (!Context)
-    {
-        gcmFOOTER_ARG("%d", status);
-        return status;
-    }
-    if(!Context->profiler.enable)
+
+    if(!CommandQueue->profiler.enable)
     {
         gcmFOOTER_ARG("%d", status);
         return status;
     }
 
-    gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
-    gcoPROFILER_NEW_Begin(Context->halProfile, gcvCOUNTER_OP_DRAW);
+    gcoOS_GetTime(&CommandQueue->profiler.frameStartTimeusec);
+    gcoPROFILER_Begin(CommandQueue->halProfile, gcvCOUNTER_OP_FRAME);
 
     /* Return the status. */
     gcmFOOTER_ARG("%d", status);
@@ -378,7 +311,6 @@ clfEndProfiler(
     )
 {
     gctINT status = gcvSTATUS_OK;
-    clsContext_PTR      Context;
 
     gcmHEADER_ARG("CommandQueue=0x%x ", CommandQueue);
 
@@ -387,25 +319,20 @@ clfEndProfiler(
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    Context = CommandQueue->context;
-    if (!Context)
-    {
-        gcmFOOTER_ARG("%d", status);
-        return status;
-    }
-    if(!Context->profiler.enable)
+
+    if(!CommandQueue->profiler.enable)
     {
         gcmFOOTER_ARG("%d", status);
         return status;
     }
 
     {
-        gcoPROFILER profilerObj = Context->halProfile;
+        gcoPROFILER Profiler = CommandQueue->halProfile;
         /* write frame number */
-        gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
+        gcmWRITE_COUNTER(VPG_FRAME, CommandQueue->profiler.frameNumber);
 
         /* write gpu counters */
-        gcoPROFILER_NEW_EndFrame(Context->halProfile, gcvCOUNTER_OP_NONE);
+        gcoPROFILER_End(CommandQueue->halProfile, gcvCOUNTER_OP_FRAME, CommandQueue->profiler.frameNumber);
 
         /* write kernel info */
         gcmWRITE_CONST(VPG_PROG);
@@ -431,20 +358,20 @@ clfEndProfiler(
         gcmWRITE_CONST(VPG_END);
 
         /* write frame time */
-        gcoOS_GetTime(&Context->profiler.frameEndTimeusec);
+        gcoOS_GetTime(&CommandQueue->profiler.frameEndTimeusec);
         gcmWRITE_CONST(VPG_TIME);
-        gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32) (Context->profiler.frameEndTimeusec
-                         - Context->profiler.frameStartTimeusec));
+        gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32) (CommandQueue->profiler.frameEndTimeusec
+                         - CommandQueue->profiler.frameStartTimeusec));
         gcmWRITE_CONST(VPG_END);
 
         gcmWRITE_CONST(VPG_END);
 
-        gcoPROFILER_NEW_Flush(Context->halProfile);
+        gcoPROFILER_Flush(CommandQueue->halProfile);
         gcmPRINT("VPC_KERNELNAME: %s\n", Kernel->name);
-        gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (Context->profiler.frameEndTimeusec
-                         - Context->profiler.frameStartTimeusec));
+        gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (CommandQueue->profiler.frameEndTimeusec
+                         - CommandQueue->profiler.frameStartTimeusec));
         gcmPRINT("*********\n");
-        Context->profiler.frameNumber++;
+        CommandQueue->profiler.frameNumber++;
     }
 
     /* Return the status. */

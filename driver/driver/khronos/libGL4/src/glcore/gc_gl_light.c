@@ -17,7 +17,6 @@
 **
 */
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 extern GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                               GLint toType, GLvoid *result, GLint size);
@@ -171,11 +170,6 @@ GLvoid APIENTRY __glim_Lightfv(__GLcontext *gc, GLenum light, GLenum pname, cons
     GLuint lightIndex = ((GLuint)light - GL_LIGHT0);
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Lightfv", DT_GLenum, light, DT_GLenum, pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     __glLightfv(gc, lightIndex, pname, (GLfloat*)pv);
 }
 
@@ -184,11 +178,6 @@ GLvoid APIENTRY __glim_Lightf(__GLcontext *gc, GLenum light, GLenum pname, GLflo
     GLfloat tmpf[4];
     GLuint lightIndex = (light - GL_LIGHT0);
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Lightf", DT_GLenum, light, DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -212,11 +201,6 @@ GLvoid APIENTRY __glim_Lightiv(__GLcontext *gc, GLenum light, GLenum pname, cons
     GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
     GLuint lightIndex = (light - GL_LIGHT0);
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Lightiv", DT_GLenum, light, DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
 
     switch (pname) {
       case GL_AMBIENT:
@@ -253,11 +237,6 @@ GLvoid APIENTRY __glim_Lighti(__GLcontext *gc, GLenum light, GLenum pname, GLint
     GLfloat tmpf[4] ;
     GLuint lightIndex = (light - GL_LIGHT0);
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Lighti", DT_GLenum, light, DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -325,11 +304,6 @@ GLvoid APIENTRY __glim_LightModelfv(__GLcontext *gc, GLenum pname, const GLfloat
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LightModelfv", DT_GLenum, pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     __glLightModelfv(gc, pname, (GLfloat*)pv);
 }
 
@@ -337,11 +311,6 @@ GLvoid APIENTRY __glim_LightModelf(__GLcontext *gc, GLenum pname, GLfloat f)
 {
     GLfloat tmpf[4] ;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LightModelf", DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -361,11 +330,6 @@ GLvoid APIENTRY __glim_LightModeliv(__GLcontext *gc, GLenum pname, const GLint *
 {
     GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LightModeliv", DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
 
     switch (pname) {
       case GL_LIGHT_MODEL_AMBIENT:
@@ -391,11 +355,6 @@ GLvoid APIENTRY __glim_LightModeli(__GLcontext *gc, GLenum pname, GLint i)
     GLfloat tmpf[4] ;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LightModeli", DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
-
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
       case GL_LIGHT_MODEL_LOCAL_VIEWER:
@@ -413,11 +372,6 @@ GLvoid APIENTRY __glim_LightModeli(__GLcontext *gc, GLenum pname, GLint i)
 GLvoid APIENTRY __glim_ColorMaterial(__GLcontext *gc, GLenum face, GLenum p)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ColorMaterial", DT_GLenum, face, DT_GLenum, p, DT_GLnull);
-#endif
 
     switch (face)
     {
@@ -465,11 +419,6 @@ GLvoid APIENTRY __glim_GetLightfv(__GLcontext *gc, GLenum light, GLenum pname, G
     GLint index;
     __GLlightSourceState *src;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_GetLightfv", DT_GLenum, light, DT_GLenum, pname, DT_GLfloat_ptr, result, DT_GLnull);
-#endif
 
     index = light - GL_LIGHT0;
     if ((index < 0) || (index >= (GLint)gc->constants.numberOfLights)) {
@@ -535,11 +484,6 @@ GLvoid APIENTRY __glim_GetLightiv(__GLcontext *gc, GLenum light, GLenum pname, G
     GLint index;
     __GLlightSourceState *src;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_GetLightiv", DT_GLenum, light, DT_GLenum, pname, DT_GLint_ptr, result, DT_GLnull);
-#endif
 
     index = light - GL_LIGHT0;
     if ((index < 0) || (index >= (GLint)gc->constants.numberOfLights)) {

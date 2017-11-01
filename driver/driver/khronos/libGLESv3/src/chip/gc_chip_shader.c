@@ -308,7 +308,35 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     { gcSHADER_UINT64_X8,    GL_NONE,                      0},
     { gcSHADER_UINT64_X16,   GL_NONE,                      0},
 
-    {gcSHADER_UNKONWN_TYPE,                  GL_NONE,                                            0},
+    /*halType                glType                     size    */
+    {gcSHADER_FLOAT64_X1,    GL_NONE,                      0},
+    {gcSHADER_FLOAT64_X2,    GL_NONE,                      0},
+    {gcSHADER_FLOAT64_X3,    GL_NONE,                      0},
+    {gcSHADER_FLOAT64_X4,    GL_NONE,                      0},
+    {gcSHADER_FLOAT64_2X2,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_3X3,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_4X4,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_2X3,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_2X4,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_3X2,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_3X4,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_4X2,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_4X3,   GL_NONE,                      0},
+    {gcSHADER_FLOAT64_X8,    GL_NONE,                      0},
+    {gcSHADER_FLOAT64_X16,   GL_NONE,                      0},
+
+    /* OpenGL 4.0 types  */
+    { gcSHADER_SAMPLER_2D_RECT,         GL_NONE,           0},
+    { gcSHADER_ISAMPLER_2D_RECT,        GL_NONE,           0},
+    { gcSHADER_USAMPLER_2D_RECT,        GL_NONE,           0},
+    { gcSHADER_SAMPLER_2D_RECT_SHADOW,  GL_NONE,           0},
+    { gcSHADER_ISAMPLER_1D_ARRAY,       GL_NONE,           0},
+    { gcSHADER_USAMPLER_1D_ARRAY,       GL_NONE,           0},
+    { gcSHADER_ISAMPLER_1D,             GL_NONE,           0},
+    { gcSHADER_USAMPLER_1D,             GL_NONE,           0},
+    { gcSHADER_SAMPLER_1D_SHADOW,       GL_NONE,           0},
+
+    {gcSHADER_UNKONWN_TYPE,  GL_NONE,                      0},
 };
 /* compile-time assertion if the g_typeInfos is not the same length as gcSHADER_TYPE_COUNT */
 const gctINT _verify_gTypeInfo[sizeof(g_typeInfos)/sizeof(__GLchipUniformTypeInfo) == gcSHADER_TYPE_COUNT] = { 0 };
@@ -1437,13 +1465,13 @@ gcChipProcessUniforms(
                 {
                 case __GL_CHIP_UNIFORM_SUB_USAGE_XFB_ENABLE:
                     GL_ASSERT(stageIdx == __GLSL_STAGE_VS);
-                    GL_ASSERT(chipCtx->chipFeature.hasHwTFB == GL_FALSE);
+                    GL_ASSERT(chipCtx->chipFeature.hwFeature.hasHwTFB == GL_FALSE);
                     pgInstance->xfbActiveUniform = slot;
                     break;
                 case __GL_CHIP_UNIFORM_SUB_USAGE_XFB_BUFFER:
                     GL_ASSERT(stageIdx == __GLSL_STAGE_VS);
                     GL_ASSERT(pgInstance->xfbBufferCount < __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS);
-                    GL_ASSERT(chipCtx->chipFeature.hasHwTFB == GL_FALSE);
+                    GL_ASSERT(chipCtx->chipFeature.hwFeature.hasHwTFB == GL_FALSE);
                     pgInstance->xfbBufferUniforms[pgInstance->xfbBufferCount++] = slot;
                     break;
                 case __GL_CHIP_UNIFORM_SUB_USAGE_STARTVERTEX:
@@ -1684,6 +1712,12 @@ gcChipProcessUniforms(
                         program->samplerMap[samplerIdx].subUsage = subUsage;
                         program->samplerMap[samplerIdx].isInteger = isInteger;
 
+                        if (GetUniformResOpFlags(uniform) == gcUNIFORM_RES_OP_FLAG_FETCH ||
+                            GetUniformResOpFlags(uniform) == gcUNIFORM_RES_OP_FLAG_FETCH_MS)
+                        {
+                            __glBitmaskSet(&program->texelFetchSamplerMask, samplerIdx);
+                        }
+
                         if (binding >= 0)
                         {
                             GL_ASSERT(slot->data);
@@ -1693,7 +1727,7 @@ gcChipProcessUniforms(
                         if (gcSHADER_SAMPLER_2D_SHADOW == dataType       ||
                             gcSHADER_SAMPLER_2D_ARRAY_SHADOW == dataType ||
                             gcSHADER_SAMPLER_CUBE_SHADOW == dataType     ||
-                            gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW == dataType     )
+                            gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW == dataType)
                         {
                             __glBitmaskSet(&program->shadowSamplerMask, samplerIdx);
                         }
@@ -3368,6 +3402,7 @@ gcChipProgramCleanBindingInfo(
     programObject->bindingInfo.vsInputArrayMask = 0;
 
     __glBitmaskSetAll(&program->shadowSamplerMask, GL_FALSE);
+    __glBitmaskSetAll(&program->texelFetchSamplerMask, GL_FALSE);
 
     /* Free uniforms */
     if (program->uniforms)
@@ -6992,19 +7027,7 @@ gcChipPgInstanceDeinitialize(
     }
 
     /* Free any states. */
-    if (pgInstance->programState.stateBuffer != gcvNULL)
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pgInstance->programState.stateBuffer));
-        pgInstance->programState.stateBuffer = gcvNULL;
-        pgInstance->programState.stateBufferSize = 0;
-    }
-
-    if (pgInstance->programState.hints != gcvNULL)
-    {
-        gcmVERIFY_OK(gcHINTS_Destroy(pgInstance->programState.hints));
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pgInstance->programState.hints));
-        pgInstance->programState.hints = gcvNULL;
-    }
+    gcmVERIFY_OK(gcFreeProgramState(pgInstance->programState));
 
     if (pgInstance->recompilePatchInfo.recompilePatchDirectivePtr)
     {
@@ -7030,16 +7053,7 @@ gcChipProgFreeCmdInstance(
     {
         gcsPROGRAM_STATE *stateBuf = (gcsPROGRAM_STATE*)cmdInstance;
 
-        if (stateBuf->hints)
-        {
-            gcHINTS_Destroy(stateBuf->hints);
-            gcoOS_Free(gcvNULL, stateBuf->hints);
-        }
-
-        if (stateBuf->stateBuffer)
-        {
-            gcoOS_Free(gcvNULL, stateBuf->stateBuffer);
-        }
+        gcFreeProgramState(*stateBuf);
 
         gc->imports.free(gc, stateBuf);
     }
@@ -7137,6 +7151,7 @@ __glChipCreateProgram(
     program->stageBits = 0;
 
     __glBitmaskInitAllZero(&program->shadowSamplerMask, gc->constants.shaderCaps.maxTextureSamplers);
+    __glBitmaskInitAllZero(&program->texelFetchSamplerMask, gc->constants.shaderCaps.maxTextureSamplers);
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -7347,8 +7362,7 @@ __glChipLinkProgram(
     __GLSLStage stage, transformFeedbackStage = __GLSL_STAGE_VS;
     gctUINT key;
     gceSTATUS  status;
-    gctUINT32  statesSize = 0;
-    gctPOINTER states = gcvNULL;
+    gcsPROGRAM_STATE programState = {0};
     gceSHADER_FLAGS flags;
     gceSHADER_SUB_FLAGS subFlags;
     gcSHADER_KIND shaderTypes[] =
@@ -7577,9 +7591,7 @@ __glChipLinkProgram(
                              masterPgInstance->binaries,
                              flags,
                              &subFlags,
-                             &statesSize,
-                             &states,
-                             &masterPgInstance->programState.hints);
+                             &programState);
 
     if (gcmIS_ERROR(status))
     {
@@ -7589,17 +7601,14 @@ __glChipLinkProgram(
     programObject->programInfo.invalidFlags &= ~__GL_INVALID_LINK_BIT;
 
     /* Successful link must guarantee there is state buffer generated. */
-    GL_ASSERT(states && statesSize > 0);
+    GL_ASSERT(programState.stateBuffer && programState.stateBufferSize > 0);
 
     /* Only successfully link can replace the previous shader states buffer */
     if (masterPgInstance->programState.stateBuffer != gcvNULL)
     {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, masterPgInstance->programState.stateBuffer));
-        masterPgInstance->programState.stateBuffer = gcvNULL;
-        masterPgInstance->programState.stateBufferSize = 0;
+        gcmVERIFY_OK(gcFreeProgramState(masterPgInstance->programState));
     }
-    masterPgInstance->programState.stateBufferSize = statesSize;
-    masterPgInstance->programState.stateBuffer     = states;
+    masterPgInstance->programState = programState;
 
     program->stageBits = masterPgInstance->programState.hints->stageBits;
 
@@ -7769,8 +7778,7 @@ gcChipGetProgramBinary_V0(
     /* Get size of program binary. */
     gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
                              masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                             masterPgInstance->programState.stateBufferSize, masterPgInstance->programState.stateBuffer,
-                             masterPgInstance->programState.hints, gcvNULL, (gctUINT32 *)&size));
+                             masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
 
     if (binary)
     {
@@ -7782,8 +7790,7 @@ gcChipGetProgramBinary_V0(
         /* Save program binary. */
         gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
                                  masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                                 masterPgInstance->programState.stateBufferSize, masterPgInstance->programState.stateBuffer,
-                                 masterPgInstance->programState.hints, &binary, (gctUINT32 *)&size));
+                                 masterPgInstance->programState, &binary, (gctUINT32 *)&size));
 
     }
 
@@ -7877,7 +7884,7 @@ gcChipProgramBinary_V0(
                              (gctUINT32)length,
                              masterPgInstance->binaries[__GLSL_STAGE_VS],
                              masterPgInstance->binaries[__GLSL_STAGE_FS],
-                             gcvNULL, gcvNULL, gcvNULL));
+                             gcvNULL));
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
@@ -7957,9 +7964,7 @@ gcChipProgramBinary_V0(
                            masterPgInstance->binaries,
                            flags,
                            &subFlags,
-                           &masterPgInstance->programState.stateBufferSize,
-                           &masterPgInstance->programState.stateBuffer,
-                           &masterPgInstance->programState.hints);
+                           &masterPgInstance->programState);
     if (gcmIS_ERROR(status))
     {
         programObject->programInfo.invalidFlags |= __GL_INVALID_LINK_BIT;
@@ -8407,8 +8412,6 @@ __glChipShaderBinary(
                                   length,
                                   vertexShader,
                                   fragmentShader,
-                                  gcvNULL,
-                                  gcvNULL,
                                   gcvNULL));
 
     }
@@ -9356,7 +9359,7 @@ gcChipLoadCompiler(
             gcSHADER_DynamicPatch,
             gcCreateOutputConversionDirective,
             gcCreateInputConversionDirective,
-            gcHINTS_Destroy,
+            gcFreeProgramState,
             gcSetGLSLCompiler,
             gcDestroyPatchDirective
         };
@@ -10003,7 +10006,7 @@ gcChipPreparePrivateUniform(
     case __GL_CHIP_UNIFORM_SUB_USAGE_GROUPNUM:
         {
             if (gc->compute.indirect &&
-                gcvFALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPUTE_INDIRECT))
+                !chipCtx->chipFeature.hwFeature.hasComputeIndirect)
             {
                 gcChipLockOutComputeIndirectBuf(gc);
             }
@@ -10943,8 +10946,7 @@ gcChipDynamicPatchProgram(
     __GLchipSLProgram          *program          = (__GLchipSLProgram *)programObject->privateData;
     __GLchipSLProgramInstance  *masterPgInstance = program->masterPgInstance;
     __GLchipSLProgramInstance  *pgInstance       = program->curPgInstance;
-    gctUINT32                  statesSize        = 0;
-    gctPOINTER                 states            = gcvNULL;
+    gcsPROGRAM_STATE            programState     = {0};
     gcPatchDirective           *dynamicPatchInfo = recompilePatchDirectivePtr;
     gceSHADER_FLAGS            flags;
     gceSHADER_SUB_FLAGS        subFlags;
@@ -11074,15 +11076,13 @@ gcChipDynamicPatchProgram(
                            pgInstance->binaries,
                            flags,
                            &subFlags,
-                           &statesSize ,
-                           &states,
-                           &pgInstance->programState.hints);
+                           &programState);
 
     if (gcmIS_ERROR(status))
     {
-        if (states != gcvNULL)
+        if (programState.stateBuffer != gcvNULL)
         {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, states));
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, programState.stateBuffer));
         }
         programObject->programInfo.invalidFlags |= __GL_INVALID_LINK_BIT;
         gcmFATAL("%s(%d): gcLinkProgram failed status=%d", __FUNCTION__, __LINE__, status);
@@ -11092,10 +11092,9 @@ gcChipDynamicPatchProgram(
         programObject->programInfo.invalidFlags &= ~__GL_INVALID_LINK_BIT;
 
         /* Successful link must guarantee there is state buffer generated. */
-        GL_ASSERT(states && statesSize > 0);
+        GL_ASSERT(programState.stateBuffer && programState.stateBufferSize > 0);
 
-        pgInstance->programState.stateBufferSize = statesSize;
-        pgInstance->programState.stateBuffer     = states;
+        pgInstance->programState = programState;
 
         gcChipPgInstanceCleanBindingInfo(gc, pgInstance);
 

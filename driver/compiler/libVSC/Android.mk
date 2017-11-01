@@ -110,6 +110,7 @@ LOCAL_SRC_FILES := \
 	vir/transform/gc_vsc_vir_static_patch.c \
 	vir/transform/gc_vsc_vir_vectorization.c \
 	vir/transform/gc_vsc_vir_loop.c \
+	vir/transform/gc_vsc_vir_param_opts.c \
 	debug/gc_vsc_debug.c \
 
 LOCAL_GENERATED_SOURCES := \

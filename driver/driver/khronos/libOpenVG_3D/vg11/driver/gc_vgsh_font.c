@@ -394,6 +394,12 @@ void vgDrawGlyph(VGFont            font,
     OVG_GET_CONTEXT(OVG_NO_RETVAL);
     vgmGetApiStartTime();
     vgmPROFILE(context, VGDRAWGLYPH, 0);
+
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_BEGIN, 0);
+    }
+
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_TYPE, (gctUINTPTR_T)VG_GLYPH);
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)1);
     if (paintModes & VG_STROKE_PATH)
@@ -434,7 +440,14 @@ void vgDrawGlyph(VGFont            font,
 
     V2_ADD(context->glyphOrigin, glyphObj->escapement.x, glyphObj->escapement.y);
     context->inputGlyphOrigin = context->glyphOrigin;
+#if VIVANTE_PROFILER
+    vgmPROFILE(context, VG_PROFILER_PRIMITIVE_END, 0);
 
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_END, 0);
+    }
+#endif
 Error:
     vgmGetApiEndTime(context);
     gcmFOOTER_NO();
@@ -460,6 +473,12 @@ void vgDrawGlyphs(VGFont            font,
     OVG_GET_CONTEXT(OVG_NO_RETVAL);
     vgmGetApiStartTime();
     vgmPROFILE(context, VGDRAWGLYPHS, 0);
+
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_BEGIN, 0);
+    }
+
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_TYPE, (gctUINTPTR_T)VG_GLYPH);
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)glyphCount);
     if (paintModes & VG_STROKE_PATH)
@@ -516,6 +535,15 @@ void vgDrawGlyphs(VGFont            font,
             context->glyphOrigin.y += inputFloat(adjustments_y[i]);
         context->inputGlyphOrigin = context->glyphOrigin;
     }
+
+#if VIVANTE_PROFILER
+    vgmPROFILE(context, VG_PROFILER_PRIMITIVE_END, 0);
+
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_END, 0);
+    }
+#endif
 
 Error:
     vgmGetApiEndTime(context);

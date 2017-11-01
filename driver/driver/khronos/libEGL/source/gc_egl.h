@@ -104,11 +104,6 @@ typedef struct eglPixmapInfo      * VEGLPixmapInfo;
 #define MAJOR_API_VER(x)            ((x) >> 4)
 #define MINOR_API_VER(x)            ((x) & 0xF)
 
-/* Some internal platform types exist on linux. */
-#define EGL_PLATFORM_FBDEV_VIV      0x31DA
-#define EGL_PLATFORM_NULLWS_VIV     0x31DB
-#define EGL_PLATFORM_DFB_VIV        0x31DC
-
 
 struct eglResObj
 {
@@ -670,6 +665,7 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_KHR_partial_update,
     VEGL_EXTID_EXT_swap_buffers_with_damage,
     VEGL_EXTID_KHR_swap_buffers_with_damage,
+    VEGL_EXTID_EXT_image_dma_buf_import_modifiers,
 
     VEGL_EXTID_COUNT,
 }
@@ -1060,6 +1056,18 @@ _CreateImageFromVGParentImage(
     VEGLImage      eglimage
     );
 
+EGLenum
+_CreateImageFromANativeBuffer(
+    VEGLThreadData Thread,
+    EGLClientBuffer Buffer,
+    VEGLImage Image
+    );
+
+EGLBoolean
+_IsExtSuppored(
+    EGLenum extId
+    );
+
 #define VEGL_TRACE_API(func) \
     if (veglTracerDispatchTable.func)(*veglTracerDispatchTable.func)
 
@@ -1180,7 +1188,10 @@ typedef struct
     /* EGL_KHR_swap_buffers_with_damage. */
     EGLBoolean (* SwapBuffersWithDamageKHR)(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects);
     EGLBoolean (* SwapBuffersWithDamageEXT)(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects);
-    /* EGL_EXT_swap_buffers_with_damage. */
+
+    /* EGL_EXT_image_dma_buf_import_modifiers */
+    EGLBoolean (* QueryDmaBufFormatsEXT)(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats);
+    EGLBoolean (* QueryDmaBufModifiersEXT)(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers);
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 

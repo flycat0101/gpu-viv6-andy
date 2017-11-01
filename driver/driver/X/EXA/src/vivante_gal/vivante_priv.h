@@ -33,9 +33,12 @@
 extern "C" {
 #endif
 
-#include "HAL/gc_hal.h"
-#include "HAL/gc_hal_raster.h"
-#include "HAL/gc_hal_base.h"
+#include "gc_hal.h"
+#include "gc_hal_raster.h"
+#include "gc_hal_base.h"
+#ifdef ENABLE_VIVANTE_DRI3
+#include "vivante_bo.h"
+#endif
 
     /************************************************************************
      * PIXMAP_HANDLING_STUFF(START)
@@ -59,6 +62,10 @@ extern "C" {
         gctUINT32 mStride;
         VideoNode mVideoNode;
         gctPOINTER mData;
+#ifdef ENABLE_VIVANTE_DRI3
+        struct drm_vivante_bo *bo;
+        int fd;
+#endif
     } GenericSurface, *GenericSurfacePtr;
 
     /************************************************************************
@@ -74,6 +81,9 @@ extern "C" {
         gcoHAL mHal;
         gco2D m2DEngine;
         gcoBRUSH mBrush;
+#ifdef ENABLE_VIVANTE_DRI3
+        struct drm_vivante *drm;
+#endif
 
         /*video memory mapping*/
         gctPHYS_ADDR g_InternalPhysical, g_ExternalPhysical, g_ContiguousPhysical;

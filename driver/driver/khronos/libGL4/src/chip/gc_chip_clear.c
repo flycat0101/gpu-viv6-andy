@@ -20,7 +20,7 @@
 
 #if gcdFRAMEINFO_STATISTIC
 extern GLboolean g_dbgPerDrawKickOff;
-extern GLboolean g_dbgDumpImagePerDraw;
+extern GLbitfield g_dbgDumpImagePerDraw;
 extern GLboolean g_dbgSkipDraw;
 #endif
 
@@ -53,7 +53,9 @@ gcChipGetClearRect(
     gcmONERROR(gcoSURF_GetSize(surf, (gctUINT*)&width, (gctUINT*)&height, gcvNULL));
 
     /* make compiler happy */
+#ifndef __clang__
     chipCtx = chipCtx;
+#endif
 
     if (gc->state.enables.scissorTest)
     {
@@ -224,13 +226,13 @@ gcChipClearRenderTarget(
                 clearArg.clearRect = &clearRect;
             }
 
-            tsEnabled = gcoSURF_IsTileStatusEnabled(&(chipCtx->drawRtViews[i]));
+            tsEnabled = gcoSURF_IsTileStatusEnabled(&chipCtx->drawRtViews[i]);
 
             gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
 
             /* TS from disable to enable */
             if (!tsEnabled &&
-                gcoSURF_IsTileStatusEnabled(&(chipCtx->drawRtViews[i])))
+                gcoSURF_IsTileStatusEnabled(&chipCtx->drawRtViews[i]))
             {
                 chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = gcvTRUE;
             }
@@ -402,6 +404,10 @@ __glChipClearBegin(
     }
 
 #if gcdFRAMEINFO_STATISTIC
+    gcoHAL_FrameInfoOps(chipCtx->hal,
+                        gcvFRAMEINFO_DRAW_NUM,
+                        gcvFRAMEINFO_OP_INC,
+                        gcvNULL);
     if (g_dbgSkipDraw)
     {
         return GL_FALSE;
@@ -567,9 +573,9 @@ __glChipClearEnd(
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
 
-    if (g_dbgDumpImagePerDraw == 3)
+    if (g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS))
     {
-        gcmONERROR(gcChipUtilsDumpRT(gc, 1));
+        gcmONERROR(gcChipUtilsDumpRT(gc, (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS)));
     }
 #endif
 
@@ -647,6 +653,7 @@ __glChipClearBuffer(
     __GLrasterState    *pRasterState = &gc->state.raster;
     gcsSURF_VIEW        *surfView = gcvNULL;
     gceSTATUS           status = gcvSTATUS_OK;
+    GLuint j;
 
     gcmHEADER_ARG("gc=0x%x buffer=%d drawbuffer=%d value=0x%x type=%d",
                    gc, buffer, drawbuffer, value, type);
@@ -732,7 +739,17 @@ __glChipClearBuffer(
 
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
+#ifdef OPENGL40
+        for (j = 0; j < gc->constants.shaderCaps.maxDrawBuffers; ++j)
+        {
+            if (chipCtx->drawRtViews[j].surf)
+            {
+                gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[j], &clearArg));
+            }
+        }
+#else
         gcmONERROR(gcoSURF_Clear(surfView, &clearArg));
+#endif
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

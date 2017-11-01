@@ -15,6 +15,8 @@
 #define __gc_hal_user_hardware_vg_h_
 
 #include "gc_hal_user_vg.h"
+#include "gc_feature_database.h"
+
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -39,9 +41,10 @@ struct _gcoVGHARDWARE
     /* Context buffer. */
     gcsVGCONTEXT              * pContext;
 
+    /* Feature database. */
+    gcsFEATURE_DATABASE       * features;
+
     /* Chip characteristics. */
-    gceCHIPMODEL                chipModel;
-    gctUINT32                   chipRevision;
     gctUINT32                   chipFeatures;
     gctUINT32                   chipMinorFeatures;
     gctUINT32                   chipMinorFeatures2;

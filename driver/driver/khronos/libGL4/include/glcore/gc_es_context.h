@@ -14,6 +14,11 @@
 #ifndef __gc_gl_context_h__
 #define __gc_gl_context_h__
 
+/* Some platform (win64) predefined such macro, which make driver code confused. */
+#if defined(MemoryBarrier)
+#undef MemoryBarrier
+#endif
+
 #include "gc_es_types.h"
 #include "gc_es_consts.h"
 #include "gc_es_utils.h"
@@ -53,11 +58,6 @@
 #ifdef OPENGL40
 #include "wintogl.h"
 #include "viv_lock.h"
-#endif
-
-/* Some platform (win64) predefined such macro, which make driver code confused. */
-#if defined(MemoryBarrier)
-#undef MemoryBarrier
 #endif
 
 #ifdef OPENGL40
@@ -660,73 +660,67 @@ enum {
                 __GL_SAMPLE_MIN_SHADING_VALUE_BIT)
 
 
-
 /*
 ** Referenced by "gc->texUnitAttrState[0 .. (__GL_TEXTURE_MAX_UNITS-1)]".
  */
-enum
-{
-    __GL_TEX_ENABLE_DIM_CHANGED_BIT     = (1 << 0),
-    __GL_TEX_IMAGE_CONTENT_CHANGED_BIT  = (1 << 1),
-    __GL_TEX_IMAGE_FORMAT_CHANGED_BIT   = (1 << 2),
-    __GL_TEXPARAM_WRAP_S_BIT            = (1 << 3),
-    __GL_TEXPARAM_WRAP_T_BIT            = (1 << 4),
-    __GL_TEXPARAM_WRAP_R_BIT            = (1 << 5),
-    __GL_TEXPARAM_MIP_HINT_BIT          = (1 << 6),
-    __GL_TEXPARAM_MIN_FILTER_BIT        = (1 << 7),
-    __GL_TEXPARAM_MAG_FILTER_BIT        = (1 << 8),
-    __GL_TEXPARAM_MIN_LOD_BIT           = (1 << 9),
-    __GL_TEXPARAM_MAX_LOD_BIT           = (1 << 10),
-    __GL_TEXPARAM_BASE_LEVEL_BIT        = (1 << 11),
-    __GL_TEXPARAM_MAX_LEVEL_BIT         = (1 << 12),
-    __GL_TEXPARAM_COMPARE_MODE_BIT      = (1 << 13),
-    __GL_TEXPARAM_COMPARE_FUNC_BIT      = (1 << 14),
-    __GL_TEXPARAM_SWIZZLE_R_BIT         = (1 << 15),
-    __GL_TEXPARAM_SWIZZLE_G_BIT         = (1 << 16),
-    __GL_TEXPARAM_SWIZZLE_B_BIT         = (1 << 17),
-    __GL_TEXPARAM_SWIZZLE_A_BIT         = (1 << 18),
-    __GL_TEXPARAM_MAX_ANISTROPY_BIT     = (1 << 19),
-    __GL_TEXPARAM_D_ST_TEXMODE_BIT      = (1 << 20),
-    __GL_TEXPARAM_SRGB_BIT              = (1 << 21),
-    __GL_TEXPARAM_BORDER_COLOR_BIT      = (1 << 22),
+#define __GL_TEX_ENABLE_DIM_CHANGED_BIT         (__GL_ONE_64 <<  0)
+#define __GL_TEX_IMAGE_CONTENT_CHANGED_BIT      (__GL_ONE_64 <<  1)
+#define __GL_TEX_IMAGE_FORMAT_CHANGED_BIT       (__GL_ONE_64 <<  2)
+#define __GL_TEXPARAM_WRAP_S_BIT                (__GL_ONE_64 <<  3)
+#define __GL_TEXPARAM_WRAP_T_BIT                (__GL_ONE_64 <<  4)
+#define __GL_TEXPARAM_WRAP_R_BIT                (__GL_ONE_64 <<  5)
+#define __GL_TEXPARAM_MIP_HINT_BIT              (__GL_ONE_64 <<  6)
+#define __GL_TEXPARAM_MIN_FILTER_BIT            (__GL_ONE_64 <<  7)
+#define __GL_TEXPARAM_MAG_FILTER_BIT            (__GL_ONE_64 <<  8)
+#define __GL_TEXPARAM_MIN_LOD_BIT               (__GL_ONE_64 <<  9)
+#define __GL_TEXPARAM_MAX_LOD_BIT               (__GL_ONE_64 << 10)
+#define __GL_TEXPARAM_BASE_LEVEL_BIT            (__GL_ONE_64 << 11)
+#define __GL_TEXPARAM_MAX_LEVEL_BIT             (__GL_ONE_64 << 12)
+#define __GL_TEXPARAM_COMPARE_MODE_BIT          (__GL_ONE_64 << 13)
+#define __GL_TEXPARAM_COMPARE_FUNC_BIT          (__GL_ONE_64 << 14)
+#define __GL_TEXPARAM_SWIZZLE_R_BIT             (__GL_ONE_64 << 15)
+#define __GL_TEXPARAM_SWIZZLE_G_BIT             (__GL_ONE_64 << 16)
+#define __GL_TEXPARAM_SWIZZLE_B_BIT             (__GL_ONE_64 << 17)
+#define __GL_TEXPARAM_SWIZZLE_A_BIT             (__GL_ONE_64 << 18)
+#define __GL_TEXPARAM_MAX_ANISOTROPY_BIT        (__GL_ONE_64 << 19)
+#define __GL_TEXPARAM_DS_TEXMODE_BIT            (__GL_ONE_64 << 20)
+#define __GL_TEXPARAM_SRGB_BIT                  (__GL_ONE_64 << 21)
+#define __GL_TEXPARAM_BORDER_COLOR_BIT          (__GL_ONE_64 << 22)
 #ifdef OPENGL40
-    __GL_TEXTURE_TRANSFORM_BIT          = (1 << 23),
-    __GL_TEX_UNIT_LODBIAS_BIT           = (1 << 24),
-    __GL_TEXGEN_S_ENDISABLE_BIT         = (1 << 25),
-    __GL_TEXGEN_T_ENDISABLE_BIT         = (1 << 26),
-    __GL_TEXGEN_R_ENDISABLE_BIT         = (1 << 27),
-    __GL_TEXGEN_Q_ENDISABLE_BIT         = (1 << 28),
-    __GL_TEXGEN_S_BIT                   = (1 << 29),
-    __GL_TEXGEN_T_BIT                   = (1 << 30),
-    __GL_TEXGEN_R_BIT                   = (1 << 31),
-#endif
-};
-#ifdef OPENGL40
-#define    __GL_TEXGEN_Q_BIT                      (__GL_ONE_64 << 32)
-#define    __GL_TEXENV_MODE_BIT                (__GL_ONE_64 << 33)
-#define    __GL_TEXENV_COLOR_BIT               (__GL_ONE_64 << 34)
-#define    __GL_TEXENV_COMBINE_ALPHA_BIT       (__GL_ONE_64 << 35)
-#define    __GL_TEXENV_COMBINE_RGB_BIT         (__GL_ONE_64 << 36)
-#define    __GL_TEXENV_SOURCE0_RGB_BIT         (__GL_ONE_64 << 37)
-#define    __GL_TEXENV_SOURCE1_RGB_BIT         (__GL_ONE_64 << 38)
-#define    __GL_TEXENV_SOURCE2_RGB_BIT         (__GL_ONE_64 << 39)
-#define    __GL_TEXENV_SOURCE0_ALPHA_BIT       (__GL_ONE_64 << 40)
-#define    __GL_TEXENV_SOURCE1_ALPHA_BIT       (__GL_ONE_64 << 41)
-#define    __GL_TEXENV_SOURCE2_ALPHA_BIT       (__GL_ONE_64 << 42)
-#define    __GL_TEXENV_OPERAND0_RGB_BIT        (__GL_ONE_64 << 43)
-#define    __GL_TEXENV_OPERAND1_RGB_BIT        (__GL_ONE_64 << 44)
-#define    __GL_TEXENV_OPERAND2_RGB_BIT        (__GL_ONE_64 << 45)
-#define    __GL_TEXENV_OPERAND0_ALPHA_BIT      (__GL_ONE_64 << 46)
-#define    __GL_TEXENV_OPERAND1_ALPHA_BIT      (__GL_ONE_64 << 47)
-#define    __GL_TEXENV_OPERAND2_ALPHA_BIT      (__GL_ONE_64 << 48)
-#define    __GL_TEXENV_RGB_SCALE_BIT           (__GL_ONE_64 << 49)
-#define    __GL_TEXENV_ALPHA_SCALE_BIT         (__GL_ONE_64 << 50)
-#define    __GL_TEXENV_COORD_REPLACE_BIT       (__GL_ONE_64 << 51)
-#define    __GL_TEXPARAM_PRIORITY_BIT          (__GL_ONE_64 << 52)
-#define    __GL_TEXPARAM_LOD_BIAS_BIT          (__GL_ONE_64 << 53)
-#define    __GL_TEXPARAM_DEPTH_TEX_MODE_BIT    (__GL_ONE_64 << 54)
-#define    __GL_TEXPARAM_COMPARE_FAIL_VALUE_BIT (__GL_ONE_64 << 55)
-#define    __GL_TEXPARAM_GENERATE_MIPMAP_BIT    (__GL_ONE_64 << 56)
+#define __GL_TEXPARAM_PRIORITY_BIT              (__GL_ONE_64 << 23)
+#define __GL_TEXPARAM_LOD_BIAS_BIT              (__GL_ONE_64 << 24)
+#define __GL_TEXPARAM_DEPTH_TEX_MODE_BIT        (__GL_ONE_64 << 25)
+#define __GL_TEXPARAM_COMPARE_FAIL_VALUE_BIT    (__GL_ONE_64 << 26)
+#define __GL_TEXPARAM_GENERATE_MIPMAP_BIT       (__GL_ONE_64 << 27)
+#define __GL_TEXTURE_TRANSFORM_BIT              (__GL_ONE_64 << 28)
+#define __GL_TEXGEN_S_ENDISABLE_BIT             (__GL_ONE_64 << 29)
+#define __GL_TEXGEN_T_ENDISABLE_BIT             (__GL_ONE_64 << 30)
+#define __GL_TEXGEN_R_ENDISABLE_BIT             (__GL_ONE_64 << 31)
+#define __GL_TEXGEN_Q_ENDISABLE_BIT             (__GL_ONE_64 << 32)
+#define __GL_TEXGEN_S_BIT                       (__GL_ONE_64 << 33)
+#define __GL_TEXGEN_T_BIT                       (__GL_ONE_64 << 34)
+#define __GL_TEXGEN_R_BIT                       (__GL_ONE_64 << 35)
+#define __GL_TEXGEN_Q_BIT                       (__GL_ONE_64 << 36)
+#define __GL_TEXENV_MODE_BIT                    (__GL_ONE_64 << 37)
+#define __GL_TEXENV_COLOR_BIT                   (__GL_ONE_64 << 38)
+#define __GL_TEXENV_COMBINE_ALPHA_BIT           (__GL_ONE_64 << 39)
+#define __GL_TEXENV_COMBINE_RGB_BIT             (__GL_ONE_64 << 40)
+#define __GL_TEXENV_SOURCE0_RGB_BIT             (__GL_ONE_64 << 41)
+#define __GL_TEXENV_SOURCE1_RGB_BIT             (__GL_ONE_64 << 42)
+#define __GL_TEXENV_SOURCE2_RGB_BIT             (__GL_ONE_64 << 43)
+#define __GL_TEXENV_SOURCE0_ALPHA_BIT           (__GL_ONE_64 << 44)
+#define __GL_TEXENV_SOURCE1_ALPHA_BIT           (__GL_ONE_64 << 45)
+#define __GL_TEXENV_SOURCE2_ALPHA_BIT           (__GL_ONE_64 << 46)
+#define __GL_TEXENV_OPERAND0_RGB_BIT            (__GL_ONE_64 << 47)
+#define __GL_TEXENV_OPERAND1_RGB_BIT            (__GL_ONE_64 << 48)
+#define __GL_TEXENV_OPERAND2_RGB_BIT            (__GL_ONE_64 << 49)
+#define __GL_TEXENV_OPERAND0_ALPHA_BIT          (__GL_ONE_64 << 50)
+#define __GL_TEXENV_OPERAND1_ALPHA_BIT          (__GL_ONE_64 << 51)
+#define __GL_TEXENV_OPERAND2_ALPHA_BIT          (__GL_ONE_64 << 52)
+#define __GL_TEXENV_RGB_SCALE_BIT               (__GL_ONE_64 << 53)
+#define __GL_TEXENV_ALPHA_SCALE_BIT             (__GL_ONE_64 << 54)
+#define __GL_TEXENV_COORD_REPLACE_BIT           (__GL_ONE_64 << 55)
+#define __GL_TEX_UNIT_LODBIAS_BIT               (__GL_ONE_64 << 56)
 #endif
 
 
@@ -736,57 +730,9 @@ enum
                 __GL_TEXPARAM_SWIZZLE_B_BIT | \
                 __GL_TEXPARAM_SWIZZLE_A_BIT)
 
-#define __GL_SAMPLERPARAMETER_BITS ( \
-                __GL_TEXPARAM_WRAP_S_BIT | \
-                __GL_TEXPARAM_WRAP_T_BIT | \
-                __GL_TEXPARAM_WRAP_R_BIT | \
-                __GL_TEXPARAM_MIN_FILTER_BIT | \
-                __GL_TEXPARAM_MAG_FILTER_BIT | \
-                __GL_TEXPARAM_MIN_LOD_BIT | \
-                __GL_TEXPARAM_MAX_LOD_BIT | \
-                __GL_TEXPARAM_COMPARE_MODE_BIT |  \
-                __GL_TEXPARAM_COMPARE_FUNC_BIT |  \
-                __GL_TEXPARAM_MAX_ANISTROPY_BIT | \
-                __GL_TEXPARAM_SRGB_BIT          | \
-                __GL_TEXPARAM_BORDER_COLOR_BIT)
-
 #define __GL_TEXIMAGE_BITS ( \
                 __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | \
                 __GL_TEX_IMAGE_FORMAT_CHANGED_BIT )
-
-#ifdef OPENGL40
-#define __GL_TEXPARAMETER_BITS ( \
-                __GL_TEXPARAM_WRAP_S_BIT | \
-                __GL_TEXPARAM_WRAP_T_BIT | \
-                __GL_TEXPARAM_WRAP_R_BIT | \
-                __GL_TEXPARAM_MIN_FILTER_BIT | \
-                __GL_TEXPARAM_MAG_FILTER_BIT | \
-                __GL_TEXPARAM_BORDER_COLOR_BIT | \
-                __GL_TEXPARAM_PRIORITY_BIT | \
-                __GL_TEXPARAM_MIN_LOD_BIT | \
-                __GL_TEXPARAM_MAX_LOD_BIT | \
-                __GL_TEXPARAM_BASE_LEVEL_BIT | \
-                __GL_TEXPARAM_MAX_LEVEL_BIT | \
-                __GL_TEXPARAM_LOD_BIAS_BIT | \
-                __GL_TEXPARAM_DEPTH_TEX_MODE_BIT | \
-                __GL_TEXPARAM_COMPARE_MODE_BIT | \
-                __GL_TEXPARAM_COMPARE_FUNC_BIT | \
-                __GL_TEXPARAM_GENERATE_MIPMAP_BIT | \
-                __GL_TEXPARAM_COMPARE_FAIL_VALUE_BIT | \
-                __GL_TEXPARAM_MAX_ANISTROPY_BIT | \
-                __GL_TEXPARAMETER_SWIZZLE_BITS | \
-                __GL_TEXPARAM_MIP_HINT_BIT | \
-                __GL_TEXPARAM_D_ST_TEXMODE_BIT)
-
-#else
-#define __GL_TEXPARAMETER_BITS ( \
-                __GL_SAMPLERPARAMETER_BITS | \
-                __GL_TEXPARAMETER_SWIZZLE_BITS | \
-                __GL_TEXPARAM_MIP_HINT_BIT | \
-                __GL_TEXPARAM_BASE_LEVEL_BIT | \
-                __GL_TEXPARAM_MAX_LEVEL_BIT |\
-                __GL_TEXPARAM_D_ST_TEXMODE_BIT)
-#endif
 
 #ifdef OPENGL40
 #define __GL_TEXGEN_BITS ( \
@@ -820,7 +766,32 @@ enum
                 __GL_TEXENV_ALPHA_SCALE_BIT | \
                 __GL_TEXENV_COORD_REPLACE_BIT)
 
+#define __GL_SAMPLERPARAMETER_BITS ( \
+                __GL_TEXPARAM_WRAP_S_BIT | \
+                __GL_TEXPARAM_WRAP_T_BIT | \
+                __GL_TEXPARAM_WRAP_R_BIT | \
+                __GL_TEXPARAM_MIN_FILTER_BIT | \
+                __GL_TEXPARAM_MAG_FILTER_BIT | \
+                __GL_TEXPARAM_MIN_LOD_BIT | \
+                __GL_TEXPARAM_MAX_LOD_BIT | \
+                __GL_TEXPARAM_LOD_BIAS_BIT | \
+                __GL_TEXPARAM_COMPARE_MODE_BIT |  \
+                __GL_TEXPARAM_COMPARE_FUNC_BIT |  \
+                __GL_TEXPARAM_MAX_ANISOTROPY_BIT | \
+                __GL_TEXPARAM_SRGB_BIT | \
+                __GL_TEXPARAM_BORDER_COLOR_BIT)
 
+#define __GL_TEXPARAMETER_BITS ( \
+                __GL_TEXPARAMETER_SWIZZLE_BITS | \
+                __GL_SAMPLERPARAMETER_BITS | \
+                __GL_TEXPARAM_PRIORITY_BIT | \
+                __GL_TEXPARAM_BASE_LEVEL_BIT | \
+                __GL_TEXPARAM_MAX_LEVEL_BIT | \
+                __GL_TEXPARAM_DEPTH_TEX_MODE_BIT | \
+                __GL_TEXPARAM_DS_TEXMODE_BIT | \
+                __GL_TEXPARAM_GENERATE_MIPMAP_BIT | \
+                __GL_TEXPARAM_MIP_HINT_BIT | \
+                __GL_TEXPARAM_COMPARE_FAIL_VALUE_BIT)
 
 /* Used when push/pop GL_TEXTURE_BIT */
 #define __GL_TEX_UNIT_ALL_BITS ( \
@@ -838,8 +809,29 @@ enum
                 __GL_TEXGEN_R_ENDISABLE_BIT | \
                 __GL_TEXGEN_Q_ENDISABLE_BIT)
 
-#define __GL_TEX_VERTEXPROGRAM_BITS (__GL_TEXGEN_BITS|__GL_TEXTURE_TRANSFORM_BIT)
-#define __GL_TEX_FRAGMENTPROGRAM_BITS  (__GL_TEXENV_BITS)
+#else
+
+#define __GL_SAMPLERPARAMETER_BITS ( \
+                __GL_TEXPARAM_WRAP_S_BIT | \
+                __GL_TEXPARAM_WRAP_T_BIT | \
+                __GL_TEXPARAM_WRAP_R_BIT | \
+                __GL_TEXPARAM_MIN_FILTER_BIT | \
+                __GL_TEXPARAM_MAG_FILTER_BIT | \
+                __GL_TEXPARAM_MIN_LOD_BIT | \
+                __GL_TEXPARAM_MAX_LOD_BIT | \
+                __GL_TEXPARAM_COMPARE_MODE_BIT |  \
+                __GL_TEXPARAM_COMPARE_FUNC_BIT |  \
+                __GL_TEXPARAM_MAX_ANISOTROPY_BIT | \
+                __GL_TEXPARAM_SRGB_BIT | \
+                __GL_TEXPARAM_BORDER_COLOR_BIT)
+
+#define __GL_TEXPARAMETER_BITS ( \
+                __GL_TEXPARAMETER_SWIZZLE_BITS | \
+                __GL_SAMPLERPARAMETER_BITS | \
+                __GL_TEXPARAM_MIP_HINT_BIT | \
+                __GL_TEXPARAM_BASE_LEVEL_BIT | \
+                __GL_TEXPARAM_MAX_LEVEL_BIT |\
+                __GL_TEXPARAM_DS_TEXMODE_BIT)
 
 #endif
 
@@ -1084,6 +1076,20 @@ typedef enum __GLApiVersionRec
     __GL_API_VERSION_ES30 = 300,
     __GL_API_VERSION_ES31 = 310,
     __GL_API_VERSION_ES32 = 320,
+
+    __GL_API_VERSION_OGL10  = 0x10000,
+    __GL_API_VERSION_OGL11  = 0x10100,
+    __GL_API_VERSION_OGL12  = 0x10200,
+    __GL_API_VERSION_OGL13  = 0x10300,
+    __GL_API_VERSION_OGL14  = 0x10400,
+    __GL_API_VERSION_OGL15  = 0x10500,
+    __GL_API_VERSION_OGL20  = 0x20000,
+    __GL_API_VERSION_OGL21  = 0x20100,
+    __GL_API_VERSION_OGL30  = 0x30000,
+    __GL_API_VERSION_OGL31  = 0x30100,
+    __GL_API_VERSION_OGL32  = 0x30200,
+    __GL_API_VERSION_OGL33  = 0x30300,
+    __GL_API_VERSION_OGL40  = 0x40000,
 } __GLApiVersion;
 
 
@@ -1213,10 +1219,8 @@ struct __GLcontextRec
     __GLbitmask imageUnitDirtyMask;
 #ifdef OPENGL40
     GLbitfield lightAttrState[__GL_MAX_LIGHT_NUMBER];
-    GLuint64   texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
-#else
-    GLbitfield texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
 #endif
+    GLuint64   texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
     GLbitfield globalDirtyState[__GL_DIRTY_ATTRS_END];
     GLbitfield drawableDirtyMask;
 
@@ -1343,22 +1347,13 @@ __GL_INLINE GLvoid __glSetGLcontext(GLvoid *context)
 }
 
 extern GLvoid __glEvaluateFramebufferChange(__GLcontext *gc, GLbitfield flags);
-extern GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags);
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
 extern GLvoid __glDispatchDrawableChange(__GLcontext *gc);
 #endif
 __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
 {
-    if (DRAW_FRAMEBUFFER_BINDING_NAME == 0)
-    {
-        /* Dispatch window system render buffer changes*/
-        __glEvaluateSystemDrawableChange(gc, flags);
-    }
-    else
-    {
-       /* Evaluate context frame buffer object status*/
-        __glEvaluateFramebufferChange(gc, flags);
-    }
+    /* Evaluate context frame buffer object status, include default ones. */
+    __glEvaluateFramebufferChange(gc, flags);
 
     if ((gc->drawableDirtyMask & __GL_BUFFER_DRAW_BIT)&& (flags & __GL_BUFFER_DRAW_BIT))
     {
@@ -1496,6 +1491,23 @@ __GL_INLINE __GLbufferObject* __glGetBoundBufObj(__GLcontext *gc, GLuint targetI
 #if (defined(DEBUG) || defined(_DEBUG) || gcdDUMP || gcdFRAMEINFO_STATISTIC)
 #define __GL_FRAME_INFO       1
 #define __GLES_PRINT(...)  gcmPRINT(__VA_ARGS__)
+
+enum
+{
+    __GL_PERDRAW_DUMP_DRAW_RT       = 1 << 0,
+    __GL_PERDRAW_DUMP_DRAW_DS       = 1 << 1,
+    __GL_PERDRAW_DUMP_CLEAR_RT      = 1 << 2,
+    __GL_PERDRAW_DUMP_CLEAR_DS      = 1 << 3,
+    __GL_PERDRAW_DUMP_TEXTURE       = 1 << 4,
+    __GL_PERDRAW_DUMP_BLITFBO_RT    = 1 << 5,
+    __GL_PERDRAW_DUMP_BLITFBO_DS    = 1 << 6,
+
+    __GL_PERDRAW_DUMP_AS_TGA        = 1 << 16,
+    __GL_PERDRAW_DUMP_AS_RAW        = 1 << 17,
+
+    __GL_PERDRAW_DUMP_NONE      = 0x0,
+    __GL_PERDRAW_DUMP_ALL       = 0xFFFFFFFF,
+};
 #else
 #define __GL_FRAME_INFO       0
 #define __GLES_PRINT(...)
@@ -1546,9 +1558,14 @@ __GL_INLINE GLvoid __glEvaluateAttribDrawableChange(__GLcontext *gc)
 //    (*gc->dp.syncFrontToFakeFront)(gc);
 
 
-//    __glEvaluateAttributeChange(gc);
+    __glEvaluateAttributeChange(gc);
 
 }
+#endif
+
+
+#if VIVANTE_PROFILER
+extern GLint __glesApiProfileMode;
 #endif
 
 #endif /* __gc_gl_context_h__ */

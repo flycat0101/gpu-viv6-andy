@@ -247,19 +247,31 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
         switch (internalFormat)
         {
         case GL_R8:
-        case GL_R8UI:
             dataFormat = CL_R;
-            dataType = CL_UNSIGNED_INT8;
+            dataType = CL_UNORM_INT8;
             channelCount = 1;
             glFormat = GL_RED;
             glType = GL_UNSIGNED_BYTE;
             break;
+        case GL_R8UI:
+            dataFormat = CL_R;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 1;
+            glFormat = GL_RED_INTEGER;
+            glType = GL_UNSIGNED_BYTE;
+            break;
         case GL_R8_SNORM:
+             dataFormat = CL_R;
+            dataType = CL_SNORM_INT8;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_BYTE;
+            break;
         case GL_R8I:
             dataFormat = CL_R;
             dataType = CL_SIGNED_INT8;
             channelCount = 1;
-            glFormat = GL_RED;
+            glFormat = GL_RED_INTEGER;
             glType = GL_BYTE;
             break;
         case GL_R16F:
@@ -267,7 +279,7 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataType = CL_HALF_FLOAT;
             channelCount = 1;
             glFormat = GL_RED;
-            glType = GL_SHORT;
+            glType = GL_HALF_FLOAT;
             break;
         case GL_R32F:
             dataFormat = CL_R;
@@ -280,44 +292,56 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataFormat = CL_R;
             dataType = CL_UNSIGNED_INT16;
             channelCount = 1;
-            glFormat = GL_RED;
+            glFormat = GL_RED_INTEGER;
             glType = GL_UNSIGNED_SHORT;
             break;
         case GL_R16I:
             dataFormat = CL_R;
             dataType = CL_SIGNED_INT16;
             channelCount = 1;
-            glFormat = GL_RED;
+            glFormat = GL_RED_INTEGER;
             glType = GL_SHORT;
             break;
         case GL_R32UI:
             dataFormat = CL_R;
             dataType = CL_UNSIGNED_INT32;
             channelCount = 1;
-            glFormat = GL_RED;
+            glFormat = GL_RED_INTEGER;
             glType = GL_UNSIGNED_INT;
             break;
         case GL_R32I:
             dataFormat = CL_R;
             dataType = CL_SIGNED_INT32;
             channelCount = 1;
-            glFormat = GL_RED;
+            glFormat = GL_RED_INTEGER;
             glType = GL_INT;
             break;
         case GL_RG8:
-        case GL_RG8UI:
             dataFormat = CL_RG;
-            dataType = CL_UNSIGNED_INT8;
+            dataType = CL_UNORM_INT8;
             channelCount = 2;
             glFormat = GL_RG;
             glType = GL_UNSIGNED_BYTE;
             break;
+        case GL_RG8UI:
+            dataFormat = CL_RG;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 2;
+            glFormat = GL_RG_INTEGER;
+            glType = GL_UNSIGNED_BYTE;
+            break;
         case GL_RG8_SNORM:
+            dataFormat = CL_RG;
+            dataType = CL_SNORM_INT8;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_BYTE;
+            break;
         case GL_RG8I:
             dataFormat = CL_RG;
             dataType = CL_SIGNED_INT8;
             channelCount = 2;
-            glFormat = GL_RG;
+            glFormat = GL_RG_INTEGER;
             glType = GL_BYTE;
             break;
         case GL_RG16F:
@@ -338,44 +362,56 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataFormat = CL_RG;
             dataType = CL_UNSIGNED_INT16;
             channelCount = 2;
-            glFormat = GL_RG;
+            glFormat = GL_RG_INTEGER;
             glType = GL_UNSIGNED_SHORT;
             break;
         case GL_RG16I:
             dataFormat = CL_RG;
             dataType = CL_SIGNED_INT16;
             channelCount = 2;
-            glFormat = GL_RG;
+            glFormat = GL_RG_INTEGER;
             glType = GL_SHORT;
             break;
         case GL_RG32UI:
             dataFormat = CL_RG;
             dataType = CL_UNSIGNED_INT32;
             channelCount = 2;
-            glFormat = GL_RG;
+            glFormat = GL_RG_INTEGER;
             glType = GL_UNSIGNED_INT;
             break;
         case GL_RG32I:
             dataFormat = CL_RG;
             dataType = CL_SIGNED_INT32;
             channelCount = 2;
-            glFormat = GL_RG;
+            glFormat = GL_RG_INTEGER;
             glType = GL_INT;
             break;
         case GL_RGB8:
-        case GL_RGB8UI:
             dataFormat = CL_RGB;
-            dataType = CL_UNSIGNED_INT8;
+            dataType = CL_UNORM_INT8;
             channelCount = 3;
             glFormat = GL_RGB;
             glType = GL_UNSIGNED_BYTE;
             break;
+        case GL_RGB8UI:
+            dataFormat = CL_RGB;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 3;
+            glFormat = GL_RGB_INTEGER;
+            glType = GL_UNSIGNED_BYTE;
+            break;
         case GL_SRGB8:
+            dataFormat = CL_RGB;
+            dataType = CL_UNORM_INT8;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_UNSIGNED_BYTE;
+            break;
         case GL_RGB8I:
             dataFormat = CL_RGB;
             dataType = CL_SIGNED_INT8;
             channelCount = 3;
-            glFormat = GL_RGB;
+            glFormat = GL_RGB_INTEGER;
             glType = GL_BYTE;
             break;
         case GL_RGB565:
@@ -387,7 +423,7 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             break;
         case GL_RGB8_SNORM:
             dataFormat = CL_RGB;
-            dataType = CL_SIGNED_INT8;
+            dataType = CL_SNORM_INT8;
             channelCount = 3;
             glFormat = GL_RGB;
             glType = GL_BYTE;
@@ -410,13 +446,13 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataFormat = CL_RGB;
             dataType = CL_UNSIGNED_INT16;
             channelCount = 3;
-            glFormat = GL_RGB;
+            glFormat = GL_RGB_INTEGER;
             glType = GL_UNSIGNED_SHORT;
             break;
         case GL_RGB16I:
             dataFormat = CL_RGB;
             dataType = CL_SIGNED_INT16;
-            glFormat = GL_RGB;
+            glFormat = GL_RGB_INTEGER;
             glType = GL_SHORT;
             channelCount = 3;
             break;
@@ -424,29 +460,43 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataFormat = CL_RGB;
             dataType = CL_UNSIGNED_INT32;
             channelCount = 3;
+            glFormat = GL_RGB_INTEGER;
+            glType = GL_UNSIGNED_INT;
             break;
         case GL_RGB32I:
             dataFormat = CL_RGB;
             dataType = CL_SIGNED_INT32;
             channelCount = 3;
-            glFormat = GL_RGB;
+            glFormat = GL_RGB_INTEGER;
             glType = GL_INT;
             break;
         case GL_RGBA8:
         case GL_SRGB8_ALPHA8:
-        case GL_RGBA8UI:
             dataFormat = CL_RGBA;
-            dataType = CL_UNSIGNED_INT8;
+            dataType = CL_UNORM_INT8;
             channelCount = 4;
             glFormat = GL_RGBA;
             glType = GL_UNSIGNED_BYTE;
             break;
+        case GL_RGBA8UI:
+            dataFormat = CL_RGBA;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 4;
+            glFormat = GL_RGBA_INTEGER;
+            glType = GL_UNSIGNED_BYTE;
+            break;
         case GL_RGBA8_SNORM:
+            dataFormat = CL_RGBA;
+            dataType = CL_SNORM_INT8;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_BYTE;
+            break;
         case GL_RGBA8I:
             dataFormat = CL_RGBA;
             dataType = CL_SIGNED_INT8;
             channelCount = 4;
-            glFormat = GL_RGBA;
+            glFormat = GL_RGBA_INTEGER;
             glType = GL_BYTE;
             break;
         case GL_RGBA16F:
@@ -467,28 +517,28 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
             dataFormat = CL_RGBA;
             dataType = CL_UNSIGNED_INT16;
             channelCount = 4;
-            glFormat = GL_RGBA;
+            glFormat = GL_RGBA_INTEGER;
             glType = GL_UNSIGNED_SHORT;
             break;
         case GL_RGBA16I:
             dataFormat = CL_RGBA;
             dataType = CL_SIGNED_INT16;
             channelCount = 4;
-            glFormat = GL_RGBA;
+            glFormat = GL_RGBA_INTEGER;
             glType = GL_SHORT;
             break;
         case GL_RGBA32UI:
             dataFormat = CL_RGBA;
             dataType = CL_UNSIGNED_INT32;
             channelCount = 4;
-            glFormat = GL_RGBA;
+            glFormat = GL_RGBA_INTEGER;
             glType = GL_UNSIGNED_INT;
             break;
         case GL_RGBA32I:
             dataFormat = CL_RGBA;
             dataType = CL_SIGNED_INT32;
             channelCount = 4;
-            glFormat = GL_RGBA;
+            glFormat = GL_RGBA_INTEGER;
             glType = GL_INT;
             break;
         case GL_RGB10_A2UI:

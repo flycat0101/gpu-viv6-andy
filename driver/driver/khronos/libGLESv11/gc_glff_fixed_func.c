@@ -393,7 +393,7 @@ static gceSTATUS _Set_uTexCoord(
 
     status = gcUNIFORM_SetFracValue(Uniform,
                                     glvMAX_TEXTURES,
-                                    Context->currProgram->hints,
+                                    Context->currProgram->programState.hints,
                                     valueArray);
     gcmFOOTER();
     return status;
@@ -505,7 +505,7 @@ static gceSTATUS _LoadUniforms(
         gcoBUFOBJ_FastLock(ShaderControl->halBufObj, &physical, (gctPOINTER *)&ubPtr);
 
         /* this is DUBO uniform */
-        gcUNIFORM_SetValue_Ex(ubUniform, 1, Context->currProgram->hints, (gctINT *)&physical);
+        gcUNIFORM_SetValue_Ex(ubUniform, 1, Context->currProgram->programState.hints, (gctINT *)&physical);
 
         ShaderControl->logicalAddress = (gctPOINTER)ubPtr;
     }
@@ -632,16 +632,16 @@ gceSTATUS glfLoadShader(
             gctINT prevPsConstStart = -1;
 
             if (Context->currProgram != gcvNULL &&
-                Context->currProgram->hints != gcvNULL &&
-                Context->currProgram->hints->unifiedStatus.constant)
+                Context->currProgram->programState.hints != gcvNULL &&
+                Context->currProgram->programState.hints->unifiedStatus.constant)
             {
-                prevPsConstStart = Context->currProgram->hints->unifiedStatus.constPSStart;
+                prevPsConstStart = Context->currProgram->programState.hints->unifiedStatus.constPSStart;
             }
 
             Context->currProgram = program;
             Context->programDirty = gcvTRUE;
             /* Create new program if necessary. */
-            if (Context->currProgram->programSize == 0
+            if (Context->currProgram->programState.stateBufferSize== 0
                 || Context->currProgram->vs.shader == gcvNULL
                 || Context->currProgram->fs.shader == gcvNULL)
             {
@@ -664,23 +664,21 @@ gceSTATUS glfLoadShader(
                     | gcvSHADER_USE_GL_POSITION
                     | gcvSHADER_FLUSH_DENORM_TO_ZERO
                     ),
-                    &Context->currProgram->programSize,
-                    &Context->currProgram->programBuffer,
-                    &Context->currProgram->hints
+                    &Context->currProgram->programState
                     ));
             }
 
-             if (Context->currProgram->hints &&
+             if (Context->currProgram->programState.hints &&
                  Context->pointStates.pointPrimitive &&
                  Context->pointStates.smooth &&
                  !Context->pointStates.spriteEnable)
             {
-                Context->currProgram->hints->hasKill = 1;
+                Context->currProgram->programState.hints->hasKill = 1;
             }
 
             if (prevPsConstStart != -1 &&
-                Context->currProgram->hints != gcvNULL &&
-                prevPsConstStart != Context->currProgram->hints->unifiedStatus.constPSStart)
+                Context->currProgram->programState.hints != gcvNULL &&
+                prevPsConstStart != Context->currProgram->programState.hints->unifiedStatus.constPSStart)
             {
                 Context->forceFlushPSUniforms = gcvTRUE;
             }
@@ -688,9 +686,7 @@ gceSTATUS glfLoadShader(
             /* Send states to hardware. */
             gcmONERROR(gcLoadShaders(
                 Context->hal,
-                Context->currProgram->programSize,
-                Context->currProgram->programBuffer,
-                Context->currProgram->hints
+                Context->currProgram->programState
                 ));
 
             /* Load uniforms. */

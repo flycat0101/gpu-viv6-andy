@@ -371,10 +371,10 @@ enum eVXC_ERROR
  * Src0 must be hi part of 256 bit value, Src1 must be lo part
  *
  */
-#define VXC_DP16x1_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp32x1_b, Dest, Src0, Src1, Src2, Info, U512)
-#define VXC_DP8x2_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp16x2_b, Dest, Src0, Src1, Src2, Info, U512)
-#define VXC_DP4x4_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp8x4_b,  Dest, Src0, Src1, Src2, Info, U512)
-#define VXC_DP2x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP16x1_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp16x1_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP8x2_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp8x2_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP4x4_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x4_b,  Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP2x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp2x8_b,  Dest, Src0, Src1, Src2, Info, U512)
 #endif
 
 /* DP32 <a, b> dot c

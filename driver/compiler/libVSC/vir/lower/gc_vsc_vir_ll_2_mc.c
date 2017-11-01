@@ -143,11 +143,15 @@ _sameType(
     IN VIR_Instruction    *Inst
     )
 {
-    return (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)))
-        == VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0))))
-        && VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) == VIR_ROUND_DEFAULT
-        && VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) == VIR_MOD_NONE
-        && VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) == VIR_MOD_NONE;
+    gctBOOL result = gcvFALSE;
+
+    result = (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)))
+              == VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)))) &&
+             VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) == VIR_ROUND_DEFAULT        &&
+             VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) == VIR_MOD_NONE              &&
+             VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) == VIR_MOD_NONE;
+
+    return result;
 }
 
 static gctBOOL
@@ -1067,8 +1071,8 @@ static VIR_PatternMatchInst _fmaPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _fmaRepInst0[] = {
-    { VIR_OP_MUL, 0, 0, { 1, 2, 3, 0 }, { 0, 0, 0 } },
-    { VIR_OP_ADD, 0, 0, { 1, 1, 4, 0 }, { 0, 0, 0 } },
+    { VIR_OP_MUL, 0, 0, { -1, 2, 3, 0 }, { 0, 0, 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -1, 4, 0 }, { 0, 0, 0 } },
 };
 
 static VIR_Pattern _fmaPattern[] = {

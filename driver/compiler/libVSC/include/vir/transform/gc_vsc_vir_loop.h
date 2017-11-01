@@ -28,20 +28,23 @@ typedef struct VIR_LOOPOPTS
     VSC_OPTN_LoopOptsOptions* options;
     VIR_Dumper* dumper;
     VSC_MM* mm;
+    gctUINT allowedInstNumAfterUnroll;
 } VIR_LoopOpts;
 
-#define VIR_LoopOpts_GetShader(lo)              ((lo)->shader)
-#define VIR_LoopOpts_SetShader(lo, s)           ((lo)->shader = (s))
-#define VIR_LoopOpts_GetFunc(lo)                ((lo)->func)
-#define VIR_LoopOpts_SetFunc(lo, f)             ((lo)->func = (f))
-#define VIR_LoopOpts_GetLoopInfoMgr(lo)         ((lo)->loopInfoMgr)
-#define VIR_LoopOpts_SetLoopInfoMgr(lo, l)      ((lo)->loopInfoMgr = (l))
-#define VIR_LoopOpts_GetOptions(lo)             ((lo)->options)
-#define VIR_LoopOpts_SetOptions(lo, o)          ((lo)->options = (o))
-#define VIR_LoopOpts_GetDumper(lo)              ((lo)->dumper)
-#define VIR_LoopOpts_SetDumper(lo, d)           ((lo)->dumper = (d))
-#define VIR_LoopOpts_GetMM(lo)                  ((lo)->mm)
-#define VIR_LoopOpts_SetMM(lo, m)               ((lo)->mm = (m))
+#define VIR_LoopOpts_GetShader(lo)                        ((lo)->shader)
+#define VIR_LoopOpts_SetShader(lo, s)                     ((lo)->shader = (s))
+#define VIR_LoopOpts_GetFunc(lo)                          ((lo)->func)
+#define VIR_LoopOpts_SetFunc(lo, f)                       ((lo)->func = (f))
+#define VIR_LoopOpts_GetLoopInfoMgr(lo)                   ((lo)->loopInfoMgr)
+#define VIR_LoopOpts_SetLoopInfoMgr(lo, l)                ((lo)->loopInfoMgr = (l))
+#define VIR_LoopOpts_GetOptions(lo)                       ((lo)->options)
+#define VIR_LoopOpts_SetOptions(lo, o)                    ((lo)->options = (o))
+#define VIR_LoopOpts_GetDumper(lo)                        ((lo)->dumper)
+#define VIR_LoopOpts_SetDumper(lo, d)                     ((lo)->dumper = (d))
+#define VIR_LoopOpts_GetMM(lo)                            ((lo)->mm)
+#define VIR_LoopOpts_SetMM(lo, m)                         ((lo)->mm = (m))
+#define VIR_LoopOpts_GetAllowedInstNumAfterUnroll(lo)     ((lo)->allowedInstNumAfterUnroll)
+#define VIR_LoopOpts_SetAllowedInstNumAfterUnroll(lo, n)  ((lo)->allowedInstNumAfterUnroll = (n))
 
 void
 VIR_LoopOpts_Init(

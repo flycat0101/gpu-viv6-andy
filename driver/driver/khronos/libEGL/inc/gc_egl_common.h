@@ -31,6 +31,24 @@ extern "C" {
 #define __EGL_APICALL EGLAPI
 #endif
 
+/* Some internal platform types */
+enum {
+    /* khronos define platform */
+    EGL_PLATFORM_DEFAULT_VIV = 0,
+    EGL_PLATFORM_ANDROID_VIV,
+    EGL_PLATFORM_GBM_VIV,
+    EGL_PLATFORM_WAYLAND_VIV,
+    EGL_PLATFORM_X11_VIV,
+
+    /* internal platform */
+    EGL_PLATFORM_DFB_VIV,
+    EGL_PLATFORM_DRI_VIV,
+    EGL_PLATFORM_DRI3_VIV,
+    EGL_PLATFORM_FBDEV_VIV,
+    EGL_PLATFORM_NULLWS_VIV,
+    EGL_PLATFORM_QNX_VIV,
+    EGL_PLATFORM_WIN32_VIV,
+};
 
 /* EGL image type enum. */
 typedef enum _khrIMAGE_TYPE
@@ -245,13 +263,14 @@ typedef struct EGLDrawableRec
     EGLint      height;
 
 #if defined(OPENGL40) && defined(__GL_MAX_DRAW_BUFFERS_GL4)
-    void      * rtHandle[__GL_MAX_DRAW_BUFFERS];        /* gco surface handle of render target */
+    void      * rtHandles[__GL_MAX_DRAW_BUFFERS];        /* gco surface handle of render target */
+    void      * prevRtHandles[__GL_MAX_DRAW_BUFFERS];    /* gco surface handle of previous render target */
     void      * accumHandle;
 #else
     void      * rtHandle;        /* gco surface handle of render target */
+    void      * prevRtHandle;    /* gco surface handle of prevous render target */
 #endif
 
-    void      * prevRtHandle;    /* gco surface handle of prevous render target */
     void      * depthHandle;     /* gco surface handle of depth */
     void      * stencilHandle;   /* gco surface handle of stencil */
 

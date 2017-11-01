@@ -40,7 +40,7 @@ struct _cl_commit_request
 {
     gctBOOL                     stall;
     gctUINT64                   nextEnqueueNo;
-    gctSIGNAL                   signal[gcvENGINE_GPU_ENGINE_COUNT];
+    clsEvent_PTR                event[gcvENGINE_GPU_ENGINE_COUNT];
     clsCommitRequest_PTR        next;
     clsCommitRequest_PTR        previous;
 };
@@ -90,12 +90,15 @@ typedef struct _cl_command_queue
     gctSIGNAL                   workerStartSignal;
     gctSIGNAL                   workerStopSignal;
 
-    clfProcessCommandQueue      processCommandQueue;
-    clfProcessCommitRequest     processCommitRequest;
-
     clsPrivateBuffer_PTR        privateBufList;
 
-    gcoHARDWARE                  hardware;
+    /* Profiler */
+#if VIVANTE_PROFILER
+    clsProfiler                 profiler;
+    gcoPROFILER                 halProfile;
+#endif
+
+    gcoHARDWARE                 hardware;
 }
 clsCommandQueue;
 
@@ -355,8 +358,6 @@ typedef struct _cl_command
     clsEvent_PTR            event;
     gctUINT                 numEventsInWaitList;
     const clsEvent_PTR *    eventWaitList;
-    gctUINT                 internalNumEventsInWaitList;
-    clsEvent_PTR            internalEventWaitList[2];
     gctINT                  (* handler)(clsCommand_PTR);
     gctSIGNAL               releaseSignal;
     gceENGINE               submitEngine;
@@ -525,6 +526,26 @@ clfProcessDeferredReleaseCommandList(
     clsCommandQueue_PTR     CommandQueue
     );
 
+gctINT
+clfInitializeProfiler(
+    clsCommandQueue_PTR CommandQueue
+    );
+
+void
+clfDestroyProfiler(
+    clsCommandQueue_PTR CommandQueue
+    );
+
+gctINT
+clfBeginProfiler(
+    cl_command_queue CommandQueue
+    );
+
+gctINT
+clfEndProfiler(
+    cl_command_queue CommandQueue,
+    clsKernel_PTR Kerenl
+    );
 #ifdef __cplusplus
 }
 #endif

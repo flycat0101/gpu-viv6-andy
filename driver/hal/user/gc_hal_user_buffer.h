@@ -258,6 +258,9 @@ struct _gcoQUEUE
     /* Number of records currently in queue */
     gctUINT32                   recordCount;
 
+    /* Max size of pending unlock node in vidmem pool not committed */
+    gctUINT                     maxUnlockBytes;
+
     gceENGINE                   engine;
 };
 

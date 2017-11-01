@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: EGL
+Description: Vivante EGL library
+Version: 8.0
+Cflags: -I${includedir} -DLINUX -DEGL_API_FB -DEGL_API_WL
+Libs: -L${libdir} -lEGL

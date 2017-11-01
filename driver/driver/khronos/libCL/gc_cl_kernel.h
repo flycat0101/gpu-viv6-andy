@@ -87,9 +87,7 @@ typedef struct _cl_kernel_states
     gctUINT                 numArgs;
 
     /* States info. */
-    gctSIZE_T               stateBufferSize;
-    gctPOINTER              stateBuffer;
-    gcsHINT_PTR             hints;
+    gcsPROGRAM_STATE        programState;
 
     /* Need to add key for reusage. */
     clsPatchDirective_PTR   patchDirective;
@@ -161,6 +159,8 @@ typedef struct _cl_argument
     gctBOOL                 needImageSampler;
     clsMem_PTR              image;
     gctUINT                 samplerValue;
+    gctUINT                 printThreadNum;
+    gctUINT                 printBufferSizePerThread;
 }
 clsArgument;
 

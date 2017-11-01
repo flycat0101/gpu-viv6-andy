@@ -160,6 +160,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
         gcoOS_Free(gcvNULL, pPEP->attribTable.pAttribEntries);
         pPEP->attribTable.pAttribEntries = gcvNULL;
+        pPEP->attribTable.countOfEntries = 0;
     }
 
     if (pPEP->fragOutTable.countOfEntries)
@@ -183,6 +184,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
         gcoOS_Free(gcvNULL, pPEP->fragOutTable.pFragOutEntries);
         pPEP->fragOutTable.pFragOutEntries = gcvNULL;
+        pPEP->fragOutTable.countOfEntries = 0;
     }
 
     if (pPEP->pepClient == PEP_CLIENT_GL)
@@ -234,6 +236,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries);
                     pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].combinedSampTexTable.countOfEntries = 0;
                 }
 
                 if (pPEP->u.vk.pResourceSets[i].separatedSamplerTable.countOfEntries)
@@ -265,6 +268,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries);
                     pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].separatedSamplerTable.countOfEntries = 0;
                 }
 
                 if (pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries)
@@ -296,6 +300,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries);
                     pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].separatedTexTable.countOfEntries = 0;
                 }
 
                 if (pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries)
@@ -321,6 +326,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries);
                     pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].uniformTexBufTable.countOfEntries = 0;
                 }
 
                 if (pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries)
@@ -353,6 +359,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries);
                     pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].storageTable.countOfEntries = 0;
                 }
 
                 if (pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries)
@@ -381,11 +388,13 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries);
                     pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries = gcvNULL;
+                    pPEP->u.vk.pResourceSets[i].uniformBufferTable.countOfEntries = 0;
                 }
             }
 
             gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets);
             pPEP->u.vk.pResourceSets = gcvNULL;
+            pPEP->u.vk.resourceSetCount = 0;
         }
 
         if (pPEP->u.vk.pushConstantTable.pPushConstantEntries)
@@ -413,6 +422,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
             gcoOS_Free(gcvNULL, pPEP->u.vk.pushConstantTable.pPushConstantEntries);
             pPEP->u.vk.pushConstantTable.pPushConstantEntries = gcvNULL;
+            pPEP->u.vk.pushConstantTable.countOfEntries = 0;
         }
 
         if (pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray)
@@ -428,6 +438,7 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
             gcoOS_Free(gcvNULL, pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray);
             pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray = gcvNULL;
+            pPEP->u.vk.privateCombTsHwMappingPool.countOfArray = 0;
         }
     }
 
@@ -798,6 +809,173 @@ OnError:
     return errCode;
 }
 
+static gctBOOL  _NeedCheckInterpolation(VIR_Shader* pShader)
+{
+    gctBOOL                    bCheckInterpolation = gcvTRUE;
+
+    /* According to vulkan spec, interpolation decorations are not required to match. */
+    if (VIR_Shader_GetClientApiVersion(pShader) == gcvAPI_OPENVK)
+    {
+        bCheckInterpolation = gcvFALSE;
+    }
+
+    return bCheckInterpolation;
+}
+
+static VSC_ErrCode _LinkSVIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                   FSL_STAGE fslStage,
+                                                   VIR_Shader* pUpperShader,
+                                                   VIR_Shader* pLowerShader,
+                                                   VIR_AttributeIdList* pAttrIdLstsOfLowerShader,
+                                                   VIR_OutputIdList* pOutputIdLstsOfUpperShader,
+                                                   gctUINT* pSvInputIdx,
+                                                   gctUINT* pSvOutputIdx)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    gctUINT                    svInputIdx = *pSvInputIdx, svOutputIdx = *pSvOutputIdx;
+    gctUINT                    attrIdx, outputIdx;
+    gctUINT                    attrCount = VIR_IdList_Count(pAttrIdLstsOfLowerShader);
+    gctUINT                    outputCount = VIR_IdList_Count(pOutputIdLstsOfUpperShader);
+    VIR_Symbol*                pOutputSym = gcvNULL;
+    VIR_Symbol*                pAttrSym = gcvNULL;
+    gctUINT                    thisOutputRegCount, thisAttrRegCount;
+    VSC_BIT_VECTOR             outputMask, attrMask;
+
+    vscBV_Initialize(&outputMask, pBaseLinkHelper->pMM, outputCount);
+    vscBV_Initialize(&attrMask, pBaseLinkHelper->pMM, attrCount);
+
+    /* Link the matched IO first cause we need to make sure the ioIdx is matched. */
+    for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
+    {
+        pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
+
+        if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
+            &&
+            !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
+                        (fslStage == FSL_STAGE_LL_SLOT_CALC)))
+        {
+            /* Mark this output used */
+            VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
+
+            if (fslStage == FSL_STAGE_LL_SLOT_CALC)
+            {
+                for (attrIdx = 0; attrIdx < attrCount; attrIdx++)
+                {
+                    pAttrSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(pAttrIdLstsOfLowerShader, attrIdx));
+
+                    /* Only consider used one */
+                    if (isSymUnused(pAttrSym) || isSymVectorizedOut(pAttrSym))
+                    {
+                        continue;
+                    }
+
+                    if (vscBV_TestBit(&attrMask, attrIdx))
+                    {
+                        continue;
+                    }
+
+                    if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym))
+                        &&
+                        !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym),
+                                    (fslStage == FSL_STAGE_LL_SLOT_CALC))
+                        &&
+                        VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym))
+                    {
+                        /* Set output slot. */
+                        vscBV_SetBit(&outputMask, outputIdx);
+                        thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym);
+
+                        VIR_Symbol_SetFirstSlot(pOutputSym, svOutputIdx);
+                        svOutputIdx += thisOutputRegCount;
+
+                        /* Set attribute slot. */
+                        vscBV_SetBit(&attrMask, attrIdx);
+                        thisAttrRegCount = VIR_Symbol_GetVirIoRegCount(pLowerShader, pAttrSym);
+
+                        VIR_Symbol_SetFirstSlot(pAttrSym, svInputIdx);
+                        svInputIdx += thisAttrRegCount;
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Set the rest output/attribute. */
+    for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
+    {
+        pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
+
+        if (vscBV_TestBit(&outputMask, outputIdx))
+        {
+            continue;
+        }
+
+        if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
+            &&
+            !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
+                        (fslStage == FSL_STAGE_LL_SLOT_CALC)))
+        {
+            /* Mark this output used */
+            VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
+
+            if (fslStage == FSL_STAGE_LL_SLOT_CALC)
+            {
+                thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym);
+
+                VIR_Symbol_SetFirstSlot(pOutputSym, svOutputIdx);
+                svOutputIdx += thisOutputRegCount;
+            }
+        }
+    }
+
+    if (fslStage == FSL_STAGE_LL_SLOT_CALC)
+    {
+        for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
+        {
+            pAttrSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(pAttrIdLstsOfLowerShader, attrIdx));
+
+            if (vscBV_TestBit(&attrMask, attrIdx))
+            {
+                continue;
+            }
+
+            /* Only consider used one */
+            if (isSymUnused(pAttrSym) || isSymVectorizedOut(pAttrSym))
+            {
+                continue;
+            }
+
+            if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym))
+                &&
+                !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym),
+                            (fslStage == FSL_STAGE_LL_SLOT_CALC)))
+            {
+                thisAttrRegCount = VIR_Symbol_GetVirIoRegCount(pLowerShader, pAttrSym);
+
+                VIR_Symbol_SetFirstSlot(pAttrSym, svInputIdx);
+                svInputIdx += thisAttrRegCount;
+            }
+        }
+    }
+
+    /* Update the sv io index. */
+    if (pSvInputIdx)
+    {
+        *pSvInputIdx = svInputIdx;
+    }
+
+    if (pSvOutputIdx)
+    {
+        *pSvOutputIdx = svOutputIdx;
+    }
+
+    vscBV_Finalize(&outputMask);
+    vscBV_Finalize(&attrMask);
+    return errCode;
+}
+
 static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                           FSL_STAGE fslStage,
                                                           VIR_Shader* pUpperShader,
@@ -819,6 +997,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     VIR_Type*                  pAttrType;
     VIR_Type*                  pOutputType;
     gctBOOL                    bLlSlotForLayerCalced = gcvFALSE;
+    gctBOOL                    bCheckInterpolation = _NeedCheckInterpolation(pUpperShader);
 
     /*
        !!!! IO-index layout rule:
@@ -912,10 +1091,20 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
             }
 
             {
+                /* If flag SKIP-NAME-CHECK is present, check location only. */
+                if (isSymSkipNameCheck(pAttrSym))
+                {
+                    /* When a symbol has SKIP-NAME-CHECK flag, its location must be NOT -1. */
+                    gcmASSERT(VIR_Symbol_GetLocation(pAttrSym) != -1);
+                    if (VIR_Symbol_GetLocation(pAttrSym) != VIR_Symbol_GetLocation(pOutputSym))
+                    {
+                        continue;
+                    }
+                }
                 /* Name or location of the output and attribute must be matched */
-                if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
-                      (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
-                       VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
+                else if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
+                         (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
+                          VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
                 {
                     continue;
                 }
@@ -933,17 +1122,20 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 ON_ERROR(errCode, "Link Io between two shader stages");
             }
 
-            if (isSymFlat(pAttrSym) != isSymFlat(pOutputSym))
+            if (bCheckInterpolation)
             {
-                errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
-                ON_ERROR(errCode, "Link Io between two shader stages");
-            }
+                if (isSymFlat(pAttrSym) != isSymFlat(pOutputSym))
+                {
+                    errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
+                    ON_ERROR(errCode, "Link Io between two shader stages");
+                }
 
-            if ((isSymSample(pAttrSym) != isSymSample(pOutputSym)) &&
-                !VIR_Shader_IsES31AndAboveCompiler(pUpperShader))
-            {
-                errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
-                ON_ERROR(errCode, "Link Io between two shader stages");
+                if ((isSymSample(pAttrSym) != isSymSample(pOutputSym)) &&
+                    !VIR_Shader_IsES31AndAboveCompiler(pUpperShader))
+                {
+                    errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
+                    ON_ERROR(errCode, "Link Io between two shader stages");
+                }
             }
 
             /* Insure reg count of input and ouput are same */
@@ -956,7 +1148,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 {
                     /* No need to set ll-slot as location specified by app here because it is an IO
                        among the shader stages which are linked together as non-seperated shaders */
-                    pAttrSym->layout.llFirstSlot = pOutputSym->layout.llFirstSlot = ioIdx;
+                    VIR_Symbol_SetFirstSlot(pAttrSym, ioIdx);
+                    VIR_Symbol_SetFirstSlot(pOutputSym, ioIdx);
 
                     ioIdx += thisOutputRegCount;
 
@@ -998,7 +1191,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 /* Per HW requirement, layer is highp*/
                 VIR_Symbol_SetPrecision(pAttrSym, VIR_PRECISION_HIGH);
 
-                pAttrSym->layout.llFirstSlot = pOutputSym->layout.llFirstSlot = ioIdx;
+                VIR_Symbol_SetFirstSlot(pAttrSym, ioIdx);
+                VIR_Symbol_SetFirstSlot(pOutputSym, ioIdx);
                 ioIdx ++;
 
                 break;
@@ -1008,53 +1202,14 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
 
     /* Then for SV IOs  */
     svInputIdx = svOutputIdx = ioIdx;
-
-    for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
-    {
-        pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
-
-        if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
-            &&
-            !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
-                        (fslStage == FSL_STAGE_LL_SLOT_CALC)))
-        {
-            /* Mark this output used */
-            VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
-
-            if (fslStage == FSL_STAGE_LL_SLOT_CALC)
-            {
-                thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym);
-
-                VIR_Symbol_SetFirstSlot(pOutputSym, svOutputIdx);
-                svOutputIdx += thisOutputRegCount;
-            }
-        }
-    }
-
-    if (fslStage == FSL_STAGE_LL_SLOT_CALC)
-    {
-        for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
-        {
-            pAttrSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(pAttrIdLstsOfLowerShader, attrIdx));
-
-            /* Only consider used one */
-            if (isSymUnused(pAttrSym) || isSymVectorizedOut(pAttrSym))
-            {
-                continue;
-            }
-
-            if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym))
-                &&
-                !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym),
-                            (fslStage == FSL_STAGE_LL_SLOT_CALC)))
-            {
-                thisAttrRegCount = VIR_Symbol_GetVirIoRegCount(pLowerShader, pAttrSym);
-
-                VIR_Symbol_SetFirstSlot(pAttrSym, svInputIdx);
-                svInputIdx += thisAttrRegCount;
-            }
-        }
-    }
+    _LinkSVIoBetweenTwoShaderStages(pBaseLinkHelper,
+                                    fslStage,
+                                    pUpperShader,
+                                    pLowerShader,
+                                    pAttrIdLstsOfLowerShader,
+                                    pOutputIdLstsOfUpperShader,
+                                    &svInputIdx,
+                                    &svOutputIdx);
 
     /* Then for stream-out outputs */
     soOutputIdx = svOutputIdx;
@@ -1870,6 +2025,7 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
     VIR_Type*                  pInputType;
     VIR_Type*                  pOutputType;
     VSC_BIT_VECTOR             outputWorkingMask;
+    gctBOOL                    bCheckInterpolation = _NeedCheckInterpolation(pUpperShader);
 
     if (inputCount == 0)
     {
@@ -1899,15 +2055,20 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdListOfUpperShader, outputIdx));
             pOutputType = VIR_Symbol_GetType(pOutputSym);
 
-            /* If input IOB has SkipNameCheck flag, then check location, instead of checking name string. */
+            /* If flag SKIP-NAME-CHECK is present, check location only. */
             if (isSymSkipNameCheck(pInputSym))
             {
-                if (VIR_Symbol_GetLocation(pOutputSym) != VIR_Symbol_GetLocation(pInputSym))
+                /* When a symbol has SKIP-NAME-CHECK flag, its location must be NOT -1. */
+                gcmASSERT(VIR_Symbol_GetLocation(pInputSym) != -1);
+                if (VIR_Symbol_GetLocation(pInputSym) != VIR_Symbol_GetLocation(pOutputSym))
                 {
                     continue;
                 }
             }
-            else if (!VIR_Symbol_isNameMatch(pLowerShader, pInputSym, pUpperShader, pOutputSym))
+            /* Name or location of the output and attribute must be matched */
+            else if (!(VIR_Symbol_isNameMatch(pLowerShader, pInputSym, pUpperShader, pOutputSym) ||
+                        (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
+                        VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pInputSym))))
             {
                 continue;
             }
@@ -1919,10 +2080,13 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
                 ON_ERROR(errCode, "Link IO blocks between two shader stages");
             }
 
-            if (isSymFlat(pOutputSym) != isSymFlat(pInputSym))
+            if (bCheckInterpolation)
             {
-                errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
-                ON_ERROR(errCode, "Link IO blocks between two shader stages");
+                if (isSymFlat(pOutputSym) != isSymFlat(pInputSym))
+                {
+                    errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
+                    ON_ERROR(errCode, "Link IO blocks between two shader stages");
+                }
             }
 
             /* Check its members. */
@@ -2560,10 +2724,20 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
 
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
+            /* If flag SKIP-NAME-CHECK is present, check location only. */
+            if (isSymSkipNameCheck(pAttrSym))
+            {
+                /* When a symbol has SKIP-NAME-CHECK flag, its location must be NOT -1. */
+                gcmASSERT(VIR_Symbol_GetLocation(pAttrSym) != -1);
+                if (VIR_Symbol_GetLocation(pAttrSym) != VIR_Symbol_GetLocation(pOutputSym))
+                {
+                    continue;
+                }
+            }
             /* Name or location of the output and attribute must be matched */
-           if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
-                 (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
-                  VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
+            else if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
+                        (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
+                        VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
             {
                 continue;
             }
@@ -3143,10 +3317,20 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
                 continue;
             }
 
+            /* If flag SKIP-NAME-CHECK is present, check location only. */
+            if (isSymSkipNameCheck(pAttrSym))
+            {
+                /* When a symbol has SKIP-NAME-CHECK flag, its location must be NOT -1. */
+                gcmASSERT(VIR_Symbol_GetLocation(pAttrSym) != -1);
+                if (VIR_Symbol_GetLocation(pAttrSym) != VIR_Symbol_GetLocation(pOutputSym))
+                {
+                    continue;
+                }
+            }
             /* Name or location of the output and attribute must be matched */
-           if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
-                 (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
-                  VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
+            else if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
+                        (VIR_Symbol_GetLocation(pOutputSym) != -1 &&
+                        VIR_Symbol_GetLocation(pOutputSym) == VIR_Symbol_GetLocation(pAttrSym))))
             {
                 continue;
             }
@@ -3964,6 +4148,9 @@ static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHel
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_GPG_PASS_MANAGER*      pPgPassMnger = &pPgLinkHelper->pgPassMnger;
+
+    /* It must be called after lower */
+    vscPM_SetCurPassLevel(&pPgPassMnger->basePgmPM.basePM, VSC_PASS_LEVEL_MC);
 
     /* 0. individual shader API level check */
     errCode = _APICheckShaders(pPgLinkHelper);
@@ -7402,7 +7589,7 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     }
 
     /* If no USC armed on chip, just bail out */
-    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCSizeInKbyte == 0)
+    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCAttribBufInKbyte == 0)
     {
         for (stageIdx = 0; stageIdx < VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT; stageIdx ++)
         {
@@ -7515,7 +7702,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     gctINT                              totalAllocatedUSCSizeInKbyte = 0, unAllocatedUSCSizeInKbyte, deltaUSCSizeInKbyte;
     gctUINT                             vsDownStreamVerticesCountPerHwTG, dsDownStreamVerticesCountPerHwTG;
     gctUINT                             maxHwTGThreadCount = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4;
-    gctUINT                             realMaxHwUSCSizeInKbyte = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCSizeInKbyte;
+    gctUINT                             realMaxHwUSCSizeInKbyte = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCAttribBufInKbyte;
     gctUINT                             maxResCashWinSize = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxResultCacheWinSize;
     USC_ANALYZE_TRIAL_TYPE              anaTrialType;
     gctBOOL                             bUSCAlloced;
@@ -8009,6 +8196,54 @@ OnError:
     return errCode;
 }
 
+static gctBOOL _NeedLinkWithUpperShader(gctBOOL         bSeperatedShaders,
+                                        SHADER_HW_INFO* pUpperHwShader,
+                                        SHADER_HW_INFO* pLowerHwShader)
+{
+    gctBOOL needLink = gcvTRUE;
+
+    /* Enable only when we need to program states for seperated program. */
+#if PROGRAMING_STATES_FOR_SEPERATED_PROGRAM
+    SHADER_TYPE upperShaderType = (SHADER_TYPE)DECODE_SHADER_TYPE(pUpperHwShader->pSEP->shVersionType);
+    SHADER_TYPE lowerShaderType = (SHADER_TYPE)DECODE_SHADER_TYPE(pLowerHwShader->pSEP->shVersionType);
+
+    /* If the program is not separable, always need to link. */
+    if (!bSeperatedShaders)
+    {
+        return needLink;
+    }
+
+    /* For TES, its upper shader must be TCS. */
+    if (lowerShaderType == SHADER_TYPE_DOMAIN)
+    {
+        if (upperShaderType != SHADER_TYPE_HULL)
+        {
+            needLink = gcvFALSE;
+        }
+    }
+    /* For PS, its upper shader must be VS, GS or TES. */
+    else if (lowerShaderType == SHADER_TYPE_PIXEL)
+    {
+        if (upperShaderType != SHADER_TYPE_VERTEX   &&
+            upperShaderType != SHADER_TYPE_GEOMETRY &&
+            upperShaderType != SHADER_TYPE_DOMAIN)
+        {
+            needLink = gcvFALSE;
+        }
+    }
+    else if (lowerShaderType == SHADER_TYPE_GEOMETRY)
+    {
+        if (upperShaderType != SHADER_TYPE_VERTEX &&
+            upperShaderType != SHADER_TYPE_DOMAIN)
+        {
+            needLink = gcvFALSE;
+        }
+    }
+#endif
+
+    return needLink = gcvFALSE;
+}
+
 gceSTATUS vscLinkHwShaders(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
                            VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
                            gctBOOL                         bSeperatedShaders)
@@ -8028,7 +8263,8 @@ gceSTATUS vscLinkHwShaders(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
 
         if (pHwPipelineShsParam->pSEPArray[stageIdx])
         {
-            if (pPreShaderStageHwInfo)
+            if (pPreShaderStageHwInfo &&
+                _NeedLinkWithUpperShader(bSeperatedShaders, pPreShaderStageHwInfo, &pOutHwShdsLinkInfo->shHwInfoArray[stageIdx]))
             {
                 /* Low-level link two hw shader stages by I-O */
                 errCode = _LinkIoBetweenTwoHwShaderStages(pHwPipelineShsParam,

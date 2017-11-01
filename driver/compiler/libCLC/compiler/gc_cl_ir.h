@@ -27,6 +27,10 @@
 #define _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES 0
 #endif
 
+#ifndef _RELAX_SYNTAX_FOR_EMBEDDED_UNNAMED_STRUCT_OR_UNION
+#define _RELAX_SYNTAX_FOR_EMBEDDED_UNNAMED_STRUCT_OR_UNION     1
+#endif
+
 /* Compute aligned value in bytes */
 #define clmALIGN(N, Alignment, Packed) \
    ((Packed) ? (N) : gcmALIGN(N, Alignment))
@@ -354,6 +358,9 @@ typedef enum _cleELEMENT_TYPE
   ((Decl)->array.numDim == 0  && \
    (Decl)->ptrDscr != gcvNULL))
 
+#define clmDECL_IsPointerArray(Decl) \
+ (clmDECL_IsArray(Decl) && (Decl)->ptrDscr != gcvNULL)
+
 #define clmDECL_IsVectorType(Decl) \
  ((Decl)->array.numDim == 0  &&  \
   (Decl)->ptrDscr == gcvNULL && \
@@ -477,6 +484,15 @@ OUT clsDATA_TYPE **DataType
 );
 
 gceSTATUS
+cloCOMPILER_CloneDataTypeExplicit(
+IN cloCOMPILER Compiler,
+IN cltQUALIFIER AccessQualifier,
+IN cltQUALIFIER AddrSpaceQualifier,
+IN clsDATA_TYPE * Source,
+OUT clsDATA_TYPE **DataType
+);
+
+gceSTATUS
 cloCOMPILER_ClonePtrDscr(
 IN cloCOMPILER Compiler,
 IN slsSLINK_LIST *Source,
@@ -538,6 +554,15 @@ clGetVectorElementByteSize(
 IN cloCOMPILER Compiler,
 IN cltELEMENT_TYPE ElementType
 );
+
+cltELEMENT_TYPE
+clGenElementTypeByByteSizeAndBaseType(
+    IN cloCOMPILER Compiler,
+    IN cltELEMENT_TYPE BaseElementType,
+    IN gctBOOL IsPacked,
+    IN gctUINT Size,
+    OUT VIR_TypeId * VirPrimitiveType
+    );
 
 gctSIZE_T
 clsDECL_GetFieldOffset(
@@ -844,6 +869,8 @@ IN clsDECL * RDecl
         (Name)->u.typeInfo.alignment = 0;         \
         (Name)->u.typeInfo.needMemory = gcvFALSE; \
         (Name)->u.typeInfo.typeNameOffset = -1;   \
+        (Name)->u.typeInfo.hasUnnamedFields = gcvFALSE; \
+        (Name)->u.typeInfo.hasUnionFields = gcvFALSE; \
     } while (gcvFALSE)
 
 /* Name and Name space. */
@@ -975,6 +1002,8 @@ typedef struct _clsNAME
         gctBOOL packed;
         gctBOOL needMemory;
         gctINT  typeNameOffset;
+        gctBOOL hasUnnamedFields;
+        gctBOOL hasUnionFields;
       } typeInfo;
       struct {
         struct _clsNAME_SPACE *localSpace;
@@ -1129,6 +1158,15 @@ gceSTATUS
 clsNAME_SPACE_Search(
 IN cloCOMPILER Compiler,
 IN clsNAME_SPACE * NameSpace,
+IN cltPOOL_STRING Symbol,
+IN gctBOOL Recursive,
+OUT clsNAME ** Name
+);
+
+gceSTATUS
+clsNAME_SPACE_SearchFieldSpaceWithUnnamedField(
+IN cloCOMPILER Compiler,
+IN clsNAME_SPACE * FieldSpace,
 IN cltPOOL_STRING Symbol,
 IN gctBOOL Recursive,
 OUT clsNAME ** Name
@@ -2169,6 +2207,12 @@ cloIR_BINARY_EXPR_Evaluate(
     IN cloIR_CONSTANT RightConstant,
     IN clsDECL *ResultType,
     OUT cloIR_CONSTANT * ResultConstant
+    );
+
+gceSTATUS
+cloIR_BINARY_EXPR_ImplicitTypeConv(
+    IN cloCOMPILER Compiler,
+    IN cloIR_BINARY_EXPR BinaryExpr
     );
 
 gctUINT

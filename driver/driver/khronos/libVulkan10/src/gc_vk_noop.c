@@ -874,6 +874,47 @@ VKAPI_ATTR void VKAPI_CALL __nop_DebugReportMessageEXT(VkInstance instance, VkDe
     __VK_NOP_MESSAGE();
 }
 
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceFeatures2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2KHR* pFeatures)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties2KHR* pProperties)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceFormatProperties2KHR(VkPhysicalDevice physicalDevice, VkFormat format, VkFormatProperties2KHR* pFormatProperties)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2KHR*  pImageFormatInfo, VkImageFormatProperties2KHR* pImageFormatProperties)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2KHR* pQueueFamilyProperties)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties2KHR* pMemoryProperties)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2KHR* pFormatInfo, uint32_t* pPropertyCount, VkSparseImageFormatProperties2KHR* pProperties)
+{
+    __VK_NOP_MESSAGE();
+}
+
+VKAPI_ATTR void VKAPI_CALL __nop_TrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlagsKHR flags)
+{
+    __VK_NOP_MESSAGE();
+}
+
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __nop_CreateXlibSurfaceKHR(VkInstance instance, Display* dpy, Window window, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {

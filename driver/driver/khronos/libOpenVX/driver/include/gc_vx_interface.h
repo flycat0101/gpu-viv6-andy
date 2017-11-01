@@ -28,12 +28,20 @@ extern vx_kernel_description_s internalkernel_NNActivationLayer;
 extern vx_kernel_description_s internalkernel_NNTensorAdd;
 extern vx_kernel_description_s internalkernel_NNTensorSub;
 extern vx_kernel_description_s internalkernel_NNTensorMul;
+extern vx_kernel_description_s internalkernel_NNTensorDiv;
+extern vx_kernel_description_s internalkernel_NNTensorTrans;
 extern vx_kernel_description_s internalkernel_NNLeakyReluLayer;
 extern vx_kernel_description_s internalkernel_NNBatchNormLayer;
 extern vx_kernel_description_s internalkernel_NNRPNLayer;
 extern vx_kernel_description_s internalkernel_NNROIPoolLayer;
 extern vx_kernel_description_s internalkernel_NNConcat2Layer;
 extern vx_kernel_description_s internalkernel_NNConvolutionLayer;
+extern vx_kernel_description_s internalkernel_NNConcatIndefiniteLayer;
+extern vx_kernel_description_s internalkernel_NNReorgLayer;
+extern vx_kernel_description_s internalkernel_NNDeConvolutionLayer;
+extern vx_kernel_description_s internalkernel_NNL2NormalizeLayer;
+extern vx_kernel_description_s internalkernel_NNTensorCopy;
+extern vx_kernel_description_s internalkernel_NNConvolutionReluPoolingCnnLayer2;
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Invalid(vx_node node, const vx_reference paramTable[], vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateInput(vx_node node, vx_uint32 index);
@@ -1038,9 +1046,37 @@ vx_kernel_description_s internalkernel_sobelMxN = {
 #endif
 };
 
+static vx_param_description_s internlkernel_gradientMxN_F16_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_Validate(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_F16_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxNF16(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s internalkernel_sobelMxN_f16 = {
+    VX_KERNEL_INTERNAL_SOBEL_MxN_F16,
+    "org.khronos.internal.sobelMxN_f16",
+    vxoInternalKernel_SobelMxNF16,
+    internlkernel_gradientMxN_F16_params, vxmLENGTH_OF(internlkernel_gradientMxN_F16_params),
+    NULL,
+    vxoGradientMxN_ValidateInput,
+    vxoGradientMxN_F16_ValidateOutput,
+    NULL,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_true_e, vx_true_e, 2, 0, 0, 0, 1, 2 },
+#endif
+};
+
 static vx_param_description_s internalkernel_harrisscore_params[] = {
     {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
@@ -1123,6 +1159,39 @@ vx_kernel_description_s internalkernel_norm = {
     NULL,
     vxoNorm_ValidateInput,
     vxoNorm_ValidateOutput,
+    NULL,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_true_e, vx_true_e, 2, 0, 0, 0, 2, 1 },
+#endif
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NormF16(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s internalkernel_norm_f16 = {
+    VX_KERNEL_INTERNAL_ELEMENTWISE_NORM_F16,
+    "org.khronos.internal.elementwise_norm_f16",
+    vxoInternalKernel_NormF16,
+    internalkernel_norm_params, vxmLENGTH_OF(internalkernel_norm_params),
+    NULL,
+    vxoNorm_ValidateInput,
+    vxoNorm_ValidateOutput,
+    NULL,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_true_e, vx_true_e, 2, 0, 0, 0, 2, 1 },
+#endif
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_PhaseF16(vx_node node, const vx_reference *parameters, vx_uint32 num);
+
+vx_kernel_description_s internalkernel_phase_f16 = {
+    VX_KERNEL_INTERNAL_PHASE_F16,
+    "org.khronos.internal.phase_f16",
+    vxoInternalKernel_PhaseF16,
+    basekernel_phase_params, vxmLENGTH_OF(basekernel_phase_params),
+    NULL,
+    vxoPhase_ValidateInput,
+    vxoPhase_ValidateOutput,
     NULL,
     NULL,
 #if gcdVX_OPTIMIZER

@@ -484,9 +484,10 @@ __glUtilReadBlock(
     GLubyte offset;
     GLubyte shift;
     GLubyte bitpos;
-    GLuint64 temp;
+    GLuint64 temp = 0;
     GLuint64 mask;
     GLuint64 value;
+    GLuint counts;
     GLuint i;
 
     /* Reverse the start position if needed. */
@@ -498,15 +499,16 @@ __glUtilReadBlock(
     /* Determine data position. */
     offset = (GLubyte)start >> 3;
     shift = start & 7;
+    counts = ((start + count + 7) >> 3) - offset;
 
     /* Extract the value. */
     /* For Android, if address is not aligned, it may crash. */
     {
         const GLubyte * ptr = &data[offset];
-        temp =((GLuint64)ptr[0])            | (((GLuint64)ptr[1]) << 8)
-              | (((GLuint64)ptr[2]) << 16)  | (((GLuint64)ptr[3]) << 24)
-              | (((GLuint64) ptr[4]) << 32) | (((GLuint64) ptr[5]) << 40)
-              | (((GLuint64) ptr[6]) << 48) | (((GLuint64) ptr[7]) << 56);
+        for (i = 0; i < counts; i++)
+        {
+            temp |= ((GLuint64)ptr[i]) << (i * 8);
+        }
     }
 
     if (reverse)

@@ -512,6 +512,14 @@ gcChipSetDepthMode(
                            ? gcvDEPTH_Z
                            : gcvDEPTH_NONE;
 
+        if (!gc->frameBuffer.drawFramebufObj->name &&
+            (chipCtx->patchId == gcvPATCH_DEQP) &&
+            chipCtx->drawDepthView.surf &&
+            (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES7) == gcvFALSE))
+        {
+            chipCtx->depthMode = gcvDEPTH_Z;
+        }
+
         /* Set the depth mode. */
         gcmERR_BREAK(gco3D_SetDepthMode(chipCtx->engine, chipCtx->depthMode));
     } while (GL_FALSE);
@@ -554,24 +562,16 @@ gcChipSetDepthTest(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if ((gc->state.enables.rasterizerDiscard) &&
-        (!chipCtx->chipFeature.hasHwTFB))
+    /* Restore depth state, if depth test enabled and depth buffer exist.
+    ** We can't rely on depthMode, which can be not NONE if stencil test need it.
+    */
+    if (gc->state.enables.depthTest && chipCtx->drawDepthView.surf)
     {
-        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_NEVER));
+        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, gc->state.depth.testFunc));
     }
     else
     {
-        /* Restore depth state, if depth test enabled and depth buffer exist.
-        ** We can't rely on depthMode, which can be not NONE if stencil test need it.
-        */
-        if ((gc->state.enables.depthTest) && chipCtx->drawDepthView.surf)
-        {
-            gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, gc->state.depth.testFunc));
-        }
-        else
-        {
-            gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_ALWAYS));
-        }
+        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_ALWAYS));
     }
 
 OnError:

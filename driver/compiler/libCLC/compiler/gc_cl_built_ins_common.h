@@ -1034,13 +1034,13 @@ _GenMinCode(
       !(CodeGenerator->fpConfig & cldFpFINITE_MATH_ONLY)) {
       if(IOperand &&
          clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /*Floating point vector case with no finite math */
-         return _GenBuiltinVectorCode(Compiler,
-                                      CodeGenerator,
-                                      PolynaryExpr,
-                                      OperandCount,
-                                      OperandsParameters,
-                                      IOperand,
-                                      _GenScalarMinCode);
+         return clGenBuiltinVectorCode(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       OperandCount,
+                                       OperandsParameters,
+                                       IOperand,
+                                       _GenScalarMinCode);
       }
       else {
          return _GenScalarMinCode(Compiler,
@@ -1274,13 +1274,13 @@ _GenMaxCode(
       if(IOperand &&
          clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /*Floating point vector case with no finite math */
          /* special handling for vector case */
-         return _GenBuiltinVectorCode(Compiler,
-                                      CodeGenerator,
-                                      PolynaryExpr,
-                                      OperandCount,
-                                      OperandsParameters,
-                                      IOperand,
-                                      _GenScalarMaxCode);
+         return clGenBuiltinVectorCode(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       OperandCount,
+                                       OperandsParameters,
+                                       IOperand,
+                                       _GenScalarMaxCode);
       }
       else {
          return _GenScalarMaxCode(Compiler,
@@ -5519,7 +5519,10 @@ _GenShufflePtrCode(
            else
            {
                /*integer move. Otherwise, it may impact previous index data type, when IOperand data type is float */
-               destLOperands[i].dataType.elementType = clvTYPE_UINT;
+               if (clmIsElementTypeFloating(destLOperands[i].dataType.elementType))
+               {
+                    destLOperands[i].dataType.elementType = clvTYPE_UINT;
+               }
            }
            status = clGenAssignCode(
                     Compiler,
@@ -8403,6 +8406,14 @@ _GenPrintfCode(
        return gcvSTATUS_INVALID_DATA;
     }
 
+    clsROPERAND_InitializeIntOrIVecConstant(constantOneROperand,
+                                            clmGenCodeDataType(T_INT),
+                                            (gctINT)1);
+
+    clsROPERAND_InitializeIntOrIVecConstant(constantZeroROperand,
+                                            clmGenCodeDataType(T_INT),
+                                            (gctINT)0);
+
     cloCOMPILER_SetNeedPrintfMemory(Compiler);
 
     /* do check arguments */
@@ -8621,7 +8632,7 @@ END_FIND:
         }
     }
 
-    printfBufferOffset = 4;
+    printfBufferOffset = 8;
     for(i = 1; i < (operandsNeeded + 1); i++) {
         gctINT componentCount;
 
@@ -8679,10 +8690,27 @@ END_FIND:
                                     printfMaxEnd,
                                     tempROperand));
 
+    printfBufferOffset = -printfBufferOffset;
+
+    clsROPERAND_InitializeIntOrIVecConstant(constantROperand,
+                                            clmGenCodeDataType(T_INT),
+                                            __OCL_PRINTF_WRITE_MASK__);
+    clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,
+                                            clmGenCodeDataType(T_INT),
+                                            printfBufferOffset);
+    gcmONERROR(clGenStoreCode(Compiler,
+                              PolynaryExpr->exprBase.base.lineNo,
+                              PolynaryExpr->exprBase.base.stringNo,
+                              constantROperand,
+                              printfStart,
+                              clmGenCodeDataType(T_INT),
+                              offsetOperand));
+    printfBufferOffset += 4;
+
     clsROPERAND_InitializeIntOrIVecConstant(constantROperand,
                                             clmGenCodeDataType(T_INT),
                                             OperandsParameters[0].dataTypes[0].savedByteOffset);
-    printfBufferOffset = -printfBufferOffset;
+
     clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,
                                             clmGenCodeDataType(T_INT),
                                             printfBufferOffset);
@@ -8694,13 +8722,6 @@ END_FIND:
                               clmGenCodeDataType(T_INT),
                               offsetOperand));
 
-    clsROPERAND_InitializeIntOrIVecConstant(constantOneROperand,
-                                            clmGenCodeDataType(T_INT),
-                                            (gctINT)1);
-
-    clsROPERAND_InitializeIntOrIVecConstant(constantZeroROperand,
-                                            clmGenCodeDataType(T_INT),
-                                            (gctINT)0);
     printfBufferOffset += 4;
     arg = slsDLINK_NODE_Next(&PolynaryExpr->operands->members, struct _cloIR_EXPR);
     for(i = 1; i < (operandsNeeded + 1); i++) {

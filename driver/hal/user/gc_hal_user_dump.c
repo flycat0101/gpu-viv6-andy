@@ -726,7 +726,7 @@ gcfDumpUnlock(
     gcmUNLOCKDUMP();
 }
 
-#if gcdDUMP || gcdDUMP_COMMAND
+#if gcdDUMP || gcdDUMP_COMMAND || gcdDUMP_2DVG
 gceSTATUS
 gcfDump(
     IN gcoOS Os,

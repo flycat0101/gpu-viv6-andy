@@ -45,22 +45,22 @@ extern "C" {
 #define __GL_VERSION31      "OpenGL ES 3.1 V"
 #define __GL_VERSION32      "OpenGL ES 3.2 V"
 
-/* Fix me for the next defines */
-#define __OGL_VERSION21      "2.1 V"
-#define __OGL_VERSION30      "3.0 V"
-#define __OGL_VERSION40      "4.0 V"
-
 #define __GL_GLSL_VERSION20 "OpenGL ES GLSL ES 1.0.0"
 #define __GL_GLSL_VERSION30 "OpenGL ES GLSL ES 3.00"
 #define __GL_GLSL_VERSION31 "OpenGL ES GLSL ES 3.10"
 #define __GL_GLSL_VERSION32 "OpenGL ES GLSL ES 3.20"
 
+#ifdef OPENGL40
 /* Fix me for the next defines */
+#define __OGL_VERSION21      "2.1 V"
+#define __OGL_VERSION30      "3.0 V"
+#define __OGL_VERSION31      "3.1 V"
+#define __OGL_VERSION40      "4.0 V"
+
 #define __OGL_GLSL_VERSION21 "2.1.0 "
 #define __OGL_GLSL_VERSION30 "3.00 "
 #define __OGL_GLSL_VERSION40 "4.00 "
 
-#ifdef OPENGL40
 #define __GL_MAX_HW_LIGHTS            8
 #define __GL_MAX_GEOMETRY_VARYING_COMPONENTS        (1024-4)   /* exclude gl_Position */
 #define __GL_MAX_VERTEX_VARYING_COMPONENTS          (16*6*4)
@@ -209,7 +209,9 @@ typedef struct __GLchipDirtyRec
             unsigned int tesReload       : 1;
             unsigned int gsReload        : 1;
             unsigned int activeUniform   : 1;
-            unsigned int reserved        : 14;
+            unsigned int lastFragData    : 1;
+            unsigned int pgInsChanged    : 1;
+            unsigned int reserved        : 12;
         } sDefer;
         unsigned int deferDirty;
     } uDefer;
@@ -270,11 +272,6 @@ typedef struct __GLchipInstantDrawRec
     GLint           positionIndex;
 
     gctBOOL         primitiveRestart;
-
-    /** Spilt Draw if last index address mod 64 is locate in 0-47 */
-    gctBOOL         spilitDraw;
-    gctSIZE_T       spilitCount;
-    gcePRIMITIVE    spilitPrimMode;
 } __GLchipInstantDraw;
 
 typedef struct __GLchipHalRtSlotInfoRec
@@ -287,9 +284,6 @@ typedef struct __GLchipHalRtSlotInfoRec
 struct __GLchipContextRec
 {
     gcoHAL                      hal;
-#ifdef VIVANTE_PROFILER
-    gcoHAL                      phal;
-#endif
     gco3D                       engine;
     gcoOS                       os;
 
@@ -303,8 +297,9 @@ struct __GLchipContextRec
     gctGLSLInitCompiler         pfInitCompiler;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
-    /* Below 3 shortcuts ONLY can be used withine draw validation.
-    ** Any places out of there is invalid.
+    /* Attention: Below 3 shortcuts ONLY can be used within draw/compute validation,
+    **            Any places out of there is invalid. Because the program may be
+    **            deleted, while this fields have no chance to be reset and left wild.
     */
     __GLchipSLProgram           *activePrograms[__GLSL_STAGE_LAST];
     gcePROGRAM_STAGE_BIT        activeStageBits;
@@ -368,6 +363,7 @@ struct __GLchipContextRec
     /* Record attrib index, actually means hw attribute register usage. */
     GLint                       attribMask;
     GLint                       positionIndex;
+    GLint                       directPositionIndex;
     gcoVERTEXARRAY              vertexArray;
 
     /* Translated primitive type seen in PA */
@@ -449,21 +445,28 @@ struct __GLchipContextRec
 
     gctBOOL                     robust;
 
+    /* flags quickly check if we need do recompile */
+    gctBOOL                     needTexRecompile;
+    gctBOOL                     needRTRecompile;
+
+#if VIVANTE_PROFILER
     gcoPROFILER                 profiler;
+#endif
+
 #ifdef OPENGL40
     gctBOOL                     hwPointSprite;
     gcoSURF                     drawRT[__GL_MAX_DRAW_BUFFERS];
-    GLboolean                       fsRoundingEnabled;
-    GLboolean                       drawTexOESEnabled;
-    GLboolean                       drawClearRectEnabled;
-    gctBOOL                          useFragmentProcessor;
+    GLboolean                   fsRoundingEnabled;
+    GLboolean                   drawTexOESEnabled;
+    GLboolean                   drawClearRectEnabled;
+    gctBOOL                     useFragmentProcessor;
 
-    glsHASHKEY                     hashKey;
-    glsHASHTABLE_PTR           hashTable;
-    glsPROGRAMINFO_PTR       currProgram;
-    gctBOOL              fixProgramFlag;
+    glsHASHKEY                  hashKey;
+    glsHASHTABLE_PTR            hashTable;
+    glsPROGRAMINFO_PTR          currProgram;
+    gctBOOL                     fixProgramFlag;
     glsATTRIBUTEINFO            attributeInfo[gldMAX_ATTRIBUTES_INFO];
-    glsLIGHTING                     lightingStates;
+    glsLIGHTING                 lightingStates;
     glsPOINT                    pointStates;
 
     gcsTEXTURE                  polygonStippleTexture;
@@ -486,7 +489,6 @@ struct __GLchipContextRec
     GLboolean                   drawToAccumBuf;
     GLfloat                     accumValue;
     GLfloat                     yMajor;
-
     gctBOOL                     hwLogicOp;
     glsLOGICOP                  logicOp;
     GLint                       builtinAttributeIndex[_GL_BT_INDEX_MAX];
@@ -564,10 +566,7 @@ __glChipDetachDrawable(
 
 extern GLboolean
 __glChipUpdateDrawable(
-    __GLdrawablePrivate *drawable,
-    GLvoid* rtHandle,
-    GLvoid* depthHandle,
-    GLvoid *stencilHandle
+    __GLdrawablePrivate *drawable
     );
 
 extern GLvoid
@@ -846,7 +845,6 @@ gcChipValidateState(
     __GLchipContext *chipCtx
     );
 
-
 extern gceSTATUS
 gcChipValidateRecompileStateCB(
     __GLcontext *gc,
@@ -948,6 +946,7 @@ extern gcsSURF_VIEW
 gcChipGetTextureSurface(
     __GLchipContext *chipCtx,
     __GLtextureObject *texObj,
+    GLboolean layered,
     GLint level,
     GLint slice
     );
@@ -983,7 +982,7 @@ gcChipProcessPixelStore(
     gctSIZE_T skipImgs,
     gctSIZE_T *pRowStride,
     gctSIZE_T *pImgHeight,
-    const GLvoid** pBuf
+    gctSIZE_T *pSkipBytes
     );
 
 /* chip_codec.c */
@@ -1037,6 +1036,19 @@ gcChipDecompress_EAC_11bitToR16F(
     OUT gctSIZE_T *pRowStride
     );
 
+extern GLvoid*
+gcChipDecompressASTC(
+    IN  __GLcontext *gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T numSlices,
+    IN  gctSIZE_T compressedSize,
+    IN  const void * Data,
+    IN  __GLformatInfo *formatInfo,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T *pRowStride
+    );
+
 /* chip_shader.c */
 extern gceSTATUS
 gcChipLTCReleaseResultArray(
@@ -1055,6 +1067,7 @@ __glChipGetError(
     __GLcontext *gc
     );
 
+#if VIVANTE_PROFILER
 GLboolean
 __glChipProfilerSet(
     IN __GLcontext *gc,
@@ -1083,6 +1096,7 @@ gcChipInitProfileDevicePipeline(
     __GLcontext *gc,
     __GLchipContext *chipCtx
     );
+#endif
 
 GLboolean
 __glChipComputeBegin(

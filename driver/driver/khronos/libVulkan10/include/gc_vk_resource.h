@@ -16,10 +16,12 @@
 
 #define __VK_FORMAT_SAMPLE_IMAGE_FEATURES \
     VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT               | \
-    VK_FORMAT_FEATURE_BLIT_SRC_BIT
+    VK_FORMAT_FEATURE_BLIT_SRC_BIT                    | \
+    VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR            | \
+    VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR
 
 #define __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES \
-    __VK_FORMAT_SAMPLE_IMAGE_FEATURES               | \
+    __VK_FORMAT_SAMPLE_IMAGE_FEATURES                 | \
     VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT
 
 #define __VK_FORMAT_STORAGE_IMAGE_FEATURES \
@@ -112,10 +114,10 @@ typedef struct __vkDeviceMemoryRec
 
     VkDeviceSize mappedOffset;
     VkDeviceSize mappedSize;
-
+#if __VK_ENABLETS
     /* ts related information. */
     __vkTileStatus *ts;
-
+#endif
 } __vkDeviceMemory;
 
 typedef struct __vkBufferRec

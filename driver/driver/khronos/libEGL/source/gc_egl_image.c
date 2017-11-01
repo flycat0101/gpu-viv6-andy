@@ -17,21 +17,11 @@
 #define _GC_OBJ_ZONE    gcdZONE_EGL_IMAGE
 
 #if defined(ANDROID)
-#  include <pixelflinger/format.h>
-#  include <pixelflinger/pixelflinger.h>
-
 #if ANDROID_SDK_VERSION >= 16
 #    include <ui/ANativeObjectBase.h>
 #  else
 #    include <private/ui/android_natives_priv.h>
 #  endif
-
-#  include "gc_gralloc_priv.h"
-#endif
-
-#if defined(WL_EGL_PLATFORM) && !defined(USE_VIV_WAYLAND)
-#  include <wayland-server.h>
-#  include <gc_wayland_protocol.h>
 #endif
 
 #ifdef LINUX
@@ -187,15 +177,6 @@ _DestroyImage(
 
             Display->platform->disconnectPixmap(Display, (void *) pixmap, info);
             Image->image.u.pixmap.nativePixmap = gcvNULL;
-        }
-
-        if (Image->image.type == KHR_IMAGE_LINUX_DMA_BUF)
-        {
-            /*
-             * Linux dma-buf image source is also the 'surface'.
-             * Need extra dereference here.
-             */
-            gcoSURF_Destroy(Image->image.surface);
         }
 
         /* Destroy the surface. */
@@ -424,6 +405,12 @@ _CreateImageTex2D(
         return EGL_NO_IMAGE;
     }
 
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
+    }
+
     return image;
 }
 
@@ -541,6 +528,12 @@ _CreateImageTexCube(
 
         veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
+    }
+
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
     }
 
     return image;
@@ -669,9 +662,15 @@ _CreateImagePixmap(
     {
         gctPOINTER pointer;
 
+        /* According to extension EGL_KHR_image_pixmap:
+        ** If <target> is EGL_NATIVE_PIXMAP_KHR and <buffer> is not a
+        ** valid native pixmap handle, or if <buffer> is a native pixmap
+        ** whose color buffer format is incompatible with the system's
+        ** EGLImage implementation, the error EGL_BAD_PARAMETER is generated.
+        */
         if (!Dpy->platform->connectPixmap(Dpy, pixmap, &info, &surface))
         {
-            veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
+            veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
@@ -716,6 +715,12 @@ _CreateImagePixmap(
     image->image.u.pixmap.pixInfo      = info;
     image->image.u.pixmap.width        = (gctUINT) width;
     image->image.u.pixmap.height       = (gctUINT) height;
+
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
+    }
 
 #ifdef EGL_API_XXX
     /* Reset the sequence NO. */
@@ -837,39 +842,55 @@ _CreateImageRenderBuffer(
         return EGL_NO_IMAGE;
     }
 
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
+    }
+
     return image;
 }
 
 #if defined(ANDROID)
-static gctBOOL
-_UpdateANativeBuffer(
-    khrEGL_IMAGE * Image
+#if gcdDRM_GRALLOC
+static EGLBoolean
+_GetANativeBufferSurface(
+    android_native_buffer_t * Buffer,
+    gcoSURF * Surface
     )
 {
-    gceSTATUS status;
-    gctUINT64 timeStamp;
+    return EGL_FALSE;
+}
 
-    gcmASSERT(Image->type == KHR_IMAGE_ANDROID_NATIVE_BUFFER);
+#  else
+#    include <gc_gralloc_priv.h>
+static EGLBoolean
+_GetANativeBufferSurface(
+    android_native_buffer_t * Buffer,
+    gcoSURF * Surface
+    )
+{
+    gcoSURF surface;
 
-    /* Pop shared info. */
-    gcmONERROR(gcoSURF_PopSharedInfo(Image->surface));
-
-    /* Query surface time stamp. */
-    gcmVERIFY_OK(gcoSURF_QueryTimeStamp(Image->surface, &timeStamp));
-
-    if (timeStamp > Image->u.ANativeBuffer.timeStamp)
+    if (!Buffer->handle)
     {
-        /* Surface has updated. */
-        Image->u.ANativeBuffer.timeStamp = timeStamp;
-        return gcvTRUE;
+        return EGL_FALSE;
     }
 
-    return gcvFALSE;
+    surface = (gcoSURF)gcmUINT64_TO_PTR(
+                    gc_native_handle_get(Buffer->handle)->surface);
 
-OnError:
-    return gcvFALSE;
+    if (!surface)
+    {
+        return EGL_FALSE;
+    }
+
+    gcoSURF_ReferenceSurface(surface);
+
+    *Surface = surface;
+    return EGL_TRUE;
 }
-#endif
+#  endif
 
 static VEGLImage
 _CreateImageANativeBuffer(
@@ -881,82 +902,14 @@ _CreateImageANativeBuffer(
     EGLBoolean intAttrib
     )
 {
-#if defined(ANDROID)
-    VEGLImage                   image;
-    android_native_buffer_t*    nativeBuffer;
-    struct gc_native_handle_t * handle;
-    gcoSURF                     surface;
-    gceSURF_FORMAT              format = gcvSURF_UNKNOWN;
+    VEGLImage image;
+    EGLenum status;
 
     /* Context must be null. */
     if (Ctx != gcvNULL)
     {
         veglSetEGLerror(Thread,  EGL_BAD_CONTEXT);
         return EGL_NO_IMAGE;
-    }
-
-    /* Create short cut of a native buffer. */
-    nativeBuffer = (android_native_buffer_t*)Buffer;
-
-    /* Validate native buffer object. */
-    if (nativeBuffer->common.magic != ANDROID_NATIVE_BUFFER_MAGIC)
-    {
-        veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);;
-        return EGL_NO_IMAGE;
-    }
-
-    /* Validate vative buffer version. */
-    if (nativeBuffer->common.version != sizeof(android_native_buffer_t))
-    {
-        veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);;
-        return EGL_NO_IMAGE;
-    }
-
-    /* Grab native handle. */
-    handle = gc_native_handle_get(nativeBuffer->handle);
-
-    /* Cast surface object. */
-    surface = (gcoSURF) (intptr_t)handle->surface;
-
-    /* Query surface format. */
-    if (surface != gcvNULL)
-    {
-        gcmVERIFY_OK(gcoSURF_GetFormat(surface, gcvNULL, &format));
-    }
-    else
-    {
-        /* Some custom specific buffer may not have surface object. */
-        switch (nativeBuffer->format)
-        {
-        case GGL_PIXEL_FORMAT_RGB_565:
-            format = gcvSURF_R5G6B5;
-            break;
-
-        case GGL_PIXEL_FORMAT_RGBA_8888:
-            format = gcvSURF_A8B8G8R8;
-            break;
-
-        case GGL_PIXEL_FORMAT_RGBX_8888:
-            format = gcvSURF_X8B8G8R8;
-            break;
-
-        case GGL_PIXEL_FORMAT_RGBA_4444:
-            format = gcvSURF_R4G4B4A4;
-            break;
-
-        case GGL_PIXEL_FORMAT_RGBA_5551:
-            format = gcvSURF_R5G5B5A1;
-            break;
-
-        case GGL_PIXEL_FORMAT_BGRA_8888:
-            format = gcvSURF_A8R8G8B8;
-            break;
-
-        default:
-            /* Unknown format. */
-            veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);;
-            return EGL_NO_IMAGE;
-        }
     }
 
     /* Initialize an image struct. */
@@ -968,49 +921,20 @@ _CreateImageANativeBuffer(
         return EGL_NO_IMAGE;
     }
 
-    image->image.magic   = KHR_EGL_IMAGE_MAGIC_NUM;
-    image->image.type    = KHR_IMAGE_ANDROID_NATIVE_BUFFER;
+    status = _CreateImageFromANativeBuffer(Thread, Buffer, image);
 
-    /* Stores image buffer */
-    image->image.surface = surface;
-    image->image.update  = _UpdateANativeBuffer;
-
-    /* Store android native buffer. */
-    image->image.u.ANativeBuffer.nativeBuffer = (gctPOINTER) nativeBuffer;
-    image->image.u.ANativeBuffer.format       = format;
-    image->image.u.ANativeBuffer.timeStamp    = 0;
-
-    /* Keep a reference of native buffer. */
-    nativeBuffer->common.incRef(&nativeBuffer->common);
-
-    return image;
-
-#else
-    VEGLImage image;
-    gcoSURF   surf = (gcoSURF)Buffer;
-
-    if (gcoSURF_IsValid(surf) != gcvSTATUS_TRUE)
+    /* Clean up if error happen. */
+    if (status != EGL_SUCCESS)
     {
-        veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);;
+        _FinalizeImage(Thread, Dpy, image);
+
+        veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
     }
 
-    /* Initialize an image struct. */
-    image = _InitializeImage(Thread, Dpy, Ctx);
-
-    if (image != gcvNULL)
-    {
-        image->image.magic   = KHR_EGL_IMAGE_MAGIC_NUM;
-        image->image.type    = KHR_IMAGE_ANDROID_NATIVE_BUFFER;
-
-        /* Use the buffer as the image surface. */
-        image->image.surface = (gcoSURF) surf;
-    }
-
     return image;
-
-#endif
 }
+#endif
 
 static VEGLImage
 _CreateImageVGParent(
@@ -1109,6 +1033,12 @@ _CreateImageVGParent(
         return EGL_NO_IMAGE;
     }
 
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
+    }
+
     return image;
 }
 
@@ -1162,6 +1092,12 @@ _CreateImageWL(
     image->image.surface           = surface;
     image->image.u.wlbuffer.width  = width;
     image->image.u.wlbuffer.height = height;
+
+    if (image->image.surface)
+    {
+        /* Reference the surface. */
+        gcoSURF_ReferenceSurface(image->image.surface);
+    }
 #endif
 
     return image;
@@ -1169,92 +1105,111 @@ _CreateImageWL(
 #endif
 
 #ifdef LINUX
+const EGLuint64KHR _ModiferTable[] =
+{
+    DRM_FORMAT_MOD_VIVANTE_TILED,
+    DRM_FORMAT_MOD_VIVANTE_SUPER_TILED,
+    DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED,
+    DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED
+};
 
+#define __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT           0
+#define __DRM_FORMAT_MOD_VIVANTE_TILED_BIT             (1 << 0)
+#define __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT       (1 << 1)
+#define __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT       (1 << 2)
+#define __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT (1 << 3)
+
+#define __DRM_FORMAT_MOD_VIVANTE_ALL_BIT (__DRM_FORMAT_MOD_VIVANTE_TILED_BIT | \
+                                          __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT | \
+                                          __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT | \
+                                          __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT )
 static struct
 {
     int fourcc;
     gceSURF_FORMAT format;
+    gctUINT32 modifer;  /* modifier.*/
 }
 _FormatTable[] =
 {
     /* 8 bpp R */
-    {DRM_FORMAT_R8,       gcvSURF_R8},
+    {DRM_FORMAT_R8,       gcvSURF_R8,       __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
     /* 16 bpp RG */
-    {DRM_FORMAT_GR88,     gcvSURF_G8R8},
+    {DRM_FORMAT_GR88,     gcvSURF_G8R8,     __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
     /* 16 bpp RGB */
-    {DRM_FORMAT_XRGB4444, gcvSURF_X4R4G4B4},
-    {DRM_FORMAT_XBGR4444, gcvSURF_X4B4G4R4},
+    {DRM_FORMAT_XRGB4444, gcvSURF_X4R4G4B4, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_XBGR4444, gcvSURF_X4B4G4R4, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
 /*
     {DRM_FORMAT_RGBX4444, gcvSURF_R4G4B4X4},
     {DRM_FORMAT_BGRX4444, gcvSURF_B4G4R4X4},
  */
 
-    {DRM_FORMAT_ARGB4444, gcvSURF_A4R4G4B4},
-    {DRM_FORMAT_ABGR4444, gcvSURF_A4B4G4R4},
+    {DRM_FORMAT_ARGB4444, gcvSURF_A4R4G4B4, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_ABGR4444, gcvSURF_A4B4G4R4, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
 /*
     {DRM_FORMAT_RGBA4444, gcvSURF_R4G4B4A4},
     {DRM_FORMAT_BGRA4444, gcvSURF_B4G4R4A4},
  */
 
-    {DRM_FORMAT_XRGB1555, gcvSURF_X1R5G5B5},
-    {DRM_FORMAT_XBGR1555, gcvSURF_X1B5G5R5},
+    {DRM_FORMAT_XRGB1555, gcvSURF_X1R5G5B5, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_XBGR1555, gcvSURF_X1B5G5R5, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
 /*
     {DRM_FORMAT_RGBX5551, gcvSURF_R5G5B5X1},
     {DRM_FORMAT_BGRX5551, gcvSURF_B5G5R5X1},
  */
 
-    {DRM_FORMAT_ARGB1555, gcvSURF_A1R5G5B5},
-    {DRM_FORMAT_ABGR1555, gcvSURF_A1B5G5R5},
+    {DRM_FORMAT_ARGB1555, gcvSURF_A1R5G5B5, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_ABGR1555, gcvSURF_A1B5G5R5, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
 /*
     {DRM_FORMAT_RGBA5551, gcvSURF_R5G5B5A1},
     {DRM_FORMAT_BGRA5551, gcvSURF_B5G5R5A1},
  */
 
-    {DRM_FORMAT_RGB565,   gcvSURF_R5G6B5},
-    {DRM_FORMAT_BGR565,   gcvSURF_B5G6R5},
+    {DRM_FORMAT_RGB565,   gcvSURF_R5G6B5,   __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_BGR565,   gcvSURF_B5G6R5,   __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
     /* 24 bpp RGB not supported */
 
     /* 32 bpp RGB */
-    {DRM_FORMAT_XRGB8888, gcvSURF_X8R8G8B8},
-    {DRM_FORMAT_XBGR8888, gcvSURF_X8B8G8R8},
+    {DRM_FORMAT_XRGB8888, gcvSURF_X8R8G8B8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_XBGR8888, gcvSURF_X8B8G8R8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
-    {DRM_FORMAT_RGBX8888, gcvSURF_R8G8B8X8},
-    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8},
+    {DRM_FORMAT_RGBX8888, gcvSURF_R8G8B8X8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
-    {DRM_FORMAT_ARGB8888, gcvSURF_A8R8G8B8},
-    {DRM_FORMAT_ABGR8888, gcvSURF_A8B8G8R8},
+    {DRM_FORMAT_ARGB8888, gcvSURF_A8R8G8B8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_ABGR8888, gcvSURF_A8B8G8R8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
-    {DRM_FORMAT_RGBA8888, gcvSURF_R8G8B8A8},
-    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8},
+    {DRM_FORMAT_RGBA8888, gcvSURF_R8G8B8A8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8, __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
     /* 32 bpp 2-10-10-10 format not supported */
 
     /* packed YCbCr */
-    {DRM_FORMAT_YUYV, gcvSURF_YUY2},
-    {DRM_FORMAT_YVYU, gcvSURF_YVYU},
-    {DRM_FORMAT_UYVY, gcvSURF_UYVY},
-    {DRM_FORMAT_VYUY, gcvSURF_VYUY},
+    {DRM_FORMAT_YUYV, gcvSURF_YUY2,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_YVYU, gcvSURF_YVYU,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_UYVY, gcvSURF_UYVY,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_VYUY, gcvSURF_VYUY,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
 
-    {DRM_FORMAT_AYUV, gcvSURF_AYUV},
+    {DRM_FORMAT_AYUV, gcvSURF_AYUV,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
 
     /* 2 plane YCbCr */
-    {DRM_FORMAT_NV12, gcvSURF_NV12},
-    {DRM_FORMAT_NV21, gcvSURF_NV21},
+    {DRM_FORMAT_NV12, gcvSURF_NV12,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_NV21, gcvSURF_NV21,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
     /* supported by SW convertor. */
-    {DRM_FORMAT_NV16, gcvSURF_NV16},
-    {DRM_FORMAT_NV61, gcvSURF_NV61},
+    {DRM_FORMAT_NV16, gcvSURF_NV16,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_NV61, gcvSURF_NV61,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
 
     /* 3 plane YCbCr */
-    {DRM_FORMAT_YUV420, gcvSURF_I420},
-    {DRM_FORMAT_YVU420, gcvSURF_YV12},
+    {DRM_FORMAT_YUV420, gcvSURF_I420,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_YVU420, gcvSURF_YV12,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
 };
+
 
 static VEGLImage
 _CreateImageDMABuf(
@@ -1274,19 +1229,23 @@ _CreateImageDMABuf(
 
     EGLint width  = 0;
     EGLint height = 0;
-    EGLint fd[3]     = {-1, -1, -1};
+    EGLint fd[4]     = {-1, -1, -1, -1};
     EGLint fourcc    = 0;
-    EGLint offset[3] = {-1, -1, -1};
-    EGLint pitch[3]  = {-1, -1, -1};
+    EGLint offset[4] = {-1, -1, -1, -1};
+    EGLint pitch[4]  = {-1, -1, -1, -1};
+    EGLint modifierLO[4] = {0, 0, 0, 0};
+    EGLint modifierHI[4] = {0, 0, 0, 0};
+    EGLuint64KHR modifier0 = 0;
     EGLenum colorSpace  = EGL_ITU_REC601_EXT;
     EGLenum sampleRange = EGL_YUV_NARROW_RANGE_EXT;
     EGLenum siting[2]   = {
         EGL_YUV_CHROMA_SITING_0_EXT,
         EGL_YUV_CHROMA_SITING_0_EXT
     };
-    gctUINT stride[3];
-    gctUINT32 handle[3];
-    gctUINT bufferOffset[3];
+    gctUINT stride[4];
+    gctUINT32 handle[4];
+    gctUINT bufferOffset[4];
+    gceSURF_TYPE surfType = gcvSURF_BITMAP;
 
     /* Context must be null, Buffer must be null. */
     if (Ctx != gcvNULL || Buffer != (EGLClientBuffer) gcvNULL)
@@ -1329,6 +1288,12 @@ _CreateImageDMABuf(
         case EGL_DMA_BUF_PLANE0_PITCH_EXT:
             pitch[0] = value;
             break;
+        case EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT:
+            modifierLO[0] = value;
+            break;
+        case EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT:
+            modifierHI[0] = value;
+            break;
 
         case EGL_DMA_BUF_PLANE1_FD_EXT:
             fd[1] = value;
@@ -1339,6 +1304,12 @@ _CreateImageDMABuf(
         case EGL_DMA_BUF_PLANE1_PITCH_EXT:
             pitch[1] = value;
             break;
+        case EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT:
+            modifierLO[1] = value;
+            break;
+        case EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT:
+            modifierHI[1] = value;
+            break;
 
         case EGL_DMA_BUF_PLANE2_FD_EXT:
             fd[2] = value;
@@ -1348,6 +1319,28 @@ _CreateImageDMABuf(
             break;
         case EGL_DMA_BUF_PLANE2_PITCH_EXT:
             pitch[2] = value;
+            break;
+        case EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT:
+            modifierLO[2] = value;
+            break;
+        case EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT:
+            modifierHI[2] = value;
+            break;
+
+        case EGL_DMA_BUF_PLANE3_FD_EXT:
+            fd[3] = value;
+            break;
+        case EGL_DMA_BUF_PLANE3_OFFSET_EXT:
+            offset[3] = value;
+            break;
+        case EGL_DMA_BUF_PLANE3_PITCH_EXT:
+            pitch[3] = value;
+            break;
+        case EGL_DMA_BUF_PLANE3_MODIFIER_LO_EXT:
+            modifierLO[3] = value;
+            break;
+        case EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT:
+            modifierHI[3] = value;
             break;
 
         case EGL_YUV_COLOR_SPACE_HINT_EXT:
@@ -1389,6 +1382,25 @@ _CreateImageDMABuf(
         }
     }
 
+    /* Seems like we can't support different plane with different modifiers.*/
+    modifier0 = modifierLO[0] | (modifierHI[0] < 32);
+
+    if (!modifier0)
+    {
+        /* Check Modifier.*/
+        for (i = 0; i < 4; ++i)
+        {
+            EGLuint64KHR modifier = modifierLO[i] | (modifierHI[i] < 32);
+
+            if (modifier0 != modifier ||
+                !(modifierLO[i] != 0 && modifierHI[i] != 0))
+            {
+                veglSetEGLerror(Thread, EGL_BAD_PARAMETER);
+                return EGL_NO_IMAGE;
+            }
+        }
+    }
+
     /* Check width, height */
     if (width <= 0 || height <= 0)
     {
@@ -1414,7 +1426,26 @@ _CreateImageDMABuf(
         return EGL_NO_IMAGE;
     }
 
-    /* Check format. */
+    /* Get surface type.*/
+    switch (modifier0)
+    {
+        /* Currently, we only support super tile */
+    case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
+        surfType = gcvSURF_TEXTURE;
+        break;
+    case DRM_FORMAT_MOD_VIVANTE_TILED:
+    case DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED:
+    case DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED:
+        /* Need add code to support other modifier in future.*/
+        gcmASSERT(gcvFALSE);
+        veglSetEGLerror(Thread, EGL_BAD_PARAMETER);
+        return EGL_NO_IMAGE;
+    default:
+        surfType = gcvSURF_BITMAP;
+        break;
+    }
+
+    /* Check format*/
     switch (format)
     {
     case gcvSURF_YV12:
@@ -1492,7 +1523,7 @@ _CreateImageDMABuf(
         break;
     }
 
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < 4; i++)
     {
         stride[i] = (gctUINT) pitch[i];
         handle[i] = (gctUINT32) fd[i];
@@ -1502,7 +1533,7 @@ _CreateImageDMABuf(
     /* Wrap as a surface object. */
     if (gcmIS_ERROR(gcoSURF_WrapUserMultiBuffer(gcvNULL,
                                                 width, height,
-                                                gcvSURF_BITMAP,
+                                                surfType,
                                                 format,
                                                 stride,
                                                 handle,
@@ -1700,6 +1731,7 @@ veglCreateImage (
                                          intAttrib);
         break;
 
+#if defined(ANDROID)
     case EGL_NATIVE_BUFFER_ANDROID:
         image = _CreateImageANativeBuffer(thread,
                                           dpy, ctx,
@@ -1707,6 +1739,7 @@ veglCreateImage (
                                           attrib_list,
                                           intAttrib);
         break;
+#endif
 
     case EGL_VG_PARENT_IMAGE_KHR:
         image = _CreateImageVGParent(thread,
@@ -1750,28 +1783,19 @@ veglCreateImage (
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Reference the image surface if it is from a client driver */
-    if (image->image.surface)
-    {
-        gcoSURF_ReferenceSurface(image->image.surface);
-    }
-
     VEGL_LOCK_DISPLAY_RESOURCE(dpy);
 
     /* Push image into stack. */
     /* Image is already referenced when creation. */
-    if (image->next != gcvNULL)
     {
         VEGLImage img = image;
+
         while (img->next != gcvNULL)
         {
             img = img->next;
         }
+
         img->next = dpy->imageStack;
-    }
-    else
-    {
-        image->next = dpy->imageStack;
     }
     dpy->imageStack = image;
 
@@ -1882,6 +1906,235 @@ OnError:
     return EGL_FALSE;
 }
 
+static EGLBoolean
+veglQueryDmaBufFormats(
+    EGLDisplay Dpy,
+    EGLint max_formats,
+    EGLint *formats,
+    EGLint *num_formats
+    )
+{
+#ifdef LINUX
+    VEGLThreadData  thread;
+    VEGLDisplay     dpy;
+    gceSTATUS       status;
+    gctUINT         formatCount = 0;
+    gctUINT         i = 0;
+
+    /* Get thread data. */
+    thread = veglGetThreadData();
+    if (thread == gcvNULL)
+    {
+        gcmTRACE(
+            gcvLEVEL_ERROR,
+            "%s(%d): veglGetThreadData failed.",
+            __FUNCTION__, __LINE__
+            );
+
+        return EGL_FALSE;
+    }
+
+    /* Test for valid EGLDisplay structure. */
+    dpy = veglGetDisplay(Dpy);
+    if (dpy == gcvNULL)
+    {
+        /* Bad display. */
+        veglSetEGLerror(thread,  EGL_BAD_DISPLAY);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Test if EGLDisplay structure has been initialized. */
+    if (!dpy->initialized)
+    {
+        /* Not initialized. */
+        veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get format Count */
+    for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
+    {
+        /* Now, we only support super tiled format.*/
+        if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT)
+        {
+            formatCount++;
+        }
+    }
+
+    if (max_formats < 0)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    else if (max_formats == 0)
+    {
+        gcmASSERT(num_formats);
+        *num_formats = formatCount;
+    }
+    else
+    {
+        if (formats)
+        {
+            for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
+            {
+                if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT)
+                {
+                    formats[i] = _FormatTable[i].fourcc;
+                }
+            }
+        }
+        else
+        {
+            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
+
+    /* Success */
+    return EGL_TRUE;
+OnError:
+#endif
+    return EGL_FALSE;
+}
+
+#ifdef LINUX
+static EGLBoolean
+_QueryDmaBufModifiers(
+    gctUINT formatIndex,
+    EGLint *num_modifiers,
+    EGLuint64KHR *modifiers
+    )
+{
+    EGLint modifierCount = 0;
+    gctUINT32 modifier = _FormatTable[formatIndex].modifer;
+    const gctUINT32 modifierBitTable[] = {
+        __DRM_FORMAT_MOD_VIVANTE_TILED_BIT,
+        __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT,
+        __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT,
+        __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT
+        };
+    gctUINT i = 0;
+
+    /* Compute modifier num or fill modifier.*/
+    for (i = 0; i < gcmCOUNTOF(modifierBitTable); ++i)
+    {
+        if (modifier & modifierBitTable[i])
+        {
+            if (num_modifiers)
+            {
+                modifierCount++;
+            }
+            else
+            {
+                gcmASSERT(modifiers);
+                modifiers[i] = _ModiferTable[i];
+            }
+        }
+    }
+
+    if (num_modifiers)
+    {
+        *num_modifiers = modifierCount;
+    }
+
+    return EGL_TRUE;
+}
+#endif
+
+static EGLBoolean
+veglQueryDmaBufModifiers(
+    EGLDisplay Dpy,
+    EGLint format,
+    EGLint max_modifiers,
+    EGLuint64KHR *modifiers,
+    EGLBoolean *external_only,
+    EGLint *num_modifiers
+    )
+{
+#ifdef LINUX
+    VEGLThreadData     thread;
+    VEGLDisplay        dpy;
+    gceSTATUS          status;
+    gctUINT            formatCount = 0;
+    gctUINT            i = 0;
+
+    /* Get thread data. */
+    thread = veglGetThreadData();
+    if (thread == gcvNULL)
+    {
+        gcmTRACE(
+            gcvLEVEL_ERROR,
+            "%s(%d): veglGetThreadData failed.",
+            __FUNCTION__, __LINE__
+            );
+
+        return EGL_FALSE;
+    }
+
+    /* Test for valid EGLDisplay structure. */
+    dpy = veglGetDisplay(Dpy);
+    if (dpy == gcvNULL)
+    {
+        /* Bad display. */
+        veglSetEGLerror(thread,  EGL_BAD_DISPLAY);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Test if EGLDisplay structure has been initialized. */
+    if (!dpy->initialized)
+    {
+        /* Not initialized. */
+        veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get format Count */
+    formatCount = gcmCOUNTOF(_FormatTable);
+
+    /* Check format */
+    for (i = 0; i < formatCount; ++i)
+    {
+        if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT &&
+            format == _FormatTable[i].fourcc)
+            break;
+    }
+
+    if (i >= formatCount)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (max_modifiers < 0)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    else if (max_modifiers == 0)
+    {
+        gcmASSERT(num_modifiers);
+        _QueryDmaBufModifiers(i, num_modifiers, gcvNULL);
+    }
+    else
+    {
+        if (modifiers)
+        {
+            _QueryDmaBufModifiers(i, gcvNULL, modifiers);
+        }
+        else
+        {
+            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
+
+    /* Success */
+    return EGL_TRUE;
+OnError:
+#endif
+    return EGL_FALSE;
+}
+
 /* EGL 1.5 */
 EGLAPI EGLImage EGLAPIENTRY
 eglCreateImage(
@@ -1981,6 +2234,48 @@ eglDestroyImageKHR(
     return result;
 }
 
+EGLAPI EGLBoolean EGLAPIENTRY
+eglQueryDmaBufFormatsEXT(
+    EGLDisplay dpy,
+    EGLint max_formats,
+    EGLint *formats,
+    EGLint *num_formats
+    )
+{
+    EGLBoolean result = EGL_FALSE;
+    gcmHEADER_ARG("dpy=0x%x max_formats=0x%x, formats=0x%x, num_formats=0x%x", dpy, max_formats, formats, num_formats);
+
+    result = veglQueryDmaBufFormats(dpy, max_formats, formats, num_formats);
+
+    gcmDUMP_API("${EGL eglQueryDmaBufFormatsEXT 0x%08X 0x%08X 0x%08X 0x%08X}", dpy, max_formats, formats, num_formats);
+    VEGL_TRACE_API(QueryDmaBufFormatsEXT)(dpy, max_formats, formats, num_formats);
+
+    gcmFOOTER_ARG("return=%d", result);
+    return result;
+}
+
+EGLAPI EGLBoolean EGLAPIENTRY
+eglQueryDmaBufModifiersEXT(
+    EGLDisplay dpy,
+    EGLint format,
+    EGLint max_modifiers,
+    EGLuint64KHR *modifiers,
+    EGLBoolean *external_only,
+    EGLint *num_modifiers
+    )
+{
+    EGLBoolean result = EGL_FALSE;
+    gcmHEADER_ARG("dpy=0x%x format=0x%x, max_modifiers=0x%x, modifiers=0x%x, external_only=0x%x, num_modifiers=0x%x", dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
+
+    result = veglQueryDmaBufModifiers(dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
+
+    gcmDUMP_API("${EGL eglQueryDmaBufModifiersEXT 0x%08X 0x%08X 0x%08X 0x%08X}", dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
+    VEGL_TRACE_API(QueryDmaBufModifiersEXT)(dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
+
+    gcmFOOTER_ARG("return=%d", result);
+    return result;
+}
+
 #if defined EGL_WAYLAND_BUFFER_WL && defined EGL_API_WL
 struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR Image)
 {
@@ -2042,7 +2337,6 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-#if defined(USE_VIV_WAYLAND)
     /* Call underlying function. */
     wl_buf = veglCreateWaylandBufferFromImage(thread, dpy, image);
 
@@ -2051,55 +2345,6 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
         veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-#  else
-    VEGL_LOCK_DISPLAY_RESOURCE(dpy);
-    {
-        gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*)dpy->localInfo);
-        gcsWL_EGL_BUFFER* egl_buffer;
-
-        gcoOS_AllocateMemory(gcvNULL, sizeof(struct _gcsWL_EGL_BUFFER),
-                            (gctPOINTER) &egl_buffer);
-        gcoOS_ZeroMemory( egl_buffer, sizeof(struct _gcsWL_EGL_BUFFER));
-
-        egl_buffer->info.width = image->image.u.wlbuffer.width;
-        egl_buffer->info.height = image->image.u.wlbuffer.height;
-        gcmONERROR(
-                gcoSURF_GetAlignedSize(
-                    image->image.surface,
-                    gcvNULL,
-                    gcvNULL,
-                    &egl_buffer->info.stride
-                    ));
-
-        gcmONERROR(
-               gcoSURF_QueryVidMemNode(
-                    image->image.surface,
-                    (gctUINT32 *)&egl_buffer->info.node,
-                    &egl_buffer->info.pool,
-                    &egl_buffer->info.bytes
-                    ));
-        gcmONERROR(
-                gcoSURF_GetFormat(
-                    image->image.surface,
-                    &egl_buffer->info.type,
-                    &egl_buffer->info.format
-                    ));
-
-        gcmONERROR(
-                gcoHAL_NameVideoMemory(gcmPTR2INT(egl_buffer->info.node),
-                                       gcmINT2PTR(&egl_buffer->info.node)));
-
-
-        gcoWL_CreateGhostBuffer(display, egl_buffer);
-        wl_buf = egl_buffer->wl_buffer;
-        /*egl_buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
-        gcoOS_FreeMemory(gcvNULL, egl_buffer);
-        egl_buffer = gcvNULL;
-
-    }
-
-    VEGL_UNLOCK_DISPLAY_RESOURCE(dpy);
-#  endif
 
     /* Success. */
     veglSetEGLerror(thread,  EGL_SUCCESS);

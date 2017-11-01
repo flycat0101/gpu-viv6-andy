@@ -699,7 +699,7 @@ static int debugfs_write_dump_trigger(void *cmd)
         kernel = device->kernels[core];
 
 #if gcdENABLE_3D || gcdENABLE_2D
-        if (kernel && !kernel->hardware->powerManagement)
+        if (kernel && !kernel->hardware->options.powerManagement)
         {
             debugfs_print("Get dump from the stdout...\n");
 

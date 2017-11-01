@@ -283,6 +283,7 @@ typedef enum _gceSPLIT_DRAW_TYPE
     gcvSPLIT_DRAW_INDEX_FETCH,
     gcvSPLIT_DRAW_TCS,
     gcvSPLIT_DRAW_WIDE_LINE,
+    gcvSPLIT_DRAW_STIPPLE,
     gcvSPLIT_DRAW_LAST
 }
 gceSPLIT_DRAW_TYPE;
@@ -490,12 +491,6 @@ gcoBUFOBJ_IsFenceEnabled(
     );
 
 gceSTATUS
-gcoSURF_SetSharedLock(
-    IN gcoSURF Surface,
-    IN gctPOINTER SharedLock
-    );
-
-gceSTATUS
 gcoSURF_GetFence(
     IN gcoSURF Surface,
     IN gceFENCE_TYPE Type
@@ -525,12 +520,6 @@ gceSTATUS
 gcoINDEX_WaitFence(
     IN gcoINDEX Index,
     IN gceFENCE_TYPE Type
-    );
-
-gceSTATUS
-gcoINDEX_SetSharedLock(
-    IN gcoINDEX Index,
-    IN gctPOINTER SharedLock
     );
 
 gceSTATUS
@@ -2291,6 +2280,13 @@ gcoTEXTURE_IsComplete(
     );
 
 gceSTATUS
+gcoTEXTURE_CheckTexLevel0Attrib(
+    IN gcoTEXTURE Texture,
+    IN gctINT MaxLevel,
+    IN gctINT usedLevel
+    );
+
+gceSTATUS
 gcoTEXTURE_BindTexture(
     IN gcoTEXTURE Texture,
     IN gctINT Target,
@@ -2384,12 +2380,6 @@ typedef enum _gceATTRIB_SCHEME
 } gceATTRIB_SCHEME;
 
 gceSTATUS
-gcoSTREAM_SetSharedLock(
-    IN gcoSTREAM Stream,
-    IN gctPOINTER sharedLock
-    );
-
-gceSTATUS
 gcoSTREAM_Construct(
     IN gcoHAL Hal,
     OUT gcoSTREAM * Stream
@@ -2421,12 +2411,6 @@ gcoSTREAM_SetStride(
     );
 
 gceSTATUS
-gcoSTREAM_Size(
-    IN gcoSTREAM Stream,
-    OUT gctSIZE_T *Size
-    );
-
-gceSTATUS
 gcoSTREAM_Node(
     IN gcoSTREAM Stream,
     OUT gcsSURF_NODE_PTR * Node
@@ -2455,14 +2439,6 @@ gcoSTREAM_Flush(
     IN gcoSTREAM Stream
     );
 
-/* Dynamic buffer API. */
-gceSTATUS
-gcoSTREAM_SetDynamic(
-    IN gcoSTREAM Stream,
-    IN gctSIZE_T Bytes,
-    IN gctUINT Buffers
-    );
-
 typedef struct _gcsSTREAM_INFO
 {
     gctUINT             index;
@@ -2474,15 +2450,6 @@ typedef struct _gcsSTREAM_INFO
     gctUINT             stride;
 }
 gcsSTREAM_INFO, * gcsSTREAM_INFO_PTR;
-
-gceSTATUS
-gcoSTREAM_UploadDynamic(
-    IN gcoSTREAM Stream,
-    IN gctUINT VertexCount,
-    IN gctUINT InfoCount,
-    IN gcsSTREAM_INFO_PTR Info,
-    IN gcoVERTEX Vertex
-    );
 
 gceSTATUS
 gcoSTREAM_CPUCacheOperation(

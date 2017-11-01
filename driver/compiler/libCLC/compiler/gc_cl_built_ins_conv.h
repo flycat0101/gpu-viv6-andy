@@ -15,7 +15,7 @@
 #define __gc_cl_built_ins_conv_h_
 
 #define _USE_CONV_FOR_EXPLICIT_CONVERT_FUNCTION                         1
-#define _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION             1
+#define _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION             0
 #define _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION   1
 
 static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
@@ -2434,6 +2434,9 @@ _GenOldConvert_Code(
 
             case clvBUILTIN_ROUND_TO_NEAREST_EVEN :
                 {
+                    clsIOPERAND tempIOperand[1];
+                    clsROPERAND tempROperand[1];
+
                     clsIOPERAND_New(Compiler, &intermIOperands[2], clmGenCodeDataType(T_FLOAT));
                     clsROPERAND_InitializeUsingIOperand(&intermROperands[2], &intermIOperands[2]);
 
@@ -2452,6 +2455,9 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     /* r0 = r1 + 0.5 */
+                    clsIOPERAND_Initialize(Compiler, &tempIOperand[0], clmGenCodeDataType(T_FLOAT), intermIOperands[1].tempRegIndex);
+                    clsROPERAND_InitializeUsingIOperand(&tempROperand[0], &tempIOperand[0]);
+
                     status = clGenArithmeticExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
@@ -2459,7 +2465,7 @@ _GenOldConvert_Code(
                                             clvOPCODE_ADD_RTZ : clvOPCODE_ADD,
                                         &intermIOperands[0],
                                         &dot5ROperand,
-                                        &intermROperands[1]);
+                                        &tempROperand[0]);
                     if (gcmIS_ERROR(status)) return status;
 
                     /* r2 = floor(r0) */
@@ -2479,7 +2485,7 @@ _GenOldConvert_Code(
                                 PolynaryExpr->exprBase.base.stringNo,
                                 clvOPCODE_FRACT,
                                 &intermIOperands[0],
-                                &intermROperands[1]);
+                                &tempROperand[0]);
                     if (gcmIS_ERROR(status)) return status;
 
                     {
@@ -3322,6 +3328,46 @@ _GenOldConvert_Code(
 
     return gcvSTATUS_OK;
 }
+
+static gceSTATUS
+_GenOldVectorConvert_Code(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand,
+    IN gctBOOL Saturation,
+    IN cleBUILTIN_ROUNDING_MODE RoundingMode,
+    IN cltBUILT_IN_GEN_CODE_FUNC_PTR GenCode
+    )
+{
+    if(!CodeGenerator->supportRTNE) {
+        clsBUILTIN_FUNCTION_INFO *functionInfo = clGetBuiltinFunctionInfo(PolynaryExpr->funcSymbol);
+
+        if(!functionInfo->handleVector &&
+           OperandCount &&
+           OperandsParameters->needROperand &&
+           clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) {
+/* special handling for vector case */
+             return clGenBuiltinVectorCode(Compiler,
+                                          CodeGenerator,
+                                          PolynaryExpr,
+                                          OperandCount,
+                                          OperandsParameters,
+                                          IOperand,
+                                          GenCode);
+        }
+    }
+
+    if(!CodeGenerator->supportRTNE ||
+       (cloCOMPILER_IsLongUlongPatch(Compiler) &&
+       !(clmIsElementTypeHighPrecision(OperandsParameters->rOperands[0].dataType.elementType) ||
+         clmIsElementTypeHighPrecision(IOperand->dataType.elementType)))) {
+        return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, Saturation, RoundingMode);
+    }
+    return _GenConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, Saturation, RoundingMode);
+}
 #endif
 
 static gceSTATUS
@@ -3475,6 +3521,12 @@ _GenConvert_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
+    if(!CodeGenerator->supportRTNE ||
+       (cloCOMPILER_IsLongUlongPatch(Compiler) &&
+       !(clmIsElementTypeHighPrecision(OperandsParameters->rOperands[0].dataType.elementType) ||
+         clmIsElementTypeHighPrecision(IOperand->dataType.elementType)))) {
+        return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    }
     return _GenConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #endif
 }
@@ -3549,6 +3601,12 @@ _GenConvert_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
+    if(!CodeGenerator->supportRTNE ||
+       (cloCOMPILER_IsLongUlongPatch(Compiler) &&
+       !(clmIsElementTypeHighPrecision(OperandsParameters->rOperands[0].dataType.elementType) ||
+         clmIsElementTypeHighPrecision(IOperand->dataType.elementType)))) {
+         return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    }
     return _GenConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #endif
 }
@@ -3605,7 +3663,15 @@ _GenConvert2_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert2_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvFALSE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert2_rteCode);
 #endif
 }
 
@@ -3679,7 +3745,15 @@ _GenConvert2_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert2_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvTRUE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert2_sat_rteCode);
 #endif
 }
 
@@ -3735,7 +3809,15 @@ _GenConvert3_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert3_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvFALSE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert3_rteCode);
 #endif
 }
 
@@ -3809,7 +3891,15 @@ _GenConvert3_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert3_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvTRUE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert3_sat_rteCode);
 #endif
 }
 
@@ -3865,7 +3955,15 @@ _GenConvert4_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert4_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvFALSE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert4_rteCode);
 #endif
 }
 
@@ -3939,7 +4037,15 @@ _GenConvert4_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert4_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvTRUE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert4_sat_rteCode);
 #endif
 }
 
@@ -3995,7 +4101,15 @@ _GenConvert8_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert8_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvFALSE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert8_rteCode);
 #endif
 }
 
@@ -4069,7 +4183,15 @@ _GenConvert8_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert8_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvTRUE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert8_sat_rteCode);
 #endif
 }
 
@@ -4125,7 +4247,15 @@ _GenConvert16_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert16_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvFALSE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvFALSE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert16_rteCode);
 #endif
 }
 
@@ -4199,7 +4329,15 @@ _GenConvert16_sat_rteCode(
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     return _GenOldConvert_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
 #else
-    return _GenConvert16_Code(Compiler, CodeGenerator, PolynaryExpr, OperandCount, OperandsParameters, IOperand, gcvTRUE, clvBUILTIN_ROUND_TO_NEAREST_EVEN);
+    return _GenOldVectorConvert_Code(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters,
+                                     IOperand,
+                                     gcvTRUE,
+                                     clvBUILTIN_ROUND_TO_NEAREST_EVEN,
+                                     _GenConvert16_sat_rteCode);
 #endif
 }
 

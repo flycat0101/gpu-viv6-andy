@@ -67,7 +67,7 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
         }
 
         status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&memory->logicals[planeIndex],
-                                        (gctPHYS_ADDR*)&memory->physicals[planeIndex],
+                                        &memory->physicals[planeIndex],
                                         &memory->nodePtrs[planeIndex]);
         context->memoryCount++;
 

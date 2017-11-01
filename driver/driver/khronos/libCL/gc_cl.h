@@ -211,15 +211,6 @@ extern const gctSTRING clgEmptyStr;
 #define __CL_INLINE static __inline
 #endif
 
-
-/******************************************************************************\
-******************************* Testing Control *******************************
-\******************************************************************************/
-
-#define cldSYNC_MEMORY              0
-
-#define cldFSL_OPT                  0
-
 #ifdef __cplusplus
 }
 #endif

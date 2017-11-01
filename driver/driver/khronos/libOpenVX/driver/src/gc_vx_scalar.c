@@ -250,7 +250,7 @@ VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalar(vx_context context, vx_enum da
 
     scalar->dataType = dataType;
 
-    gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctPOINTER*)&scalar->value, (gctPHYS_ADDR*)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
+    gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctPOINTER*)&scalar->value, &scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
 
     context->memoryCount ++;
 

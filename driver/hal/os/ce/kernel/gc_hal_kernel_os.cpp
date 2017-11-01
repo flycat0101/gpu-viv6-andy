@@ -5468,6 +5468,16 @@ gckOS_QueryOption(
         *Value = Os->gchal->GetPhysSize();
         return gcvSTATUS_OK;
     }
+    else if (!strcmp(Option, "contiguousSize"))
+    {
+        *Value = Os->gchal->GetContiguousSize();
+        return gcvSTATUS_OK;
+    }
+    else if (!strcmp(Option, "contiguousBase"))
+    {
+        *Value = Os->gchal->GetContiguousBase();
+        return gcvSTATUS_OK;
+    }
     else if (!strcmp(Option, "mmu"))
     {
         *Value = 1;

@@ -62,7 +62,7 @@ _DestroyThreadData(
 
         gcoOS_UnLockPLS();
 
-        if (releaseThread && thread->chipCount)
+        if (releaseThread)
         {
             /* Release current thread data. */
             veglReleaseThread(thread);
@@ -1209,6 +1209,28 @@ EGLBoolean LOG_eglSwapBuffersWithDamageEXT(EGLDisplay dpy, EGLSurface surface, E
     return EGL_TRUE;
 }
 
+/* EGL_EXT_image_dma_buf_import_modifiers */
+EGLBoolean LOG_eglQueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats)
+{
+     EGL_LOG_API("EGL(tid=0x%lx): LOG_eglQueryDmaBufFormatsEXT 0x%08lX 0x%08lX 0x%08x 0x%08lX 0x%08lx\n",
+                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
+                (long)(uintptr_t)dpy, max_formats,
+                (long)(uintptr_t)formats, (long)(uintptr_t)num_formats);
+
+    return EGL_TRUE;
+}
+
+EGLBoolean LOG_eglQueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers)
+{
+     EGL_LOG_API("EGL(tid=0x%lx): eglQueryDmaBufModifiersEXT 0x%08lX 0x%08lX 0x%08x 0x%08x 0x%08lx 0x%08lx\n",
+                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
+                (long)(uintptr_t)dpy, format,
+                 max_modifiers, (long)(uintptr_t)modifiers,
+                (long)(uintptr_t)external_only, (long)(uintptr_t)num_modifiers);
+
+    return EGL_TRUE;
+}
+
 eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetError_pre,
     LOG_eglGetDisplay_post,
@@ -1278,6 +1300,9 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglSetDamageRegionKHR,
     LOG_eglSwapBuffersWithDamageKHR,
     LOG_eglSwapBuffersWithDamageEXT,
+    /* EGL_EXT_image_dma_buf_import_modifiers */
+    LOG_eglQueryDmaBufFormatsEXT,
+    LOG_eglQueryDmaBufModifiersEXT,
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 

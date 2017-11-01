@@ -220,31 +220,7 @@ static gceSTATUS _FreeShaderEntry(
     }
 
     /* Free the program. */
-    if (Entry->program.programBuffer)
-    {
-        last = gcmOS_SAFE_FREE(gcvNULL, Entry->program.programBuffer);
-        if (gcmIS_ERROR(last))
-        {
-            status = last;
-        }
-    }
-
-    /* Free the hints. */
-    if (Entry->program.hints)
-    {
-        last = gcHINTS_Destroy(Entry->program.hints);
-
-        if (gcmIS_ERROR(last))
-        {
-            status = last;
-        }
-
-        last = gcmOS_SAFE_FREE(gcvNULL, Entry->program.hints);
-        if (gcmIS_ERROR(last))
-        {
-            status = last;
-        }
-    }
+    gcmVERIFY_OK(gcFreeProgramState(Entry->program.programState));
 
     /* Free the entry. */
     last = gcmOS_SAFE_FREE(gcvNULL, Entry);

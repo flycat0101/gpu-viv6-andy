@@ -1098,8 +1098,13 @@ eglCreateContext(
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
                 resetNotification = (gctINT)attrib_list[i + 1];
-                if (resetNotification != EGL_NO_RESET_NOTIFICATION_EXT &&
-                    resetNotification != EGL_LOSE_CONTEXT_ON_RESET_EXT)
+                /* According to EGL Spec:
+                ** An EGL_BAD_ATTRIBUTE error is generated if an attribute is
+                ** specified that is not supported for the client API type.
+                */
+                if ((resetNotification != EGL_NO_RESET_NOTIFICATION_EXT &&
+                    resetNotification != EGL_LOSE_CONTEXT_ON_RESET_EXT) ||
+                    !_IsExtSuppored(VEGL_EXTID_EXT_create_context_robustness))
                 {
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -1174,7 +1179,7 @@ eglCreateContext(
             /* Halti0 HW support ES30 only */
 #if defined(ANDROID)
             else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0) &&
-                    !(((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+                    !(((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
                     && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
                     esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072")))))
 #else
@@ -1339,9 +1344,10 @@ eglCreateContext(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-#ifdef EGL_API_DRI
-    dpy->platform->createContext(dpy->localInfo, context);
-#endif
+    if(dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
+    {
+        dpy->platform->createContext(dpy->localInfo, context);
+    }
 
     /* Useful for debugging */
     gcmTRACE(
@@ -1521,9 +1527,10 @@ _DestroyContext(
     Context->thread = gcvNULL;
     Context->api    = EGL_NONE;
 
-#ifdef EGL_API_DRI
-    Display->platform->destroyContext(Display->localInfo, Context);
-#endif
+    if(Display->platform && Display->platform->platform == EGL_PLATFORM_DRI_VIV)
+    {
+        Display->platform->destroyContext(Display->localInfo, Context);
+    }
 
     /* Execute events accumulated in the buffer if any. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
@@ -2427,26 +2434,27 @@ veglMakeCurrent(
     /* Set the new current thread. */
     ctx->thread = thread;
 
-#ifdef EGL_API_DRI
-    if (draw && (draw->type & EGL_WINDOW_BIT))
+    if(platform && platform->platform == EGL_PLATFORM_DRI_VIV)
     {
-        struct eglBackBuffer backBuffer;
+        if (draw && (draw->type & EGL_WINDOW_BIT))
+        {
+            struct eglBackBuffer backBuffer;
 
-        /* Borrow it from window back buffer. */
-        platform->getWindowBackBuffer(dpy, draw, &backBuffer);
+            /* Borrow it from window back buffer. */
+            platform->getWindowBackBuffer(dpy, draw, &backBuffer);
 
-        platform->makeCurrent(
-            dpy->localInfo,
-            draw->hwnd,
-            read->hwnd,
-            ctx,
-            backBuffer.surface
-            );
+            platform->makeCurrent(
+                dpy->localInfo,
+                draw->hwnd,
+                read->hwnd,
+                ctx,
+                backBuffer.surface
+                );
 
-        /* Cancel the back buffer, actually does nothing for DRI. */
-        platform->cancelWindowBackBuffer(dpy, draw, &backBuffer);
+            /* Cancel the back buffer, actually does nothing for DRI. */
+            platform->cancelWindowBackBuffer(dpy, draw, &backBuffer);
+        }
     }
-#endif
 
     if (thread->dump != gcvNULL)
     {

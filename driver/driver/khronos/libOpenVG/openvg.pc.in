@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: OpenVG
+Description: Vivante OpenVG 1.1 library
+Version: 1.1
+Cflags: -I${includedir}
+Libs: -L${libdir} -lOpenVG

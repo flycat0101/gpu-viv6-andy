@@ -54,7 +54,12 @@ CLIENT_GLX_SOURCE_FILES = \
 GCC=$(CC)
 
 LIBDIR=-L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
+
+ifeq ($(X11_DRI3),1)
+LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
+else
 LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm
+endif
 
 ifeq ($(DEBUG),1)
 CFLAGS +=-g -O0 -DDEBUG -fPIC
@@ -110,9 +115,12 @@ OBJECTS = \
 	$(OBJ_DIR)/xfont.o \
 	$(OBJ_DIR)/dri_glx.o \
 	$(OBJ_DIR)/dri_util.o \
+	$(OBJ_DIR)/dri3_util.o \
 	$(OBJ_DIR)/XF86dri.o \
 	$(OBJ_DIR)/g_api_entry.o \
 	$(OBJ_DIR)/g_pri_api_entry.o
+
+
 
 
 LFLAGS += -Wl,--version-script=GLSymExport $(LIBDIR)

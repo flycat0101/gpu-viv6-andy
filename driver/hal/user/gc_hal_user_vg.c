@@ -190,7 +190,10 @@ _GetTessellationBuffer(
             ah = gcmALIGN(Height, 16);
             bufferSize = bufferStride * ah;
 #else
-            bufferStride = ((Vg->targetWidth + 127) & ~127) * 8;
+            if(Vg->renderQuality == gcvVG_NONANTIALIASED)
+                bufferStride = ((Vg->targetWidth + 511) & ~511) * 2;
+            else
+                bufferStride = ((Vg->targetWidth + 127) & ~127) * 8;
 
             bufferSize = bufferStride * ((Vg->targetHeight + 15) & ~15);
 #endif
@@ -2215,6 +2218,17 @@ gcoVG_SetColorRamp(
     gcoVG_ProfilerSetStates(Vg, TreeDepth, saveLayerTreeDepth, varTreeDepth);
     vghalENTERSUBAPI(gcoVG_SetColorRamp);
 #endif
+
+#if gcdDUMP_2DVG
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+        gcoSURF_Lock(ColorRamp,address,memory);
+        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (ColorRamp->stride)*(ColorRamp->alignedH));
+        gcoSURF_Unlock(ColorRamp,memory[0]);
+    }
+#endif
+
     /* Set solid paint. */
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
@@ -2262,6 +2276,15 @@ gcoVG_SetPattern(
     Pattern->requestD = 1;
     Pattern->allocedW = width;
     Pattern->allocedH = height;
+#if gcdDUMP_2DVG
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+        gcoSURF_Lock(Pattern,address,memory);
+        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Pattern->stride)*(Pattern->alignedH));
+        gcoSURF_Unlock(Pattern,memory[0]);
+    }
+#endif
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
         Pattern,
@@ -2554,6 +2577,42 @@ gcoVG_DrawPath(
                     tessellationBuffer
                     ));
 
+#if gcdDUMP_2DVG
+        {
+
+            gctUINT8_PTR data;
+            gcsCMDBUFFER_PTR CommandBuffer = &PathData->data;
+            gcsCMDBUFFER_PTR buffer = CommandBuffer;
+            gcsCOMMAND_BUFFER_INFO_PTR bufferInfo;
+            gctUINT commandAlignment;
+            gctUINT bufferDataSize;
+
+            bufferInfo = &Vg->bufferInfo;
+            buffer = CommandBuffer;
+
+            while(buffer)
+            {
+                commandAlignment  = bufferInfo->commandAlignment;
+                /* Determine the data logical pointer. */
+                data
+                    = (gctUINT8_PTR) buffer
+                    + buffer->bufferOffset;
+
+                bufferDataSize = buffer->dataCount * commandAlignment;
+
+                /* Dump it. */
+                gcmDUMP_BUFFER(gcvNULL,
+                    "path",
+                    buffer->address,
+                    data,
+                    0,
+                    bufferDataSize);
+
+                buffer = buffer->nextSubBuffer;
+            }
+        }
+#endif
+
                 /* Draw the path. */
                 gcmERR_BREAK(gcoVGHARDWARE_DrawPath(
                     Vg->hw,
@@ -2574,6 +2633,42 @@ gcoVG_DrawPath(
             Vg->userToSurface,
             tessellationBuffer
             ));
+
+#if gcdDUMP_2DVG
+        {
+
+            gctUINT8_PTR data;
+            gcsCMDBUFFER_PTR CommandBuffer = &PathData->data;
+            gcsCMDBUFFER_PTR buffer = CommandBuffer;
+            gcsCOMMAND_BUFFER_INFO_PTR bufferInfo;
+            gctUINT commandAlignment;
+            gctUINT bufferDataSize;
+
+            bufferInfo = &Vg->bufferInfo;
+            buffer = CommandBuffer;
+
+            while(buffer)
+            {
+                commandAlignment  = bufferInfo->commandAlignment;
+                /* Determine the data logical pointer. */
+                data
+                    = (gctUINT8_PTR) buffer
+                    + buffer->bufferOffset;
+
+                bufferDataSize = buffer->dataCount * commandAlignment;
+
+                /* Dump it. */
+                gcmDUMP_BUFFER(gcvNULL,
+                    "path",
+                    buffer->address,
+                    data,
+                    0,
+                    bufferDataSize);
+
+                buffer = buffer->nextSubBuffer;
+            }
+        }
+#endif
 
         /* Draw the path. */
         gcmERR_BREAK(gcoVGHARDWARE_DrawPath(
@@ -2867,6 +2962,42 @@ gcoVG_TesselateImage(
     gcoVG_ProfilerSetStates(Vg, TreeDepth, saveLayerTreeDepth, varTreeDepth);
     vghalENTERSUBAPI(gcoVG_TesselateImage);
 #endif
+
+#if gcdDUMP_2DVG
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+        gcoSURF_Lock(Image,address,memory);
+        if (Image->format == gcvSURF_NV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 1.5*(Image->stride)*(Image->alignedH));
+        }
+        else if (Image->format == gcvSURF_NV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 2*(Image->stride)*(Image->alignedH));
+        }
+#if gcdVG_ONLY
+        else if (Image->format == gcvSURF_AYUY2)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 1.5*(Image->stride)*(Image->alignedH));
+        }
+        else if (Image->format == gcvSURF_ANV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 2.5*(Image->stride)*(Image->alignedH));
+        }
+        else if (Image->format == gcvSURF_ANV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 3*(Image->stride)*(Image->alignedH));
+        }
+#endif
+        else
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Image->stride)*(Image->alignedH));
+        }
+        gcoSURF_Unlock(Image,memory[0]);
+    }
+#endif
+
     do
     {
         static gctFLOAT userToSurface[6] =
@@ -3067,6 +3198,16 @@ gcoVG_DrawSurfaceToImage(
 #if gcdGC355_PROFILER
     gcoVG_ProfilerSetStates(Vg, TreeDepth, saveLayerTreeDepth, varTreeDepth);
     vghalENTERSUBAPI(gcoVG_DrawSurfaceToImage);
+#endif
+
+#if gcdDUMP_2DVG
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+        gcoSURF_Lock(Image,address,memory);
+        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Image->stride)*(Image->alignedH));
+        gcoSURF_Unlock(Image,memory[0]);
+    }
 #endif
 
     /* Draw the image. */

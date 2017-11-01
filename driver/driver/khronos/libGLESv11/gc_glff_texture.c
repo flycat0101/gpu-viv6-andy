@@ -21,7 +21,9 @@
 #      include <private/ui/android_natives_priv.h>
 #   endif
 
-#   include <gc_gralloc_priv.h>
+#if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+#      include <gc_gralloc_priv.h>
+#   endif
 #endif
 
 /******************************************************************************\
@@ -1534,7 +1536,6 @@ static gceSTATUS _AddMipMap(
             ));
 
 #if gcdSYNC
-        gcmVERIFY_OK(gcoSURF_SetSharedLock(lod1, Context->texture.textureList->sharedLock));
         /* Why get fence here? */
         gcoSURF_GetFence(lod1, gcvFENCE_TYPE_ALL);
 #endif
@@ -1659,7 +1660,6 @@ static gceSTATUS _GenerateMipMap(
         gcmERR_BREAK(gcoSURF_Resample(lod0, lod1));
 
 #if gcdSYNC
-        gcmVERIFY_OK(gcoSURF_SetSharedLock(lod1, Context->texture.textureList->sharedLock));
         gcoSURF_GetFence(lod1, gcvFENCE_TYPE_ALL);
 #endif
 
@@ -3046,7 +3046,7 @@ gceSTATUS glfLoadTexture(
                 &samplerNumber
                 ));
 
-            samplerBase = gcHINTS_GetSamplerBaseOffset(Context->currProgram->hints,
+            samplerBase = gcHINTS_GetSamplerBaseOffset(Context->currProgram->programState.hints,
                                                        Context->currProgram->fs.shader);
             samplerNumber += samplerBase;
 
@@ -4280,9 +4280,6 @@ gceSTATUS glfUpdateTextureStates(
                         source
                         );
 
-                    gcmVERIFY_OK(gcoSURF_SetSharedLock(source,
-                        Context->texture.textureList->sharedLock));
-
                     if (gcmIS_ERROR(status))
                     {
                         gcmFATAL("%s: add mipmap fail", __FUNCTION__);
@@ -4342,9 +4339,6 @@ gceSTATUS glfUpdateTextureStates(
                         glmERROR(GL_INVALID_VALUE);
                         break;
                     }
-
-                    gcmVERIFY_OK(gcoSURF_SetSharedLock(mipmap,
-                        Context->texture.textureList->sharedLock));
 
                     /* Force dirty flag. */
                     textureDirty = contentDirty = gcvTRUE;
@@ -7382,8 +7376,6 @@ GL_API void GL_APIENTRY glTexImage2D(
             goto OnError;
         }
 
-        /* Set shared lock.*/
-        gcmVERIFY_OK(gcoSURF_SetSharedLock(shareObj, context->texture.textureList->sharedLock));
         /* Get Stride of source texture */
         stride = 0;
         _GetSourceStride(
@@ -8183,9 +8175,6 @@ GL_API void GL_APIENTRY glCopyTexImage2D(
             goto OnError;
         }
 
-        /* Set shared lock.*/
-        gcmVERIFY_OK(gcoSURF_SetSharedLock(shareObj, context->texture.textureList->sharedLock));
-
         /* Update frame buffer. */
         gcmERR_BREAK(glfUpdateFrameBuffer(context));
 
@@ -8325,6 +8314,213 @@ OnError:;
     glmLEAVE();
 }
 
+gceSTATUS
+_TexSyncEGLImage(
+    glsCONTEXT_PTR Context,
+    glsTEXTUREWRAPPER_PTR Texture,
+    GLint Level,
+    gctBOOL Stall
+)
+{
+    gctBOOL dirty;
+    gcoSURF source;
+    gctBOOL directSample;
+    gceSURF_FORMAT textureFormat;
+    khrEGL_IMAGE_PTR image;
+    gcoSURF mipmap = gcvNULL;
+    gceSTATUS status = gcvSTATUS_TRUE;
+
+    dirty = Texture->image.dirty;
+    source = Texture->image.source;
+    directSample = Texture->image.directSample;
+    textureFormat = Texture->image.textureFormat;
+
+    if (!directSample)
+    {
+        status = gcoTEXTURE_GetMipMap(Texture->object, Level, &mipmap);
+        if (gcmIS_ERROR(status))
+        {
+            /* Allocate mipmap level 0. */
+            gctUINT width;
+            gctUINT height;
+
+            /* Get source size. */
+            gcmVERIFY_OK(gcoSURF_GetSize(source, &width, &height, gcvNULL));
+
+            /* Create mipmap level 0. */
+            status = gcoTEXTURE_AddMipMap(Texture->object,
+                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, &mipmap);
+            if (gcmIS_ERROR(status))
+            {
+                /* Destroy the texture. */
+                gcmVERIFY_OK(_ResetTextureWrapper(Context, Texture));
+
+                glmERROR(GL_OUT_OF_MEMORY);
+                goto OnError;
+            }
+            /* Mipmap allocated, force dirty. */
+            dirty = gcvTRUE;
+        }
+    }
+    image = (khrEGL_IMAGE_PTR)Texture->image.image;
+
+    if (image->update)
+    {
+        /* Update source sibling pixels. */
+        if (image->update(image))
+        {
+            /* Force dirty if updated. */
+            dirty = gcvTRUE;
+        }
+    }
+    else
+    {
+        /* Assume dirty for other EGL image types. */
+        dirty = gcvTRUE;
+    }
+
+    if (dirty)
+    {
+        if (directSample)
+        {
+            /* Directly add surface to mipmap. */
+            status = gcoTEXTURE_AddMipMapFromClient(Texture->object, 0, source);
+        }
+        else
+        {
+            /* Lock the image mutex. */
+            gcoOS_AcquireMutex(gcvNULL, image->mutex, gcvINFINITE);
+
+            /* srcSurface should be the most up-to-date copy */
+            if (image->srcSurface)
+            {
+                source = image->srcSurface;
+            }
+
+            /* Release the image mutex. */
+            gcoOS_ReleaseMutex(gcvNULL, image->mutex);
+
+            if (source != mipmap)
+            {
+                gceSURF_FORMAT srcFormat;
+
+                /* Get source format. */
+                gcmVERIFY_OK(gcoSURF_GetFormat(source, gcvNULL, &srcFormat));
+
+                /*
+                * Android has following formats, but hw does not support
+                * Need software upload for such formats.
+                */
+                if ((srcFormat == gcvSURF_NV16) || (srcFormat == gcvSURF_NV61) ||
+                    (srcFormat == gcvSURF_R4G4B4A4) || (srcFormat == gcvSURF_R5G5B5A1))
+                {
+                    gctUINT width;
+                    gctUINT height;
+                    gctPOINTER memory[3] = {gcvNULL};
+                    gctINT stride[3];
+
+                    gcmVERIFY_OK(gcoSURF_GetSize(source, &width, &height, gcvNULL));
+
+                    gcmVERIFY_OK(gcoSURF_GetAlignedSize(source, gcvNULL, gcvNULL, stride));
+
+                    /* Lock source surface for read. */
+                    gcmVERIFY_OK(gcoSURF_Lock(source, gcvNULL, memory));
+
+                    if ((srcFormat == gcvSURF_NV16) || (srcFormat == gcvSURF_NV61))
+                    {
+                        /* UV stride should be same as Y stride. */
+                        stride[1] = stride[0];
+
+                        /* Upload NV16/NV61 to YUY2 by software. */
+                        status = gcoTEXTURE_UploadYUV(Texture->object,
+                            gcvFACE_NONE, width, height, 0, memory, stride, srcFormat);
+                    }
+                    else
+                    {
+                        /* Upload by software. */
+                        status = gcoTEXTURE_Upload(Texture->object,
+                            0, gcvFACE_NONE, width, height, 0, memory[0], stride[0], srcFormat, gcvSURF_COLOR_SPACE_LINEAR);
+                    }
+
+                    /* Unlock. */
+                    gcmVERIFY_OK(gcoSURF_Unlock(source, memory[0]));
+
+                    /* Check status. */
+                    gcmONERROR(status);
+                }
+                else
+                {
+                    gcsSURF_VIEW srcView = {source, 0, 1};
+                    gcsSURF_VIEW mipView = {mipmap, 0, 1};
+
+#if defined(ANDROID) && gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+                    android_native_buffer_t * nativeBuffer;
+                    struct private_handle_t * hnd = gcvNULL;
+                    struct gc_native_handle_t * handle = gcvNULL;
+
+                    /* Cast to android native buffer. */
+                    nativeBuffer = (android_native_buffer_t *) Texture->image.nativeBuffer;
+
+                    if (nativeBuffer != gcvNULL)
+                    {
+                        /* Get private handle. */
+                        hnd = (struct private_handle_t *) nativeBuffer->handle;
+                        handle = gc_native_handle_get(nativeBuffer->handle);
+                    }
+
+                    /* Check composition signal. */
+                    if (handle != gcvNULL && handle->hwDoneSignal != 0)
+                    {
+                        gcmVERIFY_OK(gcoOS_Signal(gcvNULL, (gctSIGNAL) (gctUINTPTR_T) handle->hwDoneSignal, gcvFALSE));
+                    }
+#endif
+
+                    /* Use resolve to upload texture. */
+                    gcmONERROR(gcoSURF_ResolveRect(&srcView, &mipView, gcvNULL));
+
+#if defined(ANDROID) && gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+                    if (handle != gcvNULL && handle->hwDoneSignal != 0)
+                    {
+                        /* Signal the signal, so CPU apps
+                        * can lock again once resolve is done. */
+                        gcsHAL_INTERFACE iface;
+
+                        iface.command            = gcvHAL_SIGNAL;
+                        iface.engine             = gcvENGINE_RENDER;
+                        iface.u.Signal.signal    = handle->hwDoneSignal;
+                        iface.u.Signal.auxSignal = 0;
+                        /* Stuff the client's PID. */
+                        iface.u.Signal.process   = handle->clientPID;
+                        iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
+                        /* Schedule the event. */
+                        gcmVERIFY_OK(gcoHAL_ScheduleEvent(gcvNULL, &iface));
+                    }
+#endif
+
+                    /* Wait all the pixels done. */
+                    status = gco3D_Semaphore(Context->hw, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL);
+                }
+            }
+            else
+            {
+                status = gcvSTATUS_SKIP;
+            }
+        }
+
+        /* Set dirty flag (for later flush). */
+        gcoTEXTURE_Flush(Texture->object);
+
+        /* Commit changes. */
+        gcoHAL_Commit(Context->hal, Stall);
+
+        /* Reset dirty flag. */
+        Texture->image.dirty = gcvFALSE;
+    }
+    /* Easy return on error. */
+OnError:
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -8523,12 +8719,38 @@ GL_API void GL_APIENTRY glCopyTexSubImage2D(
             goto OnError;
         }
 
-        /* Texture object has to exist. */
+        /* Test if we need to create a new gcoTEXTURE object. */
         if (texture->object == gcvNULL)
         {
-            /* No bound texture object. */
-            glmERROR(GL_INVALID_OPERATION);
-            goto OnError;
+            /* Construct the gcoTEXTURE object. */
+            status = gcoTEXTURE_ConstructEx(context->hal, _HALtexType[texture->targetType], &texture->object);
+
+            if (gcmIS_ERROR(status))
+            {
+                /* Error. */
+                glmERROR(GL_OUT_OF_MEMORY);
+                goto OnError;
+            }
+        }
+        if (texture->image.source)
+        {
+            gcmVERIFY_OK(_TexSyncEGLImage(context, texture, Level, gcvFALSE));
+        }
+        else
+        {
+            /* Add the mipmap. If it already exists, the call will be ignored. */
+            status = gcoTEXTURE_AddMipMap(
+                texture->object,
+                Level,
+                gcvUNKNOWN_MIPMAP_IMAGE_FORMAT,
+                texture->image.textureFormat,
+                texture->width,
+                texture->height,
+                0,
+                gcvFACE_NONE,
+                gcvPOOL_DEFAULT,
+                &map
+                );
         }
 
         /* Get requested mip map surface. */
@@ -9526,11 +9748,6 @@ glfBindTexImage(
             gcvPOOL_DEFAULT,
             &mipView.surf
             ));
-
-        /* Set shared lock.*/
-        gcmVERIFY_OK(gcoSURF_SetSharedLock(mipView.surf,
-            context->texture.textureList->sharedLock));
-
 
         /* Copy render target to texture without flip. */
         gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &mipView, gcvNULL));
@@ -10803,6 +11020,8 @@ glfCreateImageTexture(
         khrIMAGE_TYPE imageType;
         gctINT32 referenceCount = 0;
         gcoSURF surface;
+        gctBOOL mipmapRequired;
+        GLint maxLevelUsed = 0;
 
         /* Determine the target and the texture. */
         switch (Target)
@@ -10857,8 +11076,25 @@ glfCreateImageTexture(
         /* Find the texture object by name. */
         texture = glfFindTexture(context, Texture);
 
+        if (texture == gcvNULL)
+        {
+            status = EGL_BAD_PARAMETER;
+            goto OnError;
+        }
+
+        /* Test if the texture is from EGL image. */
+        /* According to extension EGL_KHR_image_base:
+        ** If the resource specified by <dpy>, <ctx>, <target>, <buffer> and
+        ** <attrib_list> is itself an EGLImage sibling, the error EGL_BAD_ACCESS is generated.
+        */
+        if (texture->image.source != gcvNULL)
+        {
+            status = EGL_BAD_ACCESS;
+            goto OnError;
+        }
+
         /* Test texture object. */
-        if ((texture == gcvNULL) || (texture->object == gcvNULL))
+        if (texture->object == gcvNULL)
         {
             status = EGL_BAD_PARAMETER;
             goto OnError;
@@ -10877,11 +11113,35 @@ glfCreateImageTexture(
             goto OnError;
         }
 
-        /* Test if the texture is from EGL image. */
-        if (texture->image.source != gcvNULL)
+        /* Determine whether mipmaps are required. */
+        mipmapRequired
+            =  (texture->minFilter != glvNEAREST)
+            && (texture->minFilter != glvLINEAR);
+
+        maxLevelUsed = mipmapRequired ? texture->maxLevelUsed : Level;
+
+        /* According to extension EGL_KHR_gl_image:
+        ** If EGL_GL_TEXTURE_LEVEL_KHR is 0, <target> is
+        ** EGL_GL_TEXTURE_2D_KHR, EGL_GL_TEXTURE_CUBE_MAP_*_KHR or
+        ** EGL_GL_TEXTURE_3D_KHR, <buffer> is the name of an incomplete GL
+        ** texture object, and any mipmap levels other than mipmap level 0
+        ** are specified, the error EGL_BAD_PARAMETER is generated.
+        */
+        if (gcmIS_ERROR(gcoTEXTURE_IsComplete(texture->object,
+                        gcvNULL, 0, maxLevelUsed)))
         {
-            status = EGL_BAD_ACCESS;
-            goto OnError;
+            /*According to spec:
+            ** if EGL_GL_TEXTURE_LEVEL is 0, buffer is the name of an incomplete
+            ** GL texture object, and mipmap level 0 is not specified or any
+            ** mipmap levels other than mipmap level 0 are specified,
+            ** the error EGL_BAD_PARAMETER is generated.
+            */
+            if ((Level != 0) || (gcmIS_ERROR(gcoTEXTURE_CheckTexLevel0Attrib(
+                            texture->object, maxLevelUsed, Level))))
+            {
+                status = EGL_BAD_PARAMETER;
+                goto OnError;
+            }
         }
 
         /* Test if texture is yuv format. */
@@ -10895,7 +11155,7 @@ glfCreateImageTexture(
         gcmVERIFY_OK(gcoSURF_QueryReferenceCount(surface, &referenceCount));
 
         /* Test if surface is a sibling of any eglImage. */
-        if (referenceCount > 1)
+        if ((face <= 1) && (referenceCount > 1))
         {
             status = EGL_BAD_ACCESS;
             goto OnError;
@@ -11011,6 +11271,13 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
 
         /* Get the eglImage. */
         image = (khrEGL_IMAGE_PTR) Image;
+
+        /* Validate the image. */
+        if ((image == gcvNULL) || (image->magic != KHR_EGL_IMAGE_MAGIC_NUM))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
 
         /* Get texture attributes from eglImage. */
         status = glfGetEGLImageAttributes(image, &attributes);

@@ -235,6 +235,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
     return status;
 }
 
+#if MAP_UNMAP_REFERENCE
 VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distribution, vx_map_id *map_id, void **ptr, vx_enum usage, vx_enum mem_type, vx_bitfield flags)
 {
     vx_status status = VX_FAILURE;
@@ -344,6 +345,72 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
 
     return status;
 }
+#else
+VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distribution, vx_map_id *map_id, void **ptr, vx_enum usage, vx_enum mem_type, vx_bitfield flags)
+{
+    vx_status status = VX_FAILURE;
+    vx_size size = 0;
 
+    /* bad references */
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
+        (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        vxError("Not a valid distribution object!\n");
+        return status;
+    }
 
+    /* bad parameters */
+    if (((usage != VX_READ_ONLY) && (usage != VX_READ_AND_WRITE) && (usage != VX_WRITE_ONLY)) ||
+        (mem_type != VX_MEMORY_TYPE_HOST))
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to map distribution\n");
+        return status;
+    }
+
+    /* map data */
+    size = vxoMemory_ComputeSize(&distribution->memory, 0);
+
+    if (vxoContext_MemoryMap(distribution->base.context, (vx_reference)distribution, size, usage, mem_type, flags, NULL, ptr, map_id) != vx_true_e)
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("failed to map distribution\n");
+        return status;
+    }
+
+    vxoReference_Increment(&distribution->base, VX_REF_EXTERNAL);
+    return VX_SUCCESS;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribution, vx_map_id map_id)
+{
+    vx_status status = VX_FAILURE;
+
+    /* bad references */
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
+        (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        vxError("Not a valid distribution object!\n");
+        return status;
+    }
+
+    /* bad parameters */
+    if (vxoContext_FindMemoryMap(distribution->base.context, (vx_reference)distribution, map_id) != vx_true_e)
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("not found mapped distribution\n");
+        return status;
+    }
+
+    vxoContext_MemoryUnmap(distribution->base.context, map_id);
+
+    /* regardless of the current status, if we're here, so previous call to vxMapDistribution()
+     * was successful and thus ref was locked once by a call to vxoReference_Increment() */
+    vxoReference_Decrement(&distribution->base, VX_REF_EXTERNAL);
+
+    return VX_SUCCESS;
+}
+#endif
 

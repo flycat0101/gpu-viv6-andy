@@ -107,8 +107,8 @@ _BoolToString(
 
 static gctCONST_STRING spaceaddr[] = {"", "global_space ", "const_space ", "local_space "};
 static gctCONST_STRING qualifier[] = {"", "const ", "volatile ", "const volatile "};
-static gctCONST_STRING operand_precision[] = { ".dp", ".lp", ".mp", ".hp", ".anyp"};
-static gctCONST_STRING symbol_precision[]  = { "dp ", "lp ", "mp ", "hp ", "anyp "};
+static gctCONST_STRING operand_precision[] = { ""/* .dp */, ".lp", ".mp", ".hp", ".anyp"};
+static gctCONST_STRING symbol_precision[]  = { ""/* dp */, "lp ", "mp ", "hp ", "anyp "};
 
 static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_UNKNOWN, "%s", 0, 0, VIR_DUMP_CONST_INVALID, gcvNULL},
@@ -129,7 +129,7 @@ static VIR_DumpConstFormat formats[] = {
 
     { VIR_TYPE_INT64, "%lld", 1, 64, VIR_DUMP_CONST_INVALID, gcvNULL},
     { VIR_TYPE_UINT64, "%llu", 1, 64, VIR_DUMP_CONST_INVALID, gcvNULL},
-    { VIR_TYPE_FLOAT64, "%llf", 1, 64, VIR_DUMP_CONST_INVALID, gcvNULL},
+    { VIR_TYPE_FLOAT64, "%f", 1, 32, VIR_DUMP_CONST_INVALID, gcvNULL}, /* treat as float */
     { VIR_TYPE_BOOLEAN, "%s", 1, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
 
     { VIR_TYPE_FLOAT_X2, "%f", 2, 32, VIR_DUMP_CONST_NONE, gcvNULL},
@@ -145,6 +145,13 @@ static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_FLOAT16_X8, "%f", 8, 32, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_FLOAT16_X16, "%f", 16, 32, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_FLOAT16_X32, "%f", 32, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+
+    { VIR_TYPE_FLOAT64_X2, "%f", 2, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64_X3, "%f", 3, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64_X4, "%f", 4, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64_X8, "%f", 8, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64_X16, "%f", 16, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64_X32, "%f", 32, 32, VIR_DUMP_CONST_NONE, gcvNULL},
 
     { VIR_TYPE_BOOLEAN_X2, "%s", 2, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
     { VIR_TYPE_BOOLEAN_X3, "%s", 3, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
@@ -380,6 +387,10 @@ _GetUniformKindString(
         return "sample location";
     case VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS:
         return "multiSample buffers";
+    case VIR_UNIFORM_WORK_THREAD_COUNT:
+        return "workThreadCount";
+    case VIR_UNIFORM_WORK_GROUP_COUNT:
+        return "workGroupCount";
     case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
         return "uniform_temp_reg_spill_mem_address";
     case VIR_UNIFORM_CONST_BORDER_VALUE:
@@ -1007,10 +1018,10 @@ _DumpSymbol(
 
     if (Dumper->baseDumper.verbose)
     {
-    if (FullInfo)
-    {
-        _DumpLayout(Dumper, VIR_Symbol_GetLayout(Sym));
-    }
+        if (FullInfo)
+        {
+            _DumpLayout(Dumper, VIR_Symbol_GetLayout(Sym));
+        }
     }
     switch(VIR_Symbol_GetKind(Sym))
     {
@@ -1146,11 +1157,11 @@ VIR_Symbol_Dump(
             }
             else {
                 pConstVal = (VIR_Const *)VIR_GetSymFromId(&Dumper->Shader->constTable,
-                                                          VIR_Uniform_GetInitializer(Sym->u2.uniform));
-                /* dump initializer */
+                                              VIR_Uniform_GetInitializer(Sym->u2.uniform));
+            /* dump initializer */
                 VERIFY_OK(VIR_LOG(Dumper, " = "));
-                _DumpConst(Dumper, pConstVal);
-            }
+            _DumpConst(Dumper, pConstVal);
+        }
         }
         break;
     case VIR_SYM_VARIABLE:
@@ -1197,69 +1208,69 @@ VIR_Symbol_Dump(
 
     if (Dumper->baseDumper.verbose)
     {
-    /* dump flags */
-    VERIFY_OK(VIR_LOG(Dumper, " common_flags:<"));
-    if (isSymEnabled(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " enabled"));
-    }
-    if (isSymInactive(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " inactive"));
-    }
-    if (isSymFlat(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " flat"));
-    }
-    if (isSymInvariant(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " invariant"));
-    }
-    if (isSymField(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " is_field"));
-    }
-    if (isSymCompilerGen(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " compiler_gen"));
-    }
-    if (isSymBuildin(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " builtin"));
-    }
-    if (isSymArrayedPerVertex(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " arrayed_per_vertex"));
-    }
-    if (isSymPrecise(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " precise"));
-    }
-    if (isSymLoadStoreAttr(Sym))
-    {
-         VERIFY_OK(VIR_LOG(Dumper, " ld_st_attr"));
-    }
-    if (isSymStaticallyUsed(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " statically_used"));
-    }
-    if (isSymVectorizedOut(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " vectorized_out"));
-    }
-    if (isSymIOBlockMember(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " is_ioblock_member"));
-    }
-    if (isSymInstanceMember(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " is_instance_member"));
-    }
-    if (isSymUnused(Sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " unused"));
-    }
-    VERIFY_OK(VIR_LOG(Dumper, " >"));
+        /* dump flags */
+        VERIFY_OK(VIR_LOG(Dumper, " common_flags:<"));
+        if (isSymEnabled(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " enabled"));
+        }
+        if (isSymInactive(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " inactive"));
+        }
+        if (isSymFlat(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " flat"));
+        }
+        if (isSymInvariant(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " invariant"));
+        }
+        if (isSymField(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " is_field"));
+        }
+        if (isSymCompilerGen(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " compiler_gen"));
+        }
+        if (isSymBuildin(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " builtin"));
+        }
+        if (isSymArrayedPerVertex(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " arrayed_per_vertex"));
+        }
+        if (isSymPrecise(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " precise"));
+        }
+        if (isSymLoadStoreAttr(Sym))
+        {
+             VERIFY_OK(VIR_LOG(Dumper, " ld_st_attr"));
+        }
+        if (isSymStaticallyUsed(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " statically_used"));
+        }
+        if (isSymVectorizedOut(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " vectorized_out"));
+        }
+        if (isSymIOBlockMember(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " is_ioblock_member"));
+        }
+        if (isSymInstanceMember(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " is_instance_member"));
+        }
+        if (isSymUnused(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " unused"));
+        }
+        VERIFY_OK(VIR_LOG(Dumper, " >"));
     }
     return errCode;
 }
@@ -1427,10 +1438,10 @@ _DumpType(
                     VIR_LOG(Dumper, ";"));
                 if (Dumper->baseDumper.verbose)
                 {
-                /* dump field info */
-                VERIFY_OK(
-                    VIR_LOG(Dumper, "/* offset:%d, virRegOffset:%d */",
-                            VIR_FieldInfo_GetOffset(fInfo), VIR_FieldInfo_GetTempRegOrUniformOffset(fInfo)));
+                    /* dump field info */
+                    VERIFY_OK(
+                        VIR_LOG(Dumper, "/* offset:%d, virRegOffset:%d */",
+                                VIR_FieldInfo_GetOffset(fInfo), VIR_FieldInfo_GetTempRegOrUniformOffset(fInfo)));
                 }
                 VIR_LOG_FLUSH(Dumper);
             }
@@ -1828,29 +1839,29 @@ _DumpOperand(
 
     if (Dumper->baseDumper.verbose)
     {
-    errCode = _DumpHwRegInfo(Dumper, Operand);
-    if((VIR_Operand_GetFlags(Operand) & ~VIR_OPNDFLAG_REGALLOCATED) != 0)
-    {
-        VERIFY_OK(VIR_LOG(Dumper, "< "));
+        errCode = _DumpHwRegInfo(Dumper, Operand);
+        if((VIR_Operand_GetFlags(Operand) & ~VIR_OPNDFLAG_REGALLOCATED) != 0)
+        {
+            VERIFY_OK(VIR_LOG(Dumper, "< "));
 
-        if(VIR_Operand_isTemp256High(Operand))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, "Temp256_High "));
+            if(VIR_Operand_isTemp256High(Operand))
+            {
+                VERIFY_OK(VIR_LOG(Dumper, "T256Hi "));
+            }
+            if(VIR_Operand_isTemp256Low(Operand))
+            {
+                VERIFY_OK(VIR_LOG(Dumper, "T256Lo "));
+            }
+            if(VIR_Operand_is5BitOffset(Operand))
+            {
+                VERIFY_OK(VIR_LOG(Dumper, "5Bit_Offset "));
+            }
+            if(VIR_Operand_isUniformIndex(Operand))
+            {
+                VERIFY_OK(VIR_LOG(Dumper, "Uniform_Index "));
+            }
+            VERIFY_OK(VIR_LOG(Dumper, ">"));
         }
-        if(VIR_Operand_isTemp256Low(Operand))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, "Temp256_Low "));
-        }
-        if(VIR_Operand_is5BitOffset(Operand))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, "5Bit_Offset "));
-        }
-        if(VIR_Operand_isUniformIndex(Operand))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, "Uniform_Index "));
-        }
-        VERIFY_OK(VIR_LOG(Dumper, ">"));
-    }
     }
     CHECK_ERROR(errCode, "DumpOperand");
 
@@ -2149,34 +2160,34 @@ VIR_Inst_Dump(
     {
         if (Dumper->baseDumper.verbose)
         {
-        if(Inst == VIR_ANY_DEF_INST)
-        {
-            VIR_LOG(Dumper, "ANY_DEF_INST\n");
-        }
-        if(Inst == VIR_UNDEF_INST)
-        {
-            VIR_LOG(Dumper, "UNDEF_INST\n");
-        }
-        if(Inst == VIR_HW_SPECIAL_DEF_INST)
-        {
-            VIR_LOG(Dumper, "HW_SPECIAL_DEF_INST\n");
-        }
-        if(Inst == VIR_INPUT_DEF_INST)
-        {
-            VIR_LOG(Dumper, "INPUT_DEF_INST\n");
-        }
-        if(Inst == VIR_OUTPUT_USAGE_INST)
-        {
-            VIR_LOG(Dumper, "OUTPUT_USAGE_INST\n");
-        }
-        if (gcmOPT_EnableDebug())
-        {
-            if (Inst->sourceLoc.fileId != 0 ||  Inst->sourceLoc.lineNo != 0 ||Inst->sourceLoc.colNo != 0)
+            if(Inst == VIR_ANY_DEF_INST)
             {
-                VIR_LOG(Dumper, "\t\t #Loc(%d,%d,%d)", Inst->sourceLoc.fileId, Inst->sourceLoc.lineNo, Inst->sourceLoc.colNo);
+                VIR_LOG(Dumper, "ANY_DEF_INST\n");
             }
-        }
-        VIR_LOG_FLUSH(Dumper);
+            if(Inst == VIR_UNDEF_INST)
+            {
+                VIR_LOG(Dumper, "UNDEF_INST\n");
+            }
+            if(Inst == VIR_HW_SPECIAL_DEF_INST)
+            {
+                VIR_LOG(Dumper, "HW_SPECIAL_DEF_INST\n");
+            }
+            if(Inst == VIR_INPUT_DEF_INST)
+            {
+                VIR_LOG(Dumper, "INPUT_DEF_INST\n");
+            }
+            if(Inst == VIR_OUTPUT_USAGE_INST)
+            {
+                VIR_LOG(Dumper, "OUTPUT_USAGE_INST\n");
+            }
+            if (gcmOPT_EnableDebug())
+            {
+                if (Inst->sourceLoc.fileId != 0 ||  Inst->sourceLoc.lineNo != 0 ||Inst->sourceLoc.colNo != 0)
+                {
+                    VIR_LOG(Dumper, "\t\t #Loc(%d,%d,%d)", Inst->sourceLoc.fileId, Inst->sourceLoc.lineNo, Inst->sourceLoc.colNo);
+                }
+            }
+            VIR_LOG_FLUSH(Dumper);
         }
         return errCode;
     }
@@ -2353,105 +2364,105 @@ VIR_Function_Dump(
 
     if (Dumper->baseDumper.verbose)
     {
-    /*********************************************** Function attributes ****/
-    /* Function is openCL/OpenGL builtin function */
-    if(Func->flags & VIR_FUNCFLAG_INTRINSICS)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "intrinsics "));
-    }
+        /*********************************************** Function attributes ****/
+        /* Function is openCL/OpenGL builtin function */
+        if(Func->flags & VIR_FUNCFLAG_INTRINSICS)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "intrinsics "));
+        }
 
-    if(Func->flags & VIR_FUNCFLAG_STATIC)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "static "));
-    }
+        if(Func->flags & VIR_FUNCFLAG_STATIC)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "static "));
+        }
 
-    if(Func->flags & VIR_FUNCFLAG_EXTERN)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "extern "));
-    }
+        if(Func->flags & VIR_FUNCFLAG_EXTERN)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "extern "));
+        }
 
-    /* Always inline */
-    if(Func->flags & VIR_FUNCFLAG_ALWAYSINLINE)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "inline "));
-    }
+        /* Always inline */
+        if(Func->flags & VIR_FUNCFLAG_ALWAYSINLINE)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "inline "));
+        }
 
-    /* Neve inline */
-    if(Func->flags & VIR_FUNCFLAG_NOINLINE)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "noinline "));
-    }
+        /* Neve inline */
+        if(Func->flags & VIR_FUNCFLAG_NOINLINE)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "noinline "));
+        }
 
-    /* Inline is desirable */
-    if(Func->flags & VIR_FUNCFLAG_INLINEHINT)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "inlinehint "));
-    }
+        /* Inline is desirable */
+        if(Func->flags & VIR_FUNCFLAG_INLINEHINT)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "inlinehint "));
+        }
 
-    /* Function does not access memory */
-    if(Func->flags & VIR_FUNCFLAG_READNONE)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "readnone "));
-    }
+        /* Function does not access memory */
+        if(Func->flags & VIR_FUNCFLAG_READNONE)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "readnone "));
+        }
 
-    /* Function only reads from memory */
-    if(Func->flags & VIR_FUNCFLAG_READONLY)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "readonly "));
-    }
+        /* Function only reads from memory */
+        if(Func->flags & VIR_FUNCFLAG_READONLY)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "readonly "));
+        }
 
-    /* Hidden pointer to structure to return */
-    if(Func->flags & VIR_FUNCFLAG_STRUCTRET)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "structret "));
-    }
+        /* Hidden pointer to structure to return */
+        if(Func->flags & VIR_FUNCFLAG_STRUCTRET)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "structret "));
+        }
 
-    /* Function is not returning */
-    if(Func->flags & VIR_FUNCFLAG_NORETURN)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "noreturn "));
-    }
+        /* Function is not returning */
+        if(Func->flags & VIR_FUNCFLAG_NORETURN)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "noreturn "));
+        }
 
-    /* Force argument to be passed in register */
-    if(Func->flags & VIR_FUNCFLAG_INREG)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "inreg "));
-    }
+        /* Force argument to be passed in register */
+        if(Func->flags & VIR_FUNCFLAG_INREG)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "inreg "));
+        }
 
-    /* Pass structure by value */
-    if(Func->flags & VIR_FUNCFLAG_BYVAL)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "byval "));
-    }
+        /* Pass structure by value */
+        if(Func->flags & VIR_FUNCFLAG_BYVAL)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "byval "));
+        }
 
-    /* OpenCL Kernel function */
-    if(Func->flags & VIR_FUNCFLAG_KERNEL)
-    {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "kernel "));
-    }
+        /* OpenCL Kernel function */
+        if(Func->flags & VIR_FUNCFLAG_KERNEL)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "kernel "));
+        }
 
-    /* is recursive function */
-    if(Func->flags & VIR_FUNCFLAG_RECURSIVE)
-    {
+        /* is recursive function */
+        if(Func->flags & VIR_FUNCFLAG_RECURSIVE)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "recursive "));
+        }
         VERIFY_OK(
-            VIR_LOG(Dumper, "recursive "));
-    }
-    VERIFY_OK(
-        VIR_LOG(Dumper, "/* function instruction count [%d] */\n\n",
-            VIR_Function_GetInstCount(Func)));
+            VIR_LOG(Dumper, "/* function instruction count [%d] */\n\n",
+                VIR_Function_GetInstCount(Func)));
     }
     VERIFY_OK(
         VIR_LOG(Dumper, "function "));
@@ -2621,65 +2632,65 @@ VIR_Uniform_Dump(
     }
     if (Dumper->baseDumper.verbose)
     {
-    /* dump flags */
-    VERIFY_OK(VIR_LOG(Dumper, " uniform_flags:<"));
-    if (isSymUniformLoadtimeConst(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " load_time_const"));
-    }
-    if (isSymUniformCompiletimeInitialized(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " compile_time_initialized"));
-    }
-    if (isSymUniformUsedInShader(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " used_in_shader"));
-    }
-    if (isSymUniformUsedInLTC(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " used_in_LTC"));
-    }
-    if (isSymUniformMovedToDUB(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUB"));
-    }
-    if (isSymUniformUsedInTextureSize(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " used_in_texture_size"));
-    }
-    if (isSymUniformImplicitlyUsed(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " implicitly_used"));
-    }
-    if (isSymUniformForcedToActive(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " forced_to_active"));
-    }
-    if (isSymUniformMovingToDUBO(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " moving_to_DUBO"));
-    }
-    if (isSymUniformAlwaysInDUB(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " always_in_DUB"));
-    }
-    if (isSymUniformMovedToDUBO(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUBO"));
-    }
-    if (isSymUniformMovedToCUBO(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " moved_to_CUBO"));
-    }
-    if (isSymUniformAtomicCounter(sym))
-    {
-         VERIFY_OK(VIR_LOG(Dumper, " atomic_counter"));
-    }
-    if (isSymUniformTreatSamplerAsConst(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " Treat_sampler_as_const"));
-    }
-    VERIFY_OK(VIR_LOG(Dumper, " >"));
+        /* dump flags */
+        VERIFY_OK(VIR_LOG(Dumper, " uniform_flags:<"));
+        if (isSymUniformLoadtimeConst(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " load_time_const"));
+        }
+        if (isSymUniformCompiletimeInitialized(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " compile_time_initialized"));
+        }
+        if (isSymUniformUsedInShader(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " used_in_shader"));
+        }
+        if (isSymUniformUsedInLTC(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " used_in_LTC"));
+        }
+        if (isSymUniformMovedToDUB(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUB"));
+        }
+        if (isSymUniformUsedInTextureSize(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " used_in_texture_size"));
+        }
+        if (isSymUniformImplicitlyUsed(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " implicitly_used"));
+        }
+        if (isSymUniformForcedToActive(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " forced_to_active"));
+        }
+        if (isSymUniformMovingToDUBO(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " moving_to_DUBO"));
+        }
+        if (isSymUniformAlwaysInDUB(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " always_in_DUB"));
+        }
+        if (isSymUniformMovedToDUBO(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUBO"));
+        }
+        if (isSymUniformMovedToCUBO(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " moved_to_CUBO"));
+        }
+        if (isSymUniformAtomicCounter(sym))
+        {
+             VERIFY_OK(VIR_LOG(Dumper, " atomic_counter"));
+        }
+        if (isSymUniformTreatSamplerAsConst(sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " Treat_sampler_as_const"));
+        }
+        VERIFY_OK(VIR_LOG(Dumper, " >"));
     }
     VERIFY_OK(VIR_LOG(Dumper, ";"));
     VIR_LOG_FLUSH(Dumper);

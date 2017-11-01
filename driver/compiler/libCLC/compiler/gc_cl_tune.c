@@ -15,22 +15,22 @@
 #include "gc_hal_user.h"
 
 #define clmOPCODE_U8(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_U16(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_U32(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_S16(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT16, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT16, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_S32(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT32, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT32, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT, 0))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (tempStart + temp), gcSL_ENABLE_##enable, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmJUMP(condition, label) \
 gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_JMP, gcSL_##condition, label, 0))
@@ -42,22 +42,22 @@ gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condi
 gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condition, gcSL_INT32, label, 0))
 
 #define clmTEMP(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT))
 
 #define clmTEMP_U8(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT))
 
 #define clmTEMP_U16(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT))
 
 #define clmTEMP_S16(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_INT16, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_INT16, gcSHADER_PRECISION_DEFAULT))
 
 #define clmTEMP_U32(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT))
 
 #define clmTEMP_S32(temp, swizzle) \
-gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_INT32, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_INT32, gcSHADER_PRECISION_DEFAULT))
 
 #define clmFLOAT(value) \
 gcmONERROR(gcSHADER_AddSourceConstant(shader, (gctFLOAT) (value)))

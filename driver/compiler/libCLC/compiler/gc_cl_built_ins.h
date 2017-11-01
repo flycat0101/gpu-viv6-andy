@@ -151,6 +151,18 @@ clGenInverseCode(
     IN clsGEN_CODE_PARAMETERS * OperandsParameters,
     IN clsIOPERAND * IOperand
     );
+
+gceSTATUS
+clGenBuiltinVectorCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand,
+    IN cltBUILT_IN_GEN_CODE_FUNC_PTR genCode
+    );
+
 gceSTATUS
 clGenBuiltinFunctionCode(
 IN cloCOMPILER Compiler,

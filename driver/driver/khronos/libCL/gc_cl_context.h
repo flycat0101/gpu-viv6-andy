@@ -35,15 +35,14 @@ typedef gceSTATUS (* clfCOMPILER) (
 typedef struct _cl_profiler
 {
     gctBOOL         enable;
+    /* If 'true', the counter is between two clFinish(),
+    ** otherwise, it's for each equeueNDRange(default).
+    */
     gctBOOL         perClfinish;
-    gctBOOL         enableProbe;
 
     gctUINT32       frameNumber;
-    gctUINT32       frameMaxNum;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       frameStartCPUTimeusec;
-    gctUINT64       frameEndCPUTimeusec;
 }
 clsProfiler;
 
@@ -92,12 +91,6 @@ typedef struct _cl_context
     gctSIGNAL               eventCallbackWorkerStartSignal;
     gctSIGNAL               eventCallbackWorkerStopSignal;
 
-    /* Profiler */
-#if VIVANTE_PROFILER
-    clsProfiler             profiler;
-    gcoPROFILER             halProfile;
-#endif
-
 #if cldTUNING
     gctBOOL                 sortRects;
 #endif
@@ -108,27 +101,6 @@ clsContext;
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
-gctINT
-clfInitializeProfiler(
-    clsContext_PTR Context
-    );
-
-void
-clfDestroyProfiler(
-    clsContext_PTR Context
-    );
-
-gctINT
-clfBeginProfiler(
-    cl_command_queue CommandQueue
-    );
-
-gctINT
-clfEndProfiler(
-    cl_command_queue CommandQueue,
-    clsKernel_PTR Kerenl
-    );
-
 gctINT
 clfRetainContext(
     cl_context Context

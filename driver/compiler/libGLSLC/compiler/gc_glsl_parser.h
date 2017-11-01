@@ -265,6 +265,18 @@ slParseCompoundStatementEnd(
     );
 
 void
+slParseSelectStatementBegin(
+    IN sloCOMPILER Compiler
+    );
+
+sloIR_SET
+slParseSelectStatementEnd(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * StartToken,
+    IN sloIR_SET Set
+    );
+
+void
 slParseCompoundStatementNoNewScopeBegin(
     IN sloCOMPILER Compiler
     );

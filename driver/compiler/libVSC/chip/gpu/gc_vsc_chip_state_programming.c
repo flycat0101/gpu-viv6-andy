@@ -5150,6 +5150,7 @@ static VSC_ErrCode _ProgramGpsSharedMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_S
     SHADER_EXECUTABLE_PROFILE* pGpsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           sharedVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSharedMem = NOT_ASSIGNED;
+    gctBOOL                    threadWalkInPs = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasThreadWalkerInPS;
 
     errCode = _AllocVidMemForSharedMemory(pStatesPgmer, pGpsSEP, &sharedVidmemNode, &vidMemAddrOfSharedMem);
     ON_ERROR(errCode, "Alloc vid-mem for shared memory");
@@ -5157,7 +5158,9 @@ static VSC_ErrCode _ProgramGpsSharedMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_S
     pStatesPgmer->pHints->shaderVidNodes.sharedMemVidMemNode = sharedVidmemNode;
 
     errCode = _ProgramSharedMemAddr(pGpsSEP,
-                                    _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer),
+                                    threadWalkInPs ?
+                                    _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer)
+                                  : _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                     vidMemAddrOfSharedMem,
                                     pStatesPgmer);
     ON_ERROR(errCode, "Program shared mem address ");
@@ -5181,6 +5184,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
 #if !IO_HW_LOC_NUMBER_IN_ORDER
     gctUINT                    sortedIoIdxArray[MAX_SHADER_IO_NUM];
 #endif
+    gctBOOL                    threadWalkInPs = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasThreadWalkerInPS;
 
     gcmASSERT(pGpsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
     gcmASSERT(pGpsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
@@ -5188,8 +5192,6 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
 #if !IO_HW_LOC_NUMBER_IN_ORDER
     vscSortIOsByHwLoc(&pGpsSEP->inputMapping.ioVtxPxl, sortedIoIdxArray);
 #endif
-
-    gcmASSERT(pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasThreadWalkerInPS);
 
     /* Input */
     for (ioIdx = 0; ioIdx < pGpsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping; ioIdx ++)
@@ -5263,9 +5265,10 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         break;
     }
 
-    pStatesPgmer->pHints->threadWalkerInPS = gcvTRUE;
+    pStatesPgmer->pHints->threadWalkerInPS = threadWalkInPs;
     pStatesPgmer->pHints->elementCount = gpsInputCount;
     pStatesPgmer->pHints->fsMaxTemp = calibratedGprCount;
+    pStatesPgmer->pHints->vsMaxTemp = threadWalkInPs ? 0 : calibratedGprCount;
     pStatesPgmer->pHints->fsInstCount = pGpsSEP->countOfMCInst;
     pStatesPgmer->pHints->fsIsDual16 = pGpsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16;
     pStatesPgmer->pHints->fsInputCount = (gpsInputCount > 0) ? gpsInputCount : 1;
@@ -5302,6 +5305,12 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     /* Save local memory size. */
     pStatesPgmer->pHints->localMemSizeInByte = pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte;
 
+    /* Save the concurrent workThreadCount. */
+    pStatesPgmer->pHints->workThreadCount = (gctUINT16)pGpsSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum;
+
+    /* Save the concurrent workGroupCount. */
+    pStatesPgmer->pHints->workGroupCount = (gctUINT16)pGpsSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum;
+
     switch (gpsInputCount)
     {
     case 3:
@@ -5313,72 +5322,117 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
 
     pStatesPgmer->pHints->componentCount = gcmALIGN(varyingPacking[0] + varyingPacking[1], 2);
 
-    /* Program varying pack */
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
- 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+    if (threadWalkInPs)
+    {
+        /* Program varying pack */
+        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) ((gctUINT32) (varyingPacking[0]) & ((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) |
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:4) - (0 ?
- 6:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:4) - (0 ? 6:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
  6:4))) | (((gctUINT32) ((gctUINT32) (varyingPacking[1]) & ((gctUINT32) ((((1 ?
  6:4) - (0 ? 6:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
  6:4)));
 
-    if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.newGPIPE)
-    {
-        VSC_LOAD_HW_STATE(0x02A4, state);
-        VSC_LOAD_HW_STATE(0x0420, state);
-    }
-    else
-    {
-        VSC_LOAD_HW_STATE(0x0E08, state);
+        if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.newGPIPE)
+        {
+            VSC_LOAD_HW_STATE(0x02A4, state);
+            VSC_LOAD_HW_STATE(0x0420, state);
+        }
+        else
+        {
+            VSC_LOAD_HW_STATE(0x0E08, state);
 
-        state = 0;
-        VSC_LOAD_HW_STATE(0x0E0D, state);
-    }
+            state = 0;
+            VSC_LOAD_HW_STATE(0x0E0D, state);
+        }
 
-    /* Program used GPR count */
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
- 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
+        /* Program used GPR count */
+        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0)));
-    VSC_LOAD_HW_STATE(0x0403, state);
+        VSC_LOAD_HW_STATE(0x0403, state);
 
-    /* Program sampler-related. */
-    if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
-    {
-        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        /* Program sampler-related. */
+        if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
+        {
+            state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0)));
-        VSC_LOAD_HW_STATE(0x0416, state);
-    }
+            VSC_LOAD_HW_STATE(0x0416, state);
+        }
 
-    /* Program CTCs */
-    errCode = _ProgramPsCompileTimeConsts(pShHwInfo, pStatesPgmer);
-    ON_ERROR(errCode, "Program GP CTC");
+        /* Program CTCs */
+        errCode = _ProgramPsCompileTimeConsts(pShHwInfo, pStatesPgmer);
+        ON_ERROR(errCode, "Program GP CTC");
 
-    /* Program insts */
-    errCode = _ProgramPsInsts(pShHwInfo, pStatesPgmer);
-    ON_ERROR(errCode, "Program GP inst");
+        /* Program insts */
+        errCode = _ProgramPsInsts(pShHwInfo, pStatesPgmer);
+        ON_ERROR(errCode, "Program GP inst");
 
-    /* Program gpr spill */
-    if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
-    {
-        errCode = _ProgramPsGprSpill(pShHwInfo, pStatesPgmer);
-        ON_ERROR(errCode, "Program GP grp spill");
-    }
-
-    /* Program cr spill */
-    if (pGpsSEP->exeHints.derivedHints.globalStates.bCrSpilled)
-    {
-        if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK)
+        /* Program gpr spill */
+        if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
-            errCode = _ProgramPsCrSpill(pShHwInfo, pStatesPgmer);
-            ON_ERROR(errCode, "Program GP cr spill");
+            errCode = _ProgramPsGprSpill(pShHwInfo, pStatesPgmer);
+            ON_ERROR(errCode, "Program GP grp spill");
+        }
+
+        /* Program cr spill */
+        if (pGpsSEP->exeHints.derivedHints.globalStates.bCrSpilled)
+        {
+            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK)
+            {
+                errCode = _ProgramPsCrSpill(pShHwInfo, pStatesPgmer);
+                ON_ERROR(errCode, "Program GP cr spill");
+            }
+        }
+
+    }
+    else
+    {
+        gctUINT timeoutofFE2VS;
+        gctUINT vsInputCount = (gpsInputCount > 0) ? gpsInputCount : 1;
+        timeoutofFE2VS = gcmALIGN(vsInputCount * 4 + 4, 16) / 16;
+        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (vsInputCount) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) ((gctUINT32) (timeoutofFE2VS) & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8)));
+
+        VSC_LOAD_HW_STATE(0x0202, state);
+
+        /* Program used GPR count */
+        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
+ 6:0) - (0 ? 6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
+ 6:0)));
+        VSC_LOAD_HW_STATE(0x0203, state);
+
+        /* Program CTCs */
+        errCode = _ProgramVsCompileTimeConsts(pShHwInfo, pStatesPgmer);
+        ON_ERROR(errCode, "Program GP CTC");
+
+        /* Program insts */
+        errCode = _ProgramVsInsts(pShHwInfo, pStatesPgmer);
+        ON_ERROR(errCode, "Program GP inst");
+
+        /* Program gpr spill */
+        if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
+        {
+            errCode = _ProgramVsGprSpill(pShHwInfo, pStatesPgmer);
+            ON_ERROR(errCode, "Program GP grp spill");
         }
     }
 

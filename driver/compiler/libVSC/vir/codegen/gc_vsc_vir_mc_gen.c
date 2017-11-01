@@ -429,9 +429,7 @@ _VSC_MC_GEN_GenOpcode(
         }
         else if (VIR_Shader_GetKind(Gen->Shader) == VIR_SHADER_COMPUTE)
         {
-            gctUINT workgrpSize = (Gen->Shader->shaderLayout.compute.workGroupSize[0] *
-                                   Gen->Shader->shaderLayout.compute.workGroupSize[1] *
-                                   Gen->Shader->shaderLayout.compute.workGroupSize[2]);
+            gctUINT workgrpSize = VIR_Shader_GetWorkGroupSize(Gen->Shader);
 
             if ((workgrpSize > 0) &&
                 (workgrpSize <= (Gen->pComCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4)))
@@ -1008,30 +1006,67 @@ _VSC_MC_GEN_GenRound(
 
 static gctUINT
 _VSC_MC_GEN_GetInstTypeFromImgFmt(
-    IN VIR_LayoutQual  imgQual
+    IN VIR_ImageFormat  imgQual
     )
 {
-    if ((imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F) ||
-        (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_R32F)    ||
-        (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA16F) ||
-        (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA8)   ||
-        (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA8_SNORM))
+    switch (imgQual)
     {
+    case VIR_IMAGE_FORMAT_RGBA32F:
+    case VIR_IMAGE_FORMAT_RG32F:
+    case VIR_IMAGE_FORMAT_R32F:
+    case VIR_IMAGE_FORMAT_RGBA16F:
+    case VIR_IMAGE_FORMAT_RG16F:
+    case VIR_IMAGE_FORMAT_R16F:
         return 0x0;
-    }
-    else if ((imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I) ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_R32I)    ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA16I) ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA8I))
-    {
+
+    case VIR_IMAGE_FORMAT_BGRA8_UNORM:
+    case VIR_IMAGE_FORMAT_RGBA8:
+    case VIR_IMAGE_FORMAT_RGBA8_UNORM:
+    case VIR_IMAGE_FORMAT_RG8:
+    case VIR_IMAGE_FORMAT_RG8_UNORM:
+    case VIR_IMAGE_FORMAT_R8:
+    case VIR_IMAGE_FORMAT_R8_UNORM:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA8_SNORM:
+    case VIR_IMAGE_FORMAT_RG8_SNORM:
+    case VIR_IMAGE_FORMAT_R8_SNORM:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA32I:
+    case VIR_IMAGE_FORMAT_RG32I:
+    case VIR_IMAGE_FORMAT_R32I:
+    case VIR_IMAGE_FORMAT_RGBA16I:
+    case VIR_IMAGE_FORMAT_RG16I:
+    case VIR_IMAGE_FORMAT_R16I:
+    case VIR_IMAGE_FORMAT_RGBA8I:
+    case VIR_IMAGE_FORMAT_RG8I:
+    case VIR_IMAGE_FORMAT_R8I:
+    case VIR_IMAGE_FORMAT_ABGR8I_PACK32:
         return 0x2;
-    }
-    else if ((imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI) ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_R32UI)    ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA16UI) ||
-             (imgQual == VIR_LAYQUAL_IMAGE_FORMAT_RGBA8UI))
-    {
+
+    case VIR_IMAGE_FORMAT_RGBA32UI:
+    case VIR_IMAGE_FORMAT_RG32UI:
+    case VIR_IMAGE_FORMAT_R32UI:
+    case VIR_IMAGE_FORMAT_RGBA16UI:
+    case VIR_IMAGE_FORMAT_RG16UI:
+    case VIR_IMAGE_FORMAT_R16UI:
+    case VIR_IMAGE_FORMAT_RGBA8UI:
+    case VIR_IMAGE_FORMAT_RG8UI:
+    case VIR_IMAGE_FORMAT_R8UI:
+    case VIR_IMAGE_FORMAT_ABGR8UI_PACK32:
+    case VIR_IMAGE_FORMAT_A2B10G10R10UI_PACK32:
         return 0x5;
+
+    case VIR_IMAGE_FORMAT_R5G6B5_UNORM_PACK16:
+    case VIR_IMAGE_FORMAT_ABGR8_UNORM_PACK32:
+    case VIR_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32:
+    case VIR_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32:
+        return 0x0;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;;
     }
 
     return 0x2;
@@ -1049,7 +1084,7 @@ _VSC_MC_GEN_GetInstType(
     VIR_TypeId      ty           = VIR_Operand_GetTypeId(Opnd);
     VIR_OperandKind opndKind     = VIR_Operand_GetOpKind(Opnd);
     VIR_TypeId      componentTy;
-    VIR_LayoutQual  imgQual;
+    VIR_ImageFormat imgQual;
 
     if(opndKind == VIR_OPND_NONE || opndKind == VIR_OPND_UNDEF)
     {
@@ -1063,10 +1098,10 @@ _VSC_MC_GEN_GetInstType(
     {
         gcmASSERT(VIR_Symbol_GetKind(sym) == VIR_SYM_IMAGE ||
                   isSymUniformTreatSamplerAsConst(sym));
-        imgQual = VIR_Symbol_GetLayoutQualifier(sym);
+        imgQual = VIR_Symbol_GetImageFormat(sym);
 
         /* OCL image type has no layout info */
-        if (imgQual != VIR_LAYQUAL_IMAGE_FORMAT_NONE)
+        if (imgQual != VIR_IMAGE_FORMAT_NONE)
         {
             return _VSC_MC_GEN_GetInstTypeFromImgFmt(imgQual);
         }
@@ -1189,7 +1224,60 @@ _VSC_MC_GEN_GenInstType(
         }
         else
         {
-            return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
+            /* Since HW uses inst type to control comparison and to control implicit conversion, and also clamp src0 and src1.
+               we may choose data type from different source, and
+
+               For this case:
+               if we use F32, the value of src0's clamp is wrong.
+               if we use I32, the value of src1' clamp may be wrong.
+                013: JMPC.eq            dp 14, bvec4 mp  temp(1).mp.x, bool false
+                015: MOV                hp temp(6).hp.x, 0.900000[3f666666]
+                016: JMP                dp 15
+                018: LABEL              dp 14:
+                017: MOV                hp temp(6).hp.x, 0.100000[3dcccccd]
+                020: LABEL              dp 15:
+                019: NOP
+                -->
+                026: CSELECT.not        hp temp(6).hp.x, bvec4 mp  temp(1).mp.x, 0.100000[3dcccccd], 0.900000[3f666666]
+
+
+               For this case:
+               if we use U8, the value of src2 is wrong because it is overflow.
+                027: JMPC.eq            30, uchar_X4 temp(37).w, int 0
+                028: MOV                int temp(51).x, int 32768
+                029: JMP                31
+                031: LABEL              30:
+                030: MOV                int temp(51).x, int 0
+                033: LABEL              31:
+                -->
+                065: CSELECT.not        int temp(51).x, uchar_X4 temp(37).w, int 0, int 32768
+
+               A temporary solution:
+               If src0 and src1 have the same data type(float/int), use the data type which has the larger size;
+               otherwise use src0's data type.
+
+            */
+            VIR_TypeId src0TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
+            VIR_TypeId src1TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 1)));
+
+            if ((VIR_TypeId_isFloat(src0TypeId) && VIR_TypeId_isFloat(src1TypeId))
+                ||
+                (VIR_TypeId_isInteger(src0TypeId) && VIR_TypeId_isInteger(src1TypeId)))
+            {
+                /* Try to use the dataType of src0 first. */
+                if (VIR_GetTypeSize(src0TypeId) >= VIR_GetTypeSize(src1TypeId))
+                {
+                    return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
+                }
+                else
+                {
+                    return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 1));
+                }
+            }
+            else
+            {
+                return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
+            }
         }
     case VIR_OP_STORE:
     case VIR_OP_STORE_S:
@@ -3011,7 +3099,7 @@ _VSC_MC_GEN_GenInst(
         return VSC_ERR_NONE;
     }
 
-    VIR_Inst_InitMcInsts(Inst, Gen->Shader, *GenCount);
+    VIR_Inst_InitMcInsts(Inst, Gen->Shader, *GenCount, (gctINT32)Gen->InstCount);
 
     if (bNeedGen)
     {
@@ -3185,14 +3273,27 @@ VSC_MC_GEN_MachineCodeGen(
 {
     VSC_ErrCode           errCode = VSC_ERR_NONE;
     VSC_MCGen             gen;
-    VIR_Shader            *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Shader            *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_COMPILER_CONFIG   *pComCfg = &pPassWorker->pCompilerParam->cfg;
     VSC_OPTN_MCGenOptions *Options = (VSC_OPTN_MCGenOptions*)pPassWorker->basePassWorker.pBaseOption;
-    VIR_Dumper            *Dumper = pPassWorker->basePassWorker.pDumper;
+    VIR_Dumper            *pDumper = pPassWorker->basePassWorker.pDumper;
 
-    _VSC_MC_GEN_Initialize(Shader, pComCfg, Options, Dumper, pPassWorker->basePassWorker.pMM, &gen);
+    _VSC_MC_GEN_Initialize(pShader, pComCfg, Options, pDumper, pPassWorker->basePassWorker.pMM, &gen);
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Before Machine code gen", pShader, gcvTRUE);
+        VIR_LOG_FLUSH(pDumper);
+    }
+
     errCode = _VSC_MC_GEN_PerformOnShader(&gen);
     _VSC_MC_GEN_Finalize(&gen);
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After Machine code gen", pShader, gcvTRUE);
+        VIR_LOG_FLUSH(pDumper);
+    }
 
     return errCode;
 }

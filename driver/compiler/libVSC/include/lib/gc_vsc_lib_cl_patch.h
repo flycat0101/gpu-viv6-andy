@@ -135,7 +135,7 @@
 #define CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_3d \
 "    fcoord = fcoord * convert_float3(imageSize); \n"
 
-/* TODO - Need to optimize the division. */
+/* TODO: - Need to optimize the division. */
 #define CONVERT_UNNORMALIZED_COORD_TO_NORMALIZED_COORD_1d \
 "    fcoord = fcoord / convert_float(imageSize); \n"
 
@@ -176,7 +176,7 @@
 #define CONVERT_FLOAT_COORD_TO_INT_COORD_3d \
 "    int3 coord = convert_int3_rtn(fcoord); \n"
 
-/* TODO - Need to optimize (imageSize - 1). */
+/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_COORD_UPPER \
 "    coord = viv_min(coord, imageSize - 1); \n"
 #define CLAMP_COORD_UPPER_1d CLAMP_COORD_UPPER
@@ -199,7 +199,7 @@
 "    coord.z = clamp(coord.z, 0, imageSize.z - 1); \n"
 #define CLAMP_NONE_3d
 
-/* TODO - Need to optimize (imageSize - 1). */
+/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_COORD_1d \
 "    coord = clamp(coord, 0, imageSize - 1); \n"
 
@@ -224,7 +224,11 @@
 #define CHECK_BORDER_1dbuffer CHECK_BORDER_1d
 #define CHECK_BORDER_1d_BGRA CHECK_BORDER_1d
 #define CHECK_BORDER_1dbuffer_BGRA CHECK_BORDER_1d
-#define CHECK_BORDER_1dbuffer_R CHECK_BORDER_1d
+#define CHECK_BORDER_1dbuffer_R(_TYPE_)\
+"    if (((uint)coord >= (uint)imageSize) || (coord < 0)) \n" \
+"    { \n" \
+"        return (" #_TYPE_ ")0; \n" \
+"    } \n"
 
 #define CHECK_BORDER_1d_R(_TYPE_) \
 "    if (((uint)coord >= (uint)imageSize) || (coord < 0)) \n" \
@@ -361,7 +365,7 @@
 "    coordQ = convert_int3(fcoord); \n" \
 "    coordR = coordQ + 1; \n"
 
-/* TODO - Need to optimize (imageSize - 1). */
+/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_I0J0I1J1_1d \
 "    int imageSizeM1 = imageSize - 1; \n" \
 "    coordQ.x = clamp(coordQ.x, (int)(0), imageSizeM1); \n" \
@@ -1403,7 +1407,7 @@
 
 #define LOAD_Half_TEXEL_3d_R(_TYPE_, _BASE_) LOAD_HALF4_3d_R
 #define LOAD_HALF4_3d_R \
-"     half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n" \
+"     half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n" \
 "     return (float4)(vload_half((uint)coord.x, base), 0.0f, 0.0f, 1.0f); \n" \
 "} \n" \
 "\n"
@@ -1530,11 +1534,73 @@
 "    float4 T00 = convert_float4(base0[coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n"
 
+#define LOAD_4_UNORM_TEXELS_1d_CONV(_CONV_TYPE_,_TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image); \n" \
+"    float4 T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T11 = convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+
+#define LOAD_4_UNORM_TEXELS_1d_BGRA    LOAD_4_UNORM_TEXELS_1d
+
+#define LOAD_4_UNORM_TEXELS_1d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1d_R(_TYPE_, _BASE_) \
+       LOAD_4_UNORM_TEXELS_1d_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_UNORM_TEXELS_1dbuffer(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image); \n" \
 "    float4 T00 = convert_float4(base0[coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n"
 
+#define LOAD_4_UNORM_TEXELS_1dbuffer_BGRA LOAD_4_UNORM_TEXELS_1dbuffer
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1dbuffer_R(_TYPE_, _BASE_) \
+       LOAD_4_UNORM_TEXELS_1dbuffer_R_##_TYPE_(_TYPE_,_BASE_)
 
 #define LOAD_4_UNORM_TEXELS_2d(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
@@ -1544,6 +1610,43 @@
 "    float4 T01 = convert_float4(base1[coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T11 = convert_float4(base1[coordQ.z]) / " #_BASE_ "; \n"
 
+#define LOAD_4_UNORM_TEXELS_2d_BGRA    LOAD_4_UNORM_TEXELS_2d
+
+#define LOAD_4_UNORM_TEXELS_2d_CONV(_CONV_TYPE_,_TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"    float4 T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T10 = convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"    float4 T01 = convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T11 = convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n"
+
+#define LOAD_4_UNORM_TEXELS_2d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2d_R(_TYPE_, _BASE_) \
+       LOAD_4_UNORM_TEXELS_2d_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_UNORM_TEXELS_1darray(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.y); \n" \
 "    index = clamp(index, 0, imageSize.y - 1); \n" \
@@ -1551,6 +1654,41 @@
 "    float4 T00 = convert_float4(base0[coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n"
 
+#define LOAD_4_UNORM_TEXELS_1darray_BGRA LOAD_4_UNORM_TEXELS_1darray
+
+#define LOAD_4_UNORM_TEXELS_1darray_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    float4 T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T11 = convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n"
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_1darray_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_1darray_R(_TYPE_, _BASE_) \
+       LOAD_4_UNORM_TEXELS_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
 /* TODO: 2DARRAY not really implemented, just to pass building. */
 #define LOAD_4_UNORM_TEXELS_2DARRAY(_TYPE_, _BASE_) \
@@ -1562,6 +1700,9 @@
 "    " #_TYPE_ " * base1 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
 "    float4 T01 = convert_float4(base1[coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T11 = convert_float4(base1[coordQ.z]) / " #_BASE_ "; \n"
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_BGRA LOAD_4_UNORM_TEXELS_2DARRAY
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R LOAD_4_UNORM_TEXELS_2DARRAY
 
 /* TODO: The following similiar 3D macros are not proven to be done. */
 #define LOAD_4_UNORM_TEXELS_3d(_TYPE_, _BASE_) \
@@ -1578,15 +1719,95 @@
 "    float4 T011 = convert_float4(base3[(uint)coordQ.x]) / " #_BASE_ "; \n" \
 "    float4 T111 = convert_float4(base3[(uint)coordR.x]) / " #_BASE_ "; \n"
 
+#define LOAD_4_UNORM_TEXELS_3d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T000 = convert_float4((" #_TYPE_ ")(base0[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T100 = convert_float4((" #_TYPE_ ")(base0[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T010 = convert_float4((" #_TYPE_ ")(base1[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T110 = convert_float4((" #_TYPE_ ")(base1[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    " #_CONV_TYPE_ " * base2 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"    float4 T001 = convert_float4((" #_TYPE_ ")(base2[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T101 = convert_float4((" #_TYPE_ ")(base2[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    " #_CONV_TYPE_ " * base3 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"    float4 T011 = convert_float4((" #_TYPE_ ")(base3[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T111 = convert_float4((" #_TYPE_ ")(base3[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n"
+
+#define LOAD_4_UNORM_TEXELS_3d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(uint, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(int, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(float, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_CONV(half, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_R(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_3d_R_##_TYPE_(_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_3d_BGRA LOAD_4_UNORM_TEXELS_3d
+
 #define LOAD_4_SNORM_TEXELS_1d(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image); \n" \
 "    float4 T00 = max(convert_float4(base0[coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
 
+#define LOAD_4_SNORM_TEXELS_1d_BGRA LOAD_4_SNORM_TEXELS_1d
+
+#define LOAD_4_SNORM_TEXELS_1d_CONV(_CONV_TYPE_,_TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image); \n" \
+"    float4 T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n" \
+"    float4 T11 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n"
+
+#define LOAD_4_SNORM_TEXELS_1d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1d_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_1d_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_SNORM_TEXELS_1dbuffer(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image); \n" \
 "    float4 T00 = max(convert_float4(base0[coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
+
+#define LOAD_4_SNORM_TEXELS_1dbuffer_BGRA LOAD_4_SNORM_TEXELS_1dbuffer
+#define LOAD_4_SNORM_TEXELS_1dbuffer_R LOAD_4_SNORM_TEXELS_1dbuffer
 
 #define LOAD_4_SNORM_TEXELS_2d(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
@@ -1596,6 +1817,43 @@
 "    float4 T01 = max(convert_float4(base1[coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T11 = max(convert_float4(base1[coordQ.z]) / " #_BASE_ ", -1.0); \n"
 
+#define LOAD_4_SNORM_TEXELS_2d_CONV(_CONV_TYPE_,_TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"    float4 T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n" \
+"    float4 T10 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"    float4 T01 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n" \
+"    float4 T11 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0f); \n"
+
+#define LOAD_4_SNORM_TEXELS_2d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_2d_R_##_TYPE_(_TYPE_,_BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2d_BGRA LOAD_4_SNORM_TEXELS_2d
+
 #define LOAD_4_SNORM_TEXELS_1darray(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.y); \n" \
 "    index = clamp(index, 0, imageSize.y - 1); \n" \
@@ -1603,6 +1861,41 @@
 "    float4 T00 = max(convert_float4(base0[coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
 
+#define LOAD_4_SNORM_TEXELS_1darray_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    float4 T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T11 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+
+#define LOAD_4_SNORM_TEXELS_1darray_BGRA LOAD_4_SNORM_TEXELS_1darray
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_1darray_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_1darray_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_SNORM_TEXELS_2DARRAY(_TYPE_, _BASE_) \
@@ -1614,6 +1907,9 @@
 "    " #_TYPE_ " * base1 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
 "    float4 T01 = max(convert_float4(base1[coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T11 = max(convert_float4(base1[coordQ.z]) / " #_BASE_ ", -1.0); \n"
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_BGRA LOAD_4_SNORM_TEXELS_2DARRAY
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R LOAD_4_SNORM_TEXELS_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_SNORM_TEXELS_3d(_TYPE_, _BASE_) \
@@ -1630,6 +1926,49 @@
 "    float4 T011 = max(convert_float4(base3[(uint)coordQ.x]) / " #_BASE_ ", -1.0); \n" \
 "    float4 T111 = max(convert_float4(base3[(uint)coordR.x]) / " #_BASE_ ", -1.0); \n"
 
+#define LOAD_4_SNORM_TEXELS_3d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T000 = max(convert_float4((" #_TYPE_ " )(base0[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T100 = max(convert_float4((" #_TYPE_ " )(base0[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T010 = max(convert_float4((" #_TYPE_ " )(base1[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T110 = max(convert_float4((" #_TYPE_ " )(base1[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    " #_CONV_TYPE_ " * base2 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"    float4 T001 = max(convert_float4((" #_TYPE_ " )(base2[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T101 = max(convert_float4((" #_TYPE_ " )(base2[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    " #_CONV_TYPE_ " * base3 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"    float4 T011 = max(convert_float4((" #_TYPE_ " )(base3[(uint)coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T111 = max(convert_float4((" #_TYPE_ " )(base3[(uint)coordR.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n"
+
+#define LOAD_4_SNORM_TEXELS_3d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(uint, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(int, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(float, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_CONV(half, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_R(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_3d_R_##_TYPE_(_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_3d_BGRA LOAD_4_SNORM_TEXELS_3d
+
 /* Use LOAD_4_UNORM_TEXELS(uchar4, 255.0) for UNORM8 */
 /* Use LOAD_4_UNORM_TEXELS(ushort4, 65535.0) for UNORM16 */
 #define LOAD_4_Half_TEXELS_1d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_1d
@@ -1638,7 +1977,17 @@
 "    float4 T00 = vload_half4((uint)coordQ.x, base0); \n" \
 "    float4 T11 = vload_half4((uint)coordQ.y, base0); \n" \
 
+#define LOAD_4_Half_TEXELS_1d_BGRA LOAD_4_Half_TEXELS_1d
+#define LOAD_4_Half_TEXELS_1d_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_1d_R
+#define LOAD_4_HALF_TEXELS_1d_R \
+"    half * base0 = (half *) ((uchar *)image); \n" \
+"    float4 T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
+
 #define LOAD_4_Half_TEXELS_1dbuffer(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_1d
+
+#define LOAD_4_Half_TEXELS_1dbuffer_BGRA LOAD_4_Half_TEXELS_1dbuffer
+#define LOAD_4_Half_TEXELS_1dbuffer_R LOAD_4_Half_TEXELS_1dbuffer
 
 #define LOAD_4_Half_TEXELS_2d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_2d
 #define LOAD_4_HALF_TEXELS_2d \
@@ -1649,12 +1998,31 @@
 "    float4 T01 = vload_half4((uint)coordQ.x, base1); \n" \
 "    float4 T11 = vload_half4((uint)coordQ.z, base1); \n"
 
+#define LOAD_4_Half_TEXELS_2d_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_2d_R
+#define LOAD_4_HALF_TEXELS_2d_R \
+"    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"    float4 T00 = (float4)(vload_half((uint)coordQ.x, base0), 0.0, 0.0, 1.0); \n" \
+"    float4 T10 = (float4)(vload_half((uint)coordQ.z, base0), 0.0, 0.0, 1.0); \n" \
+"    half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"    float4 T01 = (float4)(vload_half((uint)coordQ.x, base1), 0.0, 0.0, 1.0); \n" \
+"    float4 T11 = (float4)(vload_half((uint)coordQ.z, base1), 0.0, 0.0, 1.0); \n"
+
+#define LOAD_4_Half_TEXELS_2d_BGRA LOAD_4_Half_TEXELS_2d
+
 #define LOAD_4_Half_TEXELS_1darray(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.y); \n" \
 "    index = clamp(index, 0, imageSize.y - 1); \n" \
 "    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)index); \n" \
 "    float4 T00 = vload_half4((uint)coordQ.x, base0); \n" \
 "    float4 T11 = vload_half4((uint)coordQ.y, base0); \n" \
+
+#define LOAD_4_Half_TEXELS_1darray_BGRA LOAD_4_Half_TEXELS_1darray
+#define LOAD_4_Half_TEXELS_1darray_R(_TYPE_, _BASE_) \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    float4 T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_2DARRAY(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_2DARRAY
@@ -1667,6 +2035,9 @@
 "    half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
 "    float4 T01 = vload_half4((uint)coordQ.x, base1); \n" \
 "    float4 T11 = vload_half4((uint)coordQ.z, base1); \n"
+
+#define LOAD_4_Half_TEXELS_2DARRAY_BGRA LOAD_4_Half_TEXELS_2DARRAY
+#define LOAD_4_Half_TEXELS_2DARRAY_R LOAD_4_Half_TEXELS_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_3d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_3d
@@ -1684,13 +2055,26 @@
 "    float4 T011 = vload_half4((uint)coordQ.x, base3); \n" \
 "    float4 T111 = vload_half4((uint)coordR.x, base3); \n"
 
+#define LOAD_4_Half_TEXELS_3d_BGRA LOAD_4_Half_TEXELS_3d
+#define LOAD_4_Half_TEXELS_3d_R LOAD_4_Half_TEXELS_3d
+
 #define LOAD_4_Float_TEXELS_1d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_1d
 #define LOAD_4_FLOAT_TEXELS_1d \
 "    float4 * base0 = (float4 *) ((uchar *)image); \n" \
 "    float4 T00 = base0[coordQ.x]; \n" \
 "    float4 T11 = base0[coordQ.y]; \n"
 
+#define LOAD_4_Float_TEXELS_1d_BGRA LOAD_4_Float_TEXELS_1d
+#define LOAD_4_Float_TEXELS_1d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_1d_R
+#define LOAD_4_FLOAT_TEXELS_1d_R \
+"    float * base0 = (float *) ((uchar *)image); \n" \
+"    float4 T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n"
+
 #define LOAD_4_Float_TEXELS_1dbuffer(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_1d
+
+#define LOAD_4_Float_TEXELS_1dbuffer_BGRA LOAD_4_Float_TEXELS_1dbuffer
+#define LOAD_4_Float_TEXELS_1dbuffer_R LOAD_4_Float_TEXELS_1dbuffer
 
 #define LOAD_4_Float_TEXELS_2d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_2d
 #define LOAD_4_FLOAT_TEXELS_2d \
@@ -1701,6 +2085,17 @@
 "    float4 T01 = base1[coordQ.x]; \n" \
 "    float4 T11 = base1[coordQ.z]; \n"
 
+#define LOAD_4_Float_TEXELS_2d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_2d_R
+#define LOAD_4_FLOAT_TEXELS_2d_R \
+"    float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"    float4 T00 = (float4)(base0[coordQ.x], 0.0, 0.0, 1.0); \n" \
+"    float4 T10 = (float4)(base0[coordQ.z], 0.0, 0.0, 1.0); \n" \
+"    float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"    float4 T01 = (float4)(base1[coordQ.x], 0.0, 0.0, 1.0); \n" \
+"    float4 T11 = (float4)(base1[coordQ.z], 0.0, 0.0, 1.0); \n"
+
+#define LOAD_4_Float_TEXELS_2d_BGRA LOAD_4_Float_TEXELS_2d
+
 #define LOAD_4_Float_TEXELS_1darray(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.y); \n" \
 "    index = clamp(index, 0, imageSize.y - 1); \n" \
@@ -1708,6 +2103,13 @@
 "    float4 T00 = base0[coordQ.x]; \n" \
 "    float4 T11 = base0[coordQ.y]; \n"
 
+#define LOAD_4_Float_TEXELS_1darray_BGRA LOAD_4_Float_TEXELS_1darray
+#define LOAD_4_Float_TEXELS_1darray_R(_TYPE_, _BASE_) \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    float * base0 = (float *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    float4 T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n"
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Float_TEXELS_2DARRAY(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_2DARRAY
@@ -1720,6 +2122,9 @@
 "    float4 * base1 = (float4 *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
 "    float4 T01 = base1[coordQ.x]; \n" \
 "    float4 T11 = base1[coordQ.z]; \n"
+
+#define LOAD_4_Float_TEXELS_2DARRAY_BGRA LOAD_4_Float_TEXELS_2DARRAY
+#define LOAD_4_Float_TEXELS_2DARRAY_R LOAD_4_Float_TEXELS_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Float_TEXELS_3d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_3d
@@ -1736,6 +2141,9 @@
 "    float4 * base3 = (float4 *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
 "    float4 T011 = base3[(uint)coordQ.x]; \n" \
 "    float4 T111 = base3[(uint)coordR.x]; \n"
+
+#define LOAD_4_Float_TEXELS_3d_BGRA LOAD_4_Float_TEXELS_3d
+#define LOAD_4_Float_TEXELS_3d_R LOAD_4_Float_TEXELS_3d
 
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
@@ -1757,6 +2165,56 @@
 "        T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n" \
 "    } \n" \
 
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T11; \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image ); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+    "        T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    } \n" \
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(half,_TYPE_, _BASE_)
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image ); \n" \
@@ -1776,6 +2234,36 @@
 "    { \n" \
 "        T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n" \
 "    } \n" \
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d_CONV(half,_TYPE_, _BASE_)
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_1dbuffer_R_##_TYPE_(_TYPE_,_BASE_)
 
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d(_TYPE_, _BASE_) \
 "    float4 T00, T01, T10, T11; \n" \
@@ -1830,6 +2318,105 @@
 "        } \n" \
 "    } \n"
 
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T01, T10, T11; \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"    } \n" \
+"    if ((uint)coordQ.w >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + (uint)image.y * (uint)coordQ.w); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"    } \n"
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(uchar, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(ushort, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(short, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(uint,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(int,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(float,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_CONV(half,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_2d_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    int index = rint(fcoord.y); \n" \
@@ -1851,6 +2438,58 @@
 "    { \n" \
 "        T11 = convert_float4(base0[coordQ.y]) / " #_BASE_ "; \n" \
 "    } \n" \
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T11; \n" \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = convert_float4((" #_TYPE_ ")(base0[coordQ.y], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    } \n" \
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_CONV(half,_TYPE_, _BASE_)
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_##_TYPE_(_TYPE_,_BASE_)
+
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) \
@@ -1907,6 +2546,12 @@
 "            T11 = convert_float4(base1[coordQ.z]) / " #_BASE_ "; \n" \
 "        } \n" \
 "    } \n"
+
+
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) \
@@ -2032,6 +2677,11 @@
 "        } \n" \
 "    } \n"
 
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d
+
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image ); \n" \
@@ -2052,6 +2702,55 @@
 "        T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
 "    } \n" \
 
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T11; \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image ); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.y], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_R_##_TYPE_(_TYPE_,_BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d
+
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image ); \n" \
@@ -2071,6 +2770,55 @@
 "    { \n" \
 "        T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
 "    } \n" \
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T11; \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image ); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_1dbuffer_R_##_TYPE_(_TYPE_,_BASE_)
 
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d(_TYPE_, _BASE_) \
 "    float4 T00, T01, T10, T11; \n" \
@@ -2125,6 +2873,108 @@
 "        } \n" \
 "    } \n"
 
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T01, T10, T11; \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"    } \n" \
+"    if ((uint)coordQ.w >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"    } \n"
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(uchar, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(ushort, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(short, _TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(uint,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(int,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(float,_TYPE_, _BASE_)
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_CONV(half,_TYPE_, _BASE_)
+
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_2d_R_##_TYPE_(_TYPE_,_BASE_)
+
+
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    int index = rint(fcoord.y); \n" \
@@ -2146,6 +2996,57 @@
 "    { \n" \
 "        T11 = max(convert_float4(base0[coordQ.y]) / " #_BASE_ ", -1.0); \n" \
 "    } \n" \
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T11; \n" \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T00 = (float4)0.0; \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T11 = (float4)0.0; \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.y], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    } \n" \
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) \
@@ -2202,6 +3103,12 @@
 "            T11 = max(convert_float4(base1[coordQ.z]) / " #_BASE_ ", -1.0); \n" \
 "        } \n" \
 "    } \n"
+
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) \
@@ -2327,6 +3234,12 @@
 "        } \n" \
 "    }\n"
 
+
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d
+
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_HALF_TEXELS_BORDER_CHECK_1d \
@@ -2347,6 +3260,56 @@
 "    else \n" \
 "    { \n" \
 "        T11 = vload_half4((uint)coordQ.y, base0); \n" \
+"    } \n"
+
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1d_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_1d
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1d_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1d_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_1d_R \
+"    float4 T00, T11; \n" \
+"    half * base0 = (half *) ((uchar *)image ); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
+"    } \n"
+
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1dbuffer_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_1dbuffer
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1dbuffer_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1dbuffer_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_1dbuffer_R \
+"    float4 T00, T11; \n" \
+"    half * base0 = (half *) ((uchar *)image ); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
 "    } \n"
 
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_2d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_2d
@@ -2403,6 +3366,64 @@
 "        } \n" \
 "    } \n"
 
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_2d_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_2d_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_2d_R \
+"    float4 T00, T01, T10, T11; \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = (float4)(vload_half((uint)coordQ.x, base0), 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = (float4)(vload_half((uint)coordQ.z, base0), 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"    } \n" \
+"    if ((uint)coordQ.w >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = (float4)(vload_half((uint)coordQ.x, base1), 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = (float4)(vload_half((uint)coordQ.z, base1), 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"    } \n"
+
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_2d_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_2d
+
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_1darray(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
 "    int index = rint(fcoord.y); \n" \
@@ -2425,6 +3446,32 @@
 "        T11 = vload_half4((uint)coordQ.y, base0); \n" \
 "    } \n"
 
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1darray_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_1darray
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1darray_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_1darray_R \
+    "    float4 T00, T11; \n" \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
+"    } \n"
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_2DARRAY
@@ -2482,6 +3529,12 @@
 "            T11 = vload_half4((uint)coordQ.z, base1); \n" \
 "        } \n" \
 "    } \n"
+
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_3d
@@ -2608,6 +3661,12 @@
 "        } \n" \
 "    } \n"\
 
+
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_3d
+
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_3d_R LOAD_4_Half_TEXELS_BORDER_CHECK_3d
+
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d \
@@ -2628,6 +3687,57 @@
 "    else \n" \
 "    { \n" \
 "        T11 = base0[coordQ.y]; \n" \
+"    } \n" \
+
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1d_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_1d
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d_R \
+"    float4 T00, T11; \n" \
+"    float * base0 = (float *) ((uchar *)image); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n" \
+"    } \n" \
+
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1dbuffer_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_1dbuffer
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1dbuffer_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1dbuffer_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1dbuffer_R \
+"    float4 T00, T11; \n" \
+"    float * base0 = (float *) ((uchar *)image); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n" \
 "    } \n" \
 
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_2d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2d
@@ -2684,6 +3794,66 @@
 "        } \n" \
 "    } \n"
 
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_2d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2d_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2d_R \
+"    float4 T00, T01, T10, T11; \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T00 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = (float4)(base0[coordQ.x], 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T10 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = (float4)(base0[coordQ.z], 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"    } \n" \
+"    if ((uint)coordQ.w >= (uint)imageSize.y) \n" \
+"    { \n" \
+"        T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.w); \n" \
+"        if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T01 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = (float4)(base1[coordQ.x], 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        if ((uint)coordQ.z >= (uint)imageSize.x) \n" \
+"        { \n" \
+"            T11 = (float4)(0.0, 0.0, 0.0, 1.0); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = (float4)(base1[coordQ.z], 0.0, 0.0, 1.0);\n" \
+"        } \n" \
+"    } \n"
+
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_2d_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_2d
+
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_1darray(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1darray
 #define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1darray \
 "    float4 T00, T11; \n" \
@@ -2705,6 +3875,34 @@
 "    else \n" \
 "    { \n" \
 "        T11 = base0[coordQ.y]; \n" \
+"    } \n" \
+
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1darray_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_1darray
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1darray_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1darray_R \
+"    float4 T00, T11; \n" \
+"    int index = rint(fcoord.y); \n" \
+"    index = clamp(index, 0, imageSize.y - 1); \n" \
+"    float * base0 = (float *) ((uchar *)image.x + image.y * (uint)index); \n" \
+"    if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T00 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    if ((uint)coordQ.y >= (uint)imageSize.x) \n" \
+"    { \n" \
+"        T11 = (float4)(0.0, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n" \
 "    } \n" \
 
 /* TODO: Just to pass building so far. */
@@ -2763,6 +3961,12 @@
 "            T11 = base1[coordQ.z];\n" \
 "        } \n" \
 "    } \n"
+
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY
 
 /* TODO: Just to pass building so far. */
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_3d
@@ -2889,6 +4093,12 @@
 "        } \n" \
 "    } \n"
 
+
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_3d
+
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_3d_R LOAD_4_Float_TEXELS_BORDER_CHECK_3d
+
 #define LINEAR_FILTER_1d \
 "    float oneMinusFractUV = 1 - fractUV; \n" \
 "    return oneMinusFractUV * T00 + fractUV * T11;\n" \
@@ -2903,11 +4113,15 @@
 "    return value;\n" \
 "} \n" \
 "\n"
-#define LINEAR_FILTER_1d_R LINEAR_FILTER_1d
+
+#define LINEAR_FILTER_1d_R \
+"    float oneMinusFractUV = 1 - fractUV; \n" \
+"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
+"} \n" \
+"\n"
 
 #define LINEAR_FILTER_1dbuffer LINEAR_FILTER_1d
 #define LINEAR_FILTER_1dbuffer_BGRA LINEAR_FILTER_1d_BGRA
-#define LINEAR_FILTER_1dbuffer_R LINEAR_FILTER_1d
 
 #define LINEAR_FILTER_2d \
 "    float2 oneMinusFractUV = 1 - fractUV; \n" \
@@ -2957,7 +4171,13 @@
 
 #define LINEAR_FILTER_1darray_R \
 "    float oneMinusFractUV = 1 - fractUV; \n" \
-"    return oneMinusFractUV * T00 + fractUV * T11;\n" \
+"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
+"} \n" \
+"\n"
+
+#define LINEAR_FILTER_1dbuffer_R \
+"    float oneMinusFractUV = 1 - fractUV; \n" \
+"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
 "} \n" \
 "\n"
 
@@ -3488,6 +4708,71 @@ static gctSTRING gcLibCLImage_ReadFunc_3D_R =
     READFUNC(3d, _R)
 ;
 
+#define IMGLOAD_FLOAT_TEXEL_2d \
+"    float4 result;\n" \
+"    _viv_asm(IMAGE_READ, result, image, coord);\n"\
+"    return result;\n"\
+"}\n"
+
+#define IMGLOAD_4_FLOAT_TEXELS_2d \
+"    float4 T00;\n" \
+"    float4 T10;\n" \
+"    float4 T01;\n" \
+"    float4 T11;\n" \
+"    _viv_asm(IMAGE_READ, T00, image, coordQ.xy);\n"\
+"    _viv_asm(IMAGE_READ, T10, image, coordQ.zy);\n"\
+"    _viv_asm(IMAGE_READ, T01, image, coordQ.xw);\n"\
+"    _viv_asm(IMAGE_READ, T11, image, coordQ.zw);\n"\
+
+#define read_image_IMG_ARGS_FLOAT_COORD_2d \
+"    (\n" \
+"    uint4 image, \n" \
+"    int2 imageSize, \n" \
+"    float2 fcoord \n" \
+"    ) \n" \
+"{ \n"
+
+#define READ_IMAGEF_CHANNEL_TYPE_IMGLD(SUFFIX, IMAGETYPE, ORDER) \
+"float4 \n" \
+"_read_image_nearest_norm_none_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    CONVERT_FLOAT_COORD_TO_INT_COORD_##IMAGETYPE \
+    IMGLOAD_FLOAT_TEXEL_##IMAGETYPE \
+"float4 \n" \
+"_read_image_nearest_norm_clamp_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    CONVERT_FLOAT_COORD_TO_INT_COORD_##IMAGETYPE \
+    IMGLOAD_FLOAT_TEXEL_##IMAGETYPE \
+"float4 \n" \
+"_read_image_nearest_norm_border_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    CONVERT_FLOAT_COORD_TO_INT_COORD_##IMAGETYPE \
+    IMGLOAD_FLOAT_TEXEL_##IMAGETYPE \
+"float4 \n" \
+"_read_image_linear_norm_none_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
+    IMGLOAD_4_FLOAT_TEXELS_##IMAGETYPE \
+    LINEAR_FILTER_##IMAGETYPE \
+"float4 \n" \
+"_read_image_linear_norm_clamp_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
+    IMGLOAD_4_FLOAT_TEXELS_##IMAGETYPE \
+    LINEAR_FILTER_##IMAGETYPE \
+"float4 \n" \
+"_read_image_linear_norm_border_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER"_imageLd \n" \
+    read_image_IMG_ARGS_FLOAT_COORD_##IMAGETYPE \
+    CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
+    GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
+    IMGLOAD_4_FLOAT_TEXELS_##IMAGETYPE \
+    LINEAR_FILTER_##IMAGETYPE
+
 #define READ_IMAGEF_CHANNEL_TYPE(SUFFIX, LOAD_TYPE, CHANNEL_TYPE, BASE, IMAGETYPE, ORDER) \
 "float4 \n" \
 "_read_image_nearest_unnorm_none_intcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
@@ -3563,27 +4848,27 @@ static gctSTRING gcLibCLImage_ReadFunc_3D_R =
 "_read_image_linear_unnorm_none_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_unnorm_clamp_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
     CLAMP_I0J0I1J1_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_unnorm_border_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_BORDER_CHECK_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_BORDER_CHECK_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_norm_none_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_norm_clamp_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
@@ -3591,26 +4876,26 @@ static gctSTRING gcLibCLImage_ReadFunc_3D_R =
     CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
     CLAMP_I0J0I1J1_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_norm_border_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_##IMAGETYPE \
     GET_I0J0I1J1_SIMPLE_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_BORDER_CHECK_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_BORDER_CHECK_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_norm_wrap_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     GET_I0J0I1J1_WRAP_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER \
 "float4 \n" \
 "_read_image_linear_norm_mirror_floatcoord_f_"#SUFFIX"_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_FLOAT_COORD_##IMAGETYPE \
     GET_I0J0I1J1_MIRROR_##IMAGETYPE \
-    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE(CHANNEL_TYPE, BASE) \
+    LOAD_4_##LOAD_TYPE##_TEXELS_##IMAGETYPE##ORDER(CHANNEL_TYPE, BASE) \
     LINEAR_FILTER_##IMAGETYPE##ORDER
 
 
@@ -3670,6 +4955,14 @@ static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R1 =
 READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2d, _R)
 READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2d, _R)
 ;
+
+static gctSTRING gcLibCLImage_ReadFuncF_IMGLD =
+"#pragma OPENCL EXTENSION  CL_VIV_asm : enable\n" \
+READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,)
+READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,_R)
+READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,_BGRA)
+;
+
 static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R2 =
 READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2d, _R)
 READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2d, _R)
@@ -4268,6 +5561,17 @@ WRITE_IMAGE_PROTOTYPE_##IMAGETYPE(float4, CHANNEL_TYPE, _R) \
     STORE_TEXELF_1CHANNEL_##IMAGETYPE(CHANNEL_TYPE, BASE) \
 "} \n"
 
+#define WRITE_IMAGE_IMGST(TYPE, IMAGETYPE) \
+"void\n" \
+    "_write_image_"#TYPE"_"#IMAGETYPE" (\n" \
+"    uint4 image, \n" \
+"    uint2 imageSize, \n" \
+"    int2 coord, \n" \
+"    "#TYPE" color \n"\
+"    ) \n" \
+"{ \n" \
+"    _viv_asm(IMAGE_WRITE, color, image, coord);\n"\
+"}\n"
 
 static gctSTRING gcLibCLImage_WriteFunc =
 /* write_imageui */
@@ -4325,6 +5629,10 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 2DARRAY)
 WRITE_IMAGEF_NORM(char4, 127.0, 3d)
 WRITE_IMAGEF_NORM(ushort4, 65535.0, 3d)
 WRITE_IMAGEF_NORM(short4, 32767.0, 3d)*/
+"#pragma OPENCL EXTENSION  CL_VIV_asm : enable\n" \
+WRITE_IMAGE_IMGST(float4, 2d)
+WRITE_IMAGE_IMGST(int4, 2d)
+WRITE_IMAGE_IMGST(uint4, 2d)
 
 "void\n"
 "_write_image_float4_float4_1d (\n"
@@ -10001,6 +11309,5 @@ static gctSTRING    gcLibCLLong_Func2 =
     _longulong_left_shift_long_scalar
     _longulong_left_shift_ulong_scalar;
 #endif
-
 
 

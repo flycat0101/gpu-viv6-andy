@@ -154,6 +154,8 @@ typedef struct _SpvTypeDescriptor
         {
             SpvId baseTypeId;
             gctUINT length;
+            /* corresponding type for sampledImage. */
+            VIR_TypeId sampledImageType;
         }array;
 
         struct
@@ -251,14 +253,15 @@ typedef struct _SpvConvDecorationData
 #define SPV_DECORATION_Initialize(Decoration) \
     do \
             { \
-        (Decoration)->location          = SPV_DEFAULT_LOCATION;     \
-        (Decoration)->binding           = -1;                       \
-        (Decoration)->arrayStride       = -1;                       \
-        (Decoration)->matrixStride      = -1;                       \
-        (Decoration)->offset            = -1;                       \
-        (Decoration)->alignment         = -1;                       \
-        (Decoration)->descriptorSet     = -1;                       \
-        (Decoration)->builtIn           = -1;                       \
+        (Decoration)->location              = SPV_DEFAULT_LOCATION;     \
+        (Decoration)->binding               = -1;                       \
+        (Decoration)->arrayStride           = -1;                       \
+        (Decoration)->matrixStride          = -1;                       \
+        (Decoration)->offset                = -1;                       \
+        (Decoration)->alignment             = -1;                       \
+        (Decoration)->inputAttachmentIndex  = -1;                       \
+        (Decoration)->descriptorSet         = -1;                       \
+        (Decoration)->builtIn               = -1;                       \
     } \
     while (gcvFALSE)
 
@@ -328,6 +331,8 @@ typedef struct
     gctBOOL isSampledImage;
     gctBOOL isPerVertex;
     gctBOOL isPerPatch;
+    /* For inputAttachment. */
+    Spv_AttachmentFlag attachmentFlag;
 
     SpvStorageClass storageClass;
 
@@ -514,49 +519,6 @@ typedef struct SpvFuncCallTable{
     gctUINT funcCount;
     gctUINT funcAllocated;
 }SpvFuncCallTable;
-
-/* This struct must same as __vkAttachmentDesc */
-typedef struct
-{
-    VkFormat format;
-    uint32_t sampleCount;
-    VkImageLayout initialLayout;
-    VkImageLayout finalLayout;
-    VkBool32 usedInRenderPass;
-    VkBool32 loadClear;
-    VkBool32 ignoreStore;
-    VkBool32 stencil_loadClear;
-    VkBool32 stencil_ignoreStore;
-    const gctPOINTER formatInfo;
-}SpvAttachmentDesc;
-
-/* This struct must same as __vkRenderSubPassInfo */
-#define __SPV_MAX_RENDER_TARGETS 4
-typedef struct SpvRenderSubPassInfoRec
-{
-    uint32_t color_attachment_index[__SPV_MAX_RENDER_TARGETS];
-    VkImageLayout color_attachment_imageLayout[__SPV_MAX_RENDER_TARGETS];
-    uint32_t resolve_attachment_index[__SPV_MAX_RENDER_TARGETS];
-    VkImageLayout resolve_attachment_imageLayout[__SPV_MAX_RENDER_TARGETS];
-    uint32_t colorCount;
-
-    uint32_t input_attachment_index[__SPV_MAX_RENDER_TARGETS];
-    VkImageLayout input_attachment_imageLayout[__SPV_MAX_RENDER_TARGETS];
-    uint32_t inputCount;
-
-    uint32_t dsAttachIndex;
-    VkImageLayout dsImageLayout;
-
-}SpvRenderSubPassInfo;
-
-typedef struct
-{
-    gctUINT attachmentCount;
-    SpvAttachmentDesc * attachments;
-
-    gctUINT subPassInfoCount;
-    SpvRenderSubPassInfo *subPassInfo;
-}SpvRenderPassInfo;
 
 struct _gcSPV
 {

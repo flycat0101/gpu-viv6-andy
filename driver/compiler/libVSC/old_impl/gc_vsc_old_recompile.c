@@ -56,6 +56,34 @@ extern gctCLCompiler gcCLCompiler;
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
 #define CL_LIB_COUNT    4
 #define LONG_ULONG_LIB_INDEX 3
+#define CL_LONG_ULONG_FUNCS \
+            { \
+                gcLibCLLong_Func, \
+                gcLibCLLong_Func1, \
+                gcLibCLLong_Func2, \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+                "", \
+            }
+
 #else
 #define CL_LIB_COUNT    3
 #define LONG_ULONG_LIB_INDEX 2
@@ -119,7 +147,7 @@ static gceSTATUS
 _ChangeAttribToTempForAllCodes(
     IN OUT gcSHADER Shader,
     IN gctUINT16 AttribIndex,
-    IN gctUINT16 TempIndex
+    IN gctUINT32 TempIndex
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -229,7 +257,8 @@ _copySource(
     )
 {
     gctSOURCE_t source = 0;
-    gctUINT16 sourceIndex = 0, sourceIndexed = 0;
+    gctUINT32 sourceIndex = 0;
+    gctUINT16 sourceIndexed = 0;
     gctUINT8                 swizzle;
     gcSL_FORMAT              format;
     gctUINT8                 enable;
@@ -281,7 +310,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_INTEGER);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
+        sourceIndex =  (gctUINT32)(SourceValue->i32);
         sourceIndexed = 0;
         break;
 
@@ -290,7 +319,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->u32) & 0xFFFF);
+        sourceIndex = SourceValue->u32;
         sourceIndexed = 0;
         break;
 
@@ -299,7 +328,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
+        sourceIndex = (gctUINT32) (SourceValue->i32);
         sourceIndexed = 0;
         break;
 
@@ -308,7 +337,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_INT32);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
+        sourceIndex = (gctUINT32) ((SourceValue->i32) & 0xFFFF);
         sourceIndexed = 0;
         break;
 
@@ -317,7 +346,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->u32) & 0xFFFF);
+        sourceIndex = (gctUINT32) ((SourceValue->u32) & 0xFFFF);
         sourceIndexed = 0;
         break;
 
@@ -326,7 +355,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
+        sourceIndex = (gctUINT32) ((SourceValue->i32) & 0xFFFF);
         sourceIndexed = 0;
         break;
 
@@ -335,7 +364,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_INT32);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
+        sourceIndex = (gctUINT32)(SourceValue->i32);
         sourceIndexed = 0;
         break;
 
@@ -344,7 +373,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16)((SourceValue->u32) & 0xFFFF);
+        sourceIndex = (gctUINT32)(SourceValue->u32);
         sourceIndexed = 0;
         break;
 
@@ -353,7 +382,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
         source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
         source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-        sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
+        sourceIndex = (gctUINT32)(SourceValue->i32);
         sourceIndexed = 0;
         break;
 
@@ -614,7 +643,7 @@ _addRetValueInst(
     gcsFUNCTION_ARGUMENT_PTR arg;
     gctSOURCE_t              source;
     /*gcSL_TYPE                type;*/
-    gctUINT16                tempIndex;
+    gctUINT32                tempIndex;
     gctUINT16                tempIndexed;
     gctUINT8                 swizzle;
     gcSL_INDEXED             mode;
@@ -669,7 +698,7 @@ _addRetValueInst(
         swizzle     = gcSL_SWIZZLE_XYZW;
         val         = (gcsValue *)SourceValue;
         gcmASSERT(val->i32 >= 0 && val->i32 < 0xFFFF);
-        tempIndex   = (gctUINT16) val->i32;
+        tempIndex   = (gctUINT32) val->i32;
         tempIndexed = 0;
         break;
     default:
@@ -694,12 +723,12 @@ _addRetValue2NewTemp(
     IN gcSL_INSTRUCTION   Code,
     IN gctUINT            ArgNo,
     IN _targetType        TargetType,
-    IN OUT gctUINT16 *      Index
+    IN OUT gctUINT32 *      Index
     )
 {
     gceSTATUS                status = gcvSTATUS_OK;
     gcsFUNCTION_ARGUMENT_PTR arg;
-    gctUINT16                tempIndex;
+    gctUINT32                tempIndex;
     gctUINT16                tempIndexed;
     gctUINT8                 swizzle;
     gcSL_INDEXED             mode;
@@ -726,7 +755,7 @@ _addRetValue2NewTemp(
                              &rows,
                              &type);
 
-        tempIndex   = (gctUINT16)gcSHADER_NewTempRegs(Shader, rows, type);
+        tempIndex   = gcSHADER_NewTempRegs(Shader, rows, type);
         tempIndexed = 0;
         *Index = tempIndex;
         break;
@@ -1725,6 +1754,8 @@ gcGetReadImageFunctionName(
     static const gctSTRING  channelOrderName[] = {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"};
 
+    static const gctSTRING tail = "_imageLd";
+
     filterMode = (ReadImage->samplerValue >> 8) & 0xF;
     gcmASSERT(filterMode <= 1);
     gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), filterModeName[filterMode]));
@@ -1756,6 +1787,11 @@ gcGetReadImageFunctionName(
     if (ReadImage->channelOrder == 6 || ReadImage->channelOrder == 0)
     {
         gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), channelOrderName[channelOrder]));
+    }
+
+    if (ReadImage->useImageLoad)
+    {
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), tail));
     }
 
     /* dup the name to ConvertFuncName */
@@ -1843,6 +1879,7 @@ _createWriteImageFunction(
     IN gcSL_FORMAT          ColorType,
     IN gctUINT              ImageType,
     IN gctUINT              ChannelOrder,
+    IN gctBOOL              imageStore,
     OUT gcFUNCTION *        NewFunction
     )
 {
@@ -1891,29 +1928,43 @@ _createWriteImageFunction(
         break;
     }
 
-    if (gcoOS_StrCmp(dataTypeName, "") == gcvSTATUS_OK)
+    if (imageStore)
     {
         gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
-                                gcmSIZEOF(convertFuncName),
-                                "null"));
+                                    gcmSIZEOF(convertFuncName),
+                                    colorTypeName));
+
+        imgType = ImageType & 0xF;
+        gcmASSERT(imgType <= 6);
+        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), imageTypeName[imgType] + 1));
+
     }
     else
     {
-        gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
-                                gcmSIZEOF(convertFuncName),
-                                colorTypeName));
+        if (gcoOS_StrCmp(dataTypeName, "") == gcvSTATUS_OK)
+        {
+            gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
+                                    gcmSIZEOF(convertFuncName),
+                                    "null"));
+        }
+        else
+        {
+            gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
+                                    gcmSIZEOF(convertFuncName),
+                                    colorTypeName));
 
-        gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
-                                gcmSIZEOF(convertFuncName),
-                                dataTypeName));
+            gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
+                                    gcmSIZEOF(convertFuncName),
+                                    dataTypeName));
+        }
+
+        channelOrder = ChannelOrder & 0xF;
+        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), swizzleName[channelOrder]));
+
+        imgType = ImageType & 0xF;
+        gcmASSERT(imgType <= 6);
+        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), imageTypeName[imgType]));
     }
-
-    channelOrder = ChannelOrder & 0xF;
-    gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), swizzleName[channelOrder]));
-
-    imgType = ImageType & 0xF;
-    gcmASSERT(imgType <= 6);
-    gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), imageTypeName[imgType]));
 
     gcmASSERT(Library != gcvNULL);
 
@@ -2015,7 +2066,7 @@ _createMLOutputs(
                                                   precision,
                                                   gcvFALSE,
                                                   1,
-                                                  (gctUINT16)tempRegister,
+                                                  (gctUINT32)tempRegister,
                                                   OutputConversion->outputs[0]->shaderMode,
                                                   Shader->outputCount,
                                                   -1,
@@ -2876,7 +2927,7 @@ _createLongULongStubFunction_jmp(
     IN gcSHADER             Shader,
     IN gcsPatchLongULong *  Patch,
     IN gcFUNCTION           ConvertFunction,
-    IN OUT gctUINT16 *      Index)
+    IN OUT gctUINT32 *      Index)
 {
     gctCHAR          funcName[32];
     gctUINT          offset         = 0;
@@ -2964,7 +3015,7 @@ _createLongULongStubFunction_jmp_src2(
     IN gcSHADER             Shader,
     IN gcsPatchLongULong *  Patch,
     IN gcFUNCTION           Function,
-    IN OUT gctUINT16 *      Index)
+    IN OUT gctUINT32 *      Index)
 {
     gctCHAR          funcName[32];
     gctUINT          offset         = 0;
@@ -3752,7 +3803,7 @@ OnError:
 static gctINT
 _findLastDefine(
     IN     gcSHADER          Shader,
-    IN     gctINT            outputTempIndex
+    IN     gctUINT32         outputTempIndex
     )
 {
 
@@ -4590,13 +4641,14 @@ gcFinalizeRecompilation(void)
 
 gceSTATUS
 gcLoadCLPatchLibrary(
-    void
+    IN gcSHADER   Shader
     )
 {
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   gcCLPatchSource[CL_LIB_COUNT] = {gcvNULL};
     gctSTRING   log = gcvNULL;
     gctINT      i, j;
+    gctSTRING   options = gcvNULL;
 
     _gcmLockLoadLibrary(status);
     gcmONERROR(status);
@@ -4682,35 +4734,10 @@ gcLoadCLPatchLibrary(
                 gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_R,
                 gcLibCLImage_ReadFuncF_UNNORM_3D_R,
                 gcLibCLImage_WriteFunc_R,
-                ""
-            },
+                gcLibCLImage_ReadFuncF_IMGLD,
+                },
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
-            {
-                gcLibCLLong_Func,
-                gcLibCLLong_Func1,
-                gcLibCLLong_Func2,
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-            }
+            CL_LONG_ULONG_FUNCS
 #endif
         };
         gctSIZE_T   sourceSize, length;
@@ -4726,6 +4753,7 @@ gcLoadCLPatchLibrary(
 
         for (j = 0; j < CL_LIB_COUNT; j++)
         {
+            if(gcCLPatchLibrary[j]) continue; /* loaded already */
             stringNum = sizeof(CLPatchLib[j]) / sizeof(gctSTRING);
             patchLen = stringNum;
             for (i = 0; i < stringNum; i++)
@@ -4746,10 +4774,15 @@ gcLoadCLPatchLibrary(
             }
 
             sourceSize = gcoOS_StrLen(gcCLPatchSource[j], gcvNULL);
+            options = "";
+            if(Shader && gcShaderHasInt64Patch(Shader) && LONG_ULONG_LIB_INDEX == j)
+            {
+                options = "-cl-viv-longulong-patch";
+            }
             status = (*gcCLCompiler)(gcvNULL,
                                      sourceSize,
                                      gcCLPatchSource[j],
-                                     "",
+                                     options,
                                      &library,
                                      &log);
 
@@ -4807,6 +4840,96 @@ OnError:
     }
 
     _gcmUnlockLoadLibrary(status);
+    /* Return the status. */
+    return status;
+}
+
+static gceSTATUS
+_LoadCLPatchLongULongLibrary()
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gctSTRING   patchSource = gcvNULL;
+    gctSTRING   log = gcvNULL;
+    gctINT      i;
+    gctBOOL     locked = gcvFALSE;
+
+    if (gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] == gcvNULL)
+    {
+        gcSHADER    library;
+        gctSTRING   patchLib[] = CL_LONG_ULONG_FUNCS;
+        gctSIZE_T   sourceSize, length;
+        gctPOINTER  pointer = gcvNULL;
+        gctINT      stringNum;
+        gctINT      patchLen;
+
+        _gcmLockLoadLibrary(status);
+        gcmONERROR(status);
+        locked = gcvTRUE;
+
+        if (gcCLCompiler == gcvNULL)
+        {
+            locked = gcvFALSE;
+            _gcmUnlockLoadLibrary(status);
+            gcmONERROR(status);
+            return gcvSTATUS_INVALID_ADDRESS;
+        }
+
+        stringNum = sizeof(patchLib) / sizeof(gctSTRING);
+        patchLen = stringNum;
+        for (i = 0; i < stringNum; i++)
+        {
+            patchLen += gcoOS_StrLen(patchLib[i], gcvNULL);
+        }
+        gcmONERROR(gcoOS_Allocate(gcvNULL, patchLen, &pointer));
+        patchSource = (gctSTRING)pointer;
+
+        /* Get library source based on hardware capability. */
+        length = gcoOS_StrLen(patchLib[0], gcvNULL);
+        gcoOS_StrCopySafe(patchSource, length + 1, patchLib[0]);
+
+        for (i = 1; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(patchSource, patchLen, patchLib[i]);
+        }
+
+        sourceSize = gcoOS_StrLen(patchSource, gcvNULL);
+        status = (*gcCLCompiler)(gcvNULL,
+                                 sourceSize,
+                                 patchSource,
+                                 "-cl-viv-longulong-patch",
+                                 &library,
+                                 &log);
+
+        if (status != gcvSTATUS_OK)
+        {
+            /* report error */
+            gcoOS_Print("Compiler Error:");
+            if (log)
+            {
+                gcoOS_Print("%s\n", log);
+            }
+            goto OnError;
+        }
+
+        gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] = library;
+    }
+
+OnError:
+    if (patchSource)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, patchSource);
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    if (locked)
+    {
+        _gcmUnlockLoadLibrary(status);
+    }
+
     /* Return the status. */
     return status;
 }
@@ -4883,7 +5006,7 @@ _patchColorFactoring(
         gctINT                      tempCodeIndex = 0;
         gctUINT                     lastInstruction;
         gcSHADER_INSTRUCTION_INDEX  instrIndex    = 0;
-        gctUINT16                   newTemp       = 0;
+        gctUINT32                   newTemp       = 0;
 
         /* set the const value */
         constValue.f32_v4[0] = constValue.f32_v4[1] =
@@ -4904,7 +5027,7 @@ _patchColorFactoring(
                                        &uniform);
 
         /* create one new temp register */
-        newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+        newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
 
         /* insert 2 NOPs to the end of main() */
         tempCodeIndex = _insertNOP2Main(Shader, 2);
@@ -5000,10 +5123,10 @@ _patchAlphaBlending(
         gctINT                      tempCodeIndex;
         gctUINT                     lastInstruction;
         gcSHADER_INSTRUCTION_INDEX  instrIndex;
-        gctUINT16 newTemp;
+        gctUINT32 newTemp;
 
         /* create one new temp register */
-        newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+        newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
 
         /* insert 2 NOPs to the end of main() */
         tempCodeIndex = _insertNOP2Main(Shader, 2);
@@ -5167,12 +5290,12 @@ OnError:
 gctINT
 _insertNOP2Shader(
     IN OUT gcSHADER          Shader,
-    IN     gctINT            InsertAtInst,
+    IN     gctUINT32         InsertAtInst,
     IN     gctUINT           Num
     )
 {
     gceSTATUS   status = gcvSTATUS_OK;
-    gctINT      origCodeCount = (gctINT)Shader->lastInstruction;
+    gctUINT     origCodeCount = (gctINT)Shader->lastInstruction;
     gctUINT     i;
 
     gcmASSERT(InsertAtInst >= 0 &&
@@ -5223,7 +5346,7 @@ _insertNOP2Shader(
                 (code->tempIndex >= InsertAtInst) &&
                 (code->tempIndex < Shader->lastInstruction))
             {
-                code->tempIndex += (gctINT16)Num;
+                code->tempIndex += Num;
             }
         }
         /* 4. adjust function start and end instruction */
@@ -5363,7 +5486,7 @@ _patchDepthBias(
     /* found output to patch */
     if (DepthBias->depthBiasUniform != gcvNULL)
     {
-        gctUINT16 newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 2, gcSHADER_FLOAT_X2);
+        gctUINT32 newTemp = gcSHADER_NewTempRegs(Shader, 2, gcSHADER_FLOAT_X2);
         gcATTRIBUTE fragCoord = gcvNULL;
         gcOUTPUT depth = gcvNULL;
 
@@ -5608,7 +5731,7 @@ _patchYFlippedShader(
     gctINT                      i;
     gctUINT                     lastInstruction = Shader->lastInstruction;
     gctINT                      addNopCount = 0;
-    gctUINT16                   newTemp;
+    gctUINT32                   newTemp;
     gcShaderCodeInfo            codeInfo;
     gctBOOL                     useDSY;
     const gctFLOAT              constantZero = 0.0;
@@ -5683,7 +5806,7 @@ _patchYFlippedShader(
         {
             /* gl_FragCoord.y = rtHeight - gl_FragCoord.y */
             /* create a new temp register */
-            newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+            newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
             _ChangeAttribToTempForAllCodes(Shader, position->index, newTemp);
 
             /* MOV  temp.xyzw, gl_PointCoord.xyzw */
@@ -5723,7 +5846,7 @@ _patchYFlippedShader(
         {
             /* gl_SamplePosition.y = 1.0 - gl_SamplePosition.y */
             /* create a new temp register */
-            newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
+            newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
             _ChangeAttribToTempForAllCodes(Shader, samplePosition->index, newTemp);
 
             /* MOV  temp.xy, gl_SamplePosition.xy */
@@ -5761,7 +5884,7 @@ _patchYFlippedShader(
         {
             /* gl_FrontFacing  = !gl_FrontFacing */
             /* create a new temp register */
-            newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
+            newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
             _ChangeAttribToTempForAllCodes(Shader, frontFacing->index, newTemp);
             /* SET.eq temp.x, gl_FrontFacing, 0.0 */
             gcmONERROR(gcSHADER_AddOpcodeConditionIndexed(Shader,
@@ -5789,7 +5912,7 @@ _patchYFlippedShader(
         {
             /* gl_PointCoord.y = 1.0 -gl_PointCoord.y */
             /* create a new temp register */
-            newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
+            newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
             _ChangeAttribToTempForAllCodes(Shader, pointCoord->index, newTemp);
 
             /* MOV  temp.xy, gl_PointCoord.xy */
@@ -5850,7 +5973,7 @@ _patchYFlippedShader(
 
                 /* DSY dst, src
                  *    change dst to newTemp */
-                newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+                newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
                 code->tempIndex = newTemp;
                 /* reset indexed */
                 code->temp          = gcmSL_TARGET_SET(code->temp, Indexed, 0);
@@ -5867,7 +5990,7 @@ _patchYFlippedShader(
                 /* SUB dst, 0.0, newTemp */
                 gcmONERROR(gcSHADER_AddOpcodeIndexed(Shader,
                                                      gcSL_SUB,
-                                                     (gctUINT16)dst,
+                                                     (gctUINT32)dst,
                                                      enable,
                                                      dst_indexed,
                                                      (gctUINT16)dst_indexedIndex,
@@ -5939,7 +6062,7 @@ _findSubsampleDepthTemp(
 
     if (subsampleDepth == gcvNULL)
     {
-        gctUINT16 t = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+        gctUINT32 t = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
         gcmONERROR(gcSHADER_AddOutput(Shader, "#Subsample_Depth", gcSHADER_UINT_X4, 1, t, gcSHADER_PRECISION_HIGH));
 
         subsampleDepth = Shader->outputs[Shader->outputCount - 1];
@@ -6266,7 +6389,7 @@ _patchColorKill(
     gctUINT                         lastInstruction;
     gcSHADER_INSTRUCTION_INDEX      instrIndex    = 0;
     gctFLOAT                        constZero = 0.0;
-    gctUINT16                       newTempIndex;
+    gctUINT32                       newTempIndex;
 
     if (Shader->type != gcSHADER_TYPE_FRAGMENT)
     {
@@ -6295,7 +6418,7 @@ _patchColorKill(
     Shader->instrIndex = gcSHADER_OPCODE;
 
     /* create one new temp register */
-    newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
 
     /* DP4: newTemp, output, output. */
     gcmONERROR(gcSHADER_AddOpcode(Shader,
@@ -6845,7 +6968,7 @@ static gceSTATUS
 _ConvertRepeatNP2Mode(
     IN OUT gcSHADER             Shader,
     IN gcSL_INSTRUCTION Code,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctINT ChannelIndex,
     IN gcSHADER_PRECISION Precision
     )
@@ -6853,12 +6976,12 @@ _ConvertRepeatNP2Mode(
     gceSTATUS status = gcvSTATUS_OK;
     gcSL_SWIZZLE sourceSwizzle;
     gcSL_ENABLE targetEnable;
-    gctUINT16 tempReg;
+    gctUINT32 tempReg;
 
     targetEnable = gcSL_ENABLE_X << ChannelIndex;
     sourceSwizzle = _SingleEnable2Swizzle(targetEnable);
 
-    tempReg = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    tempReg = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
 
     /* frac r1.x, tempTexCoord */
     gcSHADER_AddOpcode(Shader, gcSL_FRAC, tempReg,
@@ -6879,7 +7002,7 @@ static gceSTATUS
 _ConvertMIRRORNP2Mode(
     IN OUT gcSHADER             Shader,
     IN gcSL_INSTRUCTION Code,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctINT ChannelIndex,
     IN gcSHADER_PRECISION Precision
     )
@@ -6887,17 +7010,17 @@ _ConvertMIRRORNP2Mode(
     gceSTATUS status = gcvSTATUS_OK;
     gcSL_SWIZZLE sourceSwizzle;
     gcSL_ENABLE targetEnable;
-    gctUINT16 tempReg1, tempReg2, tempReg3, tempReg4;
+    gctUINT32 tempReg1, tempReg2, tempReg3, tempReg4;
     gctFLOAT constZero = 0.0, constPointFive = 0.5, constOne = 1.0, constTwo = -2.0;
     gctUINT label  = gcSHADER_FindNextUsedLabelId(Shader);
 
     targetEnable = gcSL_ENABLE_X << ChannelIndex;
     sourceSwizzle = _SingleEnable2Swizzle(targetEnable);
 
-    tempReg1 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
-    tempReg2 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
-    tempReg3 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
-    tempReg4 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    tempReg1 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    tempReg2 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    tempReg3 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+    tempReg4 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
 
     /* r1.x would hole the result temporarily. */
     /* frc r1.x, tempTexCoord*/
@@ -6986,7 +7109,7 @@ _ConvertNP2Textue(
 {
     gctINT j;
     gctINT addCountNum = 0;
-    gctUINT16 tempTexCoord = 0;
+    gctUINT32 tempTexCoord = 0;
     gctUINT movIndex = 0;
 
     if (!CountAddCode)
@@ -6996,14 +7119,14 @@ _ConvertNP2Textue(
         /* tempTexCoord would hold the modified value of texCoord. */
         if (NP2Texture->np2Texture[TextureIndex].texDimension == 2)
         {
-            tempTexCoord = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
+            tempTexCoord = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
             gcSHADER_AddOpcode(Shader, gcSL_MOV, tempTexCoord,
                               gcSL_ENABLE_XY, gcSL_FLOAT, gcmSL_SOURCE_GET(Code->source1, Precision), 0);
         }
         else
         {
             gcmASSERT(NP2Texture->np2Texture[TextureIndex].texDimension == 3);
-            tempTexCoord = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
+            tempTexCoord = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
             gcSHADER_AddOpcode(Shader, gcSL_MOV, tempTexCoord,
                                gcSL_ENABLE_XYZ, gcSL_FLOAT, gcmSL_SOURCE_GET(Code->source1, Precision), 0);
         }
@@ -7672,7 +7795,7 @@ _patchGlobalWorkSizeCode(
 
     /* Insert instructions */
     {
-        gctUINT16 newTemp = (gctUINT16)gcSHADER_NewTempRegs(
+        gctUINT32 newTemp = gcSHADER_NewTempRegs(
                                     Shader, 1,
                                     Shader->attributes[attribCount]->type);
         gctUINT32 zeroValue = 0;
@@ -7788,7 +7911,7 @@ _patchRealGlobalWorkSizeCode(
 
     /* Insert instructions */
     {
-        gctUINT16 newTemp = (gctUINT16)gcSHADER_NewTempRegs(
+        gctUINT32 newTemp = gcSHADER_NewTempRegs(
                                     Shader, 1,
                                     attrGlobalWorkID->type);
         gctUINT32 zeroValue = 0;
@@ -7906,6 +8029,47 @@ OnError:
 }
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
+#define __CL_JMP_LABEL_ADJUSTMENT__ 0x40000000
+#define _gcmIsOrdinaryClLabel(Shader, Label)  ((Label) < ((gctUINT32) (~0 - ((Shader)->kernelFunctionCount + (Shader)->functionCount))))
+#define _gcmIsLabelResolved(Shader, Label) (_gcmIsOrdinaryClLabel(Shader, (Label)) && ((Label) & __CL_JMP_LABEL_ADJUSTMENT__) == 0)
+
+/*******************************************************************************
+**
+**  Find a label id which is not used inside the gcSHADER object
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**  RETURN:
+**
+**      the next unused label id
+*/
+gctUINT
+_FindClNextUnusedJmpLabelId(
+    IN gcSHADER Shader
+    )
+{
+    gcSHADER_LABEL label;
+    gctUINT  maxLabelId = 0;
+
+    /* Walk all defines shader labels to find the requested label. */
+    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    {
+        if (_gcmIsOrdinaryClLabel(Shader, label->label))
+        {
+            if (label->label > maxLabelId)
+            {
+                maxLabelId = label->label;
+            }
+        }
+    }
+
+    return (maxLabelId + 1) | __CL_JMP_LABEL_ADJUSTMENT__;
+}
+
+#define _IsCl
 static gctUINT tmpLabel1=0, tmpLabel2=0;
 static gceSTATUS
 _patchLongULong(
@@ -7926,9 +8090,7 @@ _patchLongULong(
     /*  gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] is used as long/ulong patch lib. */
     if (gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] == gcvNULL)
     {
-        gcmASSERT((gcCLPatchLibrary[0] == gcvNULL) &&
-                  (gcCLPatchLibrary[1] == gcvNULL));
-        gcmONERROR(gcLoadCLPatchLibrary());
+        gcmONERROR(gcLoadCLPatchLibrary(Shader));
     }
 
     gcmASSERT(Patch);
@@ -7948,7 +8110,7 @@ _patchLongULong(
             gctUINT i = Patch->instructionIndex + Shader->InsertCount;
             gcFUNCTION          convertFunction_jmp = gcvNULL;
             gcFUNCTION          stubFunction_jmp = gcvNULL;
-            gctUINT16 jmpIndex = 0;
+            gctUINT32 jmpIndex = 0;
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
             gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex+Shader->InsertCount];
@@ -8006,7 +8168,7 @@ _patchLongULong(
 
             if(Shader->InstNum == 0)
             {
-                tmpLabel1  = gcSHADER_FindNextUsedLabelId(Shader);
+                tmpLabel1 = _FindClNextUnusedJmpLabelId(Shader);
                 gcSHADER_AddOpcodeConditional(Shader,
                                               gcSL_JMP,
                                               (condition == gcSL_NOT_EQUAL ? gcSL_NOT_ZERO : gcSL_ZERO),
@@ -8045,7 +8207,7 @@ _patchLongULong(
             }
             else if(Shader->InstNum == 1)
             {
-                tmpLabel2  = gcSHADER_FindNextUsedLabelId(Shader);
+                tmpLabel2 = _FindClNextUnusedJmpLabelId(Shader);
                 gcSHADER_AddOpcodeConditional(Shader,
                                             gcSL_JMP,
                                             gcSL_ZERO,
@@ -8082,6 +8244,7 @@ _patchLongULong(
                     opcode = gcmSL_OPCODE_GET(curCode->opcode, Opcode);
 
                     if ((opcode == gcSL_JMP || opcode == gcSL_CALL) &&
+                        _gcmIsLabelResolved(Shader, curCode->tempIndex) &&
                         (curCode->tempIndex >= i+1 ))
                     {
                         curCode->tempIndex += 1;
@@ -8149,10 +8312,10 @@ _patchLongULong(
             gctUINT patchInstrIndex = Patch->instructionIndex;
             gcFUNCTION          convertFunction_jmp = gcvNULL;
             gcFUNCTION          stubFunction_jmp = gcvNULL;
-            gctUINT16 jmpIndex = 0;
+            gctUINT32 jmpIndex = 0;
             gctUINT   jmpLabel = 0;
             gcSL_INSTRUCTION code;
-            gctUINT16   origJmpLabel = 0;
+            gctUINT32   origJmpLabel = 0;
             /*1D to 2D Patch will add 3 instruction in the top of binary, we need add 3 offset in instructionIndex if Patch is set. */
             Patch->instructionIndex += (Patched1Dto2D?3:0);
 
@@ -8195,7 +8358,7 @@ _patchLongULong(
             /* add JMP instruction label */
             Shader->lastInstruction = origJmpLabel;
             Shader->instrIndex = gcSHADER_OPCODE;
-            jmpLabel  =  gcSHADER_FindNextUsedLabelId(Shader);
+            jmpLabel = _FindClNextUnusedJmpLabelId(Shader);
             gcSHADER_AddLabel(Shader, jmpLabel);
             /* add JMP instruction to jump same target like before */
             Shader->lastInstruction = patchInstrIndex + 1;
@@ -8232,6 +8395,7 @@ _patchLongULong(
                     opcode = gcmSL_OPCODE_GET(curCode->opcode, Opcode);
 
                     if ((opcode == gcSL_JMP || opcode == gcSL_CALL) &&
+                        _gcmIsLabelResolved(Shader, curCode->tempIndex) &&
                         (curCode->tempIndex >= patchInstrIndex+1 ))
                     {
                         curCode->tempIndex += 1;
@@ -8346,7 +8510,6 @@ _patchLongULong(
     }
 
 OnError:
-
     return gcvSTATUS_OK;
 }
 #endif
@@ -8366,7 +8529,7 @@ _patchReadImage(
     if (gcCLPatchLibrary[0] == gcvNULL)
     {
         gcmASSERT(gcCLPatchLibrary[1] == gcvNULL);
-        gcmONERROR(gcLoadCLPatchLibrary());
+        gcmONERROR(gcLoadCLPatchLibrary(Shader));
     }
 
     /* Pre-allocate more space to reduce overhead. */
@@ -8492,7 +8655,7 @@ _patchReadImageUnnorm(
         {
             gctUINT samplerId = gcmSL_INDEX_GET(code->source0Index, Index);
             gctUINT extraInstNum;
-            gctUINT16 newTempIndex;
+            gctUINT32 newTempIndex;
             gctUINT enable;
             gctUINT swizzle;
             gctBOOL needToAddI2F;
@@ -8548,20 +8711,20 @@ _patchReadImageUnnorm(
             if (ReadImage->imageType == gcSHADER_IMAGE_2D ||
                 ReadImage->imageType == gcSHADER_IMAGE_1D_ARRAY)
             {
-                newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
+                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
                 enable = gcSL_ENABLE_XY;
                 swizzle = gcSL_SWIZZLE_XYYY;
             }
             else if (ReadImage->imageType == gcSHADER_IMAGE_3D ||
                      ReadImage->imageType == gcSHADER_IMAGE_2D_ARRAY)
             {
-                newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
+                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
                 enable = gcSL_ENABLE_XYZ;
                 swizzle = gcSL_SWIZZLE_XYZZ;
             }
             else
             {
-                newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
+                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
                 enable = gcSL_ENABLE_X;
                 swizzle = gcSL_SWIZZLE_XXXX;
             }
@@ -8600,7 +8763,7 @@ _patchReadImageUnnorm(
                 prevCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                                   | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
                                   | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-                prevCode->source1Index = (gctUINT16) ReadImage->imageSizeIndex;
+                prevCode->source1Index = ReadImage->imageSizeIndex;
             }
             else
             {
@@ -8621,7 +8784,7 @@ _patchReadImageUnnorm(
                 prevCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                                   | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
                                   | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-                prevCode->source1Index = (gctUINT16) ReadImage->imageSizeIndex;
+                prevCode->source1Index =  ReadImage->imageSizeIndex;
             }
 
             /* Change TEXLS's src1 to new temp. */
@@ -8654,7 +8817,7 @@ _patchWriteImage(
     if (gcCLPatchLibrary[0] == gcvNULL)
     {
         gcmASSERT(gcCLPatchLibrary[1] == gcvNULL);
-        gcmONERROR(gcLoadCLPatchLibrary());
+        gcmONERROR(gcLoadCLPatchLibrary(Shader));
     }
 
     for (i = 0; i < origCodeCount; i++)
@@ -8685,6 +8848,7 @@ _patchWriteImage(
                                     (gcSL_FORMAT)gcmSL_TARGET_GET(code->temp, Format),
                                     WriteImage->imageType,
                                     WriteImage->channelOrder,
+                                    WriteImage->imageStore,
                                     &convertFunction);
 
                 if (!gcmIS_ERROR(status))
@@ -8746,7 +8910,7 @@ _patchYFlippedTexture(
             gctBOOL isSamplerMatch = gcvFALSE;
             gctINT minSamplerIndex, maxSamplerIndex;
             gctUINT insertIndex = i;
-            gctUINT16 newTemp;
+            gctUINT32 newTemp;
 
             gcmASSERT(type == gcSL_SAMPLER || type == gcSL_UNIFORM);
 
@@ -8807,7 +8971,7 @@ _patchYFlippedTexture(
             Shader->instrIndex = gcSHADER_OPCODE;
 
             /* MOV: temp, coord */
-            newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
+            newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
             gcmONERROR(gcSHADER_AddOpcode(Shader,
                                                            gcSL_MOV,
                                                            newTemp,
@@ -8864,8 +9028,8 @@ OnError:
 static gceSTATUS
 _IsTempOutputColor(
     IN gcSHADER Shader,
-    IN gctUINT16 TempIndex,
-    IN gctINT16 *Index,
+    IN gctUINT32 TempIndex,
+    IN gctINT32 *Index,
     IN OUT gcOUTPUT *Output
     )
 {
@@ -8874,7 +9038,7 @@ _IsTempOutputColor(
 
     for (i = 0; i < 4; i++)
     {
-        if (Index[i] != -1 && TempIndex == (gctUINT16)Index[i])
+        if (Index[i] != -1 && TempIndex == (gctUINT32)Index[i])
         {
             break;
         }
@@ -8915,7 +9079,7 @@ _patchRemoveAssignmentForAlphaChannel(
     gctSIZE_T i;
     gcSL_INSTRUCTION code = gcvNULL;
     /* For a es30 shader, it may have 4 output. */
-    gctINT16 index[4] = {-1, -1, -1, -1};
+    gctINT32 index[4] = {-1, -1, -1, -1};
     gctINT outputCount = 0;
     gcOUTPUT output;
 
@@ -8935,7 +9099,7 @@ _patchRemoveAssignmentForAlphaChannel(
         {
             if (Shader->outputs[i] != gcvNULL && Shader->outputs[i]->nameLength == gcSL_COLOR)
             {
-                index[0] = (gctINT16)Shader->outputs[i]->tempIndex;
+                index[0] = (gctINT32)Shader->outputs[i]->tempIndex;
                 outputCount++;
                 break;
             }
@@ -8948,7 +9112,7 @@ _patchRemoveAssignmentForAlphaChannel(
             if (Shader->outputs[i] != gcvNULL && Shader->outputs[i]->nameLength !=  gcSL_DEPTH)
             {
                 gcmASSERT(Shader->outputLocations[i] < 4);
-                index[Shader->outputLocations[i]] = (gctINT16)Shader->outputs[i]->tempIndex;
+                index[Shader->outputLocations[i]] = (gctINT32)Shader->outputs[i]->tempIndex;
                 outputCount++;
             }
         }
@@ -9049,6 +9213,18 @@ gcSHADER_DynamicPatch(
     */
     if (curDirective)
         _addInstNopToEndOfMainFunc(Shader);
+
+    gcShaderClrHasInt64Patch(Shader);
+    for (; curDirective; curDirective = curDirective->next)
+    {
+        if (curDirective->kind == gceRK_PATCH_CL_LONGULONG)
+        {
+            gcShaderSetHasInt64Patch(Shader);
+            break;
+        }
+    }
+
+    curDirective = PatchDirective;
 
     for (; curDirective; curDirective = curDirective->next)
     {
@@ -9237,7 +9413,7 @@ _ConvertIntOrUIntAttribute(
     {
         if (AttribArray[attribCount])
         {
-            gctUINT16 newTemp = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, Shader->attributes[attribCount]->type);
+            gctUINT32 newTemp = gcSHADER_NewTempRegs(Shader, 1, Shader->attributes[attribCount]->type);
 
             /* Change all users of this attribute. */
             _ChangeAttribToTempForAllCodes(Shader, Shader->attributes[attribCount]->index, newTemp);
@@ -10805,16 +10981,16 @@ _MappingInfo;
 static void
 _fixTempIndexByMappingTable(
     IN     _MappingInfo *   MI,
-    IN OUT gctUINT16 *      TempIndexPtr
+    IN OUT gctUINT32 *      TempIndexPtr
     )
 {
-    gctINT libFunctionTempIndexStart = (gctINT)MI->Function->tempIndexStart - MI->TempOffset;
+    gctUINT32 libFunctionTempIndexStart = (gctUINT32)(MI->Function->tempIndexStart - MI->TempOffset);
 
     gcmASSERT(*TempIndexPtr < MI->LibList->tempMappingTableEntries);
-    if (MI->LibList->tempMappingTable[*TempIndexPtr] != (gctUINT16)-1)
+    if (MI->LibList->tempMappingTable[*TempIndexPtr] != (gctUINT32)-1)
     {
         /* already mapped, use the mapped temp index */
-        *TempIndexPtr = (gctUINT16) MI->LibList->tempMappingTable[*TempIndexPtr];
+        *TempIndexPtr = (gctUINT32) MI->LibList->tempMappingTable[*TempIndexPtr];
         gcmASSERT(*TempIndexPtr < MI->Shader->_tempRegCount);
         return;
     }
@@ -10823,12 +10999,12 @@ _fixTempIndexByMappingTable(
     if (*TempIndexPtr >= libFunctionTempIndexStart &&
         *TempIndexPtr < (libFunctionTempIndexStart + MI->Function->tempIndexCount))
     {
-        gctINT newTempIndex = (gctINT)*TempIndexPtr + MI->TempOffset;
-        gcmASSERT(newTempIndex > 0 && newTempIndex < (gctINT)MI->Shader->_tempRegCount);
+        gctUINT32 newTempIndex = (gctUINT32)(*TempIndexPtr + MI->TempOffset);
+        gcmASSERT(newTempIndex > 0 && newTempIndex < (gctUINT)MI->Shader->_tempRegCount);
         /* enter the mapping */
-        gcmASSERT(newTempIndex < 0xFFFF);
-        MI->LibList->tempMappingTable[*TempIndexPtr] = (gctUINT16)newTempIndex;
-        *TempIndexPtr = (gctUINT16)newTempIndex;
+        gcmASSERT(newTempIndex < 0xFFFFFF);
+        MI->LibList->tempMappingTable[*TempIndexPtr] = newTempIndex;
+        *TempIndexPtr = newTempIndex;
     }
     else
     {
@@ -10930,7 +11106,7 @@ _MapTempRegister(
 {
     gcmASSERT(TempIndex >= 0 &&
               TempIndex < (gctINT)LibList->tempMappingTableEntries);
-    LibList->tempMappingTable[TempIndex] = (gctUINT16)MappedTempRegIndex;
+    LibList->tempMappingTable[TempIndex] = (gctUINT32)MappedTempRegIndex;
     return;
 }
 
@@ -10964,14 +11140,14 @@ _addToLibraryList(
         /* make sure the max temp count can fit into 16bit */
         gcmASSERT(LibraryShader->_tempRegCount < 0xFFFF);
         gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
-                                  gcmSIZEOF(gctUINT16) * LibraryShader->_tempRegCount,
+                                  gcmSIZEOF(gctUINT32) * LibraryShader->_tempRegCount,
                                   &pointer));
         libList->tempMappingTableEntries = LibraryShader->_tempRegCount;
-        libList->tempMappingTable = (gctUINT16 *) pointer;
+        libList->tempMappingTable = (gctUINT32 *) pointer;
 
         for (i=0; i < (gctINT)libList->tempMappingTableEntries; i++)
         {
-            libList->tempMappingTable[i] = (gctUINT16)-1;
+            libList->tempMappingTable[i] = (gctUINT32)-1;
         }
         /* make sure the max uniform count can fit into 16bit */
         libList->uniformMappingTableEntries =
@@ -11078,7 +11254,7 @@ _CreateSamplerSizeArgument(
                                         gcSHADER_FLOAT_X3,
                                         0,
                                         gcvNULL,
-                                        (gctUINT16)tempIndex1,
+                                        tempIndex1,
                                         gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                         gcSHADER_PRECISION_MEDIUM,
                                         0,
@@ -11094,7 +11270,7 @@ _CreateSamplerSizeArgument(
                                             gcSHADER_FLOAT_X3,
                                             0,
                                             gcvNULL,
-                                            (gctUINT16)tempIndex2,
+                                            tempIndex2,
                                             gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                             gcSHADER_PRECISION_MEDIUM,
                                             0,
@@ -11118,7 +11294,7 @@ _CreateSamplerSizeArgument(
 
     /* Insert the new arguments. */
     newArguments[1].enable = gcSL_ENABLE_XYZ;
-    newArguments[1].index = (gctUINT16)tempIndex1;
+    newArguments[1].index = tempIndex1;
     newArguments[1].qualifier = gcvFUNCTION_INPUT;
     newArguments[1].precision = gcSHADER_PRECISION_MEDIUM;
     newArguments[1].variableIndex = (gctUINT16)variableIndex1;
@@ -11126,7 +11302,7 @@ _CreateSamplerSizeArgument(
     if (CreateLod)
     {
         newArguments[2].enable = gcSL_ENABLE_XYZ;
-        newArguments[2].index = (gctUINT16)tempIndex2;
+        newArguments[2].index = tempIndex2;
         newArguments[2].qualifier = gcvFUNCTION_INPUT;
         newArguments[2].precision = gcSHADER_PRECISION_MEDIUM;
         newArguments[2].variableIndex = (gctUINT16)variableIndex2;
@@ -11214,7 +11390,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_INTEGER_X1,
                                       0,
                                       gcvNULL,
-                                      (gctUINT16)interpolateTypeIndex,
+                                      interpolateTypeIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       interpolateTypeVariable->precision,
                                       0,
@@ -11232,7 +11408,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_FLOAT_X4,
                                       0,
                                       gcvNULL,
-                                      (gctUINT16)positionIndex,
+                                      positionIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       positionVariable->precision,
                                       0,
@@ -11250,7 +11426,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_BOOLEAN_X1,
                                       0,
                                       gcvNULL,
-                                      (gctUINT16)multiSampleBufferIndex,
+                                      multiSampleBufferIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       multiSampleBufferVariable->precision,
                                       0,
@@ -11268,7 +11444,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_BOOLEAN_X1,
                                       0,
                                       gcvNULL,
-                                      (gctUINT16)underSampleShadingIndex,
+                                      underSampleShadingIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       underSampleShadingVariable->precision,
                                       0,
@@ -11286,7 +11462,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_INTEGER_X1,
                                       0,
                                       gcvNULL,
-                                      (gctUINT16)sampleIdIndex,
+                                      sampleIdIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       sampleIdVariable->precision,
                                       0,
@@ -11306,7 +11482,7 @@ _CreateInterpolationArgument(
                                           gcSHADER_INTEGER_X1,
                                           0,
                                           gcvNULL,
-                                          (gctUINT16)sampleMaskIndex,
+                                          sampleMaskIndex,
                                           gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                           sampleMaskVariable->precision,
                                           0,
@@ -11325,7 +11501,7 @@ _CreateInterpolationArgument(
                                       gcSHADER_FLOAT_X4,
                                       1,
                                       sampleLocationVariable->arrayLengthList,
-                                      (gctUINT16)sampleLocationIndex,
+                                      sampleLocationIndex,
                                       gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
                                       sampleLocationVariable->precision,
                                       0,
@@ -11353,7 +11529,7 @@ _CreateInterpolationArgument(
 
     /* Insert argument "interpolateType". */
     newArguments[currentArgumentIndex].enable             = gcSL_ENABLE_X;
-    newArguments[currentArgumentIndex].index              = (gctUINT16)interpolateTypeIndex;
+    newArguments[currentArgumentIndex].index              = interpolateTypeIndex;
     newArguments[currentArgumentIndex].qualifier          = gcvFUNCTION_INPUT;
     newArguments[currentArgumentIndex].precision          = interpolateTypeVariable->precision;
     newArguments[currentArgumentIndex].variableIndex      = (gctUINT16)interpolateTypeVariableIndex;
@@ -11361,7 +11537,7 @@ _CreateInterpolationArgument(
 
     /* Insert argument "position". */
     newArguments[currentArgumentIndex].enable             = gcSL_ENABLE_XYZW;
-    newArguments[currentArgumentIndex].index              = (gctUINT16)positionIndex;
+    newArguments[currentArgumentIndex].index              = positionIndex;
     newArguments[currentArgumentIndex].qualifier          = gcvFUNCTION_INPUT;
     newArguments[currentArgumentIndex].precision          = positionVariable->precision;
     newArguments[currentArgumentIndex].variableIndex      = (gctUINT16)positionVariableIndex;
@@ -11369,7 +11545,7 @@ _CreateInterpolationArgument(
 
     /* Insert argument "multiSampleBuffer". */
     newArguments[currentArgumentIndex].enable             = gcSL_ENABLE_X;
-    newArguments[currentArgumentIndex].index              = (gctUINT16)multiSampleBufferIndex;
+    newArguments[currentArgumentIndex].index              = multiSampleBufferIndex;
     newArguments[currentArgumentIndex].qualifier          = gcvFUNCTION_INPUT;
     newArguments[currentArgumentIndex].precision          = multiSampleBufferVariable->precision;
     newArguments[currentArgumentIndex].variableIndex      = (gctUINT16)multiSampleBufferVariableIndex;
@@ -11377,7 +11553,7 @@ _CreateInterpolationArgument(
 
     /* Insert argument "underSampleShading". */
     newArguments[currentArgumentIndex].enable             = gcSL_ENABLE_X;
-    newArguments[currentArgumentIndex].index              = (gctUINT16)underSampleShadingIndex;
+    newArguments[currentArgumentIndex].index              = underSampleShadingIndex;
     newArguments[currentArgumentIndex].qualifier          = gcvFUNCTION_INPUT;
     newArguments[currentArgumentIndex].precision          = underSampleShadingVariable->precision;
     newArguments[currentArgumentIndex].variableIndex      = (gctUINT16)underSampleShadingVariableIndex;
@@ -11385,7 +11561,7 @@ _CreateInterpolationArgument(
 
     /* Insert argument "sampleId". */
     newArguments[currentArgumentIndex].enable             = gcSL_ENABLE_X;
-    newArguments[currentArgumentIndex].index              = (gctUINT16)sampleIdIndex;
+    newArguments[currentArgumentIndex].index              = sampleIdIndex;
     newArguments[currentArgumentIndex].qualifier          = gcvFUNCTION_INPUT;
     newArguments[currentArgumentIndex].precision          = sampleIdVariable->precision;
     newArguments[currentArgumentIndex].variableIndex      = (gctUINT16)sampleIdVariableIndex;
@@ -11395,7 +11571,7 @@ _CreateInterpolationArgument(
     if (IsIntrinsicsKindInterpolateAtCentroid(Function->intrinsicsKind))
     {
         newArguments[currentArgumentIndex].enable         = gcSL_ENABLE_X;
-        newArguments[currentArgumentIndex].index          = (gctUINT16)sampleMaskIndex;
+        newArguments[currentArgumentIndex].index          = sampleMaskIndex;
         newArguments[currentArgumentIndex].qualifier      = gcvFUNCTION_INPUT;
         newArguments[currentArgumentIndex].precision      = sampleMaskVariable->precision;
         newArguments[currentArgumentIndex].variableIndex  = (gctUINT16)sampleMaskVariableIndex;
@@ -11406,7 +11582,7 @@ _CreateInterpolationArgument(
     for (i = 0; i < 4; i++)
     {
         newArguments[currentArgumentIndex].enable         = gcSL_ENABLE_XYZW;
-        newArguments[currentArgumentIndex].index          = (gctUINT16)(sampleLocationIndex + i);
+        newArguments[currentArgumentIndex].index          = (sampleLocationIndex + i);
         newArguments[currentArgumentIndex].qualifier      = gcvFUNCTION_INPUT;
         newArguments[currentArgumentIndex].precision      = sampleLocationVariable->precision;
         newArguments[currentArgumentIndex].variableIndex  = (gctUINT16)sampleLocationVariableIndex;
@@ -11512,8 +11688,8 @@ _InsertAssignmentForSamplerSize(
     IN gctBOOL              CreateLod,
     IN gctBOOL              BuiltIn,
     IN gceINTRINSICS_KIND   IntrinsicsKind,
-    IN gctINT16 *           ArgIndex0,
-    IN gctINT16 *           ArgIndex1
+    IN gctINT32 *           ArgIndex0,
+    IN gctINT32 *           ArgIndex1
     );
 
 static gceSTATUS
@@ -11522,12 +11698,12 @@ _InsertAssignmentForAllFuncStack(
     IN gcFUNCTION           Function,
     IN gctBOOL              CreateLod,
     IN gceINTRINSICS_KIND   IntrinsicsKind,
-    IN gctINT16 *           ArgIndex0,
-    IN gctINT16 *           ArgIndex1
+    IN gctINT32 *           ArgIndex0,
+    IN gctINT32 *           ArgIndex1
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctINT16 argIndex0 = 0, argIndex1 = 0;
+    gctINT32 argIndex0 = 0, argIndex1 = 0;
 
     gcmONERROR(_CreateSamplerSizeArgument(Shader, gcvNULL, Function, CreateLod));
 
@@ -11560,8 +11736,8 @@ _InsertAssignmentForSamplerSize(
     IN gctBOOL              CreateLod,
     IN gctBOOL              BuiltIn,
     IN gceINTRINSICS_KIND   IntrinsicsKind,
-    IN gctINT16 *           ArgIndex0,
-    IN gctINT16 *           ArgIndex1
+    IN gctINT32 *           ArgIndex0,
+    IN gctINT32 *           ArgIndex1
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -11572,7 +11748,7 @@ _InsertAssignmentForSamplerSize(
     gcUNIFORM uniform, firstChild, lodMinMaxUniform, levelBaseSizeUniform;
     gctSTRING symbol;
     gctINT16 lodMinMaxIndex, levelBaseSizeIndex;
-    gctINT16 argumentIndex0 = 0, argumentIndex1 = 0;
+    gctINT32 argumentIndex0 = 0, argumentIndex1 = 0;
     gctINT32 i, j;
     gctBOOL fromUniform = gcvFALSE;
     gctPOINTER pointer = gcvNULL;
@@ -11585,7 +11761,7 @@ _InsertAssignmentForSamplerSize(
         code = Shader->code + i;
 
         if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_CALL ||
-            (BuiltIn && (code->tempIndex != (gctUINT16)Function->label)) ||
+            (BuiltIn && (code->tempIndex != (gctUINT32)Function->label)) ||
             (!BuiltIn && (code->tempIndex != Function->codeStart)))
         {
             continue;
@@ -11706,7 +11882,7 @@ _InsertAssignmentForSamplerSize(
 
                 gcmONERROR(gcSHADER_AddUniformEx1(Shader,
                                                   symbol,
-                                                  gcSHADER_INTEGER_X3,
+                                                  gcSHADER_INTEGER_X4,
                                                   gcSHADER_PRECISION_MEDIUM,
                                                   -1,
                                                   -1,
@@ -11724,8 +11900,8 @@ _InsertAssignmentForSamplerSize(
                 pointer = gcvNULL;
             }
 
-            argumentIndex0 = levelBaseSizeIndex;
-            argumentIndex1 = lodMinMaxIndex;
+            argumentIndex0 = (gctUINT32)levelBaseSizeIndex;
+            argumentIndex1 = (gctUINT32)lodMinMaxIndex;
         }
 
         /* Insert two argument assignments. */
@@ -11745,7 +11921,7 @@ _InsertAssignmentForSamplerSize(
                             | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
                             | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_MEDIUM);
         insertCode1->source0Index = argumentIndex0;
-        argumentIndex0 = (gctINT16)insertCode1->tempIndex;
+        argumentIndex0 = insertCode1->tempIndex;
 
         if (CreateLod)
         {
@@ -11763,7 +11939,7 @@ _InsertAssignmentForSamplerSize(
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
                                 | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_MEDIUM);
             insertCode2->source0Index = argumentIndex1;
-            argumentIndex1 = (gctINT16)insertCode2->tempIndex;
+            argumentIndex1 = insertCode2->tempIndex;
         }
 
         codeCount += createCodeCount;
@@ -11965,7 +12141,7 @@ _InsertAssignmentForInterpolation(
         code = Shader->code + i;
 
         if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_CALL ||
-            code->tempIndex != (gctUINT16)Function->label)
+            code->tempIndex != (gctUINT32)Function->label)
         {
             continue;
         }
@@ -12314,7 +12490,7 @@ _LinkImageLibFuc(
         code = Shader->code + i;
 
         if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_CALL ||
-            code->tempIndex != (gctUINT16)Function->codeStart)
+            code->tempIndex != (gctUINT32)Function->codeStart)
         {
             continue;
         }
@@ -12579,7 +12755,7 @@ _LinkImageLibFuc(
                 code = Shader->code + callIndex;
 
                 /* change the call target */
-                code->tempIndex = (gctUINT16)imgLibFunc->codeStart;
+                code->tempIndex = (gctUINT32)imgLibFunc->codeStart;
 
                 /* change the input to be the new extraLayerLib's temp */
                 argCode = &Shader->code[movIndex];
@@ -12685,7 +12861,7 @@ _LinkImageSizeLibFuc(
         code = Shader->code + i;
 
         if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_CALL ||
-            code->tempIndex != (gctUINT16)Function->codeStart)
+            code->tempIndex != (gctUINT32)Function->codeStart)
         {
             continue;
         }
@@ -12785,6 +12961,7 @@ gcSHADER_FindLibFunction(
     gctBOOL     isSupportImgInst = gcHWCaps.hwFeatureFlags.hasHalti5 ?
                                     gcHWCaps.hwFeatureFlags.hasUscGosAddrFix : isSupportImgAddr;
     gctSTRING   functionName = (gctSTRING)FunctionName;
+    gctUINT32 indexed;
 
     if (isSupportImgAddr && !isSupportImgInst &&
         (GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL))
@@ -13009,7 +13186,7 @@ gcSHADER_FindLibFunction(
         {
             if (code->tempIndex == function->label)
             {
-                code->tempIndex = (gctUINT16) function->codeStart;
+                code->tempIndex = (gctUINT32) function->codeStart;
 
                 if (function->codeStart > i)
                 {
@@ -13032,7 +13209,7 @@ gcSHADER_FindLibFunction(
                     if (_inputOutputArgument(function, code->tempIndex, gcvTRUE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->tempIndex = (gctUINT16) paraMapping[argIndex];
+                        code->tempIndex = (gctUINT32) paraMapping[argIndex];
                     }
                 }
 
@@ -13061,14 +13238,14 @@ gcSHADER_FindLibFunction(
                         _inputOutputArgument(function, code->source0Index, gcvFALSE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->source0Index = (gctUINT16) paraMapping[argIndex];
+                        code->source0Index = (gctUINT32) paraMapping[argIndex];
                     }
 
                     if ((gcmSL_SOURCE_GET(code->source1, Type) == gcSL_TEMP) &&
                         _inputOutputArgument(function, code->source1Index, gcvFALSE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->source1Index = (gctUINT16) paraMapping[argIndex];
+                        code->source1Index = (gctUINT32) paraMapping[argIndex];
                     }
                 }
             }
@@ -13097,11 +13274,11 @@ gcSHADER_FindLibFunction(
             checkVariable &&
             !checkVariable[function->arguments[i].variableIndex])
         {
-            Shader->variables[function->arguments[i].variableIndex]->tempIndex = (gctUINT16) mappedTempRegIndex;
+            Shader->variables[function->arguments[i].variableIndex]->tempIndex = (gctUINT32) mappedTempRegIndex;
             checkVariable[function->arguments[i].variableIndex] = gcvTRUE;
         }
 
-        function->arguments[i].index = (gctUINT16) mappedTempRegIndex;
+        function->arguments[i].index = (gctUINT32) mappedTempRegIndex;
     }
 
     if (checkVariable)
@@ -13128,7 +13305,7 @@ gcSHADER_FindLibFunction(
 
             /* Shader->code may be changed after link lib function to shader */
             newCode = Shader->code + function->codeStart + i;
-            newCode->tempIndex = (gctUINT16) shaderFunction->codeStart;
+            newCode->tempIndex = (gctUINT32) shaderFunction->codeStart;
         }
     }
 
@@ -13160,7 +13337,7 @@ gcSHADER_FindLibFunction(
             if (opcode == gcSL_JMP)
             {
                 /* Adjust label. */
-                code->tempIndex += (gctUINT16) codeOffset;
+                code->tempIndex += (gctUINT32) codeOffset;
             }
             else if (opcode == gcSL_CALL)
             {
@@ -13179,7 +13356,9 @@ gcSHADER_FindLibFunction(
             if (gcmSL_TARGET_GET(code->temp, Indexed) != gcSL_NOT_INDEXED)
             {
                 /* fix indexed register */
-                _fixTempIndexByMappingTable(&mi, &code->tempIndexed);
+                indexed = code->tempIndexed;
+                _fixTempIndexByMappingTable(&mi, &indexed);
+                code->tempIndexed = (gctUINT16)indexed;
             }
 
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_TEMP)
@@ -13189,13 +13368,17 @@ gcSHADER_FindLibFunction(
             }
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_UNIFORM)
             {
+                gctUINT16 uniformIndexed = (gctUINT16)code->source0Index;
                 /* Adjust uniform index . */
-                _fixUniformIndexByMappingTable(&mi, &code->source0Index);
+                _fixUniformIndexByMappingTable(&mi, &uniformIndexed);
+                code->source0Index = (gctUINT32)uniformIndexed;
             }
             if (gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
             {
                 /* fix indexed register */
-                _fixTempIndexByMappingTable(&mi, &code->source0Indexed);
+                indexed = code->source0Indexed;
+                _fixTempIndexByMappingTable(&mi, &indexed);
+                code->source0Indexed = (gctUINT16)indexed;
             }
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_ATTRIBUTE)
             {
@@ -13230,13 +13413,17 @@ gcSHADER_FindLibFunction(
             }
             if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_UNIFORM)
             {
+                gctUINT16 uniformIndexed;
                 /* Adjust uniform index . */
-                _fixUniformIndexByMappingTable(&mi, &code->source1Index);
+                _fixUniformIndexByMappingTable(&mi, &uniformIndexed);
+                code->source1Index = (gctUINT32)uniformIndexed;
             }
             if (gcmSL_SOURCE_GET(code->source1, Indexed) != gcSL_NOT_INDEXED)
             {
                 /* fix indexed register */
-                _fixTempIndexByMappingTable(&mi, &code->source1Indexed);
+                indexed = code->source1Indexed;
+                _fixTempIndexByMappingTable(&mi, &indexed);
+                code->source1Indexed = (gctUINT16)indexed;
             }
             if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_ATTRIBUTE)
             {
@@ -13368,7 +13555,7 @@ _addTextureGradUniform(
     {
         gcmONERROR(gcSHADER_AddUniformEx1(Shader,
                                             name,
-                                            gcSHADER_INTEGER_X3,
+                                            gcSHADER_INTEGER_X4,
                                             gcSHADER_PRECISION_MEDIUM,
                                             -1,
                                             -1,
@@ -13846,6 +14033,125 @@ OnError:
     return status;
 }
 
+static gctBOOL
+_InstNeedInt64Patch(
+    gcSL_INSTRUCTION    Instruction
+    )
+{
+#define _NEED_INT64_PATCH(inst, opcode, dstFormat) \
+    ((opcode == gcSL_LSHIFT)  ||\
+     (opcode == gcSL_RSHIFT)  ||\
+     (opcode == gcSL_ADD)     ||\
+     (opcode == gcSL_ADDLO)   ||\
+     (opcode == gcSL_ADDSAT)  ||\
+     (opcode == gcSL_SUB)     ||\
+     (opcode == gcSL_SUBSAT)  ||\
+     (opcode == gcSL_DIV)     ||\
+     (opcode == gcSL_MUL)     ||\
+     (opcode == gcSL_MULHI)   ||\
+     (opcode == gcSL_MULLO)   ||\
+     (opcode == gcSL_MULSAT)  ||\
+     (opcode == gcSL_MADSAT) ||\
+     (opcode == gcSL_MOD)  ||\
+     (opcode == gcSL_I2F)     ||\
+     (opcode == gcSL_F2I)     ||\
+     (opcode == gcSL_CONV && (dstFormat == gcSL_INT8 || dstFormat == gcSL_UINT8 || dstFormat == gcSL_INT16 || dstFormat == gcSL_UINT16 || dstFormat == gcSL_INT32 || dstFormat == gcSL_UINT32 || dstFormat == gcSL_INT64 || dstFormat == gcSL_UINT64) && (gcmSL_OPCODE_GET((inst->opcode), Sat) == gcSL_SATURATE)) || \
+     (opcode == gcSL_CONV && (dstFormat == gcSL_FLOAT || gcmSL_SOURCE_GET(inst->source0, Format) == gcSL_FLOAT)) ||\
+     (opcode == gcSL_CMP) ||\
+     (opcode == gcSL_ABS) ||\
+     (opcode == gcSL_ROTATE) ||\
+     (opcode == gcSL_POPCOUNT) ||\
+     (opcode == gcSL_LEADZERO) ||\
+     (opcode == gcSL_MAX) ||\
+     (opcode == gcSL_MIN)\
+    )
+
+    gctBOOL patch = gcvFALSE;
+    gctUINT dstFormat = gcmSL_TARGET_GET(GetInstTemp(Instruction), Format);
+    gctUINT opcode = gcmSL_OPCODE_GET(Instruction->opcode, Opcode);
+    gcSL_CONDITION condition = gcmSL_TARGET_GET(GetInstTemp(Instruction), Condition);
+
+    patch = _NEED_INT64_PATCH(Instruction, opcode, dstFormat) ||
+               (opcode == gcSL_JMP &&
+               (condition == gcSL_LESS_OR_EQUAL ||
+                condition == gcSL_GREATER_OR_EQUAL ||
+                condition == gcSL_LESS ||
+                condition == gcSL_GREATER ||
+                condition == gcSL_NOT_EQUAL ||
+                condition == gcSL_EQUAL));
+
+    return patch;
+}
+
+static gctINT
+_Countbits(
+    gctUINT bits,
+    gctINT n
+    )
+{
+    gctUINT count = 0;
+    gctINT i;
+
+    for (i = 0; i < n; i++)
+    {
+        count += (bits & 1);
+        bits >>= 1;
+    }
+
+    return count;
+}
+
+gceSTATUS
+gcSHADER_PatchInt64(
+    IN OUT gcSHADER  Shader
+    )
+{
+    gctINT i;
+    gctINT numInst = GetShaderCodeCount(Shader);
+
+    /* Check for int64 opeartions for patch. */
+    for (i = numInst - 1; i >= 0; i--)
+    {
+        gctUINT src0Format, src1Format, dstFormat;
+        gcSL_INSTRUCTION inst = GetShaderInstruction(Shader, i);
+
+        /* To check whether an instruction has 64-bit operands. */
+        src0Format = gcmSL_SOURCE_GET(GetInstSource0(inst), Format);
+        src1Format = gcmSL_SOURCE_GET(GetInstSource1(inst), Format);
+        dstFormat  = gcmSL_TARGET_GET(GetInstTemp(inst), Format);
+
+        if((((src0Format == gcSL_INT64) || (src0Format == gcSL_UINT64) ||
+            (src1Format == gcSL_INT64) || (src1Format == gcSL_UINT64)) ||
+            ((dstFormat == gcSL_INT64 || dstFormat == gcSL_UINT64))) &&
+            _InstNeedInt64Patch(inst))
+        {
+            gceSTATUS status;
+            gctUINT opcode = gcmSL_OPCODE_GET(inst->opcode, Opcode);
+#if defined __GNUC__
+            gcsPatchLongULong  longULongPatch[1] = { };
+#else
+            gcsPatchLongULong  longULongPatch[1] = { 0 };
+#endif
+
+            longULongPatch->instructionIndex = i;
+            if (_NEED_INT64_PATCH(inst, opcode, dstFormat))
+            {
+                gctUINT channelBits;
+
+                channelBits = gcmSL_TARGET_GET(GetInstTemp(inst), Enable);
+                longULongPatch->channelCount = _Countbits(channelBits, 4);
+            }
+
+            _LoadCLPatchLongULongLibrary();
+            status = _patchLongULong(Shader,
+                                     gcvNULL,
+                                     longULongPatch);
+            if (gcmIS_ERROR(status)) return status;
+        }
+    }
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS
 gcSHADER_PatchCentroidVaryingAsCenter(
     IN OUT gcSHADER         Shader
@@ -13897,7 +14203,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
     {
         gcATTRIBUTE         attribute = Shader->attributes[i];
         gctINT              funcIndex, codeIndex, j;
-        gctUINT16           argumentTempIndex1, argumentTempIndex2, mapTempIndex;
+        gctUINT32           argumentTempIndex1, argumentTempIndex2, mapTempIndex;
         gctINT16            variableIndex1 = -1, variableIndex2 = -1;
         gctCHAR             name[128] = "";
 
@@ -13925,8 +14231,8 @@ gcSHADER_PatchCentroidVaryingAsCenter(
                 /* Add the label. */
                 gcmONERROR(gcSHADER_AddLabel(Shader, convertFunc->label));
                 /* Add function arguments. */
-                argumentTempIndex1 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, GetATTRType(attribute));
-                argumentTempIndex2 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, GetATTRType(attribute));
+                argumentTempIndex1 = gcSHADER_NewTempRegs(Shader, 1, GetATTRType(attribute));
+                argumentTempIndex2 = gcSHADER_NewTempRegs(Shader, 1, GetATTRType(attribute));
                 gcmONERROR(gcSHADER_AddVariableEx(Shader,
                                                   convertFuncName,
                                                   GetATTRType(attribute),
@@ -13969,7 +14275,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
             convertFuncList[funcIndex] = convertFunc;
         }
         /* Add a new variable to save the new varying value. */
-        mapTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, GetATTRArraySize(attribute), GetATTRType(attribute));
+        mapTempIndex = gcSHADER_NewTempRegs(Shader, GetATTRArraySize(attribute), GetATTRType(attribute));
         gcmONERROR(gcoOS_StrCopySafe(name, gcmSIZEOF(name), GetATTRName(attribute)));
         gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_evaluated_as_centroid"));
         gcmONERROR(gcSHADER_AddVariableEx(Shader,
@@ -14006,14 +14312,14 @@ gcSHADER_PatchCentroidVaryingAsCenter(
             code = &Shader->code[codeIndex + 1];
             code->opcode = gcSL_CALL;
             code->temp = gcmSL_TARGET_SET(code->temp, Condition, gcSL_ALWAYS);
-            code->tempIndex = (gctUINT16)convertFunc->label;
+            code->tempIndex = (gctUINT32)convertFunc->label;
             /* Get the return value. */
             code = &Shader->code[codeIndex + 2];
             code->opcode = gcSL_MOV;
             code->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                        | gcmSL_TARGET_SET(0, Enable, enableList[funcIndex])
                        | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED);
-            code->tempIndex = (gctUINT16)(mapTempIndex + j);
+            code->tempIndex = (gctUINT32)(mapTempIndex + j);
             code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                           | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
                           | gcmSL_SOURCE_SET(0, Swizzle, swizzleList[funcIndex])
@@ -14039,7 +14345,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
         if (!code) continue;
 
         /* Update the source0. */
-        attributeIndex = gcmSL_INDEX_GET(code->source0Index, Index);
+        attributeIndex = (gctUINT16)gcmSL_INDEX_GET(code->source0Index, Index);
         if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_ATTRIBUTE &&
             attributeCheck[attributeIndex])
         {
@@ -14058,17 +14364,17 @@ gcSHADER_PatchCentroidVaryingAsCenter(
             }
 
             code->source0 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_TEMP);
-            code->source0Index = (gctUINT16)(attributeMapTempIndex[attributeIndex] + gcmSL_INDEX_GET(code->source0Index, ConstValue));
+            code->source0Index = (gctUINT32)(attributeMapTempIndex[attributeIndex] + gcmSL_INDEX_GET(code->source0Index, ConstValue));
             code->source0Index = gcmSL_INDEX_SET(code->source0Index, ConstValue, 0);
         }
 
         /* Update the source1. */
-        attributeIndex = gcmSL_INDEX_GET(code->source1Index, Index);
+        attributeIndex = (gctUINT16)gcmSL_INDEX_GET(code->source1Index, Index);
         if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_ATTRIBUTE &&
             attributeCheck[attributeIndex])
         {
             code->source1 = gcmSL_SOURCE_SET(code->source1, Type, gcSL_TEMP);
-            code->source1Index = (gctUINT16)(attributeMapTempIndex[attributeIndex] + gcmSL_INDEX_GET(code->source1Index, ConstValue));
+            code->source1Index = (gctUINT32)(attributeMapTempIndex[attributeIndex] + gcmSL_INDEX_GET(code->source1Index, ConstValue));
             code->source1Index = gcmSL_INDEX_SET(code->source1Index, ConstValue, 0);
         }
     }

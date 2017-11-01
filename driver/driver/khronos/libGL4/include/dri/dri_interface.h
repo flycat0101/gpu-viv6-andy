@@ -74,6 +74,7 @@ struct __DRIversionRec {
     int    major;        /**< Major version number. */
     int    minor;        /**< Minor version number. */
     int    patch;        /**< Patch-level. */
+    GLboolean dri3;        /* indicate if it is dri3 or dri1 */
 };
 
 /**

@@ -57,8 +57,6 @@ extern "C" {
 
 typedef struct _cl_mem_callback     clsMemObjCallback;
 typedef clsMemObjCallback *         clsMemObjCallback_PTR;
-typedef struct _buffer_wait_event   clsBufferWaitEvent;
-typedef clsBufferWaitEvent *        clsBufferWaitEvent_PTR;
 
 struct _cl_mem_callback
 {
@@ -81,21 +79,9 @@ typedef struct _cl_image_header
     gctUINT                 imageType;
     gceTILING               tiling;
     gctUINT                 physical;           /* GPU address: 32 bit only. */
+    gctUINT                 elementSize;
 }
 clsImageHeader;
-
-struct _buffer_wait_event
-{
-    /* commandQueueID is only used to identify event owner(do not access its member)
-       so no need to maintain reference count. and it should be also safe in:
-       1. commandQueueID is invalid(the commandQueue has been detroied)
-       2. commandQueueID is reused(commandQueue destroied and re-created with the same value)
-    */
-    clsCommandQueue_PTR     commandQueueID;
-    /* track buffer status event */
-    clsEvent_PTR            event;
-    clsBufferWaitEvent_PTR  next;
-};
 
 typedef struct _cl_mem
 {
@@ -121,9 +107,6 @@ typedef struct _cl_mem
 
     /* Modify mutex lock. */
     gctPOINTER              mutex;
-
-    /* track buffer status event */
-    clsBufferWaitEvent      waitEvent;
 
     gcsSURF_NODE_PTR        tmpNode;  /* Used for write buffer Command */
     union {

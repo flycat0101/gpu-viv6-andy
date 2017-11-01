@@ -154,7 +154,7 @@ static gceSTATUS _Set_uColor(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->aColorInfo.currValue,
         valueArray,
         1
@@ -174,7 +174,7 @@ static gceSTATUS _Set_uNormal(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           &Context->aNormalInfo.currValue,
           valueArray,
           1
@@ -194,7 +194,7 @@ static gceSTATUS _Set_uModelView(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromMatrix(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           Context->modelViewMatrix,
           valueArray,
           1, 4, 4           /* One 4x4 matrix. */
@@ -214,7 +214,7 @@ static gceSTATUS _Set_uModelViewInverse3x3Transposed(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromMatrix(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           glfGetModelViewInverse3x3TransposedMatrix(Context),
           valueArray,
           1, 3, 3           /* One 3x3 matrix. */
@@ -244,7 +244,7 @@ static gceSTATUS _Set_uModelViewProjection(
 
     status = glfSetUniformFromMatrix(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           glfGetModelViewProjectionMatrix(Context),
           valueArray,
           1, 4, 4           /* One 4x4 matrix. */
@@ -264,7 +264,7 @@ static gceSTATUS _Set_uProjection(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromMatrix(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           glfGetConvertedProjectionMatrix(Context),
           valueArray,
           1, 4, 4           /* One 4x4 matrix. */
@@ -284,7 +284,7 @@ static gceSTATUS _Set_uEcm(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           &Context->lightingStates.Ecm,
           valueArray,
           1
@@ -304,7 +304,7 @@ static gceSTATUS _Set_uAcm(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           &Context->lightingStates.Acm,
           valueArray,
           1
@@ -324,7 +324,7 @@ static gceSTATUS _Set_uDcm(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->lightingStates.Dcm,
         valueArray,
         1
@@ -344,7 +344,7 @@ static gceSTATUS _Set_uAcs(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->lightingStates.Acs,
         valueArray,
         1
@@ -364,7 +364,7 @@ static gceSTATUS _Set_uSrm(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromFloats(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->lightingStates.Srm,
         gcvNULL,
         gcvNULL,
@@ -387,7 +387,7 @@ static gceSTATUS _Set_uScm(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->lightingStates.Scm,
         valueArray,
         1
@@ -407,7 +407,7 @@ static gceSTATUS _Set_uPpli(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.Ppli,
         valueArray,
         glvMAX_LIGHTS
@@ -427,7 +427,7 @@ static gceSTATUS _Set_uKi(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromFloats(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.K0i,
         Context->lightingStates.K1i,
         Context->lightingStates.K2i,
@@ -450,7 +450,7 @@ static gceSTATUS _Set_uSrli(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromFloats(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.Srli,
         gcvNULL,
         gcvNULL,
@@ -473,7 +473,7 @@ static gceSTATUS _Set_uAcli(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.Acli,
         valueArray,
         glvMAX_LIGHTS
@@ -493,7 +493,7 @@ static gceSTATUS _Set_uDcli(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.Dcli,
         valueArray,
         glvMAX_LIGHTS
@@ -513,7 +513,7 @@ static gceSTATUS _Set_uScli(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.Scli,
         valueArray,
         glvMAX_LIGHTS
@@ -566,7 +566,7 @@ static gceSTATUS _Set_uTexMatrix(
     status = gcUNIFORM_SetFracValue(
           Uniform,
           4 * Context->texture.pixelSamplers,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           valueArray
           );
 
@@ -585,7 +585,7 @@ static gceSTATUS _Set_uClipPlane(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->clipPlane,
         valueArray,
         glvMAX_CLIP_PLANES
@@ -605,7 +605,7 @@ static gceSTATUS _Set_uPointAttenuation(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->pointStates.attenuation,
         valueArray,
         1
@@ -624,7 +624,7 @@ static gceSTATUS _Set_uPointSize(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromFractions(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->aPointSizeInfo.currValue.value[0],
         Context->pointStates.clampFrom,
         Context->pointStates.clampTo,
@@ -656,7 +656,7 @@ static gceSTATUS _Set_uViewport(
 
     status = glfSetUniformFromFractions(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
 
         /* ViewportScaleX */
         glmINT2FLOAT(
@@ -736,7 +736,7 @@ static gceSTATUS _Set_uMatrixPalette(
         status = gcUNIFORM_SetFracValue(
             Uniform,
             4 * glvMAX_PALETTE_MATRICES,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             valueArray
             );
     }
@@ -804,7 +804,7 @@ static gceSTATUS _Set_uMatrixPaletteInverse(
         status = gcUNIFORM_SetFracValue(
             Uniform,
             3 * glvMAX_PALETTE_MATRICES,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             valueArray
             );
     }
@@ -851,7 +851,7 @@ static gceSTATUS _Set_uAcmAcli(
 
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           vAcmAcli,
           valueArray,
           glvMAX_LIGHTS
@@ -892,7 +892,7 @@ static gceSTATUS _Set_uVPpli(
 
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           vPpli,
           valueArray,
           glvMAX_LIGHTS
@@ -940,7 +940,7 @@ static gceSTATUS _Set_uDcmDcli(
 
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           vDcmDcli,
           valueArray,
           glvMAX_LIGHTS
@@ -961,7 +961,7 @@ static gceSTATUS _Set_uCrli(
 
     return glfSetUniformFromFloats(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         Context->lightingStates.uCrli180,
         gcvNULL,
         gcvNULL,
@@ -991,7 +991,7 @@ static gceSTATUS _Set_uCosCrli(
 
     status = glfSetUniformFromFloats(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           mCosCrli,
           gcvNULL,
           gcvNULL,
@@ -1027,7 +1027,7 @@ static gceSTATUS _Set_uNormedSdli(
 
     status = glfSetUniformFromVectors(
           Uniform,
-          Context->currProgram->hints,
+          Context->currProgram->programState.hints,
           vNormedSdli,
           valueArray,
           glvMAX_LIGHTS

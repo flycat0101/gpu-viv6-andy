@@ -244,7 +244,7 @@ hwcDumpLayer(
             break;
         }
 
-        LOGD("[%d] %6s %12p %5x %8x %5d %3s  %3d %5s "
+        LOGD("[%zd] %6s %12p %5x %8x %5d %3s  %3d %5s "
              "%3d %6s %4dx%-4d [%d,%d,%d,%d] [%d,%d,%d,%d]",
              i, typeStr,
              layer->handle,
@@ -279,7 +279,7 @@ hwcDumpLayer(
 
         for (size_t j = 0; j < region->numRects; j++)
         {
-            LOGD("    region %d: [%d,%d,%d,%d]",
+            LOGD("    region %zd: [%d,%d,%d,%d]",
                  j,
                  region->rects[j].left,
                  region->rects[j].top,

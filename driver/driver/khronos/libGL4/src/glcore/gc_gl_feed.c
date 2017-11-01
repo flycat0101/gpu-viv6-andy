@@ -16,7 +16,6 @@
 **
 */
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 GLvoid __glFeedbackTag(__GLcontext *gc, GLfloat f)
 {
@@ -34,10 +33,6 @@ GLvoid __glFeedbackTag(__GLcontext *gc, GLfloat f)
 GLvoid APIENTRY __glim_FeedbackBuffer(__GLcontext *gc, GLsizei bufferLength, GLenum type, GLfloat *buffer)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FeedbackBuffer", DT_GLsizei, bufferLength, DT_GLenum, type, DT_GLfloat_ptr, buffer, DT_GLnull);
-#endif
 
     if ((type < GL_2D) || (type > GL_4D_COLOR_TEXTURE)) {
         __glSetError(gc, GL_INVALID_ENUM);
@@ -66,11 +61,6 @@ GLvoid APIENTRY __glim_FeedbackBuffer(__GLcontext *gc, GLsizei bufferLength, GLe
 GLvoid APIENTRY __glim_PassThrough(__GLcontext *gc, GLfloat element)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PassThrough", DT_GLfloat, element, DT_GLnull);
-#endif
 
     /* flush the primitive buffer
     */

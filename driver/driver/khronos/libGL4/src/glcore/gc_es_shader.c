@@ -111,6 +111,9 @@ GLboolean __glInitProgramObject(__GLcontext *gc, __GLprogramObject *programObjec
     programObject->ppXfbVaryingNames = gcvNULL;
     programObject->xfbRefCount = 0;
 
+    programObject->maxSampler = 0;
+    programObject->maxUnit = 0;
+
     __GL_MEMZERO(programObject->bindingInfo.workGroupSize, 3 * sizeof(GLuint));
 
     programObject->programInfo.infoLog = (GLchar*)(*gc->imports.calloc)(gc, __GLSL_LOG_INFO_SIZE, sizeof(GLchar));
@@ -435,6 +438,8 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
         gc->shaderProgram.lastProgObjs[stage] = gcvNULL;
         gc->shaderProgram.lastCodeSeqs[stage] = 0xFFFFFFFF;
     }
+
+    gc->shaderProgram.maxSampler = 0;
 }
 
 GLvoid __glFreeShaderProgramState(__GLcontext * gc)
@@ -963,6 +968,33 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         if (programObject->programInfo.attachedShader[__GLSL_STAGE_GS])
         {
                 programObject->programInfo.geomShaderEnable = GL_TRUE;
+        }
+
+        if (gc->state.enables.program.vpTwoSize)
+        {
+            gcShaderSetVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
+        }
+        else
+        {
+            gcShaderClrVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
+        }
+
+        if((gc->state.light.clampVertexColor == GL_TRUE) || (gc->state.light.clampVertexColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+        {
+            gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary);
+        }
+        else
+        {
+            gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary);
+        }
+
+        if((gc->state.raster.clampFragColor == GL_TRUE) || (gc->state.raster.clampFragColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+        {
+            gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
+        }
+        else
+        {
+            gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
         }
   #endif
 
@@ -2096,6 +2128,52 @@ GLvoid GL_APIENTRY __gles_Uniform4i(__GLcontext *gc, GLint location, GLint x, GL
     __GL_FOOTER();
 }
 
+GLvoid GL_APIENTRY __gles_Uniform1d(__GLcontext *gc, GLint location, GLdouble x)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE, 1, &x, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_Uniform2d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y)
+{
+    GLdouble iv[2] = {x, y};
+
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC2, 1, iv, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+
+GLvoid GL_APIENTRY __gles_Uniform3d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z)
+{
+    GLdouble iv[3] = {x, y, z};
+
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC3, 1, iv, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+
+
+GLvoid GL_APIENTRY __gles_Uniform4d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    GLdouble iv[4] = {x, y, z, w};
+
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC4, 1, iv, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+
 GLvoid GL_APIENTRY __gles_Uniform1ui(__GLcontext *gc, GLint location, GLuint x)
 {
     __GL_HEADER();
@@ -2206,6 +2284,42 @@ GLvoid GL_APIENTRY __gles_Uniform4iv(__GLcontext *gc, GLint location, GLsizei co
     __GL_HEADER();
 
     __glUniform(gc, location, GL_INT_VEC4, count, v, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_Uniform1dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE, count, v, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_Uniform2dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC2, count, v, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_Uniform3dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC3, count, v, GL_FALSE);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_Uniform4dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_VEC4, count, v, GL_FALSE);
 
     __GL_FOOTER();
 }
@@ -2335,6 +2449,99 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4x3fv(__GLcontext *gc, GLint location, GL
 
     __GL_FOOTER();
 }
+
+GLvoid GL_APIENTRY __gles_UniformMatrix2dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT2, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix3dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT3, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix4dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT4, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix2x3dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT2x3, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix2x4dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT2x4, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+
+GLvoid GL_APIENTRY __gles_UniformMatrix3x2dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT3x2, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix3x4dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT3x4, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix4x2dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT4x2, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_UniformMatrix4x3dv(__GLcontext *gc, GLint location, GLsizei count,
+                                           GLboolean transpose, const GLdouble *v)
+{
+    __GL_HEADER();
+
+    __glUniform(gc, location, GL_DOUBLE_MAT4x3, count, v, transpose);
+
+    __GL_FOOTER();
+}
+
+
 
 
 GLvoid __glProgramUniform(__GLcontext *gc, GLuint program, GLint location, GLint type,
@@ -2805,6 +3012,46 @@ GLvoid GL_APIENTRY __gles_GetUniformuiv(__GLcontext *gc, GLuint program, GLint l
     }
 
     if (!(*gc->dp.getUniformData)(gc, programObject, location, GL_UNSIGNED_INT, params))
+    {
+        __GL_ERROR_EXIT((*gc->dp.getError)(gc));
+    }
+
+OnError:
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __gles_GetUniformdv(__GLcontext *gc, GLuint program, GLint location, GLdouble *params)
+{
+    __GLprogramObject* programObject = gcvNULL;
+
+    __GL_HEADER();
+
+    if ((program <= 0) || (params == gcvNULL))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+    if (location < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    GL_ASSERT(gc->shaderProgram.spShared);
+
+    programObject = (__GLprogramObject *)__glGetObject(gc, gc->shaderProgram.spShared, program);
+    if (!programObject)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+    else if (programObject->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+    else if (!programObject->programInfo.linkedStatus)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    if (!(*gc->dp.getUniformData)(gc, programObject, location, GL_DOUBLE, params))
     {
         __GL_ERROR_EXIT((*gc->dp.getError)(gc));
     }
@@ -4955,21 +5202,20 @@ OnError:
 
 }
 #ifdef OPENGL40
-GLvoid APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, GLuint colorNumber,
-                                const GLbyte *name)
+GLvoid GL_APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, GLuint colorNumber,
+                                const GLchar *name)
 {
     __GLprogramObject * programObject;
-    GLuint i;
 
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
 
-    if((program <= 0) || (name == NULL) || (colorNumber > __GL_MAX_DRAW_BUFFERS)) {
+    if((program <= 0) || (name == NULL) || (colorNumber >=  __GL_MAX_DRAW_BUFFERS)) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
     }
-    else if(!strncmp((const char *)name, "gl_", 3)) {
-        __glSetError(gc, GL_INVALID_VALUE);
+    else if(!strncmp(name, "gl_", 3)) {
+        __glSetError(gc, GL_INVALID_OPERATION);
         return;
     }
 
@@ -4985,8 +5231,13 @@ GLvoid APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, GLu
         return;
     }
 
-    (*gc->dp.bindFragDataLocation)(gc, programObject, colorNumber, (GLchar *)name);
+   (*gc->dp.bindFragDataLocation)(gc, programObject, colorNumber, name);
 
 
+}
+
+GLvoid GL_APIENTRY __glim_GetActiveUniformName(__GLcontext *gc, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName)
+{
+    __gles_GetActiveUniform(gc, program, uniformIndex, bufSize, length, NULL, NULL, uniformName);
 }
 #endif

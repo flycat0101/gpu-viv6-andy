@@ -54,6 +54,12 @@ DECLARE_QUERY_PASS_PROP(vscVIR_ConvertVirtualInstructions);
 VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_PreprocessLLShader);
 
+VSC_ErrCode vscVIR_PreprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PreprocessMLPostShader);
+
+VSC_ErrCode vscVIR_PostprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PostprocessMLPostShader);
+
 VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_CheckVariableUsage);
 

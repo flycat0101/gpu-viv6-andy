@@ -224,6 +224,26 @@ $(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
 .PHONY: gl21
 gl21:               $(LIB_GL21)
 endif # EGL_API_DRI
+
+ifeq ($(X11_DRI3),1)
+
+ifeq ($(GL4_LINUX_ENABLE),1)
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
+else
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
+endif
+
+
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_GL21)
+endif
+
+$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: gl21
+gl21:               $(LIB_GL21)
+endif # X11_DRI3
+
 endif # VIVANTE_ENABLE_3D
 
 
@@ -278,6 +298,13 @@ LIB_LIST            += $(LIB_EXA)
 $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
 
+ifeq ($(X11_DRI3),1)
+LIB_LIST            += $(LIB_EXA)
+
+$(LIB_EXA):         $(LIB_GAL)
+endif # X11_DRI3
+
+
 else
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
@@ -288,6 +315,13 @@ LIB_LIST            += $(LIB_EXA)
 
 $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
+
+ifeq ($(X11_DRI3),1)
+LIB_LIST            += $(LIB_EXA)
+
+$(LIB_EXA):         $(LIB_GAL)
+endif # X11_DRI3
+
 
 endif
 

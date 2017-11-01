@@ -79,7 +79,7 @@ GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint na
     bufObj->name                = name;
 }
 
-GLvoid __glBindBufferToGeneralPoint(__GLcontext *gc, GLuint targetIndex, GLuint buffer)
+__GL_INLINE GLvoid __glBindBufferToGeneralPoint(__GLcontext *gc, GLuint targetIndex, GLuint buffer)
 {
     __GLbufferObject *newBufObj, *oldBufObj;
     __GLBufGeneralBindPoint *bindingPoint = &gc->bufferObject.generalBindingPoint[targetIndex];
@@ -195,7 +195,7 @@ OnError:
     return;
 }
 
-GLvoid __glBindBufferToArrayPoint(__GLcontext *gc, GLuint targetIndex, GLuint bindingPointIdx,
+__GL_INLINE GLvoid __glBindBufferToArrayPoint(__GLcontext *gc, GLuint targetIndex, GLuint bindingPointIdx,
                                   GLuint buffer, GLintptr offset, GLsizeiptr size)
 {
     __GLbufferObject *bufObj;
@@ -244,7 +244,7 @@ GLvoid __glBindBufferToArrayPoint(__GLcontext *gc, GLuint targetIndex, GLuint bi
 }
 
 
-GLvoid __glBindBufferToXfb(__GLcontext *gc, GLuint buffer)
+__GL_INLINE GLvoid __glBindBufferToXfb(__GLcontext *gc, GLuint buffer)
 {
     __GLbufferObject *newBufObj, *oldBufObj;
     __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
@@ -326,7 +326,7 @@ OnError:
 }
 
 
-GLvoid __glBindBufferToXfbStream(__GLcontext *gc, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size)
+__GL_INLINE GLvoid __glBindBufferToXfbStream(__GLcontext *gc, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size)
 {
     __GLbufferObject *bufObj;
     __GLxfbObject    *xfbObj = gc->xfb.boundXfbObj;
@@ -358,7 +358,7 @@ GLvoid __glBindBufferToXfbStream(__GLcontext *gc, GLuint index, GLuint buffer, G
 }
 
 
-GLvoid __glGetBufferParameteri64v(__GLcontext *gc, GLenum target, GLenum pname, GLint64 *params)
+__GL_INLINE GLvoid __glGetBufferParameteri64v(__GLcontext *gc, GLenum target, GLenum pname, GLint64 *params)
 {
     GLuint targetIndex;
     __GLbufferObject * bufObj;

@@ -93,6 +93,115 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
 
     return status;
 }
+
+vx_status vxNorm_F16(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output)
+{
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_status status = VX_SUCCESS;
+    vx_enum norm_type_value;
+    vx_uint32 width;
+    vx_uint32 height;
+
+    vxReadScalarValue(norm_type, &norm_type_value);
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
+    }
+
+    vxQueryImage(output, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(output, VX_IMAGE_HEIGHT, &height, sizeof(height));
+
+    /*index = 0*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_x, GC_VX_INDEX_AUTO);
+
+    /*index = 1*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_y, GC_VX_INDEX_AUTO);
+
+    /*index = 2*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+
+    kernelContext->params.row       = width;
+    kernelContext->params.col       = height;
+    kernelContext->params.xmax      = width;
+    kernelContext->params.ymax      = height;
+    kernelContext->params.xstep     = 8;
+    if (norm_type_value == VX_NORM_L1)
+    {
+        kernelContext->params.kernel    = gcvVX_KERNEL_ELEMENTWISE_NORM;
+    }
+    else if (norm_type_value == VX_NORM_L2)
+    {
+        kernelContext->params.kernel    = gcvVX_KERNEL_MAGNITUDE;
+
+        {
+            vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
+
+            vx_uint32 dp4x4_sqaure[16] = {
+                0x05050505, /* TCfg*/
+                0x04040404, /* ASelt*/
+                0x00110000, 0x00330022, /* ABin*/
+                0x04040404, /* BSelt*/
+                0x00110000, 0x00330022, /* BBin*/
+                0x00000400, /* AccumType, ConstantType, and PostShift*/
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 /* Constant*/
+            }; /* srcA*srcA + srcB * srcB(0-3) */
+
+            vx_uint32 dp4x4_sqaure_4_7[16] = {
+                0x05050505, /* TCfg*/
+                0x04040404, /* ASelt*/
+                0x00550044, 0x00770066, /* ABin*/
+                0x04040404, /* BSelt*/
+                0x00550044, 0x00770066, /* BBin*/
+                0x00000100, /* AccumType, ConstantType, and PostShift*/
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 /* Constant*/
+            }; /* srcA*srcA + srcB * srcB(4-7) */
+            gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[0].index = 3;
+            kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+
+            gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, dp4x4_sqaure, sizeof(dp4x4_sqaure));
+            kernelContext->uniforms[1].index       = 4;
+            kernelContext->uniforms[1].num         = 16 * 4;
+            gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, dp4x4_sqaure_4_7, sizeof(dp4x4_sqaure_4_7));
+            kernelContext->uniforms[2].index       = 8;
+            kernelContext->uniforms[2].num         = 16 * 4;
+            kernelContext->uniform_num = 3;
+
+            kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+        }
+        kernelContext->params.policy = VX_DF_IMAGE('F','0','1','6');/*temp for type*/
+    }
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    kernelContext->node = node;
+
+    status = gcfVX_Kernel(kernelContext);
+
+    vxWriteScalarValue(norm_type, &norm_type_value);
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
+
+    return status;
+}
 #endif
 
 #if VIV_EDGE

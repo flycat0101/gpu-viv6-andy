@@ -125,6 +125,9 @@ struct __hwc2_display
     buffer_handle_t outputBuffer;
     int32_t outputReleaseFence;
 
+    /* Lock cursor inside validate/present sequence. */
+    int32_t lockCursor;
+
     /* Current active config. Invalid for virtual display. */
     __hwc2_config_t *activeConfig;
 

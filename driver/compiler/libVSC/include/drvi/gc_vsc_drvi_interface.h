@@ -142,6 +142,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasAtomic              : 1;
         gctUINT          supportFullIntBranch   : 1;
         gctUINT          hasDynamicIdxDepFix    : 1;
+        gctUINT          hasLODQFix             : 1;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -156,8 +157,9 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          varyingPackingLimited  : 1;
         gctUINT          robustAtomic           : 1;
         gctUINT          newGPIPE               : 1;
+        gctUINT          supportImgLDSTCLamp    : 1;
 
-        gctUINT          reserved               : 5;
+        gctUINT          reserved               : 3;
 
     } hwFeatureFlags;
 
@@ -196,11 +198,14 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxCSSamplerCount;
     gctUINT              maxHwNativeTotalSamplerCount;
     gctUINT              maxSamplerCountPerShader;
-    gctUINT              maxUSCSizeInKbyte;
+    gctUINT              maxUSCAttribBufInKbyte;
     gctUINT              maxLocalMemSizeInByte;
     gctUINT              maxResultCacheWinSize;
     gctUINT              vsSamplerNoBaseInInstruction;
     gctUINT              psSamplerNoBaseInInstruction;
+    gctUINT              defaultWorkGroupSize;
+    gctUINT              maxWorkGroupSize;
+    gctUINT              minWorkGroupSize;
 
     /* Followings will be removed after shader programming is removed out of VSC */
     gctUINT              vsInstBufferAddrBase;
@@ -278,6 +283,7 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_FLAG_WAVIER_RESLAYOUT_COMPATIBLE  0x00001000   /* Vulkan only for resource layout is provided */
 #define VSC_COMPILER_FLAG_NEED_RTNE_ROUNDING           0x00002000
 #define VSC_COMPILER_FLAG_API_UNIFORM_PRECISION_CHECK  0x00004000
+#define VSC_COMPILER_FLAG_RECOMPILER                   0x00008000
 
 #define VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS          0x0000000F
 
@@ -431,6 +437,7 @@ typedef struct _VSC_CONTEXT
     /* Designate invoking client driver */
     gceAPI                            clientAPI;
     gcePATCH_ID                       appNameId;
+    gctBOOL                           isPatchLib;
 
     /* System wide context */
     PVSC_SYS_CONTEXT                  pSysCtx;
@@ -588,6 +595,8 @@ gceSTATUS vscCompileShader(VSC_SHADER_COMPILER_PARAM* pCompilerParam,
                                                                  so dont use VSC MM to allocate
                                                                  inside of VSC. */
                           );
+
+gcSHADER_KIND vscGetShaderKindFromShaderHandle(SHADER_HANDLE hShader);
 
 /* GL/Vulkan driver ONLY interface, this is HL interface to match glLinkProgram
    API. It may call vscCompileShader for each shader inside. After successfully

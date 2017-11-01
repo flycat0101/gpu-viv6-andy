@@ -227,6 +227,7 @@ vx_node vxHarrisScoreNode(vx_graph graph,
                          vx_scalar sensitivity,
                          vx_scalar grad_size,
                          vx_scalar block_size,
+                         vx_scalar shift,
                          vx_image score);
 
 vx_status vxuHarrisScore(vx_context context, vx_image gx,

@@ -81,7 +81,9 @@ extern __GLcontext *__glxNopContext;
 #include <X11/Xlibint.h>
 #include <X11/extensions/Xext.h>
 #include <X11/extensions/extutil.h>
-
+#ifdef X11_DRI3
+#include "vivante_bo.h"
+#endif
 
 #define X_VIVEXTQueryVersion        0
 #define X_VIVEXTPixmapPhysaddr      1
@@ -1155,7 +1157,7 @@ ENDFLAG:
     DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
 }
 
-extern GLboolean
+GLboolean
 __driUtilFullScreenCovered(__DRIdrawablePrivate *pdp)
 {
     GLboolean ret;
@@ -1571,6 +1573,24 @@ typedef  __DRIdrawable *(*TGETDRAWABLE)(__DRInativeDisplay *dpy, __DRIid draw, G
  *                              driver and libGL.
  * \param driverAPI Driver API functions used by other routines in dri_util.c.
  */
+extern GLvoid dri3DestroyScreen(Display *dpy, int scrn, GLvoid *screenPrivate);
+
+extern GLvoid *dri3CreateNewDrawable(Display *dpy,
+                                  const __GLcontextModes *modes,
+                                  __DRIid draw,
+                                  __DRIdrawable *pdraw,
+                                  int renderType,
+                                  const int *attrs);
+
+extern __DRIdrawable *dri3GetDrawable(Display *dpy, __DRIid draw,
+                                         GLvoid *screenPrivate);
+
+extern GLvoid *dri3CreateNewContext(Display *dpy, const __GLcontextModes *modes,
+                    int render_type, GLvoid *sharedPrivate, __DRIcontext *pctx);
+
+extern GLvoid dri3CopyContext(Display *dpy, __DRIcontext *src,
+                           __DRIcontext *dst, GLuint mask);
+
 __DRIscreenPrivate *
 __driUtilCreateNewScreen(__DRInativeDisplay *dpy, int scrn, __DRIscreen *psc,
                          __GLcontextModes * modes,
@@ -1621,18 +1641,22 @@ __driUtilCreateNewScreen(__DRInativeDisplay *dpy, int scrn, __DRIscreen *psc,
     psp->driMajor = dri_version->major;
     psp->driMinor = dri_version->minor;
     psp->driPatch = dri_version->patch;
+    psp->dri3 = dri_version->dri3;
 
     /* install driver's callback functions */
     memcpy( &psp->DriverAPI, driverAPI, sizeof(struct __DriverAPIRec) );
 
     psp->pSAREA = pSAREA;
 
-    psp->pFB = frame_buffer->base;
-    psp->pLogicalAddr = frame_buffer->dev_priv;
-    psp->fbSize = frame_buffer->size;
-    psp->fbStride = frame_buffer->stride;
-    psp->fbWidth = frame_buffer->width;
-    psp->fbHeight = frame_buffer->height;
+    if (frame_buffer)
+    {
+        psp->pFB = frame_buffer->base;
+        psp->pLogicalAddr = frame_buffer->dev_priv;
+        psp->fbSize = frame_buffer->size;
+        psp->fbStride = frame_buffer->stride;
+        psp->fbWidth = frame_buffer->width;
+        psp->fbHeight = frame_buffer->height;
+    }
     psp->devPrivSize = sizeof(vvtDeviceInfo);
 
     psp->pDevPriv = (GLvoid *)Xmalloc(sizeof(vvtDeviceInfo));
@@ -1656,11 +1680,23 @@ __driUtilCreateNewScreen(__DRInativeDisplay *dpy, int scrn, __DRIscreen *psc,
     */
     psp->dummyContextPriv.driScreenPriv = NULL;
 
-    psc->destroyScreen     = (TDESSCN)driDestroyScreen;
-    psc->createNewDrawable = (TNEWDRAWABLE)driCreateNewDrawable;
-    psc->getDrawable       = (TGETDRAWABLE)driGetDrawable;
-    psc->createNewContext  = (TNEWCXT)driCreateNewContext;
-    psc->copyContext       = (TCPYCXT)driCopyContext;
+    if (psp->dri3)
+    {
+#ifdef X11_DRI3
+        drm_vivante_create(psp->fd, (struct drm_vivante **)&psp->drm);
+#endif
+        psc->destroyScreen     = (TDESSCN)dri3DestroyScreen;
+        psc->createNewDrawable = (TNEWDRAWABLE)dri3CreateNewDrawable;
+        psc->getDrawable       = (TGETDRAWABLE)dri3GetDrawable;
+        psc->createNewContext  = (TNEWCXT)dri3CreateNewContext;
+        psc->copyContext       = (TCPYCXT)dri3CopyContext;
+    } else {
+        psc->destroyScreen     = (TDESSCN)driDestroyScreen;
+        psc->createNewDrawable = (TNEWDRAWABLE)driCreateNewDrawable;
+        psc->getDrawable       = (TGETDRAWABLE)driGetDrawable;
+        psc->createNewContext  = (TNEWCXT)driCreateNewContext;
+        psc->copyContext       = (TCPYCXT)driCopyContext;
+    }
 
     if ( (psp->DriverAPI.InitDriver != NULL)
                 && !(*psp->DriverAPI.InitDriver)(psp) ) {

@@ -30,6 +30,7 @@ libvulkan_la_SOURCES = \
     src/gc_vk_devqueue.c \
     src/gc_vk_dispatch.c \
     src/gc_vk_framebuffer.c \
+    src/gc_vk_icd.c \
     src/gc_vk_instance.c \
     src/gc_vk_noop.c \
     src/gc_vk_object.c \
@@ -91,7 +92,7 @@ libvulkan_la_LIBADD = \
     $(top_builddir)/hal/user/libGAL.la \
     $(top_builddir)/compiler/libVSC/libVSC.la \
     $(top_builddir)/compiler/libGLSLC/libGLSLC.la \
-    $(top_builddir)/compiler/libSPIRV/libSPIRV.la
+    $(top_builddir)/compiler/libSPIRV/libSPIRV_viv.la
 
 if EGL_PLATFORM_X11
 AM_CPPFLAGS +=
@@ -138,3 +139,5 @@ vulkaninc_HEADERS = \
     $(top_srcdir)/sdk/inc/vulkan/vk_platform.h \
     $(top_srcdir)/sdk/inc/vulkan/vulkan.h
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = vulkan.pc

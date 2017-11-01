@@ -130,7 +130,7 @@ static int32_t /*hwc2_error_t*/ destroy_virtual_display(
     __hwc2_trace(0, "dpy=%p", dpy);
 
     if (dpy->type != HWC2_DISPLAY_TYPE_VIRTUAL) {
-        ALOGE("%s: BAD_PARAMETER", __FUNCTION__);
+        __hwc2_trace_error(1, HWC2_ERROR_BAD_PARAMETER);
         return HWC2_ERROR_BAD_PARAMETER;
     }
 
@@ -774,8 +774,7 @@ static int32_t /*hwc2_error_t*/ get_display_attribute(
 
     cfg = __hwc2_get_config(dpy, config);
     if (unlikely(!cfg)) {
-        ALOGE("%s: BAD_CONFIG", __FUNCTION__);
-        __hwc2_trace_error(2, HWC2_ERROR_BAD_CONFIG);
+        __hwc2_trace_error(1, HWC2_ERROR_BAD_CONFIG);
         return HWC2_ERROR_BAD_CONFIG;
     }
 
@@ -1216,8 +1215,7 @@ static int32_t /*hwc2_error_t*/ get_release_fences(
     return HWC2_ERROR_NONE;
 }
 
-
-/* presentDisplay(..., outRetireFence)
+/* presentDisplay(..., outPresentFence)
  * Descriptor: HWC2_FUNCTION_PRESENT_DISPLAY
  * Must be provided by all HWC2 devices
  *
@@ -1231,15 +1229,16 @@ static int32_t /*hwc2_error_t*/ get_release_fences(
  * setLayerBuffer), then it is safe to call this function without first
  * validating the display.
  *
- * If this call succeeds, outRetireFence will be populated with a file
- * descriptor referring to a retire sync fence object. For physical displays,
- * this fence will be signaled when the result of composition of the prior frame
- * is no longer necessary (because it has been copied or replaced by this
- * frame). For virtual displays, this fence will be signaled when writes to the
- * output buffer have completed and it is safe to read from it.
+ * If this call succeeds, outPresentFence will be populated with a file
+ * descriptor referring to a present sync fence object. For physical displays,
+ * this fence will be signaled at the vsync when the result of composition of
+ * this frame starts to appear (for video-mode panels) or starts to transfer to
+ * panel memory (for command-mode panels). For virtual displays, this fence will
+ * be signaled when writes to the output buffer have completed and it is safe to
+ * read from it.
  *
  * Parameters:
- *   outRetireFence - a sync fence file descriptor as described above; pointer
+ *   outPresentFence - a sync fence file descriptor as described above; pointer
  *       will be non-NULL
  *
  * Returns HWC2_ERROR_NONE or one of the following errors:
@@ -1256,7 +1255,7 @@ static int32_t /*hwc2_error_t*/ get_release_fences(
  * XXX: Must implement practical function.
  */
 static int32_t /*hwc2_error_t*/ present_display(
-        hwc2_device_t* device, hwc2_display_t display, int32_t* outRetireFence)
+        hwc2_device_t* device, hwc2_display_t display, int32_t* outPresentFence)
 {
     __hwc2_device_t *dev = (__hwc2_device_t *)device;
     __hwc2_display_t *dpy = (__hwc2_display_t *)(uintptr_t)display;
@@ -1266,10 +1265,10 @@ static int32_t /*hwc2_error_t*/ present_display(
     __hwc2_trace(0, "dpy=%p", dpy);
 
     if (dpy->type == HWC2_DISPLAY_TYPE_VIRTUAL) {
-        __hwc2_queue_blit_virtual(dev, dpy, outRetireFence);
+        __hwc2_queue_blit_virtual(dev, dpy, outPresentFence);
     } else {
         /* composerSel must be disabled already. */
-        __hwc2_queue_blit(dev, dpy, NULL, NULL, outRetireFence);
+        __hwc2_queue_blit(dev, dpy, NULL, NULL, outPresentFence);
     }
 
     int32_t fd = dpy->clientAcquireFence;
@@ -1279,8 +1278,10 @@ static int32_t /*hwc2_error_t*/ present_display(
         dpy->clientAcquireFence = -1;
     }
 
+    __hwc2_frame_end(dev, dpy);
+
     ALOGW("presentDisplay: display=%p", dpy);
-    *outRetireFence = -1;
+    *outPresentFence = -1;
 
     __hwc2_trace(1, "OK");
     return HWC2_ERROR_NONE;
@@ -1322,7 +1323,7 @@ static int32_t /*hwc2_error_t*/ set_active_config(
     cfg = __hwc2_get_config(dpy, config);
 
     if (unlikely(!cfg)) {
-        ALOGE("%s: BAD_CONFIG", __FUNCTION__);
+        __hwc2_trace_error(2, HWC2_ERROR_BAD_CONFIG);
         return HWC2_ERROR_BAD_CONFIG;
     }
 
@@ -1468,6 +1469,10 @@ static int32_t /*hwc2_error_t*/ set_color_mode(
  * If the device is not capable of either using the hint or the matrix to apply
  * the desired color transform, it should force all layers to client composition
  * during validateDisplay.
+ *
+ * If HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM is present, then the client
+ * will never apply the color transform during client composition, even if all
+ * layers are being composed by the client.
  *
  * The matrix provided is an affine color transformation of the following form:
  *
@@ -1778,6 +1783,9 @@ out:
     dpy->validation = (numTypes > 0) ? HWC2_ERROR_HAS_CHANGES
                     : HWC2_ERROR_NONE;
 
+    /* Begines validate/present sequence. */
+    dpy->lockCursor = 1;
+
     __hwc2_trace(1, "out outNumTypes=%u outNumRequests=%u return=%s(%d)",
             numTypes, numRequests, error_name(dpy->validation),
             dpy->validation);
@@ -1844,11 +1852,12 @@ static int32_t /*hwc2_error_t*/ set_cursor_position(
 
     __hwc2_trace(2, "dpy=%p layer=%p(%u) x=%d y=%d", dpy, ly, ly->id, x, y);
 
-    if (ly->composition != HWC2_COMPOSITION_CURSOR)
+    if (ly->composition != HWC2_COMPOSITION_CURSOR) {
         __hwc2_trace_error(2, HWC2_ERROR_BAD_LAYER);
         return HWC2_ERROR_BAD_LAYER;
+    }
 
-    if (dpy->validation != HWC2_ERROR_NONE) {
+    if (dpy->lockCursor) {
         __hwc2_trace_error(2, HWC2_ERROR_NOT_VALIDATED);
         return HWC2_ERROR_NOT_VALIDATED;
     }
@@ -3050,6 +3059,9 @@ void __hwc2_frame_end(__hwc2_device_t *device, __hwc2_display_t *dpy)
         layer->colorChanged    = 0;
         layer->visibleRegionChanged = 0;
     }
+
+    /* Ends validate/present sequence. */
+    dpy->lockCursor = 0;
 }
 
 int32_t __hwc2_queue_post_display(__hwc2_device_t *device,

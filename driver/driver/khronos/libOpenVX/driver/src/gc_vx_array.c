@@ -419,6 +419,7 @@ VX_INTERNAL_API vx_status vxoArray_CopyArrayRangeInt(vx_array arr, vx_size start
     return status;
 }
 
+#if MAP_UNMAP_REFERENCE
 VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start, vx_size end, vx_map_id *map_id, vx_size *stride,
                              void **ptr, vx_enum usage, vx_enum mem_type, vx_uint32 flags)
 {
@@ -567,6 +568,105 @@ VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id ma
     return status;
     }
 }
+#else
+VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start, vx_size end, vx_map_id *map_id, vx_size *stride,
+                             void **ptr, vx_enum usage, vx_enum mem_type, vx_uint32 flags)
+{
+    vx_status status = VX_FAILURE;
+
+    /* bad parameters */
+    if ((usage < VX_READ_ONLY) || (VX_READ_AND_WRITE < usage) ||
+        (ptr == NULL) || (stride == NULL) ||
+        (start >= end) || (end > arr->itemCount))
+    {
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    /* determine if virtual before checking for memory */
+    if (arr->base.isVirtual == vx_true_e)
+    {
+        if (arr->base.accessible == vx_false_e)
+        {
+            /* User tried to access a "virtual" array. */
+            vxError("Can not access a virtual array\n");
+            return VX_ERROR_OPTIMIZED_AWAY;
+        }
+        /* framework trying to access a virtual array, this is ok. */
+    }
+
+    /* verify has not run or will not run yet. this allows this API to "touch"
+     * the array to create it.
+     */
+    if (vxoArray_AllocateMemory(arr) == vx_false_e)
+    {
+        return VX_ERROR_NO_MEMORY;
+    }
+
+    vxError("MapArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, *ptr, start, end);
+    {
+        vx_memory_map_extra_s extra;
+        vx_uint8 *buf = NULL;
+        vx_size size = (end - start) * arr->itemSize;
+        extra.array_data.start = start;
+        extra.array_data.end = end;
+        if (vxoContext_MemoryMap(arr->base.context, (vx_reference)arr, size, usage, mem_type, flags, &extra, (void **)&buf, map_id) == vx_true_e)
+        {
+            /* write only mode */
+            *stride = arr->itemSize;
+            *ptr = buf;
+            vxoReference_Increment(&arr->base, VX_REF_EXTERNAL);
+            status = VX_SUCCESS;
+        }
+        else
+        {
+            status = VX_FAILURE;
+        }
+    }
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id map_id)
+{
+    vx_status status = VX_FAILURE;
+
+    /* determine if virtual before checking for memory */
+    if (arr->base.isVirtual == vx_true_e)
+    {
+        if (arr->base.accessible == vx_false_e)
+        {
+            /* User tried to access a "virtual" array. */
+            vxError("Can not access a virtual array\n");
+            return VX_ERROR_OPTIMIZED_AWAY;
+        }
+        /* framework trying to access a virtual array, this is ok. */
+    }
+
+    /* bad parameters */
+    if (vxoContext_FindMemoryMap(arr->base.context, (vx_reference)arr, map_id) != vx_true_e)
+    {
+        vxError("Invalid parameters to unmap array range\n");
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    vxError("UnmapArrayRange from "VX_FMT_REF"\n", arr);
+    {
+        vx_context context = arr->base.context;
+        vx_memory_map_s* map = &context->memoryMaps[map_id];
+        if (map->used && map->ref == (vx_reference)arr)
+        {
+            /* rean only mode */
+            vxoContext_MemoryUnmap(arr->base.context, map_id);
+            vxoReference_Decrement(&arr->base, VX_REF_EXTERNAL);
+            status = VX_SUCCESS;
+        }
+        else
+        {
+            status = VX_FAILURE;
+        }
+    }
+    return status;
+}
+#endif
 
 VX_API_ENTRY vx_array VX_API_CALL vxCreateArray(vx_context context, vx_enum itemType, vx_size capacity)
 {

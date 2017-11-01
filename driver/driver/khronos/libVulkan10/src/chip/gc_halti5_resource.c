@@ -1338,6 +1338,12 @@ VkResult halti5_helper_convertHwBltDesc(
         }
     }
 
+    if (g_vkFormatInfoTable[vkFormat].category == __VK_FMT_CATEGORY_UINT ||
+        g_vkFormatInfoTable[vkFormat].category == __VK_FMT_CATEGORY_SINT)
+    {
+        downsampleMode = gcvMSAA_DOWNSAMPLE_SAMPLE;
+    }
+
     hwBltDesc->hwFormat       = format;
     hwBltDesc->bltSwizzleEx   = swizzle;
     hwBltDesc->downSampleMode = downsampleMode;
@@ -1414,6 +1420,7 @@ VkResult halti5_clearImage(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
     uint32_t srcTileConfigEx = 0, dstTileConfigEx = 0;
+#if __VK_ENABLETS
     uint32_t fcClearValue[2] = {0};
     __vkTileStatus *tsResource = img->memory->ts;
     VkBool32 fastClear = VK_TRUE;
@@ -1421,6 +1428,7 @@ VkResult halti5_clearImage(
     int32_t compressionFormat = -1;
     uint32_t tileStatusAddress = tsResource ? tsResource->devAddr : VK_NULL_HANDLE;
     VkImageSubresourceRange imgvRange = {subResource->aspectMask, subResource->mipLevel, 1, subResource->arrayLayer, 1};
+#endif
     VkBool32 forceSGPU = VK_FALSE;
 
     halti5_helper_configMSAA(img, &msaa, &cacheMode);
@@ -1481,7 +1489,7 @@ VkResult halti5_clearImage(
             clearVals,
             clearMasks,
             VK_NULL_HANDLE));
-
+#if __VK_ENABLETS
         /* Test for entire surface clear. */
         if ((rect->offset.x == 0) && (rect->offset.y == 0)
             && (rect->extent.width == pLevel->requestW)
@@ -1510,9 +1518,6 @@ VkResult halti5_clearImage(
             fastClear = VK_FALSE;
         }
 
-        /* Flush the tile status cache. */
-        __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
-
         if (!fastClear)
         {
             halti5_decompressTileStatus(cmd, &pCmdBuffer, img, &imgvRange);
@@ -1522,6 +1527,10 @@ VkResult halti5_clearImage(
             compression = tsResource->compressed;
             compressionFormat = tsResource->compressedFormat;
         }
+#endif
+
+        /* Flush the pipe. */
+        __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
         config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:0) - (0 ? 20:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:0) - (0 ? 20:0) + 1))))))) << (0 ?
@@ -1554,8 +1563,10 @@ VkResult halti5_clearImage(
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
  31:31) + 1))))))) << (0 ? 31:31)));
 
-        dstConfigEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+        dstConfigEx =
+#if __VK_ENABLETS
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (fastClear) & ((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0)))
@@ -1569,6 +1580,16 @@ VkResult halti5_clearImage(
  7:4))) | (((gctUINT32) ((gctUINT32) (compressionFormat) & ((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
+#else
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+#endif
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
  20:20) + 1))))))) << (0 ? 20:20))) | (((gctUINT32) ((gctUINT32) (clearVals[0] != clearVals[1]) & ((gctUINT32) ((((1 ?
@@ -1581,8 +1602,10 @@ VkResult halti5_clearImage(
  17:17) + 1))))))) << (0 ? 17:17)))
             | dstTileConfigEx;
 
-        srcConfigEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+        srcConfigEx =
+#if __VK_ENABLETS
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (fastClear) & ((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0)))
@@ -1596,6 +1619,16 @@ VkResult halti5_clearImage(
  7:4))) | (((gctUINT32) ((gctUINT32) (compressionFormat) & ((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
+#else
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+#endif
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:19) - (0 ? 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ?
  19:19) + 1))))))) << (0 ? 19:19))) | (((gctUINT32) ((gctUINT32) (clearVals[0] != clearVals[1]) & ((gctUINT32) ((((1 ?
@@ -1615,12 +1648,12 @@ VkResult halti5_clearImage(
             + pLevel->offset
             + subResource->arrayLayer * pLevel->sliceSize);
         address += offset;
-
+#if __VK_ENABLETS
         if (fastClear)
         {
             tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
         }
-
+#endif
         if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -1652,7 +1685,7 @@ VkResult halti5_clearImage(
 
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5011, VK_FALSE, 2, clearVals);
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5013, VK_FALSE, 2, clearMasks);
-
+#if __VK_ENABLETS
         if (fastClear)
         {
             /* DestTileStatusAddress. */
@@ -1664,7 +1697,7 @@ VkResult halti5_clearImage(
             /* SrcClearValue. */
             __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
         }
-
+#endif
         originX = rect->offset.x * img->sampleInfo.x;
         originY = rect->offset.y * img->sampleInfo.y;
         width   = rect->extent.width  * img->sampleInfo.x;
@@ -1801,7 +1834,7 @@ VkResult halti5_clearImage(
  }halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
  };
 
-
+#if __VK_ENABLETS
         if (fastClear)
         {
             /* Record FC value. */
@@ -1811,7 +1844,7 @@ VkResult halti5_clearImage(
             /* Turn the tile status on again. */
             tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = gcvFALSE;
         }
-
+#endif
         partIndex++;
     }
 
@@ -1859,17 +1892,20 @@ VkResult halti5_copyImage(
     VkResult result = VK_SUCCESS;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
-    uint32_t srcTileStatusAddress = 0;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     uint32_t srcTileConfigEx = 0, dstTileConfigEx = 0;
     uint32_t partIdx;
+#if __VK_ENABLETS
+    uint32_t srcTileStatusAddress = 0;
     VkBool32 srcFastClear = VK_FALSE;
     int32_t srcCompressionFormat = -1;
     VkBool32 srcCompression = VK_FALSE;
     __vkTileStatus * srcTsResource = VK_NULL_HANDLE;
     uint32_t color64 = 0;
+#endif
     uint32_t offset = 0;
     __vkImage *srcImg = VK_NULL_HANDLE;
+
     VkBool32 forceSGPU = VK_FALSE;
 
     if (!srcRes->isImage && !dstRes->isImage)
@@ -1882,10 +1918,11 @@ VkResult halti5_copyImage(
     if (srcRes->isImage)
     {
         __vkImageLevel *pSrcLevel;
-
         srcImg = srcRes->u.img.pImage;
-        pSrcLevel = &srcImg->pImgLevels[srcRes->u.img.subRes.mipLevel];
+#if __VK_ENABLETS
         srcTsResource = srcImg->memory->ts;
+#endif
+        pSrcLevel = &srcImg->pImgLevels[srcRes->u.img.subRes.mipLevel];
         srcOffset = srcRes->u.img.offset;
         srcExtent = srcRes->u.img.extent;
         srcAspect = srcRes->u.img.subRes.aspectMask;
@@ -1901,11 +1938,11 @@ VkResult halti5_copyImage(
         srcAddress += offset;
         halti5_helper_configMSAA(srcImg, &srcMsaa, &srcCacheMode);
         halti5_helper_configTiling(srcImg, &srcTiling, &srcSuperTile);
-
+#if __VK_ENABLETS
         if (srcTsResource)
         {
             /* Flush the tile status cache. */
-            __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+            __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
             srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);;
 
             color64 = (srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer] !=
@@ -1915,7 +1952,7 @@ VkResult halti5_copyImage(
             srcCompressionFormat = srcTsResource->compressedFormat;
             srcCompression = srcTsResource->compressed;
         }
-
+#endif
         if (devCtx->database->CACHE128B256BPERLINE)
         {
             if(srcImg->halTiling == gcvSUPERTILED)
@@ -1972,6 +2009,7 @@ VkResult halti5_copyImage(
     {
         __vkImage *dstImg = dstRes->u.img.pImage;
         __vkImageLevel *pDstLevel = &dstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
+#if __VK_ENABLETS
         VkImageSubresourceRange *imgvRange;
         VkBool32 dstAnyTsEnable = VK_FALSE;
         __vkTileStatus * dstTsResource = dstImg->memory->ts;
@@ -1983,7 +2021,7 @@ VkResult halti5_copyImage(
         imgvRange->baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         imgvRange->baseMipLevel = dstRes->u.img.subRes.mipLevel;
         imgvRange->layerCount = imgvRange->levelCount = 1;
-
+#endif
         dstOffset = dstRes->u.img.offset;
         dstExtent = dstRes->u.img.extent;
         __VK_DEBUG_ONLY(dstAspect = dstRes->u.img.subRes.aspectMask);
@@ -1999,9 +2037,9 @@ VkResult halti5_copyImage(
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
         halti5_helper_configMSAA(dstImg, &dstMsaa, &dstCacheMode);
         halti5_helper_configTiling(dstImg, &dstTiling, &dstSuperTile);
-
+#if __VK_ENABLETS
         __VK_AnyTSEnable(dstTsResource, imgvRange, &dstAnyTsEnable);
-
+#endif
         if (devCtx->database->CACHE128B256BPERLINE)
         {
             if (dstImg->halTiling == gcvSUPERTILED)
@@ -2026,13 +2064,14 @@ VkResult halti5_copyImage(
  27:26) + 1))))))) << (0 ? 27:26)));
             }
         }
-
+#if __VK_ENABLETS
         if (dstAnyTsEnable)
         {
             result = halti5_decompressTileStatus(cmd, &pCmdBuffer, dstImg, imgvRange);
         }
 
         __VK_FREE(imgvRange);
+#endif
         __VK_ONERROR(result);
     }
     else
@@ -2283,7 +2322,9 @@ VkResult halti5_copyImage(
         ;
 
     srcConfigEx
-        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+        =
+#if __VK_ENABLETS
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
  0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (srcFastClear) & ((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
@@ -2298,6 +2339,21 @@ VkResult halti5_copyImage(
  7:4))) | (((gctUINT32) ((gctUINT32) (srcCompressionFormat) & ((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:19) - (0 ?
+ 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
+ 19:19))) | (((gctUINT32) ((gctUINT32) (color64) & ((gctUINT32) ((((1 ?
+ 19:19) - (0 ? 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ?
+ 19:19) + 1))))))) << (0 ? 19:19)))
+#else
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:1) - (0 ?
+ 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+#endif
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:8) - (0 ?
  8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
  8:8))) | (((gctUINT32) ((gctUINT32) (srcBltDesc.sRGB) & ((gctUINT32) ((((1 ?
@@ -2309,11 +2365,6 @@ VkResult halti5_copyImage(
  17:17))) | (((gctUINT32) ((gctUINT32) (srcCacheMode) & ((gctUINT32) ((((1 ?
  17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
  17:17) + 1))))))) << (0 ? 17:17)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:19) - (0 ?
- 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
- 19:19))) | (((gctUINT32) ((gctUINT32) (color64) & ((gctUINT32) ((((1 ?
- 19:19) - (0 ? 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ?
- 19:19) + 1))))))) << (0 ? 19:19)))
         ;
 
     dstConfig
@@ -2369,7 +2420,7 @@ VkResult halti5_copyImage(
         | dstTileConfigEx;
 
     /* Flush the pipe. */
-    __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+    __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
     __VK_ASSERT(srcParts == dstParts);
     for (partIdx = 0; partIdx < srcParts; ++partIdx)
@@ -2561,7 +2612,7 @@ VkResult halti5_copyImage(
  31:16))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
  31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
  31:16))));
-
+#if __VK_ENABLETS
         /* Set SrcTileStatusAddress. */
         if (srcFastClear)
         {
@@ -2571,7 +2622,7 @@ VkResult halti5_copyImage(
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500E, VK_FALSE,
                 srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
         }
-
+#endif
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:1) - (0 ?
  1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
@@ -2615,14 +2666,14 @@ VkResult halti5_copyImage(
  }halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
  };
 
-
+#if __VK_ENABLETS
         if (srcFastClear)
         {
             __VK_ASSERT(srcImg != VK_NULL_HANDLE);
             offset += srcPartSize;
             srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);;
         }
-
+#endif
         srcAddress += srcPartSize;
         dstAddress += dstPartSize;
     }
@@ -2756,7 +2807,7 @@ VkResult halti5_fillBuffer(
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
 
     /* Flush the pipe. */
-    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3021,7 +3072,7 @@ VkResult halti5_copyBuffer(
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
 
     /* Flush the pipe. */
-    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3195,7 +3246,7 @@ VkResult halti5_updateBuffer(
     pCmdBuffer = pCmdBufferBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
 
     /* Flush the pipe. */
-    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3768,7 +3819,7 @@ VkResult halti5_helper_convertHwTxDesc(
             fakedImageLevel.requestH = fakedImageLevel.allocedH = (uint32_t)gcoMATH_Ceiling(((float)texelSize / __VK_FAKED_TEX_MAX_WIDTH));
         }
         fakedImageLevel.stride = (uint32_t)(fakedImageLevel.allocedW * (residentFormatInfo->bitsPerBlock >> 3));
-        fakedImageLevel.requestD = 1;
+        fakedImageLevel.requestD = texelSize;
         fakedImageLevel.sliceSize = (VkDeviceSize)sizeInByte;
         resourceMemory = buf->memory;
         offsetInResourceMemory = buf->memOffset;
@@ -3872,7 +3923,7 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].sRGB = (hwTxFmtInfo->hwFormat >> TX_FORMAT_SRGB_SHIFT) & 0x1;
         hwTxDesc[partIdx].fast_filter = ((hwTxFmtInfo->hwFormat >> TX_FORMAT_FAST_FILTER_SHIFT) & 0x1)
                                       && (viewType != VK_IMAGE_VIEW_TYPE_3D) && (viewType != VK_IMAGE_VIEW_TYPE_2D_ARRAY);
-        hwTxDesc[partIdx].sampleStencil = (aspectFlag & VK_IMAGE_ASPECT_STENCIL_BIT);
+        hwTxDesc[partIdx].sampleStencil = (aspectFlag & VK_IMAGE_ASPECT_STENCIL_BIT) ? VK_TRUE : VK_FALSE;
         hwTxDesc[partIdx].msaaImage =  msaaImage;
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 
@@ -4192,6 +4243,7 @@ VkResult halti5_helper_convertHwImgDesc(
     uint32_t width = 0, height = 0;
     VkBool32 extraPart = VK_FALSE;
     uint32_t partSize = 0;
+    uint32_t tmpResidentImgFormat = 0;
 
     __VK_ASSERT(hwImgDesc);
 
@@ -4207,6 +4259,7 @@ VkResult halti5_helper_convertHwImgDesc(
                                subResourceRange->baseArrayLayer * baseLevel->sliceSize);
 
         residentFormatInfo = (__vkFormatInfo*)imgv->formatInfo;
+        tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
 
         if (imgv->formatInfo->compressed)
         {
@@ -4234,6 +4287,7 @@ VkResult halti5_helper_convertHwImgDesc(
         physical += (uint32_t)(buf->memOffset + bufv->createInfo.offset);
 
         residentFormatInfo = &bufv->formatInfo;
+        tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
         tiling = gcvLINEAR;
         if (userSize)
         {
@@ -4266,7 +4320,7 @@ VkResult halti5_helper_convertHwImgDesc(
         __VK_ASSERT(!"Must have one view to generate image descriptor");
     }
 
-    switch (residentFormatInfo->residentImgFormat)
+    switch (tmpResidentImgFormat)
     {
     case VK_FORMAT_R8_UNORM:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -4592,6 +4646,7 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_B8G8R8A8_UNORM:
+    case VK_FORMAT_B8G8R8A8_SRGB:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
  9:6))) | (((gctUINT32) (0xF & ((gctUINT32) ((((1 ? 9:6) - (0 ? 9:6) + 1) == 32) ?
@@ -4926,6 +4981,47 @@ VkResult halti5_helper_convertHwImgDesc(
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
  9:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 9:6) - (0 ? 9:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:4) - (0 ? 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
+        break;
+
+    case VK_FORMAT_R16_UNORM:
+        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
+ 9:6))) | (((gctUINT32) (0xE & ((gctUINT32) ((((1 ? 9:6) - (0 ? 9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
@@ -6022,6 +6118,59 @@ VkResult halti5_createImageView(
         __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc));
     }
 
+    if (img->createInfo.usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+    {
+        if (img->createInfo.samples > VK_SAMPLE_COUNT_1_BIT)
+        {
+            (*chipModule->minorTable.helper_convertHwTxDesc)(devCtx, imgv, VK_NULL_HANDLE, chipImgv->txDesc);
+        }
+        else
+        {
+            switch (img->createInfo.format)
+            {
+            case VK_FORMAT_A2B10G10R10_UINT_PACK32:
+            case VK_FORMAT_R8G8B8A8_SRGB:
+            case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+            case VK_FORMAT_B8G8R8A8_SRGB:
+            case VK_FORMAT_D16_UNORM:
+            case VK_FORMAT_X8_D24_UNORM_PACK32:
+            case VK_FORMAT_D24_UNORM_S8_UINT:
+                /* Create Hw texture descriptor for all unsupported formats */
+                {
+                    static const VkSamplerCreateInfo s_SamplerCreateInfo =
+                    {
+                        VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                        VK_NULL_HANDLE,
+                        0,
+                        VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+                        (VkSamplerMipmapMode)__VK_SAMPLER_MIPMAP_MODE_NONE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        0.0,
+                        VK_FALSE,
+                        1.0,
+                        VK_FALSE,
+                        VK_COMPARE_OP_ALWAYS,
+                        -0.1f,
+                        0.1f,
+                        VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+                        VK_FALSE
+                    };
+                    (*chipModule->minorTable.helper_convertHwSampler)(devCtx, &s_SamplerCreateInfo, &chipImgv->samplerDesc);
+                    if (!chipImgv->txDesc[0].descriptor)
+                    {
+                        (*chipModule->minorTable.helper_convertHwTxDesc)(devCtx, imgv, VK_NULL_HANDLE, chipImgv->txDesc);
+                    }
+                }
+                break;
+            default:
+                __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc));
+                break;
+            }
+        }
+    }
+
     switch (residentImgFormat)
     {
     case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
@@ -6245,6 +6394,7 @@ VkResult halti5_freeDescriptorSet(
     if (chipDescSet)
     {
         __VK_FREE(chipDescSet);
+        descSet->chipPriv = VK_NULL_HANDLE;
     }
     return VK_SUCCESS;
 }
@@ -6332,7 +6482,7 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SFLOAT_2_R32G32SFLOAT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
 

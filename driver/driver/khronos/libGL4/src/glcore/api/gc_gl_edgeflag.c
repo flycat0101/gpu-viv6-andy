@@ -12,7 +12,6 @@
 
 
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
 
 
 
@@ -67,20 +66,11 @@ __GL_INLINE GLvoid __glEdgeFlag(__GLcontext *gc, GLboolean tag)
 
 GLvoid APIENTRY __glim_EdgeFlag(__GLcontext *gc, GLboolean tag)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_EdgeFlag", DT_GLboolean, tag, DT_GLnull);
-#endif
-
     __glEdgeFlag(gc, tag);
 }
 
 GLvoid APIENTRY __glim_EdgeFlagv(__GLcontext *gc, const GLboolean *tag)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_EdgeFlagv", DT_GLboolean_ptr, tag, DT_GLnull);
-#endif
     __glEdgeFlag(gc, tag[0]);
 }
 

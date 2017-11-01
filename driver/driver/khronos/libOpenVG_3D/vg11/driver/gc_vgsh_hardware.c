@@ -177,7 +177,7 @@ gceSTATUS vgshCORE_SetTarget(_vgCORE *core, gcoSURF target)
             core->samples = samples;
 
             /* when change the render target(if samples changed), need to reload the shader*/
-            core->states = gcvNULL;
+            core->programState.stateBuffer = gcvNULL;
         }
     }
     while(gcvFALSE);
@@ -345,29 +345,23 @@ gceSTATUS vgshCORE_SetColorWrite(_vgCORE *core, gctUINT8 colorWrite)
 }
 
 gceSTATUS vgshCORE_LoadShader(_vgCORE *core,
-    gctSIZE_T stateBufferSize,
-    gctPOINTER stateBuffer,
-    gcsHINT_PTR hints)
+    gcsPROGRAM_STATE ProgramState)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("core=0x%x statusBufferSize=%u stateBuffer=0x%x hints=0x%x",
-        core, (unsigned long)stateBufferSize, stateBuffer, hints);
+        core, (unsigned long)ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
-    gcmASSERT(stateBuffer != gcvNULL);
+    gcmASSERT(ProgramState.stateBuffer != gcvNULL);
 
     do
     {
-        if (core->states != stateBuffer)
+        if (core->programState.stateBuffer != ProgramState.stateBuffer)
         {
             gcmERR_BREAK(gcLoadShaders(core->hal,
-                                        stateBufferSize,
-                                        stateBuffer,
-                                        hints));
+                                      ProgramState));
 
-            core->statesSize    = stateBufferSize;
-            core->states        = stateBuffer;
-            core->hints         = hints;
+            core->programState = ProgramState;
         }
     }while(gcvFALSE);
 
@@ -1497,7 +1491,7 @@ static gceSTATUS _TextureBind(_vgHARDWARE *hardware, _VGImage* image, gctINT sam
 
 gceSTATUS SetUniform_SolidColor(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->paint->paintColor);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->paint->paintColor);
 }
 
 gceSTATUS SetUniform_ModeViewMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1526,7 +1520,7 @@ gceSTATUS SetUniform_ModeViewMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
         _MatrixToGAL(hardware->userToSurface, userToSurface);
     }
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, userToSurface);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, userToSurface);
 
     gcmFOOTER();
 
@@ -1561,7 +1555,7 @@ gceSTATUS SetUniform_FilterModeViewMatrix(_vgHARDWARE *hardware, gcUNIFORM unifo
 
     _MatrixToGAL(&modelViewMatrix, userToSurface);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, userToSurface);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, userToSurface);
 
     gcmFOOTER();
 
@@ -1600,7 +1594,7 @@ gceSTATUS SetUniform_ProjectionMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
         _MatrixToGAL(&out, projection);
     }
 #endif
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, projection);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, projection);
 
     gcmFOOTER();
 
@@ -1625,7 +1619,7 @@ gceSTATUS SetUniform_GradientMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
     _MatrixToGAL(&matrix, galMatrix);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, galMatrix);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, galMatrix);
 
     gcmFOOTER();
 
@@ -1635,7 +1629,7 @@ gceSTATUS SetUniform_GradientMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
 gceSTATUS SetUniform_ZValue(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, &hardware->zValue);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, &hardware->zValue);
 }
 
 gceSTATUS SetUniform_Points0(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1647,7 +1641,7 @@ gceSTATUS SetUniform_Points0(_vgHARDWARE *hardware, gcUNIFORM uniform)
     value[2] = 0.0f;
     value[3] = 0.0f;
 
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, value);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, value);
 }
 
 gceSTATUS SetUniform_Points(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1672,7 +1666,7 @@ gceSTATUS SetUniform_Points(_vgHARDWARE *hardware, gcUNIFORM uniform)
     value[10] = 0.0f;
     value[11] = hardware->paint->radialC;
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->hints, value);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->programState.hints, value);
 
     gcmFOOTER();
 
@@ -1688,7 +1682,7 @@ gceSTATUS SetUniform_Udusq(_vgHARDWARE *hardware, gcUNIFORM uniform)
     value[2] = 0.0f;
     value[3] = 0.0f;
 
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, value);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, value);
 }
 
 gceSTATUS SetUniform_UserToPaintMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1703,7 +1697,7 @@ gceSTATUS SetUniform_UserToPaintMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
     _MatrixToGAL(&paintToUserReverse, userToPaint);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, userToPaint);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, userToPaint);
 
     gcmFOOTER();
     return status;
@@ -1718,7 +1712,7 @@ gceSTATUS SetUniform_TexBound(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
     _GetTexBound(hardware->paint->pattern, texBound);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->hints, texBound);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->programState.hints, texBound);
 
     gcmFOOTER();
 
@@ -1734,7 +1728,7 @@ gceSTATUS SetUniform_FilterTexBound(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
     _GetTexBound(hardware->srcImage, texBound);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->hints, texBound);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 3, hardware->program->programState.hints, texBound);
 
     gcmFOOTER();
 
@@ -1744,7 +1738,7 @@ gceSTATUS SetUniform_FilterTexBound(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
 gceSTATUS SetUniform_EdgeColor(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->context->tileFillColor);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->context->tileFillColor);
 }
 
 gceSTATUS SetUniform_Gray(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1754,7 +1748,7 @@ gceSTATUS SetUniform_Gray(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
     gcmHEADER_ARG("hardware=0x%x uniform=0x%x", hardware, uniform);
 
-    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)value);
+    status = gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)value);
 
     gcmFOOTER();
 
@@ -1763,27 +1757,27 @@ gceSTATUS SetUniform_Gray(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
 gceSTATUS SetUniform_ColorMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)hardware->colorMatrix);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)hardware->colorMatrix);
 }
 
 gceSTATUS SetUniform_Offset(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)(hardware->colorMatrix + 16));
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)(hardware->colorMatrix + 16));
 }
 
 gceSTATUS SetUniform_Scale(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->scale);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->scale);
 }
 
 gceSTATUS SetUniform_Bias(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->bias);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->bias);
 }
 
 gceSTATUS SetUniform_KernelSize(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->kernelSize);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->kernelSize);
 }
 
 
@@ -1791,7 +1785,7 @@ gceSTATUS SetUniform_TexCoordOffset(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
     gcmASSERT(hardware->texCoordOffsetSize >= 1.0f);
     return gcUNIFORM_SetValueF_Ex(uniform, (gctSIZE_T)(hardware->texCoordOffsetSize),
-                                  hardware->program->hints, (gctFLOAT*)hardware->texCoordOffset);
+                                  hardware->program->programState.hints, (gctFLOAT*)hardware->texCoordOffset);
 }
 
 
@@ -1799,13 +1793,13 @@ gceSTATUS SetUniform_Kernel(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
     if (hardware->kernelSize <= 0.0f) return gcvSTATUS_OK;
     return gcUNIFORM_SetValueF_Ex(uniform, (gctSIZE_T)(hardware->kernelSize),
-                                  hardware->program->hints, (gctFLOAT*)hardware->kernel);
+                                  hardware->program->programState.hints, (gctFLOAT*)hardware->kernel);
 }
 
 
 gceSTATUS SetUniform_KernelSizeY(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->kernelSizeY);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->kernelSizeY);
 }
 
 
@@ -1814,7 +1808,7 @@ gceSTATUS SetUniform_TexCoordOffsetY(_vgHARDWARE *hardware, gcUNIFORM uniform)
     gcmASSERT(hardware->texCoordOffsetSizeY >= 1.0f);
 
     return gcUNIFORM_SetValueF_Ex(uniform, (gctSIZE_T)(hardware->texCoordOffsetSizeY),
-                                  hardware->program->hints, (gctFLOAT*)hardware->texCoordOffsetY);
+                                  hardware->program->programState.hints, (gctFLOAT*)hardware->texCoordOffsetY);
 }
 
 
@@ -1822,17 +1816,17 @@ gceSTATUS SetUniform_KernelY(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
     if (hardware->kernelSizeY <= 0.0f) return gcvSTATUS_OK;
     return gcUNIFORM_SetValueF_Ex(uniform, (gctSIZE_T)(hardware->kernelSizeY),
-                                  hardware->program->hints, (gctFLOAT*)hardware->kernelY);
+                                  hardware->program->programState.hints, (gctFLOAT*)hardware->kernelY);
 }
 
 gceSTATUS SetUniform_Kernel0(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)&hardware->kernel0);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)&hardware->kernel0);
 }
 
 gceSTATUS SetUniform_ColorTransformValues(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    return gcUNIFORM_SetValueF_Ex(uniform, 2, hardware->program->hints, (gctFLOAT*)hardware->colorTransformValues);
+    return gcUNIFORM_SetValueF_Ex(uniform, 2, hardware->program->programState.hints, (gctFLOAT*)hardware->colorTransformValues);
 }
 
 gceSTATUS SetUniform_RenderSize(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -1843,7 +1837,7 @@ gceSTATUS SetUniform_RenderSize(_vgHARDWARE *hardware, gcUNIFORM uniform)
     size[0] = (gctFLOAT)(1.0f / hardware->context->targetImage.width);
     size[1] = (gctFLOAT)(1.0f / hardware->context->targetImage.height);
 
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)size);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)size);
 }
 
 gceSTATUS SetUniform_ImageSampler(_vgHARDWARE *hardware, gctINT sampler)
@@ -2073,7 +2067,7 @@ gceSTATUS SetUniform_SourceMaskSampler(_vgHARDWARE *hardware, gctINT sampler)
 gceSTATUS SetUniform_Posneg1(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
     gctFLOAT value[] = {1.0f,1.0f,-1.0f,-1.0f};
-    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->hints, (gctFLOAT*)value);
+    return gcUNIFORM_SetValueF_Ex(uniform, 1, hardware->program->programState.hints, (gctFLOAT*)value);
 }
 
 gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
@@ -2101,7 +2095,7 @@ gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
     }
 
     status = gcUNIFORM_SetValueF_Ex(uniform, hardware->context->scissor.size,
-                                    hardware->program->hints, (gctFLOAT*)value);
+                                    hardware->program->programState.hints, (gctFLOAT*)value);
 
     gcmFOOTER();
     return status;
@@ -2554,9 +2548,7 @@ static gceSTATUS _LinkShader(_VGProgram *program)
                         | gcvSHADER_OPTIMIZER
                         | gcvSHADER_FLUSH_DENORM_TO_ZERO
                         ),
-                        &program->statesSize,
-                        &program->states,
-                        &program->hints);
+                        &program->programState);
 }
 
 
@@ -6930,7 +6922,7 @@ gceSTATUS _LoadUniforms(_vgHARDWARE *hardware)
         gctUINT32 samplerBase = 0;
         if (uniform && !isUniformInactive(uniform))
         {
-            samplerBase = gcHINTS_GetSamplerBaseOffset(hardware->program->hints,
+            samplerBase = gcHINTS_GetSamplerBaseOffset(hardware->program->programState.hints,
                                                        fragShader->binary);
             gcmONERROR((*fragShader->samplers[i].setfunc)(hardware, (uniform->physical + samplerBase)));
         }
@@ -6953,7 +6945,7 @@ static gceSTATUS _LoadShader(_vgHARDWARE *hardware)
         /*get the shortcut program*/
         gcmERR_BREAK(_GetCurrentProgram(hardware));
 
-        if (hardware->program->statesSize == 0)
+        if (hardware->program->programState.stateBufferSize == 0)
         {
             /*generate the shader code*/
             gcmERR_BREAK(_GenerateShaderCode(hardware));
@@ -6970,9 +6962,7 @@ static gceSTATUS _LoadShader(_vgHARDWARE *hardware)
         }
         /*load the shader*/
         gcmERR_BREAK(vgshCORE_LoadShader(&hardware->core,
-                                        hardware->program->statesSize,
-                                        hardware->program->states,
-                                        hardware->program->hints));
+                                        hardware->program->programState));
 
         gcmERR_BREAK(_LoadUniforms(hardware));
 

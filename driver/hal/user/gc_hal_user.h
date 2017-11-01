@@ -865,6 +865,12 @@ gcoHARDWARE_CallEvent(
     IN OUT gcsHAL_INTERFACE * Interface
     );
 
+gceSTATUS
+gcoHARDWARE_QueryQueuedMaxUnlockBytes(
+    IN  gcoHARDWARE Hardware,
+    OUT gctUINT_PTR Bytes
+    );
+
 /* Schedule destruction for the specified video memory node. */
 gceSTATUS
 gcoHARDWARE_ScheduleVideoMemory(
@@ -2758,6 +2764,10 @@ typedef enum _gceVX_KERNEL
 
     gcvVX_KERNEL_MAXPOOL,
     gcvVX_KERNEL_LRN,
+
+    gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION_MAX,
+    gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION_SORT,
+    gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION_NONMAX,
 }
 gceVX_KERNEL;
 
@@ -2798,7 +2808,7 @@ typedef struct _gcoVX_Instructions
     char * source;
 #endif
 
-    gcoVX_Instruction binarys[1536];
+    gcoVX_Instruction binarys[1024 * 10];
     gctUINT32 count;
     gctUINT32 regs_count;
 #if gcdVX_OPTIMIZER
@@ -2856,7 +2866,7 @@ vx_evis_no_inst_s;
 typedef struct _vx_nn_config
 {
     gctBOOL isSet;
-    gctUINT nnMadPerCoure;
+    gctUINT nnMadPerCore;
     gctUINT nnCoreCount;
     gctUINT nnInputBufferDepth;
     gctUINT nnAccumBufferDepth;
@@ -2865,8 +2875,39 @@ typedef struct _vx_nn_config
     gctUINT nnUSCCacheSize;
     gctUINT vipSRAMSize;
     gctUINT vipSRAMRemapAddress;
+    gctUINT tpCoreCount;
+    gctUINT tpPwlLUTCount;
+    gctUINT tpPwlLUTSize;
 }
 vx_nn_config;
+
+typedef struct _vx_drv_option
+{
+#define TP_FUNC_MAX 16
+    gctUINT enableTP;
+    gctUINT enableMultiTP;
+    gctUINT flagTPFunc[TP_FUNC_MAX];
+    gctUINT typeTPFunc[TP_FUNC_MAX];
+    gctUINT enableIdealPerf;
+    gctUINT enableSRAM;
+    gctUINT enableSramStreamMode;
+    gctUINT enableCNNPerf;
+    gctUINT enableBrickMode;
+    gctUINT enableBorderMode;
+    gctUINT nnFormulaOpt;
+    gctFLOAT sustainedBandwidth;
+    gctSTRING graphPerfLogFile;
+    gctUINT nnZeroRunLen;
+    gctINT  tpZeroRunLen;
+    gctUINT enableNNFCAccel;
+    gctUINT nnFCAccelThreshold;
+    gctUINT enableNNArchPerfPrint;
+    gctUINT enableNNLayerDump;
+    gctSTRING nnRoundingMode;
+    gctSTRING vxcShaderSourcePath;
+    gctUINT fcZMax;
+}
+vx_drv_option;
 
 typedef union _vx_nn_cmd_info_union
 {
@@ -2892,11 +2933,28 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
         gctUINT32  postMultiplier;
-        gctUINT32  postShift;
+        gctINT32   postShift;
         gctUINT32  wSize;
         gctUINT8   kernelDataType;
         gctUINT8   inImageDataType;
         gctUINT8   outImageDataType;
+
+        gctUINT8   brickMode;
+        gctUINT32  brickDistance;
+        /* for SRAM */
+        gctUINT32 imageCachingMode;
+        gctUINT32 kernelCachingMode;
+        gctUINT32 partialCacheDataUnit;
+        gctUINT32 kernelPatternMsb;
+        gctUINT32 kernelPatternLow32Bits;
+        gctUINT32 kernelPatternHigh32Bits;
+        gctUINT32 kernelCacheStartAddress;
+        gctUINT32 kernelCacheEndAddress;
+        gctUINT32 imageStartAddress;
+        gctUINT32 imageEndAddress;
+
+        gctUINT32 inImageBorderMode;
+        gctINT32  imImageBorderConst;
     }
     vx_nn_general_cmd_info;
 
@@ -2968,6 +3026,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 aluReluEnable;
         gctUINT32 floatRoundingMode;
         gctUINT32 integeroundingMode;
+        gctINT32  aluInputPreshift;
+        gctINT32  aluOutputPostshift;
     }
     vx_nn_tp_cmd_info;
 
@@ -3159,6 +3219,7 @@ gceSTATUS
 gcoHARDWAREVX_ProgrammeNNEngine(
     IN gcoHARDWARE Hardware,
     IN gctPOINTER Info,
+    IN gctPOINTER Options,
     IN OUT gctUINT32_PTR *Instruction
 );
 
@@ -3405,10 +3466,6 @@ struct _gcoHAL
 
     gcoDUMP                 dump;
 
-#if VIVANTE_PROFILER
-    gcsPROFILER             profiler;
-#endif
-
 #if gcdFRAME_DB
     gctINT                  frameDBIndex;
     gcsHAL_FRAME_INFO       frameDB[gcdFRAME_DB];
@@ -3469,9 +3526,6 @@ typedef struct _gcsSURF_NODE
     /* If not zero, the node is locked in the kernel. */
     gctBOOL                 lockedInKernel;
 
-    /* Locked hardware type */
-    gceHARDWARE_TYPE        lockedHardwareType;
-
     /* Number of planes in the surface for planar format support. */
     gctUINT                 count;
 
@@ -3515,7 +3569,6 @@ typedef struct _gcsSURF_NODE
         struct _gcsMEM_NODE_WRAPPED
         {
             gctPOINTER          mappingInfo;
-            gceHARDWARE_TYPE    mappingHardwareType;
             gctPHYS_ADDR_T      physical;
             gctBOOL             lockedInKernel[gcvHARDWARE_NUM_TYPES];
         }
@@ -3526,7 +3579,7 @@ typedef struct _gcsSURF_NODE
 #if gcdSYNC
     gceFENCE_STATUS             fenceStatus;
     gcsSYNC_CONTEXT_PTR         fenceCtx;
-    gctPOINTER                  sharedLock;
+    gctPOINTER                  sharedMutex;
 #endif
 
 }
@@ -3597,6 +3650,8 @@ struct _gcoSURF
     gctUINT                 aOffset;
     gctUINT                 aStride;
 #endif
+
+    gceHARDWARE_TYPE        initType;
 
     /* Video memory node for surface. */
     gcsSURF_NODE            node;
@@ -4495,13 +4550,6 @@ gcsSURF_NODE_IsFenceEnabled(
     );
 
 gceSTATUS
-gcsSURF_NODE_SetSharedLock(
-    IN gcsSURF_NODE_PTR Node,
-    IN gctPOINTER SharedLock
-    );
-
-
-gceSTATUS
 gcoHARDWARE_GetProductName(
     IN gcoHARDWARE Hardware,
     IN OUT gctSTRING *ProductName
@@ -4510,7 +4558,7 @@ gcoHARDWARE_GetProductName(
 /******************************************************************************
 *******************************HW slot*****************************************
 *******************************************************************************/
-#if gcdENABLE_3D
+#if gcdENABLE_3D && gcdENABLE_KERNEL_FENCE
 typedef enum {
     gcvHWSLOT_INDEX,
     gcvHWSLOT_STREAM,
@@ -4668,7 +4716,7 @@ typedef struct _gcsVSC_APIS
 {
     gceSTATUS (*gcCompileShader)(gctINT, gctUINT, gctCONST_STRING, gcSHADER*, gctSTRING*);
 
-    gceSTATUS (*gcLinkShaders)(gcSHADER, gcSHADER, gceSHADER_FLAGS, gctUINT32*, gctPOINTER*, gcsHINT_PTR*);
+    gceSTATUS (*gcLinkShaders)(gcSHADER, gcSHADER, gceSHADER_FLAGS, gcsPROGRAM_STATE*);
 
     gceSTATUS (*gcSHADER_Construct)(gctINT, gcSHADER*);
 
@@ -4677,7 +4725,7 @@ typedef struct _gcsVSC_APIS
 
     gceSTATUS (*gcSHADER_AddUniform)(gcSHADER, gctCONST_STRING, gcSHADER_TYPE, gctUINT32, gcSHADER_PRECISION, gcUNIFORM*);
 
-    gceSTATUS (*gcSHADER_AddOpcode)(gcSHADER, gcSL_OPCODE, gctUINT16, gctUINT8, gcSL_FORMAT, gcSHADER_PRECISION, gctUINT);
+    gceSTATUS (*gcSHADER_AddOpcode)(gcSHADER, gcSL_OPCODE, gctUINT32, gctUINT8, gcSL_FORMAT, gcSHADER_PRECISION, gctUINT);
 
     gceSTATUS (*gcSHADER_AddOpcodeConditional)(gcSHADER, gcSL_OPCODE, gcSL_CONDITION, gctUINT, gctUINT);
 
@@ -4689,7 +4737,7 @@ typedef struct _gcsVSC_APIS
 
     gceSTATUS (*gcSHADER_AddSourceConstant)(gcSHADER, gctFLOAT);
 
-    gceSTATUS (*gcSHADER_AddOutput)(gcSHADER, gctCONST_STRING, gcSHADER_TYPE, gctUINT32, gctUINT16, gcSHADER_PRECISION Precision);
+    gceSTATUS (*gcSHADER_AddOutput)(gcSHADER, gctCONST_STRING, gcSHADER_TYPE, gctUINT32, gctUINT32, gcSHADER_PRECISION Precision);
 
     gceSTATUS (*gcSHADER_SetCompilerVersion)(gcSHADER, gctUINT32_PTR);
 
@@ -4730,7 +4778,7 @@ typedef struct _gcsVSC_APIS
                                                   IN gcSHADER_KIND           ShaderKind,
                                                   OUT gcPatchDirective  **   PatchDirectivePtr);
 
-    gceSTATUS (*gcHINTS_Destroy)(gcsHINT_PTR);
+    gceSTATUS (*gcFreeProgramState)(gcsPROGRAM_STATE);
 
     void      (*gcSetGLSLCompiler)(gctGLSLCompiler);
 

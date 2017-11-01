@@ -766,6 +766,10 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                           VIR_Instruction*    pExpectedUniqueDefInst, /* Expected unique def inst */
                                           VIR_Instruction**   ppFirstOtherDefInst);              /* If not unique, it returns first other def inst when searching */
 
+gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
+                                               VIR_Instruction*    pUsageInst,
+                                               VIR_Instruction*    pDefInst);
+
 /* Check whether a def (or usage) has unique usage (or def), if yes, just return this
    unique one. */
 gctBOOL vscVIR_DoesDefInstHaveUniqueUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,

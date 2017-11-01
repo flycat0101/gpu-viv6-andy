@@ -70,6 +70,7 @@ typedef struct _vvtDeviceInfoRec {
     screenConfig ScrnConf;
 } vvtDeviceInfo;
 
+
 #define DRI_VALIDATE_DRAWABLE_INFO_ONCE(pDrawPriv)              \
     do {                                                        \
         if (*(pDrawPriv->pStamp) != pDrawPriv->lastStamp) {     \
@@ -110,6 +111,38 @@ typedef struct _vvtDeviceInfoRec {
         DRMGL_LIGHT_LOCK(psp->fd, &psp->pSAREA->lock,                     \
               pdp->driContextPriv->hHWContext);                         \
 } while (0)
+
+
+
+
+#define DRI3_VALIDATE_DRAWABLE_INFO_ONCE(pDrawPriv)              \
+    do {                                                        \
+        if (1) {     \
+            __dri3UtilUpdateDrawableInfo(pDrawPriv);             \
+        }                                                       \
+    } while (0)
+
+
+#define DRI3_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pDrawPriv)              \
+    do {                                                        \
+        if (1) {     \
+            __dri3UtilUpdateExtraDrawableInfo(pDrawPriv);             \
+        }                                                       \
+    } while (0)
+
+
+
+#define DRI3_VALIDATE_DRAWABLE_INFO(psp, pdp)                            \
+ do {                                                                   \
+        DRI3_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pdp);                    \
+} while (0)
+
+#define DRI3_FULLSCREENINFO(psp, pdp)     \
+ do {                                                                   \
+        __dri3UtilFullScreenCovered(pdp);                        \
+} while (0)
+
+
 
 
 /**
@@ -285,7 +318,7 @@ struct __DRIdrawablePrivateRec {
     /**
      * Called via glXSwapBuffers().
      */
-    GLvoid (*swapBuffers)(__DRIdrawablePrivate *dPriv );
+    GLvoid (*swapBuffers)(__DRIdrawablePrivate *dPriv);
 
     unsigned int wWidth;
     unsigned int wHeight;
@@ -299,9 +332,14 @@ struct __DRIdrawablePrivateRec {
 #ifdef DRI_PIXMAPRENDER_GL
     GLvoid *wrapPixData;
     GLvoid *wrapSurface;
-    GLvoid ( *doCPYToSCR)(__DRIdrawablePrivate *dPriv );
+    GLvoid ( *doCPYToSCR)(__DRIdrawablePrivate *dPriv);
 #endif
     unsigned int pixtag;
+    unsigned int oldx;
+    unsigned int oldy;
+    unsigned int oldw;
+    unsigned int oldh;
+    __DRIid olddrawable;
 };
 
 
@@ -374,6 +412,7 @@ struct __DRIscreenPrivateRec {
     int driMajor;
     int driMinor;
     int driPatch;
+    GLboolean dri3;
     /*@}*/
 
     /**
@@ -403,6 +442,9 @@ struct __DRIscreenPrivateRec {
      *   - close the kernel device driver
      */
     int fd;
+#ifdef X11_DRI3
+    void *drm;
+#endif
 
     /**
      * SAREA pointer
@@ -492,6 +534,7 @@ struct __DRIdisplayPrivateRec {
     int driMajor;
     int driMinor;
     int driPatch;
+    GLboolean dri3;
 
     /*
     ** Array of library handles [indexed by screen number]
@@ -511,6 +554,16 @@ __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp);
 
 extern GLboolean
 __driUtilFullScreenCovered(__DRIdrawablePrivate *pdp);
+
+
+extern GLvoid
+__dri3UtilUpdateDrawableInfo(__DRIdrawablePrivate *pdp);
+
+extern GLvoid
+__dri3UtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp);
+
+extern GLboolean
+__dri3UtilFullScreenCovered(__DRIdrawablePrivate *pdp);
 
 extern __DRIscreenPrivate * __driUtilCreateNewScreen( __DRInativeDisplay *dpy,
     int scrn, __DRIscreen *psc, __GLcontextModes * modes,

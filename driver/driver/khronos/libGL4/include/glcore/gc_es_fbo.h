@@ -144,12 +144,12 @@ typedef struct __GLframebufferObjectRec
 
     /*
     ** Format flag composition:
-    ** fbIntMask   fbUIntMask  fbUNormalizedMask   fbFloatMask         RESULT
-    **    +              +                  -                  -            Unsigned Integer
-    **    +              -                  -                  -            Signed  Integer
-    **    -              -                  +                  -            unsigned normalize
-    **    -              -                  -                  -            signed nomralize
-    **    -              -                  -                  +            float
+    ** fbIntMask   fbUIntMask  fbUnormMask   fbFloatMask        RESULT
+    **    +            +            -             -             Unsigned Integer
+    **    +            -            -             -             Signed  Integer
+    **    -            -            +             -             unsigned normalize
+    **    -            -            -             -             signed nomralize
+    **    -            -            -             +             float
     */
 
     GLuint fbIntMask;
@@ -162,7 +162,7 @@ typedef struct __GLframebufferObjectRec
     /*
     ** The bit is marked when the corresponding attachpoint is unsigned normalized format.
     */
-    GLuint fbUNormalizedMask;
+    GLuint fbUnormMask;
 
     /*
     ** The bit is marked when the corresponding attachpoint is is float internal format.
@@ -211,7 +211,8 @@ typedef struct __GLframebufObjMachineRec
     __GLsharedObjectMachine *rboShared;
 
     /* Default framebuffer object per context */
-    __GLframebufferObject defaultFBO;
+    __GLframebufferObject defaultDrawFBO;
+    __GLframebufferObject defaultReadFBO;
 
     /* Default renderbuffer object */
     __GLrenderbufferObject defaultRBO;

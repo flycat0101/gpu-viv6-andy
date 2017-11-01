@@ -228,6 +228,11 @@ typedef struct _gcsHARDWARE_CONFIG
     /* Chip registers. */
     gceCHIPMODEL                chipModel;
     gctUINT32                   chipRevision;
+    gctUINT32                   productID;
+    gctUINT32                   customerID;
+    gctUINT32                   ecoID;
+
+    gceCHIP_FLAG                chipFlags;
 
     /* Data extracted from specs bits. */
 #if gcdENABLE_3D
@@ -283,10 +288,6 @@ typedef struct _gcsHARDWARE_CONFIG
 #endif
 
     gctUINT32                   superTileMode;
-
-    gctUINT32                   productID;
-
-    gceCHIP_FLAG                chipFlags;
 
 #if gcdENABLE_3D && gcdUSE_VX
     /* Info of NN */
@@ -859,6 +860,7 @@ struct _gcoHARDWARE
     gcsHARDWARE_CONFIG *        config;
     gctBOOL                     features[gcvFEATURE_COUNT];
     gctBOOL                     swwas[gcvSWWA_COUNT];
+    gcsHAL_QUERY_CHIP_OPTIONS   options;
 
 #if gcdENABLE_3D
     /* API type. */
@@ -1098,11 +1100,15 @@ struct _gcoHARDWARE
 
     gceHARDWARE_TYPE            constructType;
 
-    gcsPROBEBUFFER              *probeBuffer;
-
 #if gcdENABLE_3D
     /* For Mixed streams bug.*/
     gctBOOL                     bForceVirtual;
+    /* quick reference */
+    gctBOOL                     streamRegV2;
+    gctUINT32                   streamAddressState;
+    gctUINT32                   streamStrideState;
+    gctUINT32                   shaderCtrlState;
+    gctUINT32                   genericWState;
 #endif
 };
 

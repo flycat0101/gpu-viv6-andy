@@ -270,12 +270,6 @@ GLvoid __glInitFramebufferObject(__GLcontext *gc, __GLframebufferObject *framebu
 
     framebuffer->readBuffer = GL_COLOR_ATTACHMENT0;
 
-    if (name == 0)
-    {
-        framebuffer->flag |= (__GL_FRAMEBUFFER_IS_CHECKED | __GL_FRAMEBUFFER_IS_COMPLETE);
-        framebuffer->checkCode = GL_FRAMEBUFFER_COMPLETE;
-    }
-
     framebuffer->fast = GL_FALSE;
 
     framebuffer->defaultWidth = 0;
@@ -396,9 +390,6 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
 
 GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
 {
-    GLboolean retVal;
-    __GLframebufferObject *framebufferObj = gcvNULL;
-
     __GLframebufferObject *prevDrawObj = gcvNULL;
     __GLframebufferObject *prevReadObj = gcvNULL;
 
@@ -433,61 +424,69 @@ GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
 
     GL_ASSERT(gcvNULL != gc->frameBuffer.fboManager);
 
-    if (name == 0)
-    {
-        /* Retrieve the default object in __GLcontext. */
-        framebufferObj = &gc->frameBuffer.defaultFBO;
-        GL_ASSERT(framebufferObj->name == 0);
-    }
-    else
-    {
-        framebufferObj = (__GLframebufferObject *)__glGetObject(gc, gc->frameBuffer.fboManager, name);
-    }
-
-    if (gcvNULL == framebufferObj)
-    {
-        /*
-        ** If this is the first time this name has been bound,
-        ** then create a new frameBuffer object and initialize it.
-        */
-        framebufferObj = (__GLframebufferObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLframebufferObject));
-        __glInitFramebufferObject(gc, framebufferObj, name);
-
-        /* Add this frameBuffer object to the "gc->frameBuffer.shared" structure. */
-        __glAddObject(gc, gc->frameBuffer.fboManager, name, framebufferObj);
-
-        /* Mark the name "frameBuffer" used in the frameBuffer nameArray. */
-        __glMarkNameUsed(gc, gc->frameBuffer.fboManager, name);
-    }
-
     prevDrawObj = gc->frameBuffer.drawFramebufObj;
     prevReadObj = gc->frameBuffer.readFramebufObj;
 
-    switch (target)
+    if (name)
     {
-    case GL_FRAMEBUFFER:
-        curDrawObj = framebufferObj;
-        curReadObj = framebufferObj;
-        break;
-    case GL_DRAW_FRAMEBUFFER:
-        curDrawObj = framebufferObj;
-        curReadObj = prevReadObj;
-        break;
-    case GL_READ_FRAMEBUFFER:
-        curDrawObj = prevDrawObj;
-        curReadObj = framebufferObj;
-        break;
+        __GLframebufferObject *fbo = (__GLframebufferObject*)__glGetObject(gc, gc->frameBuffer.fboManager, name);
+
+        if (gcvNULL == fbo)
+        {
+            fbo = (__GLframebufferObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLframebufferObject));
+
+            __glInitFramebufferObject(gc, fbo, name);
+
+            /* Add this frameBuffer object to the "gc->frameBuffer.shared" structure. */
+            __glAddObject(gc, gc->frameBuffer.fboManager, name, fbo);
+
+            /* Mark the name "frameBuffer" used in the frameBuffer nameArray. */
+            __glMarkNameUsed(gc, gc->frameBuffer.fboManager, name);
+        }
+
+        switch (target)
+        {
+        case GL_FRAMEBUFFER:
+            curDrawObj = fbo;
+            curReadObj = fbo;
+            break;
+        case GL_DRAW_FRAMEBUFFER:
+            curDrawObj = fbo;
+            curReadObj = prevReadObj;
+            break;
+        case GL_READ_FRAMEBUFFER:
+            curDrawObj = prevDrawObj;
+            curReadObj = fbo;
+            break;
+        }
+    }
+    else
+    {
+        switch (target)
+        {
+        case GL_FRAMEBUFFER:
+            curDrawObj = &gc->frameBuffer.defaultDrawFBO;
+            curReadObj = &gc->frameBuffer.defaultReadFBO;
+            break;
+        case GL_DRAW_FRAMEBUFFER:
+            curDrawObj = &gc->frameBuffer.defaultDrawFBO;
+            curReadObj = prevReadObj;
+            break;
+        case GL_READ_FRAMEBUFFER:
+            curDrawObj = prevDrawObj;
+            curReadObj = &gc->frameBuffer.defaultReadFBO;
+            break;
+        }
     }
 
-    /*
-    ** Install new frame buffer object and notify dp render target changed
-    */
     if (prevDrawObj != curDrawObj)
     {
+        GLboolean retVal;
+
         gc->drawableDirtyMask |= __GL_BUFFER_DRAW_BIT;
         gc->frameBuffer.drawFramebufObj = curDrawObj;
         retVal = (*gc->dp.bindDrawFramebuffer)(gc, prevDrawObj, curDrawObj);
-        if(!retVal)
+        if (!retVal)
         {
             __GL_ERROR((*gc->dp.getError)(gc));
         }
@@ -868,6 +867,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
                               GLboolean isExtMode)
 {
     __GLfboAttachPoint *attachPoint;
+    __GLfboAttachPoint preAttach;
 
     __GL_HEADER();
 
@@ -898,6 +898,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
 
     /* If there is previously attached obj, remove fbo from it's owner list. */
     __glRemoveFramebufferAsImageUser(gc, framebufferObj, attachPoint);
+    __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
 
     if (texObj)
     {
@@ -931,7 +932,8 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
                                    face,
                                    samples,
                                    layer,
-                                   layered))
+                                   layered,
+                                   &preAttach))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -965,6 +967,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
                                    __GLrenderbufferObject *renderbufferObj)
 {
     __GLfboAttachPoint* attachPoint;
+    __GLfboAttachPoint preAttach;
 
     __GL_HEADER();
 
@@ -983,12 +986,13 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
         else if (attachPoint->objName == renderbufferObj->name)
         {
             /* Skip if bound with same object */
-            __GL_EXIT();;
+            __GL_EXIT();
         }
     }
 
     /* If there is previously attached obj, remove fbo from it's owner list. */
     __glRemoveFramebufferAsImageUser(gc, framebufferObj, attachPoint);
+    __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
 
     if (renderbufferObj != gcvNULL)
     {
@@ -1007,7 +1011,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
         __glFramebufferResetAttachpoint(gc, framebufferObj, attachIndex, GL_TRUE);
     }
 
-    gc->dp.framebufferRenderbuffer(gc, framebufferObj, attachIndex, renderbufferObj);
+    gc->dp.framebufferRenderbuffer(gc, framebufferObj, attachIndex, renderbufferObj, &preAttach);
 
     /* Dirty this framebuffer object */
     __GL_FRAMEBUFFER_COMPLETE_DIRTY(framebufferObj);
@@ -1033,41 +1037,65 @@ OnExit:
 */
 GLvoid __glEvaluateFramebufferChange(__GLcontext *gc, GLbitfield flags)
 {
-    GLboolean complete = GL_TRUE;
+    GLboolean skipDraw = GL_FALSE;
     GLboolean drawChecked = GL_FALSE;
     __GLframebufferObject *drawFbo = gc->frameBuffer.drawFramebufObj;
     __GLframebufferObject *readFbo = gc->frameBuffer.readFramebufObj;
 
     __GL_HEADER();
 
-    /* If NOT default draw FBO */
-    if ((drawFbo->name > 0) && (flags & __GL_BUFFER_DRAW_BIT))
+    if (flags & __GL_BUFFER_DRAW_BIT)
     {
+        GLboolean complete = gc->dp.isFramebufferComplete(gc, drawFbo);
+
+        if (complete)
+        {
+            /* Also skip draw if default fbo is zero sized, but not generate any error. */
+            if (drawFbo->name == 0 && (gc->drawablePrivate->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
+            {
+                skipDraw = GL_TRUE;
+            }
+        }
+        else
+        {
+            skipDraw = GL_TRUE;
+            __GL_ERROR(GL_INVALID_FRAMEBUFFER_OPERATION);
+        }
+
         drawChecked = GL_TRUE;
-        complete &= gc->dp.isFramebufferComplete(gc, drawFbo);
     }
 
-    /* If NOT default read FBO, and different than drawFBO or drawFBO wasn't checked */
-    if ((readFbo->name > 0) && (flags & __GL_BUFFER_READ_BIT) &&
-        (readFbo != drawFbo || !drawChecked))
+    /* If read FBO was different than drawFBO or drawFBO wasn't checked */
+    if ((flags & __GL_BUFFER_READ_BIT) && (readFbo != drawFbo || !drawChecked))
     {
-        complete &= gc->dp.isFramebufferComplete(gc, readFbo);
+        GLboolean complete = gc->dp.isFramebufferComplete(gc, readFbo);
+
+        if (complete)
+        {
+            /* Also skip draw if default fbo is zero sized, but not generate any error. */
+            if (readFbo->name == 0 && (gc->readablePrivate->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
+            {
+                skipDraw = GL_TRUE;
+            }
+        }
+        else
+        {
+            skipDraw = GL_TRUE;
+            __GL_ERROR(GL_INVALID_FRAMEBUFFER_OPERATION);
+        }
     }
 
     /* Check completeness */
-    if (complete)
+    if (skipDraw)
     {
-        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
+        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
     else
     {
-        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
-        __GL_ERROR_EXIT(GL_INVALID_FRAMEBUFFER_OPERATION);
+        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
 
-OnError:
     __GL_FOOTER();
-    return;
 }
 
 __GLformatInfo* __glGetFramebufferFormatInfo(__GLcontext *gc, __GLframebufferObject *framebufferObj, GLenum attachment)
@@ -1176,11 +1204,12 @@ GLvoid __glInitFramebufferStates(__GLcontext *gc)
     __glInitRenderbufferObject(gc, &gc->frameBuffer.defaultRBO, 0);
 
     /* Default framebuffer object */
-    __glInitFramebufferObject(gc, &gc->frameBuffer.defaultFBO, 0);
+    __glInitFramebufferObject(gc, &gc->frameBuffer.defaultDrawFBO, 0);
+    __glInitFramebufferObject(gc, &gc->frameBuffer.defaultReadFBO, 0);
 
     /* Initially bind to the default object (name 0) */
-    gc->frameBuffer.drawFramebufObj = &gc->frameBuffer.defaultFBO;
-    gc->frameBuffer.readFramebufObj = &gc->frameBuffer.defaultFBO;
+    gc->frameBuffer.drawFramebufObj = &gc->frameBuffer.defaultDrawFBO;
+    gc->frameBuffer.readFramebufObj = &gc->frameBuffer.defaultReadFBO;
     gc->frameBuffer.boundRenderbufObj = &gc->frameBuffer.defaultRBO;
 
     __GL_FOOTER();
@@ -1215,6 +1244,13 @@ GLvoid GL_APIENTRY __gles_BindRenderbuffer(__GLcontext *gc, GLenum target, GLuin
     {
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
+
+#ifdef OPENGL40
+    if (renderbuffer && !__glIsNameDefined(gc, gc->frameBuffer.rboShared, renderbuffer))
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+#endif
 
     __glBindRenderbuffer(gc, target, renderbuffer);
 }
@@ -1403,6 +1439,13 @@ GLvoid GL_APIENTRY __gles_BindFramebuffer(__GLcontext *gc, GLenum target, GLuint
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
+#ifdef OPENGL40
+    if (framebuffer && !__glIsNameDefined(gc, gc->frameBuffer.fboManager, framebuffer))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#endif
+
     __glBindFramebuffer(gc, target, framebuffer);
 
 OnError:
@@ -1472,7 +1515,7 @@ OnExit:
 
 GLenum GL_APIENTRY __gles_CheckFramebufferStatus(__GLcontext *gc, GLenum target)
 {
-    GLenum retCode = 0;
+    __GLframebufferObject *fbo = gcvNULL;
 
     __GL_HEADER();
 
@@ -1480,13 +1523,13 @@ GLenum GL_APIENTRY __gles_CheckFramebufferStatus(__GLcontext *gc, GLenum target)
     {
     case GL_FRAMEBUFFER:
     case GL_DRAW_FRAMEBUFFER:
-        gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj);
-        retCode = gc->frameBuffer.drawFramebufObj->checkCode;
+        fbo = gc->frameBuffer.drawFramebufObj;
+        gc->dp.isFramebufferComplete(gc, fbo);
         break;
 
     case GL_READ_FRAMEBUFFER:
-        gc->dp.isFramebufferComplete(gc, gc->frameBuffer.readFramebufObj);
-        retCode = gc->frameBuffer.readFramebufObj->checkCode;
+        fbo = gc->frameBuffer.readFramebufObj;
+        gc->dp.isFramebufferComplete(gc, fbo);
         break;
 
     default:
@@ -1495,7 +1538,7 @@ GLenum GL_APIENTRY __gles_CheckFramebufferStatus(__GLcontext *gc, GLenum target)
 
 OnError:
     __GL_FOOTER();
-    return retCode;
+    return fbo ? fbo->checkCode : 0;
 }
 
 GLvoid GL_APIENTRY __gles_FramebufferTexture2D(__GLcontext *gc, GLenum target, GLenum attachment,
@@ -1699,7 +1742,12 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
         /*
         ** ES3.0 spec allow query default frame buffer object
         */
+#ifdef OPENGL40
+        if ((attachment >= GL_FRONT_LEFT && attachment <= GL_BACK_RIGHT) ||
+            (attachment >= GL_AUX0 && attachment <= GL_AUX3))
+#else
         if (attachment == GL_BACK)
+#endif
         {
             formatInfo = gc->drawablePrivate->rtFormatInfo;
         }
@@ -1960,9 +2008,10 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
     GLboolean bHaveDrawbuffer = GL_FALSE;
     GLboolean xReverse = GL_FALSE;
     GLboolean yReverse = GL_FALSE;
-    GLint i = 0;
     GLuint rAttachPointMask = 0;
     GLuint wAttachPointMask = 0;
+    GLvoid *readHandle = gcvNULL;
+    GLint i = 0;
 
     __GL_HEADER();
 
@@ -2017,7 +2066,6 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
             {
                 GLint attachIndex = __glMapAttachmentToIndex(readFBO->readBuffer);
 
-
                 if (attachIndex != -1)
                 {
                     readAttachPoint = &readFBO->attachPoint[attachIndex];
@@ -2044,7 +2092,41 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
             }
             else
             {
-                if (!readable->rtHandle)
+#ifdef OPENGL40
+                switch (gc->state.raster.readBuffer)
+                {
+                case GL_FRONT:
+                case GL_LEFT:
+                case GL_FRONT_AND_BACK:
+                case GL_FRONT_LEFT:
+                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                    break;
+
+                case GL_RIGHT:
+                case GL_FRONT_RIGHT:
+                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                    break;
+
+                case GL_BACK_RIGHT:
+                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                    break;
+
+                case GL_BACK:
+                case GL_BACK_LEFT:
+                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                    break;
+
+                default:
+                  break;
+                }
+#else
+                if (gc->state.raster.readBuffer == GL_BACK)
+                {
+                    readHandle = readable->rtHandles[0];
+                }
+#endif
+
+                if (!readHandle)
                 {
                     mask &= ~GL_COLOR_BUFFER_BIT;
                 }
@@ -2085,16 +2167,61 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
             }
             else
             {
-                if (drawable->rtHandle)
+#ifdef OPENGL40
+                for (i = 0; i < (GLint)gc->constants.shaderCaps.maxDrawBuffers; ++i)
+                {
+                    GLvoid *drawHandle = gcvNULL;
+
+                    switch (gc->state.raster.drawBuffers[i])
+                    {
+                    case GL_FRONT:
+                    case GL_LEFT:
+                    case GL_FRONT_LEFT:
+                    case GL_FRONT_AND_BACK:
+                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                        break;
+
+                    case GL_RIGHT:
+                    case GL_FRONT_RIGHT:
+                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                        break;
+
+                    case GL_BACK:
+                    case GL_BACK_LEFT:
+                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                        break;
+
+                    case GL_BACK_RIGHT:
+                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                        break;
+
+                    default:
+                      break;
+                    }
+
+                    if (drawHandle)
+                    {
+                        bHaveDrawbuffer = GL_TRUE;
+                    }
+
+                    /* Surface of default drawFBO must be different than named readFBO */
+                    if ((0 == readFBO->name) && (readHandle == drawHandle))
+                    {
+                        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                    }
+                }
+#else
+                if (drawable->rtHandles[0])
                 {
                     bHaveDrawbuffer = GL_TRUE;
                 }
 
                 /* Surface of default drawFBO must be different than named readFBO */
-                if ((0 == readFBO->name) && (readable->rtHandle == drawable->rtHandle))
+                if ((0 == readFBO->name) && (readHandle == drawable->rtHandles[0]))
                 {
                     __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                 }
+#endif
 
                 dstFixOrFloat = GL_TRUE;
                 dstInt        = GL_FALSE;
@@ -2129,7 +2256,6 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
 
                 }
             }
-
         }
     }
 
@@ -2443,6 +2569,12 @@ GLvoid GL_APIENTRY __gles_FramebufferTextureLayer(__GLcontext *gc, GLenum target
                 __GL_ERROR_EXIT(GL_INVALID_VALUE);
             }
             break;
+        case  __GL_TEXTURE_1D_ARRAY_INDEX:
+            if (layer >= (GLint)gc->constants.maxTextureArraySize)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_VALUE);
+            }
+            break;
         default:
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
@@ -2562,7 +2694,6 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
             __GL_EXIT();
         }
 
-
         for (i = 0; i < __GL_MAX_ATTACHMENTS; ++i)
         {
             /* Ignore if app doesn't specify the attachment, or the attachments does not exist. */
@@ -2585,6 +2716,12 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
                 break;
             default:
                 __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
+
+            if (!gc->dp.isFramebufferComplete(gc, framebufferObj))
+            {
+                /* Ignore if the framebuffer object is not complete */
+                __GL_EXIT();
             }
 
             gc->dp.invalidateDrawable(gc, x, y, width, height);
@@ -2960,11 +3097,14 @@ GLvoid GL_APIENTRY __gles_FramebufferTexture(__GLcontext *gc, GLenum target, GLe
         case __GL_TEXTURE_2D_ARRAY_INDEX:
         case __GL_TEXTURE_CUBEMAP_INDEX:
         case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
+        case __GL_TEXTURE_1D_ARRAY_INDEX:
             break;
 
         case __GL_TEXTURE_2D_INDEX:
         case __GL_TEXTURE_2D_MS_INDEX:
         case __GL_TEXTURE_EXTERNAL_INDEX:
+        case __GL_TEXTURE_RECTANGLE_INDEX:
+        case __GL_TEXTURE_1D_INDEX:
             layered = GL_FALSE;
             break;
         default:
@@ -3009,6 +3149,14 @@ OnError:
 }
 
 #ifdef OPENGL40
+GLvoid GLAPIENTRY __glim_FramebufferTexture1D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
+{
+/* to do */
+}
+GLvoid GLAPIENTRY __glim_FramebufferTexture3D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
+{
+/* to do */
+}
 GLboolean GLAPIENTRY __glim_IsRenderbufferEXT( __GLcontext *gc,  GLuint renderbuffer)
 {
     return __gles_IsRenderbuffer(gc, renderbuffer);
@@ -3079,4 +3227,3 @@ GLvoid GLAPIENTRY __glim_BlitFramebufferEXT(__GLcontext *gc,  GLint srcX0, GLint
     __gles_BlitFramebuffer(gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 }
 #endif
-

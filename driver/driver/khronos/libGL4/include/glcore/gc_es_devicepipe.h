@@ -107,9 +107,11 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*compressedTexSubImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*compressedTexSubImage3D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*generateMipmaps)(__GLcontext*, __GLtextureObject*, GLint, GLint*);
+    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLubyte*);
 #ifdef OPENGL40
     GLboolean (*getCompressedTexImage)(__GLcontext*, __GLtextureObject*, __GLmipMapLevel *, GLint , GLvoid *);
 #endif
+
 
     GLboolean (*copyTexBegin)(__GLcontext*);
     GLvoid (*copyTexValidateState)(__GLcontext *);
@@ -199,8 +201,8 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*detachRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLboolean (*renderbufferStorage)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*blitFramebuffer)(__GLcontext*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLboolean, GLboolean, GLenum);
-    GLboolean (*frameBufferTexture)(__GLcontext*, __GLframebufferObject*, GLint, __GLtextureObject*, GLint, GLint, GLsizei, GLint, GLboolean);
-    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*);
+    GLboolean (*frameBufferTexture)(__GLcontext*, __GLframebufferObject*, GLint, __GLtextureObject*, GLint, GLint, GLsizei, GLint, GLboolean, __GLfboAttachPoint*);
+    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*, __GLfboAttachPoint*);
     GLboolean (*isFramebufferComplete)(__GLcontext*, __GLframebufferObject*);
     GLvoid (*invalidateFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLfboAttachPoint*, GLint, GLint, GLsizei, GLsizei);
     GLvoid (*invalidateDrawable)(__GLcontext*, GLint, GLint, GLsizei, GLsizei);
@@ -226,23 +228,13 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*getXfbVarying)(__GLcontext*, __GLprogramObject*, GLuint, GLsizei, GLsizei*, GLsizei*, GLenum*, GLchar*);
     GLboolean (*checkXFBBufSizes)(__GLcontext *, __GLxfbObject *, GLsizei);
 
-    GLboolean (*drawArraysIndirect)(__GLcontext *);
-    GLboolean (*drawElementsIndirect)(__GLcontext *);
-
-    GLboolean (*multiDrawArraysIndirectEXT)(__GLcontext *);
-    GLboolean (*multiDrawElementsIndirectEXT)(__GLcontext *);
-
-    GLvoid (*DrawElementsBaseVertexEXT)(__GLcontext *);
-    GLvoid (*DrawRangeElementsBaseVertexEXT)(__GLcontext *);
-    GLvoid (*DrawElementsInstancedBaseVertexEXT)(__GLcontext *);
-    GLvoid (*MultiDrawElementsBaseVertexEXT)(__GLcontext *);
-
-
     /* GL_EXT_robustness */
     GLenum (*getGraphicsResetStatus)(__GLcontext *);
 
+#if VIVANTE_PROFILER
     /* profiler */
     GLboolean (*profiler)(void *, GLuint, gctHANDLE);
+#endif
 
     /* Patches. */
     GLvoid  (*patchBlend)(__GLcontext *, gctBOOL);

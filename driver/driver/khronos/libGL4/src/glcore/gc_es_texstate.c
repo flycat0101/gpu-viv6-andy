@@ -13,9 +13,6 @@
 
 #include "gc_es_context.h"
 #include "gc_es_object_inline.c"
-#ifdef OPENGL40
-#include "gc_gl_debug.h"
-#endif
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
@@ -100,7 +97,7 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->params.sampler.maxLod = 1000.0;
     tex->params.baseLevel = 0;
     tex->params.maxLevel = 1000;
-    tex->params.depthStTexMode = GL_DEPTH_COMPONENT;
+    tex->params.dsTexMode = GL_DEPTH_COMPONENT;
 
     tex->params.sampler.compareMode = GL_NONE;
     tex->params.sampler.compareFunc = GL_LEQUAL;
@@ -418,7 +415,7 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     }
 
     if (baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
-        texObj->params.depthStTexMode == GL_STENCIL_INDEX)
+        texObj->params.dsTexMode == GL_STENCIL_INDEX)
     {
         if (magFilter != GL_NEAREST || minFilter != GL_NEAREST)
         {
@@ -494,7 +491,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
 {
     __GLtextureObject *tex = gc->texture.units[unitIdx].boundTextures[targetIdx];
     GLint param = __glFloat2NearestInt(pv[0]);
-    GLbitfield dirty = 0;
+    GLuint64 dirty = 0;
 
     switch (pname)
     {
@@ -513,9 +510,25 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             {
                 __GL_ERROR_RET(GL_INVALID_ENUM);
             }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_S_BIT;
+                break;
+            }
             /* fall through */
 #ifdef OPENGL40
         case GL_CLAMP:
+            if (gc->imports.coreProfile)
+            {
+                __GL_ERROR_RET(GL_INVALID_ENUM);
+            }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_S_BIT;
+                break;
+            }
 #endif
         case GL_CLAMP_TO_EDGE:
             tex->params.sampler.sWrapMode = (GLenum)param;
@@ -551,9 +564,25 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             {
                 __GL_ERROR_RET(GL_INVALID_ENUM);
             }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_T_BIT;
+                break;
+            }
             /* fall through */
 #ifdef OPENGL40
         case GL_CLAMP:
+            if (gc->imports.coreProfile)
+            {
+                __GL_ERROR_RET(GL_INVALID_ENUM);
+            }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_T_BIT;
+                break;
+            }
 #endif
         case GL_CLAMP_TO_EDGE:
             tex->params.sampler.tWrapMode = (GLenum)param;
@@ -589,9 +618,25 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             {
                 __GL_ERROR_RET(GL_INVALID_ENUM);
             }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_R_BIT;
+                break;
+            }
             /* fall through */
 #ifdef OPENGL40
         case GL_CLAMP:
+            if (gc->imports.coreProfile)
+            {
+                __GL_ERROR_RET(GL_INVALID_ENUM);
+            }
+            else
+            {
+                tex->params.sampler.sWrapMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_WRAP_R_BIT;
+                break;
+            }
 #endif
         case GL_CLAMP_TO_EDGE:
             tex->params.sampler.rWrapMode = (GLenum)param;
@@ -853,10 +898,10 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         {
         case GL_DEPTH_COMPONENT:
         case GL_STENCIL_INDEX:
-            if (tex->params.depthStTexMode != (GLenum)param)
+            if (tex->params.dsTexMode != (GLenum)param)
             {
-                tex->params.depthStTexMode = (GLenum)param;
-                dirty = __GL_TEXPARAM_D_ST_TEXMODE_BIT;
+                tex->params.dsTexMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_DS_TEXMODE_BIT;
                 tex->uObjStateDirty.s.dsModeDirty = GL_TRUE;
             }
             break;
@@ -869,7 +914,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         if (pv[0] >= 1.0f)
         {
             tex->params.sampler.maxAnistropy = pv[0];
-            dirty = __GL_TEXPARAM_MAX_ANISTROPY_BIT;
+            dirty = __GL_TEXPARAM_MAX_ANISOTROPY_BIT;
         }
         else
         {
@@ -1014,7 +1059,25 @@ GLvoid GL_APIENTRY __gles_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
     case GL_TEXTURE_PROTECTED_VIV:
+#ifdef OPENGL40
+    case GL_TEXTURE_PRIORITY:
+    case GL_TEXTURE_LOD_BIAS:
+    case GL_GENERATE_MIPMAP:
+    case GL_TEXTURE_COMPARE_FAIL_VALUE_ARB:
+    case GL_TEXTURE_RESIDENT:
+#endif
         break;
+#ifdef OPENGL40
+    case GL_DEPTH_TEXTURE_MODE:
+        if (gc->imports.coreProfile)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        else
+        {
+            break;
+        }
+#endif
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
@@ -1198,7 +1261,25 @@ GLvoid GL_APIENTRY __gles_TexParameteri(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
     case GL_TEXTURE_PROTECTED_VIV:
+#ifdef OPENGL40
+    case GL_TEXTURE_PRIORITY:
+    case GL_TEXTURE_LOD_BIAS:
+    case GL_GENERATE_MIPMAP:
+    case GL_TEXTURE_COMPARE_FAIL_VALUE_ARB:
+    case GL_TEXTURE_RESIDENT:
+#endif
         break;
+#ifdef OPENGL40
+    case GL_DEPTH_TEXTURE_MODE:
+        if (gc->imports.coreProfile)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        else
+        {
+            break;
+        }
+#endif
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
@@ -1352,7 +1433,7 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
         v[0] = (GLfloat)params->sampler.compareFunc;
         break;
     case GL_DEPTH_STENCIL_TEXTURE_MODE:
-        v[0] = (GLfloat)params->depthStTexMode;
+        v[0] = (GLfloat)params->dsTexMode;
         break;
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
         v[0] = (GLfloat)params->sampler.maxAnistropy;
@@ -1667,12 +1748,25 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
           params[0] = faceMipmap->border;
           break;
       case GL_TEXTURE_LUMINANCE_SIZE:
-          GL_ASSERT(0); //to do
-          params[0] = formatInfo->luminanceSize;
+          switch (formatInfo->dataFormat) {
+          case GL_LUMINANCE:
+          case GL_LUMINANCE_ALPHA:
+              params[0] = formatInfo->redSize;
+              break;
+          default:
+              params[0] = 0;
+              break;
+          }
           break;
       case GL_TEXTURE_INTENSITY_SIZE:
-          GL_ASSERT(0); //to do
-          params[0] = formatInfo->intensitySize;
+          switch (formatInfo->dataFormat) {
+          case GL_INTENSITY:
+              params[0] = formatInfo->redSize;
+              break;
+          default:
+              params[0] = 0;
+              break;
+          }
           break;
       case GL_TEXTURE_COMPRESSED_IMAGE_SIZE:
           switch (target) {
@@ -1688,12 +1782,25 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
           params[0] = faceMipmap->compressedSize;
           break;
       case GL_TEXTURE_LUMINANCE_TYPE_ARB:
-          GL_ASSERT(0); //to do
-          params[0] = formatInfo->luminanceType;
+          switch (formatInfo->dataFormat) {
+          case GL_LUMINANCE:
+          case GL_LUMINANCE_ALPHA:
+              params[0] = formatInfo->redType;
+              break;
+          default:
+              params[0] = 0;
+              break;
+          }
           break;
       case GL_TEXTURE_INTENSITY_TYPE_ARB:
-          GL_ASSERT(0); //to do
-          params[0] = formatInfo->intensityType;
+          switch (formatInfo->dataFormat) {
+          case GL_INTENSITY:
+              params[0] = formatInfo->redType;
+              break;
+          default:
+              params[0] = 0;
+              break;
+          }
           break;
 #endif
     default:
@@ -1837,6 +1944,13 @@ GLvoid GL_APIENTRY __gles_BindTexture(__GLcontext *gc, GLenum target, GLuint tex
     GLuint targetIndex;
 
     __GL_HEADER();
+
+#ifdef OPENGL40
+    if (gc->imports.coreProfile && texture &&!__glIsNameDefined(gc, gc->texture.shared, texture))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#endif
 
     switch (target)
     {
@@ -2379,7 +2493,7 @@ __GL_INLINE GLvoid __glSamplerParameterfv(__GLcontext *gc, __GLsamplerObject *sa
         if (pv[0] >= 1.0f)
         {
             samplerObj->params.maxAnistropy = pv[0];
-            dirty = __GL_TEXPARAM_MAX_ANISTROPY_BIT;
+            dirty = __GL_TEXPARAM_MAX_ANISOTROPY_BIT;
         }
         else
         {
@@ -3340,11 +3454,6 @@ GLvoid GL_APIENTRY __glim_TexEnvfv(__GLcontext *gc, GLenum target, GLenum pname,
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexEnvfv", DT_GLenum, target, DT_GLenum,pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     __glTexEnvfv(gc, target, pname, (GLfloat *)pv);
 }
 
@@ -3352,11 +3461,6 @@ GLvoid GL_APIENTRY __glim_TexEnvf(__GLcontext *gc, GLenum target, GLenum pname, 
 {
     GLfloat tmpf[4];
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexEnvf", DT_GLenum, target, DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     if (pname != GL_TEXTURE_ENV_COLOR) {
@@ -3374,11 +3478,6 @@ GLvoid GL_APIENTRY __glim_TexEnviv(__GLcontext *gc, GLenum target, GLenum pname,
     GLfloat tmpf[4];
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexEnviv", DT_GLenum, target, DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
-
     if (pname == GL_TEXTURE_ENV_COLOR) {
         tmpf[0] = __GL_I_TO_FLOAT(pv[0]);
         tmpf[1] = __GL_I_TO_FLOAT(pv[1]);
@@ -3395,11 +3494,6 @@ GLvoid GL_APIENTRY __glim_TexEnvi(__GLcontext *gc, GLenum target, GLenum pname, 
 {
     GLfloat tmpf[4];
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexEnvi", DT_GLenum, target, DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     if (pname != GL_TEXTURE_ENV_COLOR) {
@@ -3509,11 +3603,6 @@ GLvoid GL_APIENTRY __glim_TexGendv(__GLcontext *gc, GLenum coord, GLenum pname, 
     GLfloat tmpf[4]={0.0, 0.0, 0.0, 0.0};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGendv", DT_GLenum, coord, DT_GLenum, pname, DT_GLdouble_ptr, pv, DT_GLnull);
-#endif
-
     switch (pname) {
       case GL_TEXTURE_GEN_MODE:
           tmpf[0] = (GLfloat)pv[0];
@@ -3535,11 +3624,6 @@ GLvoid GL_APIENTRY __glim_TexGend(__GLcontext *gc, GLenum coord, GLenum pname, G
     GLfloat tmpf = (GLfloat)d;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGend", DT_GLenum, coord, DT_GLenum, pname, DT_GLdouble, d, DT_GLnull);
-#endif
-
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
       case GL_TEXTURE_GEN_MODE:
@@ -3555,22 +3639,12 @@ GLvoid GL_APIENTRY __glim_TexGenfv(__GLcontext *gc, GLenum coord, GLenum pname, 
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGenfv", DT_GLenum, coord, DT_GLenum, pname, DT_GLfloat_ptr, pv, DT_GLnull);
-#endif
-
     __glTexGenfv(gc, coord, pname, (GLfloat *)pv);
 }
 
 GLvoid GL_APIENTRY __glim_TexGenf(__GLcontext *gc, GLenum coord, GLenum pname, GLfloat f)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGenf", DT_GLenum, coord, DT_GLenum, pname, DT_GLfloat, f, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -3587,11 +3661,6 @@ GLvoid GL_APIENTRY __glim_TexGeniv(__GLcontext *gc, GLenum coord, GLenum pname, 
 {
     GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGeniv", DT_GLenum, coord, DT_GLenum, pname, DT_GLint_ptr, pv, DT_GLnull);
-#endif
 
     switch (pname) {
       case GL_TEXTURE_GEN_MODE:
@@ -3612,11 +3681,6 @@ GLvoid GL_APIENTRY __glim_TexGeni(__GLcontext *gc, GLenum coord, GLenum pname, G
 {
     GLfloat tmpf = (GLfloat)i;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexGeni", DT_GLenum, coord, DT_GLenum, pname, DT_GLint, i, DT_GLnull);
-#endif
 
     /* Accept only enumerants that correspond to single values */
     switch (pname) {
@@ -3943,11 +4007,6 @@ GLvoid GL_APIENTRY __glim_PrioritizeTextures(__GLcontext *gc, GLsizei n, const G
 
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PrioritizeTextures", DT_GLsizei, n, DT_GLuint_ptr, textures, DT_GLfloat_ptr, priorities, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     for (i = 0; i < n; i++) {
@@ -3993,11 +4052,6 @@ GLboolean GL_APIENTRY __glim_AreTexturesResident(__GLcontext *gc, GLsizei n, con
     GLboolean allResident = GL_TRUE;
 
     __GL_SETUP_NOT_IN_BEGIN_RET(gc, 0);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_AreTexturesResident", DT_GLsizei, n, DT_GLuint_ptr, textures, DT_GLboolean_ptr, residences, DT_GLnull);
-#endif
 
     for (i = 0; i < n; i++) {
         /* Can't query a default texture. */

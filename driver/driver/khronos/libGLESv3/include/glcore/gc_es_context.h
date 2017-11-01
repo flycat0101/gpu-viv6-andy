@@ -769,4 +769,8 @@ enum
 
 #define __GLES_MAX_FILENAME_LEN 256
 
+#if VIVANTE_PROFILER
+extern GLint __glesApiProfileMode;
+#endif
+
 #endif /* __gc_gl_context_h__ */

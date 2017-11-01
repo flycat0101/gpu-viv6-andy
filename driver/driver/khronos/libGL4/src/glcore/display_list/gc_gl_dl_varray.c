@@ -383,18 +383,17 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
 
 GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const GLvoid *elemIndices)
 {
-
     __GLdlistOp *dlop;
     __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
     GLuint tagBuf[__GL_TOTAL_VERTEX_ATTRIBUTES];
     __GLbufferObject *bufObj = NULL;
-    __GLPrimBegin primBegin, *prevPrimBegin;
-    GLvoid *indices;
+    __GLPrimBegin primBegin, *prevPrimBegin = gcvNULL;
+    GLvoid *indices = gcvNULL;
     GLfloat *bufptr;
     GLubyte *edgeptr;
     GLint i, vertexCount, startIndex;
     GLuint mergePrimNode;
-    GLenum error;
+    GLenum error = GL_NO_ERROR;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         (*gc->immediateDispatchTable.DrawElements)(gc, mode, count, type, elemIndices);
@@ -475,7 +474,7 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
             }
         }
 
-        /* Alocate dlop primitive node and insert the node into the list.
+        /* Allocate dlop primitive node and insert the node into the list.
         */
         if (mergePrimNode)
         {
@@ -613,12 +612,12 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
     __GLdlistOp *dlop;
     __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
     GLuint tagBuf[__GL_TOTAL_VERTEX_ATTRIBUTES];
-    __GLPrimBegin primBegin, *prevPrimBegin;
+    __GLPrimBegin primBegin, *prevPrimBegin = gcvNULL;
     GLfloat *bufptr;
     GLubyte *edgeptr;
     GLint i, vertexCount, startIndex;
     GLuint mergePrimNode;
-    GLenum error;
+    GLenum error = GL_NO_ERROR;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         (*gc->immediateDispatchTable.DrawArrays)(gc, mode, first, count);
@@ -689,7 +688,7 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
             }
         }
 
-        /* Alocate dlop primitive node and insert the node into the list.
+        /* A locate dlop primitive node and insert the node into the list.
         */
         if (mergePrimNode)
         {

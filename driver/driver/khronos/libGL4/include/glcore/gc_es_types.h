@@ -22,18 +22,22 @@
 /*
 ** Define GL_APICALL and GL_GLEXT_PROTOTYPES before #include <GLES3/gl3.h>
 */
-#if defined(_WINDOWS) && !defined(__SCITECH_SNAP__) && !defined(UNDER_CE)
-#define GL_APICALL __declspec(dllexport)
-#else
-#define GL_APICALL
-#endif
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
 #endif
 
+#ifdef OPENGL40
 #include <GL/gl.h>
 #include <GL/glext.h>
-#include "escompat.h"
+
+#define GL_APICALL  GLAPI
+#define GL_APIENTRY GLAPIENTRY
+#include <KHR/khrplatform.h>
+#include <GLES2/gl2ext.h>
+#else
+#include <GLES3/gl32.h>
+#include <GLES2/gl2ext.h>
+#endif
 
 
 typedef union __GLvector2Union
@@ -160,5 +164,11 @@ typedef __GLvector3 __GLvertex3;
 ( \
     (GLuint) (uintptr_t) (t)\
 )
+
+#if defined(__arm__) || defined(i386)           || defined(__i386__) || defined(__x86__) || \
+    defined(_M_IX86) || defined(__x86_64__)     || defined(_M_AMD64) || defined (_M_X64) || \
+    defined(__e2k__) || defined(_LITTLE_ENDIAN) || defined(__arm64)  || defined(__arm64__)
+#define __GL_LITTLE_ENDIAN
+#endif
 
 #endif /* __gl_es_types_h__ */

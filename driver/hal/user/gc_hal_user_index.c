@@ -86,6 +86,11 @@ struct _gcoINDEX
     gctSIZE_T                   dynamicCacheSize;
     gctUINT                     dynamicAllocatedCount;
     gctBOOL                     dynamicAllocate;
+
+    struct
+    {
+        gctUINT32               hasIndexFetchFix        : 1;
+    }hwFeature;
 };
 
 /******************************************************************************\
@@ -166,10 +171,10 @@ gcoINDEX_Construct(
     index->dynamicAllocate       = gcvFALSE;
     index->dynamicCurrent        = 0;
 
+    index->hwFeature.hasIndexFetchFix = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX);
+
     /* Return pointer to the gcoINDEX object. */
     *Index = index;
-
-    gcmPROFILE_GC(GLINDEX_OBJECT, 1);
 
     /* Success. */
     gcmFOOTER_ARG("*Index=0x%x", *Index);
@@ -207,8 +212,6 @@ gcoINDEX_Destroy(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Index, gcvOBJ_INDEX);
-
-    gcmPROFILE_GC(GLINDEX_OBJECT, -1);
 
     if (Index->dynamic != gcvNULL)
     {
@@ -302,26 +305,6 @@ gcoINDEX_WaitFence(
     gcmFOOTER();
     return status;
 }
-
-
-gceSTATUS
-gcoINDEX_SetSharedLock(
-    IN gcoINDEX Index,
-    IN gctPOINTER SharedLock
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Index=0x%x SharedLock=0x%x", Index, SharedLock);
-
-    if (Index)
-    {
-        status = gcsSURF_NODE_SetSharedLock(&Index->memory, SharedLock);
-    }
-
-    gcmFOOTER();
-    return status;
-}
-
 
 /*******************************************************************************
 **
@@ -458,7 +441,7 @@ gcoINDEX_Load(
     )
 {
     gceSTATUS status;
-    gctUINT32 indexSize, bytes;
+    gctUINT32 indexSize;
     gctUINT32 indexBufferSize;
     gctUINT32 address;
     gctUINT32 endAddress;
@@ -534,9 +517,6 @@ gcoINDEX_Load(
                                      IndexType,
                                      Index->bytes));
 
-    gcmSAFECASTSIZET(bytes, Index->bytes);
-    gcmPROFILE_GC(GLINDEX_OBJECT_BYTES, bytes);
-
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -586,7 +566,9 @@ gcoINDEX_Bind(
         address = Index->dynamicHead->physical
                 + Index->dynamicHead->lastStart;
 
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, 0, 0);
+#endif
         gcmSAFECASTSIZET(bufSize, Index->dynamicHead->memory.size);
         endAddress = Index->dynamicHead->physical + bufSize - 1;
 
@@ -597,7 +579,9 @@ gcoINDEX_Bind(
         gcmGETHARDWAREADDRESS(Index->memory, address);
         gcmSAFECASTSIZET(bufSize, Index->memory.size);
         endAddress = address + bufSize -1;
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
+#endif
     }
 
     /* Program index buffer states. */
@@ -766,15 +750,11 @@ gcoINDEX_Free(
     )
 {
     gceSTATUS status;
-    gctUINT bytes;
 
     gcmHEADER_ARG("Index=0x%x", Index);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Index, gcvOBJ_INDEX);
-
-    gcmSAFECASTSIZET(bytes, Index->bytes);
-    gcmPROFILE_GC(GLINDEX_OBJECT_BYTES, -1 * bytes);
 
     /* Not available when the gcoINDEX is dynamic. */
     if (Index->dynamic != gcvNULL)
@@ -824,7 +804,6 @@ gcoINDEX_Upload(
     )
 {
     gceSTATUS status;
-    gctUINT bytes;
 
     gcmHEADER_ARG("Index=0x%x Buffer=0x%x Bytes=%lu", Index, Buffer, Bytes);
 
@@ -881,9 +860,6 @@ gcoINDEX_Upload(
                        0,
                        Bytes);
     }
-
-    gcmSAFECASTSIZET(bytes, Bytes);
-    gcmPROFILE_GC(GLINDEX_OBJECT_BYTES, bytes);
 
     /* Success. */
     gcmFOOTER_NO();
@@ -1935,8 +1911,7 @@ gcoINDEX_UploadDynamicEx(
 
     /* Compute the mod of spilit index chunck. */
     spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
-    if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-    &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
+    if (!Index->hwFeature.hasIndexFetchFix &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
     {
         offset = SPILIT_INDEX_OFFSET - spilitIndexMod;
         offset = gcmALIGN(offset, 4);
@@ -1981,8 +1956,7 @@ gcoINDEX_UploadDynamicEx(
         /* Compute the mod of spilit index chunck. */
         spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
 
-        if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-        &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
+        if (!Index->hwFeature.hasIndexFetchFix &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
         {
             offset= SPILIT_INDEX_OFFSET - spilitIndexMod;
             offset = gcmALIGN(offset, 4);
@@ -2136,8 +2110,7 @@ gcoINDEX_UploadDynamicEx2(
 
     /* Compute the mod of spilit index chunck. */
     spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
-    if ( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-         && spilitIndexMod < SPILIT_INDEX_OFFSET)
+    if (!Index->hwFeature.hasIndexFetchFix && spilitIndexMod < SPILIT_INDEX_OFFSET)
     {
         offset = SPILIT_INDEX_OFFSET - spilitIndexMod;
         offset = gcmALIGN(offset, 16);
@@ -2240,8 +2213,7 @@ gcoINDEX_UploadDynamicEx2(
 
         /* Compute the mod of spilit index chunck. */
         spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
-        if( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-            && spilitIndexMod < SPILIT_INDEX_OFFSET)
+        if(!Index->hwFeature.hasIndexFetchFix && spilitIndexMod < SPILIT_INDEX_OFFSET)
         {
             offset= SPILIT_INDEX_OFFSET - spilitIndexMod;
             offset = gcmALIGN(offset, 16);
@@ -2546,6 +2518,24 @@ gcoINDEX_GetMemoryIndexRange(
         *iMax = 0;
     return gcvSTATUS_OK;
 }
+
+gceSTATUS
+gcoINDEX_GetFence(
+    IN gcoINDEX Index
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoINDEX_WaitFence(
+    IN gcoINDEX Index,
+    IN gceFENCE_TYPE Type
+    )
+{
+    return gcvSTATUS_OK;
+}
+
 
 #endif /* gcdNULL_DRIVER < 2 */
 #endif /* gcdENABLE_3D */

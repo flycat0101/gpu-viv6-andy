@@ -19,7 +19,7 @@
 #include "debug/gc_vsc_debug.h"
 
 #define _cldFILENAME_MAX 1024
-#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   0
+#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   1
 
 /* cloCOMPILER object. */
 struct _cloCOMPILER
@@ -84,6 +84,7 @@ struct _cloCOMPILER
         gctBOOL          hasImageQuery;
         gctUINT          imageArrayMaxLevel;
         gctBOOL          basicTypePacked;
+        gctBOOL          longUlongPatch;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
     } context;
@@ -1244,6 +1245,7 @@ cloGetDefaultLanguageVersion()
     if(((chipModel == gcv1500 && chipRevision == 0x5246) ||
         (chipModel == gcv3000 && chipRevision == 0x5450) ||
         (chipModel == gcv2000 && chipRevision == 0x5108) ||
+        (chipModel == gcv3000 && chipRevision == 0x5451) ||
         (chipModel == gcv3000 && chipRevision == 0x5513)))
     {
         return _cldCL1Dot1;
@@ -1707,6 +1709,29 @@ IN cloCOMPILER Compiler
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
 
     Compiler->context.basicTypePacked = gcvTRUE;
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+cloCOMPILER_IsLongUlongPatch(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    return Compiler->context.longUlongPatch;
+}
+
+/* Set long ulong patch library */
+gceSTATUS
+cloCOMPILER_SetLongUlongPatch(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.longUlongPatch = gcvTRUE;
     return gcvSTATUS_OK;
 }
 
@@ -2626,6 +2651,7 @@ IN cloCOMPILER Compiler,
 IN cltQUALIFIER AccessQualifier,
 IN cltQUALIFIER AddrSpaceQualifier,
 IN clsDATA_TYPE *Source,
+IN gctBOOL AllocateForBuiltin,
 OUT clsDATA_TYPE ** DataType
 )
 {
@@ -2640,13 +2666,20 @@ OUT clsDATA_TYPE ** DataType
     gcmVERIFY_ARGUMENT(DataType);
 
     do {
-        clsBUILTIN_DATATYPE_INFO *typeInfo;
+        clsBUILTIN_DATATYPE_INFO *typeInfo = gcvNULL;
 
-        typeInfo = clGetBuiltinDataTypeInfo(Source->type);
-        if(typeInfo != gcvNULL) {
-          dataType = typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier];
+        if (AllocateForBuiltin)
+        {
+            dataType = gcvNULL;
         }
-        else dataType = gcvNULL;
+        else
+        {
+            typeInfo = clGetBuiltinDataTypeInfo(Source->type);
+            if(typeInfo != gcvNULL) {
+              dataType = typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier];
+            }
+            else dataType = gcvNULL;
+        }
 
         if(dataType == gcvNULL) {
             gctPOINTER pointer;
@@ -2712,6 +2745,44 @@ OUT clsDATA_TYPE ** DataType
                                    AccessQualifier,
                                    AddrSpaceQualifier,
                                    Source,
+                                   gcvFALSE,
+                                   &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    *DataType = dataType;
+
+    gcmFOOTER_ARG("*DataType=0x%x", *DataType);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+cloCOMPILER_CloneDataTypeExplicit(
+IN cloCOMPILER Compiler,
+IN cltQUALIFIER AccessQualifier,
+IN cltQUALIFIER AddrSpaceQualifier,
+IN clsDATA_TYPE * Source,
+OUT clsDATA_TYPE ** DataType
+)
+{
+    gceSTATUS       status;
+    clsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x AccessQualifier=%d AddrSpaceQualifier=%d Source=0x%x",
+                  Compiler, AccessQualifier, AddrSpaceQualifier, Source);
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    status = _clGetOrCloneDataType(Compiler,
+                                   AccessQualifier,
+                                   AddrSpaceQualifier,
+                                   Source,
+                                   gcvTRUE,
                                    &dataType);
 
     if (gcmIS_ERROR(status))
@@ -2751,6 +2822,7 @@ OUT clsDECL *Decl
                                    AccessQualifier,
                                    AddrSpaceQualifier,
                                    Source->dataType,
+                                   gcvFALSE,
                                    &decl.dataType);
 
     if (gcmIS_ERROR(status)) {

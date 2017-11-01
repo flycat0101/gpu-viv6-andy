@@ -3432,21 +3432,19 @@ gcChipValidateDrawPath(
 
             if (gc->vertexArray.drawIndirect)
             {
-                gctBOOL hwIndirect = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_INDIRECT);
-
                 if (chipCtx->anyAttibGeneric
-                ||  !hwIndirect
+                ||  !chipCtx->chipFeature.hwFeature.hasDrawIndirect
                 ||  (gc->vertexArray.primMode == GL_PATCHES_EXT
-                    && !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+                    && !chipCtx->chipFeature.hwFeature.hasPatchListFetchFix
                     && chipCtx->patchId != gcvPATCH_CAR_CHASE)
                 )
                 {
                     gcmONERROR(gcChipLockOutDrawIndirectBuf(gc));
                 }
 
-                if (!hwIndirect
+                if (!chipCtx->chipFeature.hwFeature.hasDrawIndirect
                 ||  (gc->vertexArray.primMode == GL_PATCHES_EXT
-                    && !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+                    && !chipCtx->chipFeature.hwFeature.hasPatchListFetchFix
                     && chipCtx->patchId != gcvPATCH_CAR_CHASE)
                 )
                 {
@@ -3622,7 +3620,7 @@ gcChipValidateDrawPath(
             }
 
             if (chipCtx->indexLoops && defaultInstant->first < 0 &&
-                !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX)
+                !chipCtx->chipFeature.hwFeature.hasDrawElementBaseVertex
                 )
             {
                 GL_ASSERT(defaultInstant->indexBuffer);
@@ -3680,7 +3678,7 @@ gcChipValidateDrawPath(
                  * independent primitives.
                  */
                 if ((gc->state.enables.primitiveRestart)
-                    && (!chipCtx->chipFeature.primitiveRestart)
+                    && (!chipCtx->chipFeature.hwFeature.primitiveRestart)
                     && (chipCtx->indexLoops))
                 {
                     switch (defaultInstant->primMode)
@@ -3727,7 +3725,7 @@ gcChipValidateDrawPath(
                     /* Convert triangle strip to triangle list if HW cannot support */
                     if (chipCtx->indexLoops)
                     {
-                        if (forceInstancedDraw || chipCtx->chipFeature.patchTriangleStrip)
+                        if (forceInstancedDraw || chipCtx->chipFeature.hwFeature.patchTriangleStrip)
                         {
                             if (defaultInstant->indexBuffer)
                             {
@@ -3763,7 +3761,7 @@ gcChipValidateDrawPath(
                         }
                     }
                     else if (chipCtx->indexLoops &&
-                             chipCtx->chipFeature.patchTriangleStrip &&
+                             chipCtx->chipFeature.hwFeature.patchTriangleStrip &&
                              (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30))
                     {
                         gcmONERROR(gcChipPatchTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvFALSE));
@@ -3772,7 +3770,7 @@ gcChipValidateDrawPath(
 
                 case gcvPRIMITIVE_LINE_LOOP:
                     /* Convert line loop to line list if HW cannot support */
-                    if (forceInstancedDraw || !chipCtx->chipFeature.lineLoop)
+                    if (forceInstancedDraw || !chipCtx->chipFeature.hwFeature.lineLoop)
                     {
                         /* We can change it to line strip here for performance. But then
                         ** we would need to choose glChipDrawElements as the draw path
@@ -4122,7 +4120,7 @@ gcChipValidateStream(
                     if (attribute->integer)
                     {
                         format = gcvVERTEX_INT16;
-                        if (hwIntAttrib && chipCtx->chipFeature.extendIntSign)
+                        if (hwIntAttrib && chipCtx->chipFeature.hwFeature.extendIntSign)
                         {
                             /* HW reuses normalize bit to extend sign to 32bit */
                             normalize = GL_TRUE;
@@ -4159,7 +4157,7 @@ gcChipValidateStream(
                     if (attribute->integer)
                     {
                         format = gcvVERTEX_INT8;
-                        if (hwIntAttrib && chipCtx->chipFeature.extendIntSign)
+                        if (hwIntAttrib && chipCtx->chipFeature.hwFeature.extendIntSign)
                         {
                             /* HW reuses normalize bit to extend sign to 32bit */
                             normalize = GL_TRUE;
@@ -4184,7 +4182,7 @@ gcChipValidateStream(
                     break;
                 case GL_UNSIGNED_INT_2_10_10_10_REV:
                     format = gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV;
-                    if (!chipCtx->chipFeature.attrib2101010Rev)
+                    if (!chipCtx->chipFeature.hwFeature.attrib2101010Rev)
                     {
                         chipCtx->anyAttibConverted = gcvTRUE;
                         scheme = gcvATTRIB_SCHEME_2_10_10_10_REV_TO_FLOAT;
@@ -4193,7 +4191,7 @@ gcChipValidateStream(
 
                 case GL_INT_2_10_10_10_REV:
                     format = gcvVERTEX_INT_2_10_10_10_REV;
-                    if (!chipCtx->chipFeature.attrib2101010Rev)
+                    if (!chipCtx->chipFeature.hwFeature.attrib2101010Rev)
                     {
                         chipCtx->anyAttibConverted = gcvTRUE;
                         scheme = gcvATTRIB_SCHEME_2_10_10_10_REV_TO_FLOAT;
@@ -4942,9 +4940,7 @@ gcChipValidateChipDirty(
 
                     gcmONERROR(gcLinkProgramPipeline(shaderCount,
                                                      shaderArray,
-                                                     &pCmdInstance->stateBufferSize,
-                                                     &pCmdInstance->stateBuffer,
-                                                     &pCmdInstance->hints));
+                                                     pCmdInstance));
 
                     hashObj = gcChipUtilsHashAddObject(gc, chipCtx->cmdInstaceCache, (GLvoid*)pCmdInstance, key, GL_FALSE);
                     if (!hashObj)
@@ -5845,15 +5841,14 @@ gcChipCollectSplitDrawArraysInfo(
     &&  vsProgram->xfbCount > 0
     &&  gc->vertexArray.instanceCount == 1
     /* If gcvFEATURE_FE_START_VERTEX_SUPPORT not support, VertexId after split draw is not correct. */
-    &&  gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT)
-    && (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
-        !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    &&  chipCtx->chipFeature.hwFeature.hasFEstartVertex
+    && (!chipCtx->chipFeature.hwFeature.hasPEB2BPixelFix || !chipCtx->chipFeature.hwFeature.hasV2MSAACoherencyFix)
     && (
         instantDraw->primMode == gcvPRIMITIVE_POINT_LIST ||
         instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
         instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST
         )
-    )
+       )
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_XFB;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawXFB;
@@ -5862,8 +5857,7 @@ gcChipCollectSplitDrawArraysInfo(
 
     if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
-    &&  (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
-         !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    &&  (!chipCtx->chipFeature.hwFeature.hasPEB2BPixelFix || !chipCtx->chipFeature.hwFeature.hasV2MSAACoherencyFix)
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
     &&  instantDraw->count == 129
     )
@@ -6195,7 +6189,7 @@ gcChipCollectSplitDrawElementInfo(
         return gcvSTATUS_OK;
     }
 
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
+    if (!chipCtx->chipFeature.hwFeature.hasPEEnhancement2
     &&  (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  (gc->vertexArray.instanceCount == 1 && instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
          gc->state.enables.stencilTest &&
@@ -6214,7 +6208,7 @@ gcChipCollectSplitDrawElementInfo(
     }
 
     /* Index split draw.*/
-    if ((gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE)
+    if (!chipCtx->chipFeature.hwFeature.hasIndexFetchFix
     &&  instantDraw->indexBuffer != gcvNULL
     &&  splitDrawInfo->u.info_index_fetch.instanceCount == 1
     &&  (instantDraw->primitiveRestart || gcvSTATUS_TRUE == gcChipSplitIndexFetch(instantDraw, splitDrawInfo))
@@ -6228,12 +6222,12 @@ gcChipCollectSplitDrawElementInfo(
     /* Tcs split draw.*/
     if (instantDraw->primMode == gcvPRIMITIVE_PATCH_LIST
     &&  instantDraw->first == 0
-    &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+    &&  !chipCtx->chipFeature.hwFeature.hasPatchListFetchFix
     &&  gcvSTATUS_OK == gcChipSplitTCS(instantDraw, splitDrawInfo)
     )
     {
         /* The two kind split draw should be exclusive.*/
-        gcmASSERT(gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) == gcvSTATUS_TRUE);
+        gcmASSERT(chipCtx->chipFeature.hwFeature.hasIndexFetchFix);
 
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_TCS;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawTCS;
@@ -6772,7 +6766,8 @@ __glChipDrawNothing(
 
 GLboolean
 __glChipFlush(
-    __GLcontext *gc
+    __GLcontext *gc,
+    GLboolean bInternal
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -6780,21 +6775,11 @@ __glChipFlush(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (gc->profiler.enable && gc->profiler.useGlfinish)
-    {
-        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
-    }
-
     /* Freon requires sync to external in Flush api. */
     gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
-
-    if (gc->profiler.enable && gc->profiler.useGlfinish)
-    {
-        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
-    }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -6815,11 +6800,6 @@ __glChipFinish(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (gc->profiler.enable && gc->profiler.useGlfinish)
-    {
-        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
-    }
-
     /* Sychronization between CPU and GPU, then drain all commands */
     gcmONERROR(gcChipFboSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
@@ -6830,11 +6810,6 @@ __glChipFinish(
 
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
-
-    if (gc->profiler.enable && gc->profiler.useGlfinish)
-    {
-        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
-    }
 
 OnError:
     if (gcmIS_SUCCESS(status))
@@ -6873,6 +6848,7 @@ gcChipEvaluateActiveProgramStage(
             {
                 gc->shaderProgram.activeProgObjs[stage] = progObj;
                 chipCtx->activePrograms[stage] = (__GLchipSLProgram*)progObj->privateData;
+                __glBitmaskOR2(&gc->shaderProgram.samplerTexelFetchDirty, &chipCtx->activePrograms[stage]->texelFetchSamplerMask);
                 chipCtx->activeStageBits |= chipCtx->activePrograms[stage]->stageBits;
             }
         }
@@ -6893,6 +6869,7 @@ gcChipEvaluateActiveProgramStage(
             {
                 gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS] = progObj;
                 chipCtx->activePrograms[__GLSL_STAGE_CS] = (__GLchipSLProgram*)progObj->privateData;
+                __glBitmaskOR2(&gc->shaderProgram.samplerTexelFetchDirty, &chipCtx->activePrograms[__GLSL_STAGE_CS]->texelFetchSamplerMask);
                 chipCtx->activeStageBits |= chipCtx->activePrograms[__GLSL_STAGE_CS]->stageBits;
             }
         }
@@ -6960,7 +6937,7 @@ __glChipDrawBegin(
 
     do
     {
-        __GLchipSLProgram *vsProgram, *fsProgram;
+        __GLchipSLProgram *vsProgram, *fsProgram, *tcsProgram = gcvNULL, *tesProgram = gcvNULL, *gsProgram = gcvNULL;
         /* primitive mode in previous stage */
         GLenum primMode = gc->vertexArray.primMode;
 
@@ -6994,7 +6971,7 @@ __glChipDrawBegin(
         }
 #endif
 
-        if (gc->profiler.enable)
+        if (gc->profiler.enable  && gc->profiler.perDrawMode)
         {
             __glChipProfilerSet(gc, GL3_PROFILER_DRAW_BEGIN, 0);
         }
@@ -7060,11 +7037,38 @@ __glChipDrawBegin(
             }
         }
 
-        /*1, VS stage check */
+        /* Get state programs first. */
         vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
+        fsProgram = chipCtx->activePrograms[__GLSL_STAGE_FS];
+
+        if (__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled)
+        {
+            tcsProgram = chipCtx->activePrograms[__GLSL_STAGE_TCS];
+            tesProgram = chipCtx->activePrograms[__GLSL_STAGE_TES];
+        }
+
+        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
+        {
+            gsProgram = chipCtx->activePrograms[__GLSL_STAGE_GS];
+        }
+
+        /*1, VS stage check */
         if (!vsProgram)
         {
-            __GLES_PRINT("ES30:skip draw because of NULL VS program");
+            if (tcsProgram || tesProgram)
+            {
+                __GLES_PRINT("ES30: tessellation is active and vertex shader is missing.");
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            else if (gsProgram)
+            {
+                __GLES_PRINT("ES30: geometry is active and vertex shader is missing.");
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            else
+            {
+                __GLES_PRINT("ES30:skip draw because of NULL VS program");
+            }
             break;
         }
 
@@ -7078,10 +7082,6 @@ __glChipDrawBegin(
         /*2, TS stage check */
         if (__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled)
         {
-            __GLchipSLProgram *tcsProgram, *tesProgram;
-            tcsProgram = chipCtx->activePrograms[__GLSL_STAGE_TCS];
-            tesProgram = chipCtx->activePrograms[__GLSL_STAGE_TES];
-
             if ((tcsProgram == gcvNULL) != (tesProgram == gcvNULL))
             {
                 __GL_ERROR(GL_INVALID_OPERATION);
@@ -7132,7 +7132,6 @@ __glChipDrawBegin(
         if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
         {
             __GLprogramObject *gsProgObj = gc->shaderProgram.activeProgObjs[__GLSL_STAGE_GS];
-            __GLchipSLProgram *gsProgram = chipCtx->activePrograms[__GLSL_STAGE_GS];
             GLboolean legalPrimType = GL_FALSE;
 
             if (gsProgram)
@@ -7257,7 +7256,6 @@ __glChipDrawBegin(
         }
 
         /*5, FS stage check */
-        fsProgram = chipCtx->activePrograms[__GLSL_STAGE_FS];
         if (!gc->state.enables.rasterizerDiscard && !fsProgram)
         {
             __GLES_PRINT("ES30:skip draw because of NULL PS program");
@@ -7279,7 +7277,7 @@ __glChipDrawBegin(
             fsProgram &&
             gc->state.enables.colorBuffer.blend[0])
         {
-            gceLAYOUT_QUALIFIER layoutBit = gcChipUtilConvertLayoutQualifier(gc->state.raster.blendEquationRGB[0], NULL);
+            gceLAYOUT_QUALIFIER layoutBit = gcChipUtilConvertLayoutQualifier(chipCtx, gc->state.raster.blendEquationRGB[0], NULL);
 
             if (layoutBit != gcvLAYOUT_QUALIFIER_NONE)
             {
@@ -7391,7 +7389,7 @@ __glChipDrawBegin(
         ret = GL_TRUE;
     } while (0);
 
-    if (ret == GL_FALSE && gc->profiler.enable)
+    if (ret == GL_FALSE && gc->profiler.enable &&  gc->profiler.perDrawMode)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
@@ -7507,7 +7505,7 @@ __glChipDrawEnd(
         }
     }
 
-    if (gc->profiler.enable)
+    if (gc->profiler.enable && gc->profiler.perDrawMode)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
@@ -8209,7 +8207,7 @@ __glChipDispatchCompute(
         }
 
         if (gc->compute.indirect &&
-            gcvFALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPUTE_INDIRECT))
+            !chipCtx->chipFeature.hwFeature.hasComputeIndirect)
         {
             gcmERR_BREAK(gcChipLockOutComputeIndirectBuf(gc));
             gc->compute.indirect = gcvFALSE;

@@ -1967,14 +1967,16 @@ IN clsNAME * Name
    return clGetOperandCountForRegAlloc(decl);
 }
 
-static gctSIZE_T
+static gceSTATUS
 _GetLogicalOperandFieldOffset(
     IN clsDECL * StructDecl,
-    IN clsNAME * FieldName
+    IN clsNAME * FieldName,
+    OUT gctSIZE_T *Offset
     )
 {
     gctSIZE_T    offset = 0;
     clsNAME *    fieldName;
+    gceSTATUS    status = gcvSTATUS_NAME_NOT_FOUND;
 
     gcmASSERT(StructDecl);
     gcmASSERT(clmDECL_IsStructOrUnion(StructDecl));
@@ -1984,16 +1986,32 @@ _GetLogicalOperandFieldOffset(
 
     FOR_EACH_DLINK_NODE(&StructDecl->dataType->u.fieldSpace->names, clsNAME, fieldName)
     {
-        if (fieldName == FieldName) break;
+        if (fieldName == FieldName) {
+            status = gcvSTATUS_OK;
+            break;
+        }
         gcmASSERT(fieldName->decl.dataType);
+
+        if(fieldName->symbol[0] == '\0') { /* unnamed field */
+            if (clmDATA_TYPE_IsStructOrUnion(fieldName->decl.dataType)) {
+                gctSIZE_T curOffset;
+
+                status = _GetLogicalOperandFieldOffset(&fieldName->decl,
+                                                       FieldName,
+                                                       &curOffset);
+                if (status == gcvSTATUS_OK) {
+                    offset += curOffset;
+                    break;
+                }
+            }
+        }
 
         if(StructDecl->dataType->elementType == clvTYPE_UNION) continue;
         else offset += _GetLogicalOperandCount(&fieldName->decl);
     }
 
-    gcmASSERT(fieldName == FieldName);
-
-    return offset;
+    *Offset = offset;
+    return status;
 }
 
 static gceSTATUS
@@ -2803,7 +2821,7 @@ struct _clsDERIVED_TYPE_VARIABLE
 {
     slsSLINK_NODE node;
     gctUINT typeNameLength;
-    struct _clsNAME *name;
+    cltPOOL_STRING name;
 };
 
 static gcSL_FORMAT
@@ -2878,8 +2896,24 @@ IN gcUNIFORM Uniform
 
        derivedTypeVariable = pointer;
 
-       derivedTypeVariable->name = derivedType;
-       nameLength = gcoOS_StrLen(derivedType->symbol, gcvNULL) + 1;
+       if(derivedType->type == clvSTRUCT_NAME || derivedType->type == clvUNION_NAME)
+       {
+           gctSTRING nameStr;
+
+           if(derivedType->type == clvSTRUCT_NAME) {
+               nameStr = (gctSTRING)derivedType->symbol + sizeof(cldSTRUCT_NAME_PREFIX) - 1;
+           }
+           else {
+               nameStr = (gctSTRING)derivedType->symbol + sizeof(cldUNION_NAME_PREFIX) - 1;
+           }
+           gcmASSERT(*(nameStr - 1) == '$');
+           status = cloCOMPILER_AllocatePoolString(Compiler,
+                                                   nameStr,
+                                                   &derivedTypeVariable->name);
+           if (gcmIS_ERROR(status)) return;
+       }
+       else derivedTypeVariable->name = derivedType->symbol;
+       nameLength = gcoOS_StrLen(derivedTypeVariable->name, gcvNULL) + 1;
        derivedTypeVariable->typeNameLength = nameLength;
        slmSLINK_LIST_InsertLast(CodeGenerator->derivedTypeVariables, &derivedTypeVariable->node);
        derivedType->u.typeInfo.typeNameOffset = CodeGenerator->derivedTypeNameBufferSize;
@@ -3986,6 +4020,19 @@ OUT gctUINT *NumRegNeeded
                                           &variable);
                    if (gcmIS_ERROR(status)) return status;
 
+                   if (argumentQualifier == gcvFUNCTION_INPUT)
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT);
+                   }
+                   else if (argumentQualifier == gcvFUNCTION_OUTPUT)
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_OUTPUT_ARGUMENT);
+                   }
+                   else
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INOUT_ARGUMENT);
+                   }
+
                    if (symbol != gcvNULL) {
                        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, symbol));
                    }
@@ -4095,6 +4142,23 @@ OUT gctUINT *NumRegNeeded
                    }
                }
                else variable = gcvNULL;
+
+               if (variable)
+               {
+                   if (argumentQualifier == gcvFUNCTION_INPUT)
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT);
+                   }
+                   else if (argumentQualifier == gcvFUNCTION_OUTPUT)
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_OUTPUT_ARGUMENT);
+                   }
+                   else
+                   {
+                       SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INOUT_ARGUMENT);
+                   }
+               }
+
                status = clNewFunctionArgument(Compiler,
                                               ParentName->context.u.variable.u.function,
                                               variable,
@@ -12743,6 +12807,16 @@ clGenDerefPointerCode(
                                                        &LeftParameters->dataTypes[0].byteOffset,
                                                        scaledIndex);
             if (gcmIS_ERROR(status)) return status;
+
+            if(Expr->decl.dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnionFields) {
+                for (i = 0; i < Parameters->operandCount; i++) {
+                    Parameters->rOperands[i] = LeftParameters->rOperands[0];
+                }
+                Parameters->dataTypes[0].byteOffset = scaledIndex[0];
+                Parameters->hint = clvGEN_DEREF_CODE;
+                return gcvSTATUS_OK;
+            }
+
             rOperand[0] = LeftParameters->rOperands[0];
             if(scaledIndex->isReg) {
                 clsIOPERAND_New(Compiler, iOperand, LeftParameters->rOperands[0].dataType);
@@ -17427,6 +17501,7 @@ IN cloIR_BASE Statement
 {
     cloIR_SELECTION    selection;
     cloIR_SET    set;
+    cloIR_SWITCH switchStatement;
     cloIR_BASE    member;
 
     /* Verify the arguments. */
@@ -17455,6 +17530,11 @@ IN cloIR_BASE Statement
             if (cloIR_BASE_HasReturn(Compiler, member)) return gcvTRUE;
         }
         return gcvFALSE;
+
+    case clvIR_SWITCH:
+        switchStatement = (cloIR_SWITCH)Statement;
+
+        return cloIR_BASE_HasReturn(Compiler, switchStatement->switchBody);
 
     default:
         return gcvFALSE;
@@ -20808,7 +20888,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
                             Jump->base.stringNo,
                             clvREPORT_ERROR,
                             "kernel function \"%s\" returning a value",
-                            CodeGenerator->currentFuncDefContext.funcBody->funcName));
+                            CodeGenerator->currentFuncDefContext.funcBody->funcName->symbol));
             return gcvSTATUS_INVALID_ARGUMENT;
         }
 
@@ -23005,8 +23085,11 @@ cloIR_UNARY_EXPR_GenFieldSelectionCode(
 
            if (gcmIS_ERROR(status)) return status;
 
-           operandFieldOffset = _GetLogicalOperandFieldOffset(&UnaryExpr->operand->decl,
-                                                              UnaryExpr->u.fieldName);
+           status = _GetLogicalOperandFieldOffset(&UnaryExpr->operand->decl,
+                                                 UnaryExpr->u.fieldName,
+                                                 &operandFieldOffset);
+           if (gcmIS_ERROR(status)) return status;
+
            status = _ReviseOperandRegToFieldType(Compiler,
                                                  operandFieldOffset,
                                                  UnaryExpr->u.fieldName,
@@ -28967,10 +29050,16 @@ errorHandling:
                   clsLOPERAND addressBuffer[1];
                   clsLOPERAND *lOperand;
                   gctUINT incr = 0;
-
+                  gctBOOL calculateOffset = !clIsIntegerZero(&leftParameters.dataTypes[0].byteOffset);
+                  clsIOPERAND offsetIOperand[1];
                   gctUINT elementDataTypeSize;
 
                   gcmASSERT(leftParameters.operandCount == 1); /* has to be a pointer */
+
+                  if (calculateOffset)
+                  {
+                     clsIOPERAND_New(Compiler, offsetIOperand, clmGenCodeDataType(T_UINT));
+                  }
 
                   elementDataTypeSize = clsDECL_GetByteSize(Compiler, &BinaryExpr->leftOperand->decl);
                   if(leftParameters.elementIndex) {
@@ -28995,12 +29084,24 @@ errorHandling:
                   }
 
                   for (i = 0; i < rightParameters.operandCount; i++) {
-                     clsROPERAND constantROperand[1];
+                     clsROPERAND offsetROperand[1];
 
-                     clsROPERAND_InitializeScalarConstant(constantROperand,
+                     clsROPERAND_InitializeScalarConstant(offsetROperand,
                                                           clmGenCodeDataType(T_UINT),
                                                           uint,
                                                           incr);
+
+                     if (calculateOffset)
+                     {
+                         gcmONERROR(clGenGenericCode2(Compiler,
+                                                      BinaryExpr->exprBase.base.lineNo,
+                                                      BinaryExpr->exprBase.base.stringNo,
+                                                      clvOPCODE_ADD,
+                                                      offsetIOperand,
+                                                      &leftParameters.dataTypes[0].byteOffset,
+                                                      offsetROperand));
+                         clsROPERAND_InitializeUsingIOperand(offsetROperand, offsetIOperand);
+                     }
 
                      gcmONERROR(clGenStoreCode(Compiler,
                                                BinaryExpr->exprBase.base.lineNo,
@@ -29008,10 +29109,9 @@ errorHandling:
                                                rightParameters.rOperands + i,
                                                lOperand,
                                                rightParameters.dataTypes[i].def,
-                                               constantROperand));
+                                               offsetROperand));
                      incr += clGEN_CODE_DataTypeByteSize(Compiler, rightParameters.dataTypes[i].def);
                   }
-
                }
                else {
                   gcmONERROR(_GenImplicitConvParametersToType(Compiler,
@@ -31923,8 +32023,13 @@ clGenBuiltInAsmCode(
     gceSTATUS                       status = gcvSTATUS_OK;
     gctUINT                         operandCount = OperandCount;
     clsGEN_CODE_PARAMETERS *        operandsParameters = OperandsParameters;
-    clsIOPERAND                     iOperand;
+#if defined __GNUC__
+    clsIOPERAND                     iOperand = {};
+#else
+    clsIOPERAND                     iOperand = { 0 };
+#endif
     cleOPCODE                       opcode = clvOPCODE_INVALID;
+    clsROPERAND                     *saveToOperand = gcvNULL;
     gcmHEADER();
 
     /* Verify the arguments. */
@@ -31988,11 +32093,19 @@ clGenBuiltInAsmCode(
            opcode != clvOPCODE_BARRIER &&
            opcode != clvOPCODE_MEM_FENCE &&
            operandsParameters[1].operandCount)  {
-            clsIOPERAND_InitializeWithComponentSelection(&iOperand,
-                operandsParameters[1].rOperands[0].dataType,
-                operandsParameters[1].rOperands[0].u.reg.dataType,
-                operandsParameters[1].rOperands[0].u.reg.regIndex,
-                operandsParameters[1].rOperands[0].u.reg.componentSelection);
+            if(operandsParameters[1].rOperands[0].arrayIndex.mode != clvINDEX_NONE ||
+               operandsParameters[1].rOperands[0].matrixIndex.mode != clvINDEX_NONE ||
+               operandsParameters[1].rOperands[0].vectorIndex.mode != clvINDEX_NONE) {
+                clsIOPERAND_New(Compiler, &iOperand, operandsParameters[1].rOperands[0].dataType);
+                saveToOperand = &operandsParameters[1].rOperands[0];
+            }
+            else {
+                clsIOPERAND_InitializeWithComponentSelection(&iOperand,
+                                                             operandsParameters[1].rOperands[0].dataType,
+                                                             operandsParameters[1].rOperands[0].u.reg.dataType,
+                                                             operandsParameters[1].rOperands[0].u.reg.regIndex,
+                                                             operandsParameters[1].rOperands[0].u.reg.componentSelection);
+            }
         }
     }
     else {
@@ -32240,6 +32353,19 @@ clGenBuiltInAsmCode(
             PolynaryExpr->exprBase.base.stringNo,
             clvREPORT_ERROR,
             "invalid builtin asm '%s'", PolynaryExpr->funcSymbol));
+    }
+
+    if(saveToOperand) {
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperand[1];
+
+        clsLOPERAND_InitializeUsingROperand(lOperand, saveToOperand);
+        clsROPERAND_InitializeUsingIOperand(rOperand, &iOperand);
+        gcmONERROR(clGenAssignCode(Compiler,
+                                   PolynaryExpr->exprBase.base.lineNo,
+                                   PolynaryExpr->exprBase.base.stringNo,
+                                   lOperand,
+                                   rOperand));
     }
 
 OnError:
@@ -32954,7 +33080,7 @@ cloCODE_GENERATOR_Destroy(
 
             gcmVERIFY_OK(gcoOS_StrCopySafe(buffer,
                                            derivedTypeVariable->typeNameLength,
-                                           derivedTypeVariable->name->symbol));
+                                           derivedTypeVariable->name));
             buffer += derivedTypeVariable->typeNameLength;
             cloCOMPILER_Free(Compiler, derivedTypeVariable);
         }

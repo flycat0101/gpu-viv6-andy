@@ -12,7 +12,7 @@
 
 
 #
-# Linux build file for libSPIRV
+# Linux build file for libSPIRV_viv
 #
 
 ################################################################################
@@ -25,10 +25,10 @@ ifeq ($(USE_ARMCC),1)
 endif
 
 ifeq ($(gcdSTATIC_LINK),1)
-  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV.a
+  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV_viv.a
 else
-  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV.so
-  TARGET_SONAME     := libSPIRV.so
+  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV_viv.so
+  TARGET_SONAME     := libSPIRV_viv.so
   TARGET_LINKS      :=
 endif
 

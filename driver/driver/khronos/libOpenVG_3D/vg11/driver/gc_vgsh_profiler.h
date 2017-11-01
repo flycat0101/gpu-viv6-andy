@@ -113,13 +113,20 @@ extern "C" {
 #define VG_PROFILER_FRAME_END 10
 #define VG_PROFILER_FRAME_TYPE 11
 #define VG_PROFILER_FRAME_COUNT 12
-#define VG_PROFILER_SYNC_MODE   13
 
 #define VG_PROFILER_PRIMITIVE_END 20
 #define VG_PROFILER_PRIMITIVE_TYPE 21
 #define VG_PROFILER_PRIMITIVE_COUNT 22
 #define    VG_PROFILER_STROKE    23
 #define    VG_PROFILER_FILL    24
+
+#define VG_PROFILER_WRITE_HEADER 30
+#define VG_PROFILER_WRITE_FRAME_BEGIN 31
+#define VG_PROFILER_WRITE_FRAME_END 32
+#define VG_PROFILER_WRITE_FRAME_RESET 33
+
+#define VG_PROFILER_DRAW_BEGIN 40
+#define VG_PROFILER_DRAW_END 41
 
 #define    VG_PATH        2000
 #define    VG_GLYPH    2001
@@ -129,61 +136,63 @@ extern "C" {
 struct _VGProfile
 {
     gctBOOL         enable;
-    gctBOOL         drvEnable;
-    gctBOOL         timeEnable;
-    gctBOOL         memEnable;
+    gctBOOL         perDrawMode;
+    gctBOOL         useVGfinish;
 
+    gctBOOL         need_dump;
     gctUINT32       frameBegun;
-
-    /* Aggregate Information */
-    gctUINT64       frameStart;
-    gctUINT64       frameEnd;
+    gctUINT32       drawCount;
+    gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
+    gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
+    gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
+    gctUINT32       frameEndNumber;   /* for VIV_PROFILE = 3 */
+    gctUINT32       curFrameNumber;
 
     /* Current frame information */
     gctUINT32       frameNumber;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       frameStartCPUTimeusec;
-    gctUINT64       frameEndCPUTimeusec;
 
     gctUINT32       drawPathCount;
-    gctUINT32        drawGlyphCount;
+    gctUINT32       drawGlyphCount;
     gctUINT32       drawImageCount;
-    gctUINT32        drawFillCount;
-    gctUINT32        drawStrokeCount;
+    gctUINT32       drawFillCount;
+    gctUINT32       drawStrokeCount;
 
     /* Current primitive information */
     gctUINT32       primitiveNumber;
-    gctUINT64       primitiveStartTimeusec;
-    gctUINT64       primitiveEndTimeusec;
     gctUINT32       primitiveType;
     gctUINT32       primitiveCount;
 
     gctUINT32       apiCalls[NUM_API_CALLS];
-    gctUINT32       redundantStateChangeCalls;
-
     gctUINT64       apiTimes[NUM_API_CALLS];
     gctUINT64       totalDriverTime;
-
-    gctUINT32       imageUploadSize;
 };
 
 #if VIVANTE_PROFILER
 void
-InitializeVGProfiler(
+_vgshProfilerInitialize(
     _VGContext * Context
     );
 
-void DestroyVGProfiler(
+void
+_vgshProfilerDestroy(
     _VGContext * Context
     );
 
-gctBOOL
-vgProfiler(
-    gctPOINTER Profiler,
-    gctUINT32 Enum,
+gceSTATUS
+_vgshProfilerWrite(
+    _VGContext * Context,
+    VGuint Enum
+    );
+
+VGboolean
+_vgshProfilerSet(
+    _VGContext * Context,
+    VGuint Enum,
     gctHANDLE Value
     );
+
 
 #define    vgmPROFILE(c, e, v) \
     do\
@@ -194,12 +203,12 @@ vgProfiler(
         &&    (e >= APICALLBASE) \
         ) \
         { \
-            context->profiler.apiCalls[e - APICALLBASE]++; \
+            c->profiler.apiCalls[e - APICALLBASE]++; \
             funcIndex = e; \
         } \
         else \
         { \
-            vgProfiler(&c->profiler, e, (gctHANDLE)v); \
+            _vgshProfilerSet(c, e, (gctHANDLE)v); \
         } \
     } \
     while(gcvFALSE)
@@ -234,7 +243,8 @@ vgProfiler(
              if (!c) break; \
              if (!c->profiler.enable) break; \
               gcoOS_GetTime(&endTimeusec); \
-             c->profiler.totalDriverTime+=(endTimeusec-startTimeusec); \
+              if (funcIndex >= 100) \
+                 c->profiler.totalDriverTime+=(endTimeusec-startTimeusec); \
              vgmGetApiTime(c, funcIndex); \
          } \
          while (gcvFALSE)

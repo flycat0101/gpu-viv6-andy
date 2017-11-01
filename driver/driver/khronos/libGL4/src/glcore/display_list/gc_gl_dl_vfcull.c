@@ -530,7 +530,7 @@ Restart:
             for (index = 0; index < newBegin->indexCount; index++)
             {
                 gc->input.defaultIndexBuffer[primBegin->indexCount + index] =
-                                        newBegin->indexBuffer[index] + primBegin->vertexCount;
+                                        newBegin->indexBuffer[index] + (GLushort)primBegin->vertexCount;
             }
         }
         else
@@ -542,7 +542,7 @@ Restart:
                 for (index = 0; index < newBegin->indexCount; index++)
                 {
                     gc->input.defaultIndexBuffer[primBegin->indexCount + index] =
-                                            newBegin->indexBuffer[index] + primBegin->vertexCount;
+                                            newBegin->indexBuffer[index] + (GLushort)primBegin->vertexCount;
                 }
             }
             if (newBegin->indexCount == 0 && newBegin->primType == GL_TRIANGLES)

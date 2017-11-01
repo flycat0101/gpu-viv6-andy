@@ -28,6 +28,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+#include <gc_hal_base.h>
 #include <gbmint.h>
 #include <gbm_vivint.h>
 
@@ -48,76 +49,6 @@ typedef struct gbm_bo *      PlatformPixmapType;
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
-#define GBM_MAX_BUFFER  4
-
-struct
-{
-    int gbmFormat;
-    int halFormat;
-}
-formatTable[] =
-{
-    {GBM_FORMAT_XRGB4444, gcvSURF_X4R4G4B4},
-    {GBM_FORMAT_XBGR4444, gcvSURF_X4B4G4R4},
-    /* {GBM_FORMAT_RGBX4444, gcvSURF_R4G4B4X4}, */
-    /* {GBM_FORMAT_BGRX4444, gcvSURF_B4G4R4X4}, */
-
-    {GBM_FORMAT_ARGB4444, gcvSURF_A4R4G4B4},
-    {GBM_FORMAT_ABGR4444, gcvSURF_A4B4G4R4},
-    /* {GBM_FORMAT_RGBA4444, gcvSURF_R4G4B4A4}, */
-    /* {GBM_FORMAT_BGRA4444, gcvSURF_B4G4R4A4}, */
-
-    {GBM_FORMAT_XRGB1555, gcvSURF_X1R5G5B5},
-    {GBM_FORMAT_XBGR1555, gcvSURF_X1B5G5R5},
-    /* {GBM_FORMAT_RGBX5551, gcvSURF_R5G5B5X1}, */
-    /* {GBM_FORMAT_BGRX5551, gcvSURF_B5G5R5X1}, */
-
-    {GBM_FORMAT_ARGB1555, gcvSURF_A1R5G5B5},
-    {GBM_FORMAT_ABGR1555, gcvSURF_A1B5G5R5},
-    /* {GBM_FORMAT_RGBA5551, gcvSURF_R5G5B5A1}, */
-    /* {GBM_FORMAT_BGRA5551, gcvSURF_B5G5R5A1}, */
-
-    {GBM_FORMAT_RGB565,   gcvSURF_R5G6B5  },
-    {GBM_FORMAT_BGR565,   gcvSURF_B5G6R5  },
-
-    /* {GBM_FORMAT_RGB888,   gcvSURF_R8G8B8  }, */
-    /* {GBM_FORMAT_BGR888,   gcvSURF_B8G8R8  }, */
-
-    {GBM_FORMAT_XRGB8888, gcvSURF_X8R8G8B8},
-    {GBM_FORMAT_XBGR8888, gcvSURF_X8B8G8R8},
-    /* {GBM_FORMAT_RGBX8888, gcvSURF_R8G8B8X8}, */
-    /* {GBM_FORMAT_BGRX8888, gcvSURF_B8G8R8X8}, */
-
-    {GBM_FORMAT_ARGB8888, gcvSURF_A8R8G8B8},
-    {GBM_FORMAT_ABGR8888, gcvSURF_A8B8G8R8},
-    /* {GBM_FORMAT_RGBA8888, gcvSURF_R8G8B8A8}, */
-    /* {GBM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8}, */
-
-    {GBM_FORMAT_XRGB2101010, gcvSURF_X2R10G10B10},
-    {GBM_FORMAT_XBGR2101010, gcvSURF_X2B10G10R10},
-    /* {GBM_FORMAT_RGBX1010102, gcvSURF_R10G10B10X2}, */
-    /* {GBM_FORMAT_BGRX1010102, gcvSURF_B10G10R10X2}, */
-
-    {GBM_FORMAT_ARGB2101010, gcvSURF_A2R10G10B10},
-    {GBM_FORMAT_ABGR2101010, gcvSURF_A2B10G10R10},
-    /* {GBM_FORMAT_RGBA1010102, gcvSURF_R10G10B10A2}, */
-    /* {GBM_FORMAT_BGRA1010102, gcvSURF_B10G10R10A2}, */
-
-    {GBM_FORMAT_YUYV,     gcvSURF_YUY2},
-    {GBM_FORMAT_YVYU,     gcvSURF_YVYU},
-    {GBM_FORMAT_UYVY,     gcvSURF_UYVY},
-    {GBM_FORMAT_VYUY,     gcvSURF_VYUY},
-
-    /* {GBM_FORMAT_AYUV,     gcvSURF_AYUV}, */
-
-    {GBM_FORMAT_NV12,     gcvSURF_NV12},
-    {GBM_FORMAT_NV21,     gcvSURF_NV21},
-    {GBM_FORMAT_NV16,     gcvSURF_NV16},
-    {GBM_FORMAT_NV61,     gcvSURF_NV61},
-
-    {GBM_FORMAT_YUV420,   gcvSURF_I420},
-    {GBM_FORMAT_YVU420,   gcvSURF_YV12},
-};
 
 struct _GBMDisplay
 {
@@ -130,28 +61,6 @@ struct _GBMDisplay
 
     /* Pointer to next. */
     struct _GBMDisplay * next;
-};
-
-struct _GBMBuffer {
-   struct gbm_bo       *bo;
-    enum {
-        LOCKED_BY_CLIENT, /* taken by gbm_surface_lock_front_buffer */
-        USED_BY_EGL, /* currently in use for EGL rendering */
-        FRONT_BUFFER, /* last buffer with completed rendering */
-        FREE /* free */
-    } status;
-    uint32_t bpp;
-    gcoSURF         render_surface;
-    struct _GBMWindow *win;
-};
-
-struct _GBMWindow
-{
-    struct gbm_surface base;
-    struct _GBMBuffer buffers[GBM_MAX_BUFFER];
-    gctINT buffer_count;
-    uint32_t bpp;
-
 };
 
 static struct _GBMDisplay *displayStack = gcvNULL;
@@ -276,223 +185,6 @@ _OnceInit(
 /*******************************************************************************
 ** Display. ********************************************************************
 */
-
-gceSTATUS
-gbm_GetHALFormat(
-    IN uint32_t GbmFormat,
-    OUT gceSURF_FORMAT *HalFormat
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gceSURF_FORMAT halFormat = gcvSURF_UNKNOWN;
-    int i;
-
-    if (HalFormat)
-    {
-        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
-        {
-            if (GbmFormat == formatTable[i].gbmFormat)
-            {
-                halFormat = formatTable[i].halFormat;
-                break;
-            }
-        }
-
-        if (halFormat == gcvSURF_UNKNOWN)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-
-        *HalFormat = halFormat;
-    }
-
-OnError:
-    return status;
-}
-
-gceSTATUS
-_create_gbm_buffers(
-    struct _GBMWindow *win,
-    uint32_t width,
-    uint32_t height,
-    uint32_t format,
-    uint32_t usage
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT xalignment = 0;
-    int i;
-    uint32_t alligned_width = 0;
-    gceSURF_FORMAT gc_format;
-
-    gcmONERROR(gbm_GetHALFormat(format, &gc_format));
-    gcmONERROR(gcoSURF_GetAlignment(gcvSURF_BITMAP, gc_format, NULL, &xalignment, NULL));
-    alligned_width = gcmALIGN_NP2(width, xalignment);
-
-    for (i=0; i<win->buffer_count; i++)
-    {
-        win->buffers[i].bo = gbm_bo_create(win->base.gbm, alligned_width, height,
-                                           format, usage);
-        if (!win->buffers[i].bo)
-        {
-            gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-        }
-
-        win->buffers[i].win = win;
-        win->buffers[i].status = FREE;
-        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
-        gcmONERROR(gcoSURF_ConstructWrapper(NULL, &win->buffers[i].render_surface));
-        gcmONERROR(gcoSURF_SetBuffer(win->buffers[i].render_surface, gcvSURF_BITMAP, gc_format,
-                                    (gctUINT)win->buffers[i].bo->stride,
-                                    gbm_viv_bo(win->buffers[i].bo)->map, ~0U));
-        gcmONERROR(gcoSURF_SetWindow(win->buffers[i].render_surface,
-                                   0,
-                                   0,
-                                   width,
-                                   height));
-    }
-
-    return gcvSTATUS_OK;
-
-OnError:
-    for (i=0; i<win->buffer_count; i++)
-    {
-        if (win->buffers[i].render_surface)
-        {
-            gcoSURF_Destroy(win->buffers[i].render_surface);
-        }
-
-        if (win->buffers[i].bo)
-        {
-            gbm_bo_destroy(win->buffers[i].bo);
-        }
-
-        win->buffers[i].render_surface = NULL;
-        win->buffers[i].bo = NULL;
-    }
-
-    return status;
-}
-
-static struct gbm_surface *
-gbm_SurfaceCreate(
-    struct gbm_device *gbm,
-    uint32_t width,
-    uint32_t height,
-    uint32_t format,
-    uint32_t flags
-    )
-{
-    gceSTATUS status;
-    uint32_t usage = GBM_BO_USE_SCANOUT;
-    struct _GBMWindow *win = calloc(1, sizeof(*win));
-    if (!win)
-        return NULL;
-
-    win->buffer_count = GBM_MAX_BUFFER;
-    win->base.gbm = gbm;
-    win->base.width = width;
-    win->base.height = height;
-    win->base.format = format;
-    win->base.flags = flags;
-
-    gcmONERROR(_create_gbm_buffers(win, width, height,
-                                 format, usage));
-
-    return &win->base;
-
-OnError:
-    /*Create gbm_bo failed */
-    free(win);
-
-    return NULL;
-}
-
-static struct gbm_bo *
-gbm_SurfaceLockFrontBuffer(
-    struct gbm_surface *surface
-    )
-{
-    struct _GBMWindow *win = (struct _GBMWindow *) surface;
-    struct gbm_bo *bo = NULL;
-    int i;
-
-    for (i = 0; i < win->buffer_count; i++) {
-       if (win->buffers[i].status == FRONT_BUFFER) {
-           win->buffers[i].status = LOCKED_BY_CLIENT;
-           bo = win->buffers[i].bo;
-       }
-    }
-
-    return bo;
-}
-
-static void
-gbm_SurfaceReleaseBuffer(
-    struct gbm_surface *surface,
-    struct gbm_bo *bo
-    )
-{
-    struct _GBMWindow *win = (struct _GBMWindow *) surface;
-    int i;
-
-    for (i = 0; i < win->buffer_count; i++) {
-       if (win->buffers[i].bo == bo) {
-           win->buffers[i].status = FREE;
-           break;
-       }
-    }
-
-    return;
-}
-
-static int
-gbm_SurfaceHasFreeBuffers(
-    struct gbm_surface *surface
-    )
-{
-    struct _GBMWindow *win = (struct _GBMWindow *) surface;
-    int i;
-
-    for (i = 0; i < win->buffer_count; i++) {
-       if (win->buffers[i].status == FREE) {
-           return 1;
-       }
-    }
-
-    return 0;
-}
-
-static void
-gbm_SurfaceDestroy(
-    struct gbm_surface *surface
-    )
-{
-    struct _GBMWindow *win = (struct _GBMWindow *) surface;
-    int i;
-
-    if (!win)
-        return;
-
-    for (i = 0; i < win->buffer_count; i++) {
-        if (win->buffers[i].render_surface != NULL)
-        {
-           gcoSURF_Destroy(win->buffers[i].render_surface);
-           win->buffers[i].render_surface = NULL;
-        }
-
-        if (win->buffers[i].bo != NULL)
-        {
-           gbm_bo_destroy(win->buffers[i].bo);
-           win->buffers[i].bo = NULL;
-        }
-    }
-
-    free(win);
-
-    return;
-}
-
 static
 gceSTATUS
 _GetDisplayByIndex(
@@ -577,12 +269,6 @@ _GetDisplayByIndex(
             status = gcvSTATUS_GENERIC_IO;
             break;
         }
-
-        display->gbm->surface_create = gbm_SurfaceCreate;
-        display->gbm->surface_lock_front_buffer = gbm_SurfaceLockFrontBuffer;
-        display->gbm->surface_release_buffer = gbm_SurfaceReleaseBuffer;
-        display->gbm->surface_has_free_buffers = gbm_SurfaceHasFreeBuffers;
-        display->gbm->surface_destroy = gbm_SurfaceDestroy;
 
         display->next = displayStack;
         displayStack  = display;
@@ -675,12 +361,6 @@ _GetDisplayByDevice(
         display->swapInterval = 1;
         display->next         = NULL;
 
-
-        display->gbm->surface_create = gbm_SurfaceCreate;
-        display->gbm->surface_lock_front_buffer = gbm_SurfaceLockFrontBuffer;
-        display->gbm->surface_release_buffer = gbm_SurfaceReleaseBuffer;
-        display->gbm->surface_has_free_buffers = gbm_SurfaceHasFreeBuffers;
-        display->gbm->surface_destroy = gbm_SurfaceDestroy;
 
         display->next = displayStack;
         displayStack  = display;
@@ -776,13 +456,13 @@ gbm_SetDisplayVirtual(
     )
 {
     int i;
-    struct _GBMWindow* win = ((struct _GBMWindow*) Window);
+    struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) Window);
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
 
-    for (i = 0; i < win->buffer_count; i++) {
-        if (win->buffers[i].status == USED_BY_EGL) {
-            win->buffers[i].status = FRONT_BUFFER;
+    for (i = 0; i < surf->buffer_count; i++) {
+        if (surf->buffers[i].status == USED_BY_EGL) {
+            surf->buffers[i].status = FRONT_BUFFER;
             break;
         }
     }
@@ -950,25 +630,28 @@ _GetPixmapInfo(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT width = 0;
+    gctUINT height = 0;
+    gctUINT stride = 0;
 
     if (Display == gcvNULL || Pixmap == gcvNULL)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (Bits != NULL)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
+    width = gbm_bo_get_width(Pixmap);
+    height = gbm_bo_get_height(Pixmap);
+    stride = gbm_bo_get_stride(Pixmap);;
+
 
     if (Width != NULL)
     {
-        *Width = (gctINT) gbm_bo_get_width(Pixmap);
+        *Width = (gctINT)width;
     }
 
     if (Height != NULL)
     {
-        *Height = (gctINT) gbm_bo_get_height(Pixmap);
+        *Height = (gctINT)height;
     }
 
     if (BitsPerPixel != NULL)
@@ -980,11 +663,11 @@ _GetPixmapInfo(
 
         format = gbm_bo_get_format(Pixmap);
 
-        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
+        for (i = 0; i < gcmCOUNTOF(_gGBMFormatTable); i++)
         {
-            if (format == formatTable[i].gbmFormat)
+            if (format == _gGBMFormatTable[i].gbmFormat)
             {
-                halFormat = formatTable[i].halFormat;
+                halFormat = _gGBMFormatTable[i].halFormat;
                 break;
             }
         }
@@ -1004,11 +687,11 @@ _GetPixmapInfo(
         int i;
         int format = gbm_bo_get_format(Pixmap);
 
-        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
+        for (i = 0; i < gcmCOUNTOF(_gGBMFormatTable); i++)
         {
-            if (format == formatTable[i].gbmFormat)
+            if (format == _gGBMFormatTable[i].gbmFormat)
             {
-                halFormat = formatTable[i].halFormat;
+                halFormat = _gGBMFormatTable[i].halFormat;
                 break;
             }
         }
@@ -1023,33 +706,17 @@ _GetPixmapInfo(
 
     if (Stride != NULL)
     {
-        *Stride = gbm_bo_get_stride(Pixmap);
+        *Stride = (gctINT)stride;
+    }
+
+    if (Bits != NULL)
+    {
+        gbm_bo_map(Pixmap, 0, 0, width, height, 0, &stride, Bits);
     }
 
     return gcvSTATUS_OK;
 
 OnError:
-    return status;
-}
-
-gceSTATUS
-gbm_GetPixmapInfo(
-    IN PlatformDisplayType Display,
-    IN PlatformPixmapType Pixmap,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctINT * BitsPerPixel,
-    OUT gctINT * Stride,
-    OUT gctPOINTER * Bits
-    )
-{
-    gceSTATUS status;
-    gcmHEADER_ARG("Display=0x%x Pixmap=0x%x", Display, Pixmap);
-
-    status = _GetPixmapInfo(Display, Pixmap, Width, Height,
-                            BitsPerPixel, Stride, Bits, gcvNULL);
-
-    gcmFOOTER();
     return status;
 }
 
@@ -1122,12 +789,12 @@ gbm_GetDisplayBackbufferEx(
     )
 {
     int i;
-    struct _GBMWindow * win = (struct _GBMWindow *)Window;
+    struct gbm_viv_surface * surf = (struct gbm_viv_surface *)Window;
 
-    for (i = 0; i < win->buffer_count; i++) {
-       if (win->buffers[i].status == FREE) {
-           *surface = win->buffers[i].render_surface;
-           win->buffers[i].status = USED_BY_EGL;
+    for (i = 0; i < surf->buffer_count; i++) {
+       if (surf->buffers[i].status == FREE) {
+           *surface = surf->buffers[i].render_surface;
+           surf->buffers[i].status = USED_BY_EGL;
            *Offset  = 0;
            *X       = 0;
            *Y       = 0;
@@ -1274,11 +941,11 @@ gbm_GetWindowInfoEx(
 
         format = surf->format;
 
-        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
+        for (i = 0; i < gcmCOUNTOF(_gGBMFormatTable); i++)
         {
-            if (format == formatTable[i].gbmFormat)
+            if (format == _gGBMFormatTable[i].gbmFormat)
             {
-                halFormat = formatTable[i].halFormat;
+                halFormat = _gGBMFormatTable[i].halFormat;
                 break;
             }
         }
@@ -2868,7 +2535,7 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
-    return EGL_FALSE;
+    return EGL_TRUE;
 }
 
 static EGLBoolean
@@ -3141,26 +2808,17 @@ _ConnectPixmap(
 
     /* Query pixmap geometry info. */
     gcmONERROR(gbm_GetPixmapInfoEx((PlatformDisplayType) Display->hdc,
-                                     (PlatformPixmapType) Pixmap,
-                                     &pixmapWidth,
-                                     &pixmapHeight,
-                                     &pixmapBpp,
-                                     gcvNULL,
-                                     gcvNULL,
-                                     &pixmapFormat));
-
-    /* Query pixmap bits. */
-    status = gbm_GetPixmapInfo((PlatformDisplayType) Display->hdc,
-                                 (PlatformPixmapType) Pixmap,
-                                 gcvNULL,
-                                 gcvNULL,
-                                 gcvNULL,
-                                 &pixmapStride,
-                                 &pixmapBits);
+                                   (PlatformPixmapType) Pixmap,
+                                   &pixmapWidth,
+                                   &pixmapHeight,
+                                   &pixmapBpp,
+                                   &pixmapStride,
+                                   &pixmapBits,
+                                   &pixmapFormat));
 
     do
     {
-        if (gcmIS_ERROR(status) || !pixmapBits)
+        if (!pixmapBits)
         {
             /* Can not wrap as surface object. */
             needShadow = gcvTRUE;
@@ -3418,8 +3076,11 @@ _SyncFromPixmap(
     }
     else
     {
-        gcmVERIFY_OK(
-            gcoSURF_CPUCacheOperation(Info->wrapper, gcvCACHE_FLUSH));
+        if(Info->wrapper)
+        {
+            gcmVERIFY_OK(
+                gcoSURF_CPUCacheOperation(Info->wrapper, gcvCACHE_FLUSH));
+        }
     }
 
     return EGL_TRUE;
@@ -3447,7 +3108,7 @@ _SyncToPixmap(
 
 static struct eglPlatform gbmPlatform =
 {
-    EGL_PLATFORM_GBM_KHR,
+    EGL_PLATFORM_GBM_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,

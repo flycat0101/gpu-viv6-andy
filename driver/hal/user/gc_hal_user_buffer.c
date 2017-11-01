@@ -90,6 +90,18 @@ struct _gcoBUFFER
     gctUINT32                   mirrorCount;
 
     gcsFENCE_LIST_PTR           fenceList;
+
+    struct
+    {
+        gctUINT32               hasFence                    : 1;
+        gctUINT32               hasHWFence                  : 1;
+        gctUINT32               hasPipe2D                   : 1;
+        gctUINT32               hasPipe3D                   : 1;
+        gctUINT32               hasNewMMU                   : 1;
+        gctUINT32               hasHWTFB                    : 1;
+        gctUINT32               hasProbe                    : 1;
+
+    }hwFeature;
 };
 
 /******************************************************************************\
@@ -800,6 +812,15 @@ gcoBUFFER_Construct(
         buffer->mirrorCount -= 1;
     }
 
+    buffer->hwFeature.hasFence = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE);
+    buffer->hwFeature.hasPipe2D = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_PIPE_2D);
+    buffer->hwFeature.hasPipe3D = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_PIPE_3D);
+    buffer->hwFeature.hasNewMMU = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_MMU);
+    buffer->hwFeature.hasHWTFB = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_HW_TFB);
+    buffer->hwFeature.hasProbe = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_PROBE);
+    buffer->hwFeature.hasHWFence = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE_32BIT)
+                                || gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE_64BIT);
+
     /***************************************************************************
     ** Initialize the command buffers.
     */
@@ -1159,6 +1180,12 @@ gcoBUFFER_OnIssueFence(
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
+    if(!Buffer->hwFeature.hasFence)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     fenceList = Buffer->fenceList;
 
     if (Buffer->tempCMDBUF.inUse)
@@ -1218,7 +1245,7 @@ gcoBUFFER_GetFence(
         for (i = 0; i < fenceList->onIssueCount; i++)
         {
             node = fenceList->onIssueList[i].node;
-            gcoHARDWARE_GetFence(gcvNULL, &node->fenceCtx, Buffer->info.engine, fenceList->onIssueList[i].type);
+            gcsSURF_NODE_GetFence(node, Buffer->info.engine, fenceList->onIssueList[i].type);
         }
 
         fenceList->onIssueCount = 0;
@@ -1472,9 +1499,9 @@ gcoBUFFER_Reserve(
     /* Compute the number of required bytes. */
     alignedBytes = reserveBytes + alignBytes;
 
-    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_2D)
-     && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_3D)
-     && !gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MMU)
+    if (Buffer->hwFeature.hasPipe2D
+     && Buffer->hwFeature.hasPipe3D
+     && !Buffer->hwFeature.hasNewMMU
      && (Usage == gcvCOMMAND_2D))
     {
         offset = commandBuffer->offset + alignBytes;
@@ -1721,7 +1748,7 @@ gcoBUFFER_Commit(
                 }
 
                 /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
-                if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_HW_TFB))
+                if (Buffer->hwFeature.hasHWTFB)
                 {
                     gctUINT64 pauseXfbCommand, pauseXfbCommandsaved;
 
@@ -1737,7 +1764,7 @@ gcoBUFFER_Commit(
                     }
                 }
 
-                if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE))
+                if (Buffer->hwFeature.hasProbe)
                 {
                     gctUINT64 pauseProbeCommand, pauseProbeCommandsaved;
 
@@ -1788,7 +1815,7 @@ gcoBUFFER_Commit(
 
 #if gcdSYNC
             /*Only send hw fence when commit, the fence type is hw fence when support gcvFEAUTRE_FENCE_32BIT*/
-            if ((gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_32BIT) || gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_64BIT)) &&
+            if (Buffer->hwFeature.hasHWFence &&
                 Buffer->inRerserved == gcvFALSE)
             {
                 gctUINT8_PTR fenceCommand, fenceCommandSaved;
@@ -1833,7 +1860,7 @@ gcoBUFFER_Commit(
 
         if (gcoHAL_GetOption(gcvNULL, gcvOPTION_KERNEL_FENCE))
         {
-#if gcdENABLE_3D
+#if gcdENABLE_3D && gcdENABLE_KERNEL_FENCE
             gcmONERROR(gcoHARDWARE_BuildPatchList(Buffer->hardware, Buffer, commandBuffer, Buffer->info.engine));
 #endif
 

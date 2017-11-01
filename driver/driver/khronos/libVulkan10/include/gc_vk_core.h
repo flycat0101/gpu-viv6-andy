@@ -125,6 +125,9 @@ extern VkAllocationCallbacks __vkAllocatorWrapper;
 
 #define __VK_NEW_DEVICE_QUEUE       1
 
+/* 0 means disable TS. while 1 means enable TS. */
+#define __VK_ENABLETS               0
+
 VkResult __vk_DeviceControl(
     gcsHAL_INTERFACE * iface,
     uint32_t coreIdex

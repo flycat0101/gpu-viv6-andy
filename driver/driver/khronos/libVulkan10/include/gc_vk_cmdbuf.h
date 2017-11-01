@@ -14,7 +14,7 @@
 #ifndef __gc_vk_cmdbuf_h__
 #define __gc_vk_cmdbuf_h__
 
-#define __VK_MAX_COMMITS 64
+#define __VK_MAX_COMMITS 128
 
 #define __VK_COMMANDBUFFER_SIZE             gcdCMD_BUFFER_SIZE  /* 128KB */
 #define __VK_STATEBUFFER_SIZE               (__VK_COMMANDBUFFER_SIZE - 0x800) /* Command buffer size reserves some space for kernel */

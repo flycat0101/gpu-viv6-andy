@@ -65,14 +65,6 @@ clfReleaseEvent(
 
     if (oldReference == 1)
     {
-#if cldSYNC_MEMORY
-        if (Event->queue != gcvNULL)
-        {
-            clfReleaseCommandQueue(Event->queue);
-            Event->queue = gcvNULL;
-        }
-#endif
-
         gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
         /* Free signals. */
         gcmVERIFY_OK(gcoCL_DestroySignal(Event->finishSignal));
@@ -145,7 +137,7 @@ clfAllocateEvent(
     event->next                 = gcvNULL;
     event->previous             = gcvNULL;
     event->userEvent            = gcvFALSE;
-    event->fromUserCommand      = gcvFALSE;
+    event->dominateByUser       = gcvFALSE;
 
     event->profileInfo.queued   = 0;
     event->profileInfo.submit   = 0;
@@ -254,7 +246,7 @@ clfIsEventInEventList(
     return result;
 }
 
-static gctINT
+gctINT
 clfAddEventToEventList(
     cl_event                Event
     )
@@ -664,7 +656,7 @@ clfCheckPendingEvents(
     clsCommand_PTR  Command
     )
 {
-    gctINT pendingEventStatus0, pendingEventStatus1;
+    gctINT pendingEventStatus;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
@@ -674,19 +666,11 @@ clfCheckPendingEvents(
         return gcvSTATUS_FALSE;
     }
 
-    pendingEventStatus0 = clfCheckPendingEventsList(Command, Command->numEventsInWaitList, Command->eventWaitList);
-    pendingEventStatus1 = clfCheckPendingEventsList(Command, Command->internalNumEventsInWaitList, Command->internalEventWaitList);
+    pendingEventStatus = clfCheckPendingEventsList(Command, Command->numEventsInWaitList, Command->eventWaitList);
 
-    gcmFOOTER_ARG("pendingEventStatus0=%d pendingEventStatus1=%d", pendingEventStatus0, pendingEventStatus1);
+    gcmFOOTER_ARG("pendingEventStatus=%d", pendingEventStatus);
 
-    if (pendingEventStatus0 == gcvSTATUS_TERMINATE || pendingEventStatus1 == gcvSTATUS_TERMINATE)
-    {
-        return gcvSTATUS_TERMINATE;
-    }
-    else
-    {
-        return (pendingEventStatus0 == gcvSTATUS_FALSE) ? pendingEventStatus1 : pendingEventStatus0;
-    }
+    return pendingEventStatus;
 }
 
 gctINT
@@ -885,8 +869,6 @@ clfEventListWorker(
     )
 {
     clsContext_PTR          context = (clsContext_PTR) Data;
-    clsCommandQueue_PTR     CommandQueue = gcvNULL;
-
 
     while (gcvTRUE)
     {
@@ -898,13 +880,6 @@ clfEventListWorker(
         {
             /* Stop had been signaled, exit. */
             break;
-        }
-
-        CommandQueue = context->queueList;
-        while(CommandQueue && CommandQueue->inThread)
-        {
-            clfProcessDeferredReleaseCommandList(CommandQueue);
-            CommandQueue = CommandQueue->next;
         }
 
         /* Process pending event signals. */

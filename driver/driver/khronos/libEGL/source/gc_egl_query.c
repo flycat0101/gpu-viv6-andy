@@ -18,9 +18,6 @@
 
 #if defined(WL_EGL_PLATFORM)
 #  include <wayland-server.h>
-#ifndef USE_VIV_WAYLAND
-#    include <gc_wayland_protocol.h>
-#  endif
 #endif
 
 EGLAPI EGLBoolean EGLAPIENTRY
@@ -1058,15 +1055,16 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQueryWaylandBufferWL(EGLDisplay dpy, struct wl_
     {
     case EGL_TEXTURE_FORMAT:
         *value = EGL_TEXTURE_RGB;
-        break;
+        /* Not a query, just check if buffer is valid. */
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL);
     case EGL_WIDTH:
         return veglQueryWaylandBuffer(d, buffer, value, gcvNULL, gcvNULL);
     case EGL_HEIGHT:
         return veglQueryWaylandBuffer(d, buffer, gcvNULL, value, gcvNULL);
-        break;
     case EGL_WAYLAND_Y_INVERTED_WL:
         *value = 1;
-        break;
+        /* Not a query, just check if buffer is valid. */
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL);
     default:
         return EGL_FALSE;
     }
@@ -1167,6 +1165,8 @@ static veglLOOKUP _veglLookup[] =
     eglMAKE_LOOKUP(eglSetDamageRegionKHR),
     eglMAKE_LOOKUP(eglSwapBuffersWithDamageKHR),
     eglMAKE_LOOKUP(eglSwapBuffersWithDamageEXT),
+    eglMAKE_LOOKUP(eglQueryDmaBufFormatsEXT),
+    eglMAKE_LOOKUP(eglQueryDmaBufModifiersEXT),
     eglMAKE_LOOKUP(eglPatchID),
 
     GL_API_ENTRIES(forwardGLFunction)

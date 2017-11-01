@@ -1071,9 +1071,291 @@ static VSC_ErrCode _VIR_MergeICASTD(
     return errCode;
 }
 
+#if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
+static VSC_ErrCode _CalculateIndexForPrivateMemory(
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Operand         *dstOpnd = gcvNULL;
+    VIR_Operand         *srcOpnd = gcvNULL;
+    VIR_NameId          nameId;
+    VIR_SymId           workThreadCountSymId = VIR_INVALID_ID;
+    VIR_Symbol          *workThreadCountSym = gcvNULL;
+    VIR_Symbol          *privateMemSym = gcvNULL;
+
+    if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
+    {
+        privateMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1));
+    }
+    else if (opCode == VIR_OP_IMADLO0 && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2)))
+    {
+        privateMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2));
+    }
+
+    if (privateMemSym &&
+        VIR_Symbol_isUniform(privateMemSym) &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, privateMemSym), "#private_address") == 0)
+    {
+        /* Add a new uniform to save the workThreadCount. */
+        errCode = VIR_Shader_AddString(pShader,
+                                       "#WorkThreadCount",
+                                       &nameId);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &workThreadCountSymId);
+        ON_ERROR(errCode, "Add workThreadCount uniform. ");
+
+        workThreadCountSym = VIR_Shader_GetSymFromId(pShader, workThreadCountSymId);
+        VIR_Symbol_SetFlag(workThreadCountSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(workThreadCountSym, VIR_PRECISION_MEDIUM);
+        VIR_Symbol_SetUniformKind(workThreadCountSym, VIR_UNIFORM_WORK_THREAD_COUNT);
+        VIR_Symbol_SetAddrSpace(workThreadCountSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(workThreadCountSym, VIR_TYQUAL_CONST);
+
+        if (opCode == VIR_OP_ADD)
+        {
+            /*
+            ** 004: LSHIFT             uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(9).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 005: LSHIFT             uint temp(9).x{r0.<3}, uint temp(9).x{r0.<3}, int 8
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            **
+            ** Or
+            **
+            ** 004: MUL                uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(9).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 005: MUL                uint temp(9).x{r0.<3}, uint temp(9).x{r0.<3}, uint 300
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            */
+            VIR_Instruction     *shiftOrMulInst = gcvNULL;
+
+            /* Insert a MOD before LSHIFT/MUL. */
+            shiftOrMulInst = VIR_Inst_GetPrev(pInst);
+            gcmASSERT(VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_LSHIFT || VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_MUL);
+
+            VIR_Function_AddCopiedInstructionBefore(pFunc,
+                                                    shiftOrMulInst,
+                                                    shiftOrMulInst,
+                                                    gcvTRUE,
+                                                    &newInst);
+            VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
+
+            /*
+            ** Change the instType to UINT16.
+            */
+            VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
+
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetTypeId(dstOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Change the SRC0 of LSHIFT/MUL. */
+            srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+        }
+        else
+        {
+            /*
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(8).x{r0.<3}, int 340, uint #private_address.x
+            ** -->
+            ** 003: IMOD               ushort temp(1).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(1).x{r0.<3}, int 340, uint #private_address.x
+            */
+            /* Insert a MOD before MAD. */
+            VIR_Function_AddInstructionBefore(pFunc,
+                                              VIR_OP_IMOD,
+                                              VIR_TYPE_UINT16,
+                                              pInst,
+                                              gcvTRUE,
+                                              &newInst);
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_Copy(dstOpnd, VIR_Inst_GetDest(pInst));
+            VIR_Operand_SetTypeId(dstOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Change the SRC0 of MAD. */
+            srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+        }
+    }
+
+OnError:
+    return errCode;
+}
+#endif
+
+#if __ENABLE_OPTIMIZE_FOR_SHARE_MEMORY__
+static VSC_ErrCode _CalculateIndexForLocalMemory(
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Operand         *dstOpnd = gcvNULL;
+    VIR_Operand         *srcOpnd = gcvNULL;
+    VIR_NameId          nameId;
+    VIR_SymId           workGroupCountSymId = VIR_INVALID_ID;
+    VIR_Symbol          *workGroupCountSym = gcvNULL;
+    VIR_Symbol          *localMemSym = gcvNULL;
+
+    if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1));
+    }
+    else if (opCode == VIR_OP_IMADLO0 && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2));
+    }
+
+    if (localMemSym &&
+        VIR_Symbol_isUniform(localMemSym) &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, localMemSym), "#local_address") == 0)
+    {
+        /* Add a new uniform to save the workGroupCount. */
+        errCode = VIR_Shader_AddString(pShader,
+                                       "#workGroupCount",
+                                       &nameId);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &workGroupCountSymId);
+        ON_ERROR(errCode, "Add workGroupCount uniform. ");
+
+        workGroupCountSym = VIR_Shader_GetSymFromId(pShader, workGroupCountSymId);
+        VIR_Symbol_SetFlag(workGroupCountSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(workGroupCountSym, VIR_PRECISION_MEDIUM);
+        VIR_Symbol_SetUniformKind(workGroupCountSym, VIR_UNIFORM_WORK_GROUP_COUNT);
+        VIR_Symbol_SetAddrSpace(workGroupCountSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(workGroupCountSym, VIR_TYQUAL_CONST);
+
+        if (opCode == VIR_OP_ADD)
+        {
+            /*
+            ** 004: LSHIFT             uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(9).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #workGroupCount.x
+            ** 005: LSHIFT             uint temp(9).x{r0.<3}, uint temp(9).x{r0.<3}, int 8
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            **
+            ** Or
+            **
+            ** 004: MUL                uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(9).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #workGroupCount.x
+            ** 005: MUL                uint temp(9).x{r0.<3}, uint temp(9).x{r0.<3}, uint 300
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            */
+            VIR_Instruction     *shiftOrMulInst = gcvNULL;
+
+            /* Insert a MOD before LSHIFT/MUL. */
+            shiftOrMulInst = VIR_Inst_GetPrev(pInst);
+            gcmASSERT(VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_LSHIFT || VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_MUL);
+
+            VIR_Function_AddCopiedInstructionBefore(pFunc,
+                                                    shiftOrMulInst,
+                                                    shiftOrMulInst,
+                                                    gcvTRUE,
+                                                    &newInst);
+            VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
+
+            /*
+            ** Change the instType to UINT16.
+            */
+            VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
+
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetTypeId(dstOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workGroupCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Change the SRC0 of LSHIFT/MUL. */
+            srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+        }
+        else
+        {
+            /*
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(8).x{r0.<3}, int 340, uint #local_address.x
+            ** -->
+            ** 003: IMOD               ushort temp(1).x{r0.<3}, ushort temp(8).x{r0.<3}, ushort #WorkGroupCount.x
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(1).x{r0.<3}, int 340, uint #local_address.x
+            */
+            /* Insert a MOD before MAD. */
+            VIR_Function_AddInstructionBefore(pFunc,
+                                              VIR_OP_IMOD,
+                                              VIR_TYPE_UINT16,
+                                              pInst,
+                                              gcvTRUE,
+                                              &newInst);
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_Copy(dstOpnd, VIR_Inst_GetDest(pInst));
+            VIR_Operand_SetTypeId(dstOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workGroupCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Change the SRC0 of MAD. */
+            srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+        }
+    }
+
+OnError:
+    return errCode;
+}
+#endif
+
 DEF_QUERY_PASS_PROP(vscVIR_PreCleanup)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_FCP;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
@@ -1085,6 +1367,7 @@ DEF_QUERY_PASS_PROP(vscVIR_PreCleanup)
   1) replace LDARR/STARR
   2) dual16 shader, we need to patch the code for some cases:
   2.1) insert precison conv for implicit type interpretion
+  3) Create a uniform to save the threadCount and insert a MOD to calculate the globalIndex for private memory.
    ...
 *********************************************/
 VSC_ErrCode vscVIR_PreCleanup(
@@ -1150,6 +1433,27 @@ VSC_ErrCode vscVIR_PreCleanup(
                 ON_ERROR(errCode, "Insert precision conversion inst");
             }
 
+#if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
+            /* Only support OCL now. */
+            if (VIR_Shader_IsCL(pShader) &&
+                VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
+                VIR_Shader_GetPrivateMemorySize(pShader) > 0)
+            {
+                errCode = _CalculateIndexForPrivateMemory(pShader, func, inst);
+                ON_ERROR(errCode, "Create concurrent workThreadCount. ");
+            }
+#endif
+
+#if __ENABLE_OPTIMIZE_FOR_SHARE_MEMORY__
+            /* Only support OCL now. */
+            if (VIR_Shader_IsCL(pShader) &&
+                VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
+                VIR_Shader_GetShareMemorySize(pShader) > 0)
+            {
+                errCode = _CalculateIndexForLocalMemory(pShader, func, inst);
+                ON_ERROR(errCode, "Create concurrent workGroupCount. ");
+            }
+#endif
         }
     }
 
@@ -1360,6 +1664,28 @@ static VSC_ErrCode _SetResOpBitsForSampler(VIR_Shader *pShader,
                                        index);
 }
 
+static gctBOOL
+_IsSrcFloat16(
+    IN VIR_Shader*          pShader,
+    IN VIR_Instruction*     pInst
+    )
+{
+    VIR_Operand*            pSrc0Opnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_TypeId              typeId = VIR_Operand_GetTypeId(pSrc0Opnd);
+    VIR_TypeId              componentTypeId = VIR_GetTypeComponentType(typeId);
+
+    if (VIR_Shader_isDual16Mode(pShader) &&
+        VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_16)
+    {
+        return gcvFALSE;
+    }
+    else if (componentTypeId == VIR_TYPE_FLOAT16)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
 
 /*********************************************
 * vscVIR_PostCleanup
@@ -1403,6 +1729,19 @@ VSC_ErrCode vscVIR_PostCleanup(
                 {
                     _changeConvSrc1(inst);
                 }
+            }
+
+            /* Change MOV.f16 to CONV.f16. */
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV && _IsSrcFloat16(pShader, inst))
+            {
+                VIR_Operand*    pNewOpnd = gcvNULL;
+                VIR_Inst_SetOpcode(inst, VIR_OP_CONV);
+
+                VIR_Function_NewOperand(func, &pNewOpnd);
+                VIR_Inst_SetSrcNum(inst, 2);
+                VIR_Inst_SetSource(inst, 1, pNewOpnd);
+
+                VIR_Operand_SetImmediateUint(pNewOpnd, 0x1);
             }
 
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_GET_SAMPLER_IDX)

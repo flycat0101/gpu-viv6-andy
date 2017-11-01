@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
     vx_map_id map_id1 = 0;
 
     /* read image data */
-    srcFile = fopen("lena_gray.bmp", "rb");
+    srcFile = fopen("test_gray.bmp", "rb");
     if(NULL==srcFile)
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");
@@ -155,6 +155,8 @@ int main(int argc, char* argv[])
     ContextVX = vxCreateContext();
     if (ContextVX)
     {
+        vx_border_t borderMode = {0};
+
         imgRect.start_x = 0;
         imgRect.start_y = 0;
         imgRect.end_x = imgWid;
@@ -198,6 +200,10 @@ int main(int argc, char* argv[])
             goto exit;
         }
         imgAddr[0] = NULL;
+
+        /*set border mode*/
+        borderMode.mode = VX_BORDER_REPLICATE;
+        vxSetContextAttribute(ContextVX, VX_CONTEXT_IMMEDIATE_BORDER, &borderMode, sizeof(vx_border_t));
 
         /* process image */
         if(VX_SUCCESS!=vxuSobel3x3(ContextVX, imgObj[0], imgObj[1], imgObj[2]))
@@ -271,7 +277,7 @@ int main(int argc, char* argv[])
         imgAddr[2] = NULL;
 
         /* output image */
-        destFile = fopen("lena_sobel.bmp", "wb");
+        destFile = fopen("test_sobel.bmp", "wb");
         if(NULL==destFile)
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");

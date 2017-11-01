@@ -260,7 +260,6 @@ _FillInOptions(
     gcOptions[gcvOPTION_PREFER_USC_RECONFIG] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvFALSE;
 
-
     gcOptions[gcvOPTION_KERNEL_FENCE] = gcvFALSE;
     gcOptions[gcvOPTION_ASYNC_PIPE] = gcvFALSE;
     gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvTRUE;
@@ -268,6 +267,7 @@ _FillInOptions(
     gcOptions[gcvOPTION_OCL_IN_THREAD] = gcvTRUE;
     gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvFALSE;
     gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
+    gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvTRUE;
 
 
     /* overwrite option with environment settings here. */
@@ -292,6 +292,14 @@ _FillInOptions(
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
         {
             gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvTRUE;
+        }
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_DEC400", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
+        {
+            gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvFALSE;
         }
     }
 
@@ -524,10 +532,6 @@ gcoHAL_ConstructEx(
             }
         }
 
-#if VIVANTE_PROFILER
-        hal->profiler.enable = 0;
-#endif
-
         hal->isGpuBenchSmoothTriangle = gcvFALSE;
     }
 
@@ -695,6 +699,7 @@ gcoHAL_Call(
 
     Interface->ignoreTLS = gcvFALSE;
 
+
     /* Call kernel service. */
     status = gcoOS_DeviceControl(
         gcvNULL,
@@ -728,6 +733,7 @@ gcoHAL_Call(
             /* Stall the hardware. */
             gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
         }
+
 
         /* Retry kernel call again. */
         status = gcoOS_DeviceControl(
@@ -2226,10 +2232,12 @@ OnError:
 }
 #endif
 
+#if gcdFRAME_DB
 #define gcmGET_COUNTER(record, field, usePrev) \
     ( record->field \
     - (usePrev ? record[-1].field : 0) \
     )
+#endif
 
 gceSTATUS
 gcoHAL_DumpFrameDB(
@@ -2372,6 +2380,28 @@ OnError:
 #else
     return gcvSTATUS_NOT_SUPPORTED;
 #endif
+}
+
+gceSTATUS
+gcoHAL_ExportVideoMemory(
+    IN gctUINT32 Handle,
+    IN gctUINT32 Flags,
+    OUT gctINT32 * FD
+    )
+{
+    gceSTATUS status;
+    gcsHAL_INTERFACE iface;
+
+    iface.command = gcvHAL_EXPORT_VIDEO_MEMORY;
+
+    iface.u.ExportVideoMemory.node = Handle;
+    iface.u.ExportVideoMemory.flags = Flags;
+
+    status = gcoHAL_Call(gcvNULL, &iface);
+
+    *FD = iface.u.ExportVideoMemory.fd;
+
+    return status;
 }
 
 gceSTATUS
@@ -3369,3 +3399,34 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoHAL_GetGraphicBufferFd(
+    IN gctUINT32 Node[3],
+    IN gctSHBUF ShBuf,
+    IN gctSIGNAL Signal,
+    OUT gctINT32 * Fd
+    )
+{
+    gceSTATUS status;
+    gcsHAL_INTERFACE iface;
+
+    iface.command                      = gcvHAL_GET_GRAPHIC_BUFFER_FD;
+    iface.engine                       = gcvENGINE_RENDER;
+    iface.ignoreTLS                    = gcvFALSE;
+    iface.u.GetGraphicBufferFd.node[0] = Node[0];
+    iface.u.GetGraphicBufferFd.node[1] = Node[1];
+    iface.u.GetGraphicBufferFd.node[2] = Node[2];
+    iface.u.GetGraphicBufferFd.shBuf   = gcmPTR_TO_UINT64(ShBuf);
+    iface.u.GetGraphicBufferFd.signal  = gcmPTR_TO_UINT64(Signal);
+
+    gcmONERROR(gcoOS_DeviceControl(gcvNULL,
+                                   IOCTL_GCHAL_INTERFACE,
+                                   &iface, gcmSIZEOF(iface),
+                                   &iface, gcmSIZEOF(iface)));
+
+    *Fd = iface.u.GetGraphicBufferFd.fd;
+    return gcvSTATUS_OK;
+
+OnError:
+    return status;
+}

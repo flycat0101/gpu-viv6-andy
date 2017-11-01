@@ -2006,7 +2006,7 @@ gcoHARDWARE_BindTexture(
         {
             samplerHeight = 1;
         }
-        else if (Hardware->specialHint & (1 << 1))
+        else if (Hardware->specialHint & gcvHINT_BIT_0)
         {
             if (mipFilter == gcvTEXTURE_LINEAR
                 && (--Hardware->specialHintData < 0)
@@ -3030,8 +3030,9 @@ gcoHARDWARE_BindTextureTS(
  16:16) + 1))))))) << (0 ? 16:16)));
             }
 
-            if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-                && surface->isMsaa)
+            if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] ||
+                 (gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400) && Hardware->features[gcvFEATURE_COMPRESSION_DEC400]))
+            &&  surface->isMsaa)
             {
                 sampleTSConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:18) - (0 ? 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ?
@@ -6020,7 +6021,7 @@ gcoHARDWARE_BindTextureDesc(
     else
 #endif
 
-    if (Hardware->specialHint & (1 << 1))
+    if (Hardware->specialHint & gcvHINT_BIT_0)
     {
         if ((mipFilter == gcvTEXTURE_LINEAR) &&
             (--Hardware->specialHintData < 0))

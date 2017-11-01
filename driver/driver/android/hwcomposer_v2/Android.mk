@@ -29,6 +29,8 @@ LOCAL_CFLAGS := \
     -Wall \
     -Wextra \
     -Wno-unused-parameter \
+    -Wno-unused-variable \
+    -Wno-unused-function \
     -DLOG_TAG=\"hwc\"
 
 LOCAL_C_INCLUDES := \

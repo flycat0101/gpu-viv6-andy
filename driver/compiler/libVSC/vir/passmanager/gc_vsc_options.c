@@ -26,7 +26,7 @@ gctUINT32 _VSC_OPTN_GetSubOptionLength(
     return (gctUINT32)(pos - str);
 }
 
-/* Loop Optimization options */
+/* Simple Copy Propagation options */
 void VSC_OPTN_SCPPOptions_SetDefault(
     IN OUT VSC_OPTN_SCPPOptions* options,
     IN gctUINT optLevel
@@ -115,9 +115,113 @@ void VSC_OPTN_SCPPOptions_Usage(
 {
     gctSTRING usage =
         "-SCPP:\n"
-        "    on                         turn on VIR inliner\n"
-        "    off                        turn off VIR inliner\n"
+        "    on                         turn on VIR Simple Copy Propagation\n"
+        "    off                        turn off VIR Simple Copy Propagation\n"
         "    opts:                0x1    \n"
+        "    trace:                     0x1    \n"
+        "                               0x2    \n";
+
+    VIR_LOG(dumper, usage);
+    VIR_LOG_FLUSH(dumper);
+}
+
+/* Long Parameter Optimization options */
+void VSC_OPTN_ParamOptOptions_SetDefault(
+    IN OUT VSC_OPTN_ParamOptOptions* options,
+    IN gctUINT optLevel
+    )
+{
+    VSC_OPTN_ParamOptOptions_SetLongArrayThreshold(options, 64);
+    VSC_OPTN_ParamOptOptions_SetSwitchOn(options, gcvTRUE);
+    VSC_OPTN_ParamOptOptions_SetPassId(options, 0);
+    VSC_OPTN_ParamOptOptions_SetTrace(options, 0);
+}
+
+void VSC_OPTN_ParamOptOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_ParamOptOptions* options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "on", sizeof("on") - 1))
+        {
+            VSC_OPTN_ParamOptOptions_SetSwitchOn(options, gcvTRUE);
+            str += sizeof("on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "off", sizeof("off") - 1))
+        {
+            VSC_OPTN_ParamOptOptions_SetSwitchOn(options, gcvFALSE);
+            str += sizeof("off") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "threshold:", sizeof("threshold:") - 1))
+        {
+            gctINT32 threshold;
+            gctUINT32 len;
+
+            str += sizeof("threshold:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            threshold = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_ParamOptOptions_SetLongArrayThreshold(options, threshold);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
+        {
+            gctUINT32 trace;
+            gctUINT32 len;
+
+            str += sizeof("trace:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            trace = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_ParamOptOptions_SetTrace(options, trace);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bs:", sizeof("bs:") - 1))
+        {
+            gctUINT32 before_shader;
+            gctUINT32 len;
+
+            str += sizeof("bs:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            before_shader = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_ParamOptOptions_SetBeforeShader(options, before_shader);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "as:", sizeof("as:") - 1))
+        {
+            gctUINT32 after_shader;
+            gctUINT32 len;
+
+            str += sizeof("as:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            after_shader = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_ParamOptOptions_SetAfterShader(options, after_shader);
+            str += len;
+        }
+    }
+}
+
+void VSC_OPTN_ParamOptOptions_Dump(
+    IN VSC_OPTN_ParamOptOptions* options,
+    IN VIR_Dumper* dumper
+    )
+{
+    VIR_LOG(dumper, "PAOPT options:\n");
+    VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_ParamOptOptions_GetSwitchOn(options) ? "true" : "false");
+    VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_ParamOptOptions_GetTrace(options));
+    VIR_LOG_FLUSH(dumper);
+}
+
+void VSC_OPTN_ParamOptOptions_Usage(
+    IN VIR_Dumper* dumper
+    )
+{
+    gctSTRING usage =
+        "-PAOPT:\n"
+        "    on                         turn on Long Parameter Optimizer\n"
+        "    off                        turn off Long Parameter Optimizer\n"
+        "    threshold:                0x1    \n"
         "    trace:                     0x1    \n"
         "                               0x2    \n";
 
@@ -133,7 +237,7 @@ void VSC_OPTN_LoopOptsOptions_SetDefault(
 {
     if(optLevel >=2)
     {
-        VSC_OPTN_LoopOptsOptions_SetSwitchOn(options, gcvFALSE);
+        VSC_OPTN_LoopOptsOptions_SetSwitchOn(options, gcvTRUE);
     }
     else
     {
@@ -144,6 +248,9 @@ void VSC_OPTN_LoopOptsOptions_SetDefault(
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION |
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT |
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING);
+    VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(options, 16);
+   /* TODO:: disable partial unroll and enable it after tuning its performance */
+    VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, 0);
     VSC_OPTN_LoopOptsOptions_SetTrace(options, 0);
 
     VSC_OPTN_LoopOptsOptions_SetBeforeShader(options, gcvMAXUINT32);
@@ -177,6 +284,28 @@ void VSC_OPTN_LoopOptsOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             opts = vscSTR_StrToUint32(str, len);
             VSC_OPTN_LoopOptsOptions_SetOpts(options, opts);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "fuf:", sizeof("fuf:") - 1))
+        {
+            gctINT32 fuf;
+            gctUINT32 len;
+
+            str += sizeof("fuf:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            fuf = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(options, fuf);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "puf:", sizeof("puf:") - 1))
+        {
+            gctINT32 puf;
+            gctUINT32 len;
+
+            str += sizeof("puf:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            puf = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, puf);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
@@ -233,9 +362,9 @@ void VSC_OPTN_LoopOptsOptions_Usage(
 {
     gctSTRING usage =
         "-LOOP:\n"
-        "    on                         turn on VIR inliner\n"
-        "    off                        turn off VIR inliner\n"
-        "    opts:                0x1    \n"
+        "    on                         turn on VIR loop optimizer\n"
+        "    off                        turn off VIR loop optimizer\n"
+        "    opts:                      0x1    \n"
         "    trace:                     0x1    \n"
         "                               0x2    \n";
 
@@ -350,8 +479,8 @@ void VSC_OPTN_CFOOptions_Usage(
 {
     gctSTRING usage =
         "-CFO:\n"
-        "    on                         turn on VIR inliner\n"
-        "    off                        turn off VIR inliner\n"
+        "    on                         turn on VIR control flow optimizer\n"
+        "    off                        turn off VIR control flow optimizer\n"
         "    opts:                      0x1    \n"
         "    trace:                     0x1    \n"
         "                               0x2    \n";
@@ -490,8 +619,8 @@ void VSC_OPTN_UF_AUBOOptions_Usage(
 {
     gctSTRING usage =
         "-DUBO:\n"
-        "    on                         turn on VIR inliner\n"
-        "    off                        turn off VIR inliner\n"
+        "    on                         turn on VIR DUBO phase\n"
+        "    off                        turn off VIR  DUBO phase\n"
         "    heuristics:                0x1    \n"
         "    const_reg_reservation:     number of constant register to reserve\n"
         "    opt_on                     turn on optimization\n"
@@ -681,9 +810,9 @@ void VSC_OPTN_PUOptions_Usage(
 {
     gctSTRING usage =
         "-PU:\n"
-        "    on                  turn on VIR inliner\n"
-        "    off                 turn off VIR inliner\n"
-        "    trace:              0x1    trace inliner\n"
+        "    on                  turn on VIR precision updater\n"
+        "    off                 turn off VIR precision updater\n"
+        "    trace:              0x1    trace precision updater\n"
         "                        0x2    trace output\n";
 
     VIR_LOG(dumper, usage);
@@ -1076,7 +1205,7 @@ void VSC_OPTN_SIMPOptions_SetDefault(
 {
     if(optLevel >= 2)
     {
-        VSC_OPTN_SIMPOptions_SetSwitchOn(options, gcvFALSE);
+        VSC_OPTN_SIMPOptions_SetSwitchOn(options, gcvTRUE);
     }
     else
     {
@@ -2873,6 +3002,7 @@ void VSC_OPTN_Options_SetDefault(
     )
 {
     VSC_OPTN_SCPPOptions_SetDefault(VSC_OPTN_Options_GetSCPPOptions(options, 0), optLevel);
+    VSC_OPTN_ParamOptOptions_SetDefault(VSC_OPTN_Options_GetPARAMOPTOptions(options, 0), optLevel);
     VSC_OPTN_LoopOptsOptions_SetDefault(VSC_OPTN_Options_GetLoopOptsOptions(options, 0), optLevel);
     VSC_OPTN_CFOOptions_SetDefault(VSC_OPTN_Options_GetCFOOptions(options, 0), optLevel);
     VSC_OPTN_UF_AUBOOptions_SetDefault(VSC_OPTN_Options_GetAUBOOptions(options, 0), optLevel);
@@ -2906,6 +3036,8 @@ VSC_OPTN_BASE* VSC_OPTN_Options_GetOption(VSC_OPTN_Options* pOptions, VSC_PASS_O
     {
     case VSC_PASS_OPTN_TYPE_SCPP:
         return &pOptions->scpp_options[passId].optnBase;
+    case VSC_PASS_OPTN_TYPE_PAOPT:
+        return &pOptions->paopt_options[passId].optnBase;
     case VSC_PASS_OPTN_TYPE_LOOPOPTS:
         return &pOptions->loopopts_options[passId].optnBase;
     case VSC_PASS_OPTN_TYPE_CFO:
@@ -2972,6 +3104,15 @@ void VSC_OPTN_Options_GetOptionFromString(
     {
         pos += sizeof("-SCPP") - 1;
         VSC_OPTN_SCPPOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetSCPPOptions(options, 0));
+    }
+
+    /* Long Parameter Optimization options */
+    gcoOS_StrStr(str, "-PAOPT", &pos);
+    if (pos)
+    {
+        pos += sizeof("-PAOPT") - 1;
+        VSC_OPTN_ParamOptOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetPARAMOPTOptions(options, 0));
+
     }
 
     /* loop optimizations options */
@@ -3200,6 +3341,7 @@ void VSC_OPTN_Options_Dump(
 {
     VIR_LOG(dumper, "%s\nDUMP OPTIONS\n%s\n", VSC_TRACE_BAR_LINE, VSC_TRACE_BAR_LINE);
     VSC_OPTN_SCPPOptions_Dump(VSC_OPTN_Options_GetSCPPOptions(options, 0), dumper);
+    VSC_OPTN_ParamOptOptions_Dump(VSC_OPTN_Options_GetPARAMOPTOptions(options, 0), dumper);
     VSC_OPTN_LoopOptsOptions_Dump(VSC_OPTN_Options_GetLoopOptsOptions(options, 0), dumper);
     VSC_OPTN_CFOOptions_Dump(VSC_OPTN_Options_GetCFOOptions(options, 0), dumper);
     VSC_OPTN_UF_AUBOOptions_Dump(VSC_OPTN_Options_GetAUBOOptions(options, 0), dumper);
@@ -3229,6 +3371,7 @@ void VSC_OPTN_Options_Usage(
 {
     VIR_LOG(dumper, "%s\nOPTIONS USAGE\n%s\n", VSC_TRACE_BAR_LINE, VSC_TRACE_BAR_LINE);
     VSC_OPTN_SCPPOptions_Usage(dumper);
+    VSC_OPTN_ParamOptOptions_Usage(dumper);
     VSC_OPTN_LoopOptsOptions_Usage(dumper);
     VSC_OPTN_CFOOptions_Usage(dumper);
     VSC_OPTN_UF_AUBOOptions_Usage(dumper);

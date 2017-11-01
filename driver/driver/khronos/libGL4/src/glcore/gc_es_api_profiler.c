@@ -25,9 +25,9 @@ GLchar *__glesTracerFuncNames[] = {
 };
 
 extern GLint __glesApiTraceMode;
-extern GLint __glesApiProfileMode;
 
 #if VIVANTE_PROFILER
+GLint __glesApiProfileMode = -1;
 
 #define __GLES_PROFILE_VARS() \
     gctHANDLE tid = gcoOS_GetCurrentThreadID(); \
@@ -105,6 +105,20 @@ GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion)
         case __GL_API_VERSION_ES32:
             tableSize = (GLsizei)(sizeof(__GLesTracerDispatchTableStruct)                            / sizeof(GLvoid*));
             break;
+        /* vivTracer does NOT support OGL yet */
+        case __GL_API_VERSION_OGL10:
+        case __GL_API_VERSION_OGL11:
+        case __GL_API_VERSION_OGL12:
+        case __GL_API_VERSION_OGL13:
+        case __GL_API_VERSION_OGL14:
+        case __GL_API_VERSION_OGL15:
+        case __GL_API_VERSION_OGL20:
+        case __GL_API_VERSION_OGL21:
+        case __GL_API_VERSION_OGL30:
+        case __GL_API_VERSION_OGL31:
+        case __GL_API_VERSION_OGL32:
+        case __GL_API_VERSION_OGL33:
+        case __GL_API_VERSION_OGL40:
         default:
             GL_ASSERT(0);
             return GL_FALSE;
@@ -6780,6 +6794,11 @@ GLvoid GLAPIENTRY __glesProfile_BindImageTexture(__GLcontext *gc, GLuint unit, G
     }
 }
 
+GLvoid GL_APIENTRY __glesProfile_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    __gles_GetTexImage(gc, target, level, format, type, pixels);
+}
+
 GLvoid GLAPIENTRY __glesProfile_GetBooleani_v(__GLcontext *gc, GLenum target, GLuint index, GLboolean *data)
 {
     __GLES_PROFILE_VARS();
@@ -8583,7 +8602,6 @@ GLvoid GLAPIENTRY __glesProfile(GetTexEnviv)(__GLcontext *gc,   GLenum target, G
 GLvoid GLAPIENTRY __glesProfile(GetTexGendv)(__GLcontext *gc,   GLenum coord, GLenum pname, GLdouble *params ){}
 GLvoid GLAPIENTRY __glesProfile(GetTexGenfv)(__GLcontext *gc,   GLenum coord, GLenum pname, GLfloat *params ){}
 GLvoid GLAPIENTRY __glesProfile(GetTexGeniv)(__GLcontext *gc,   GLenum coord, GLenum pname, GLint *params ){}
-GLvoid GLAPIENTRY __glesProfile(GetTexImage)(__GLcontext *gc,   GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels ){}
 GLvoid GLAPIENTRY __glesProfile(DepthRange)(__GLcontext *gc,   GLclampd near_val, GLclampd far_val ){}
 GLvoid GLAPIENTRY __glesProfile(Frustum)(__GLcontext *gc,   GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near_val, GLdouble far_val ){}
 GLvoid GLAPIENTRY __glesProfile(LoadIdentity)(__GLcontext *gc){}
@@ -8790,7 +8808,50 @@ GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4sv)(__GLcontext *gc, GLuint indx, 
 GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4ubv)(__GLcontext *gc, GLuint indx, const GLubyte * values){}
 GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4uiv)(__GLcontext *gc, GLuint indx, const GLuint * values){}
 GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4usv)(__GLcontext *gc, GLuint indx, const GLushort * values){}
-
+GLvoid  GLAPIENTRY __glesProfile(BindFragDataLocation)(__GLcontext *gc,  GLuint program, GLuint colorNumber, const GLchar *name){}
+GLvoid  GLAPIENTRY __glesProfile(GetUniformdv)(__GLcontext *gc,  GLuint program, GLint location, GLdouble * params){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform1d)(__GLcontext *gc, GLint location, GLdouble v0){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform2d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform3d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform4d)(__GLcontext *gc, GLint location, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform1dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform2dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform3dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(Uniform4dv)(__GLcontext *gc, GLint location, GLsizei count, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix2x3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix3x2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix2x4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix4x2dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix3x4dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid  GLAPIENTRY __glesProfile(UniformMatrix4x3dv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLdouble* value){}
+GLvoid GLAPIENTRY __glesProfile(ClampColor)(__GLcontext *gc, GLenum target, GLenum clamp){}
+GLvoid GLAPIENTRY __glesProfile(BeginConditionalRender)(__GLcontext *gc, GLuint id, GLenum mode){}
+GLvoid GLAPIENTRY __glesProfile(EndConditionalRender)(__GLcontext *gc){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI1i)(__GLcontext *gc, GLuint index, GLint x){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI2i)(__GLcontext *gc, GLuint index, GLint x, GLint y){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI3i)(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI1ui)(__GLcontext *gc, GLuint index, GLuint x){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI2ui)(__GLcontext *gc, GLuint index, GLuint x, GLuint y){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI3ui)(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI1iv)(__GLcontext *gc, GLuint index, const GLint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI2iv)(__GLcontext *gc, GLuint index, const GLint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI3iv)(__GLcontext *gc, GLuint index, const GLint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI1uiv)(__GLcontext *gc, GLuint index, const GLuint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI2uiv)(__GLcontext *gc, GLuint index, const GLuint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI3uiv)(__GLcontext *gc, GLuint index, const GLuint *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI4bv)(__GLcontext *gc, GLuint index, const GLbyte *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI4sv)(__GLcontext *gc, GLuint index, const GLshort *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI4ubv)(__GLcontext *gc, GLuint index, const GLubyte *v){}
+GLvoid GLAPIENTRY __glesProfile(VertexAttribI4usv)(__GLcontext *gc, GLuint index, const GLushort *v){}
+GLvoid GLAPIENTRY __glesProfile(FramebufferTexture1D)(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level){}
+GLvoid GLAPIENTRY __glesProfile(FramebufferTexture3D)(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset){}
+GLvoid GLAPIENTRY __glesProfile(PrimitiveRestartIndex)(__GLcontext *gc, GLuint index){}
+GLvoid GLAPIENTRY __glesProfile(GetActiveUniformName)(__GLcontext *gc, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName){}
+GLvoid GLAPIENTRY __glesProfile(MultiDrawArrays)(__GLcontext *gc, GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount){}
+GLvoid GLAPIENTRY __glesProfile(MultiDrawElements)(__GLcontext *gc, GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount){}
 __GLesDispatchTable __glesApiProfileDispatchTable =
 {
     __GLES_API_ENTRIES(__glesProfile)

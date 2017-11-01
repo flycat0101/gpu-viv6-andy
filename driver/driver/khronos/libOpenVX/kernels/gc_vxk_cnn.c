@@ -146,7 +146,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
             }
         }
 
-        if (node->base.context->perfEnable)
+        if (node->base.context->options.enableCNNPerf)
         {
             printf("layer %3d non-zero input:%10d/%10d (%9.6f%%)\n", layerIndex,
                    nonZeroInputCount, inputKernelInfo->orgWeightDepth,
@@ -345,7 +345,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
     outputBuffer->itemCount = outputBuffer->capacity;
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("layer %3d execution time:%10d us\n", layerIndex, gcfVX_PerfEnd((vx_reference)node, start));
 #endif
     }

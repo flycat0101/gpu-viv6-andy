@@ -33,11 +33,9 @@
 extern "C" {
 #endif
 
-#include "HAL/gc_hal.h"
-
-#include "HAL/gc_hal_raster.h"
-
-#include "HAL/gc_hal_base.h"
+#include "gc_hal.h"
+#include "gc_hal_raster.h"
+#include "gc_hal_base.h"
 
     /*******************************************************************************
      *
@@ -127,6 +125,7 @@ extern "C" {
         Viv2DPixmapPtr mNextGpuBusyPixmap;
         /*reference*/
         int mRef;
+        int fdToPixmap;
     };
 
     /*Surface Info*/
@@ -213,6 +212,7 @@ extern "C" {
      ************************************************************************/
     /*Creating and Destroying Functions*/
     Bool CreateSurface(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr toBeUpdatedpPix);
+    Bool CreateSurfaceWithFd(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr pPix, int fd);
     Bool CleanSurfaceBySW(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr pPix);
     Bool WrapSurface(PixmapPtr pPixmap, void * logical, unsigned int physical, Viv2DPixmapPtr pPix, int bytes);
     Bool ReUseSurface(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr toBeUpdatedpPix);

@@ -22,7 +22,7 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_HARDWARE
 
-#define IS_HW_SUPPORT(feature) gcoHARDWARE_IsFeatureAvailable(gcvNULL, (feature))
+#define IS_HW_SUPPORT(feature) (Hardware->features[feature])
 
 gceSTATUS
 gcoHARDWARE_QueryShaderCompilerHwCfg(
@@ -37,6 +37,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     gctUINT32 totalCount = 0;
     gctUINT32 fragmentSizeInKbyte = 0;
     gctUINT32 attribBufSizeInKbyte = 0;
+    gctUINT32 threadCount = 0;
 
     gcmHEADER_ARG("Hardware=0x%x pVscHwCfg=%d", Hardware, pVscHwCfg);
 
@@ -50,7 +51,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
                                            gcvNULL,
                                            &maxVaryingCount,
                                            gcvNULL,
-                                           gcvNULL,
+                                           &threadCount,
                                            gcvNULL,
                                            gcvNULL));
 
@@ -154,15 +155,36 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     }
     if (IS_HW_SUPPORT(gcvFEATURE_USC))
     {
-        attribBufSizeInKbyte = Hardware->config->uscPagesMaxInKbyte
-                - (Hardware->config->l1CacheSizeInKbyte / 4);
+        static const gctFLOAT s_uscCacheRatio[] =
+        {
+            1.0f,
+            0.5f,
+            0.25f,
+            0.125f,
+            0.0625f,
+            0.03125f,
+            0.75f,
+            0.0f,
+        };
+
+        attribBufSizeInKbyte = (gctUINT32)(Hardware->config->uscPagesMaxInKbyte
+              - (Hardware->config->l1CacheSizeInKbyte * s_uscCacheRatio[Hardware->options.uscL1CacheRatio]));
 
         attribBufSizeInKbyte -= fragmentSizeInKbyte;
     }
-
-    pVscHwCfg->maxUSCSizeInKbyte                     = IS_HW_SUPPORT(gcvFEATURE_USC) ?  attribBufSizeInKbyte : 0;
-    pVscHwCfg->maxLocalMemSizeInByte                 = pVscHwCfg->maxUSCSizeInKbyte * 1024;
+    pVscHwCfg->maxUSCAttribBufInKbyte                = IS_HW_SUPPORT(gcvFEATURE_USC) ?  attribBufSizeInKbyte : 0;
+    pVscHwCfg->maxLocalMemSizeInByte                 = attribBufSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize                 = Hardware->config->resultWindowMaxSize;
+
+    /*
+    ** We use a 128 as workgroupsize for computation.
+    ** At runtime, if the real workgroupsize is smaller than 128,
+    ** we need to adjust hwRegCount to make sure that the number of workgroup
+    ** fit the local memory size requirement.
+    */
+    pVscHwCfg->defaultWorkGroupSize                  = 128;
+    pVscHwCfg->maxWorkGroupSize                      = gcmMIN(threadCount, 1024);
+    pVscHwCfg->minWorkGroupSize                      = 1;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0              = IS_HW_SUPPORT(gcvFEATURE_HALTI0);
     pVscHwCfg->hwFeatureFlags.hasHalti1              = IS_HW_SUPPORT(gcvFEATURE_HALTI1);
@@ -255,6 +277,9 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.hasAtomic              = IS_HW_SUPPORT(gcvFEATURE_SHADER_HAS_ATOMIC);
     pVscHwCfg->hwFeatureFlags.supportFullIntBranch   = IS_HW_SUPPORT(gcvFEATURE_FULLLY_SUPPORT_INTEGER_BRANCH);
     pVscHwCfg->hwFeatureFlags.hasDynamicIdxDepFix    = IS_HW_SUPPORT(gcvFEATURE_HALTI5);
+    pVscHwCfg->hwFeatureFlags.supportImgLDSTCLamp    = IS_HW_SUPPORT(gcvFEATURE_SH_IMG_LDST_CLAMP);
+    /* LODQ doesn't return the correct raw LOD value, which can match the spec requirement. */
+    pVscHwCfg->hwFeatureFlags.hasLODQFix             = gcvFALSE;
 
 OnError:
     gcmFOOTER();
@@ -411,8 +436,9 @@ _StallHw(
         {
             uscConfig = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+ 2:0))) | (((gctUINT32) ((gctUINT32) (Hardware->options.uscL1CacheRatio) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))
                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:16) - (0 ? 20:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:16) - (0 ?
  20:16) + 1))))))) << (0 ? 20:16))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ?

@@ -99,9 +99,15 @@ typedef struct __VEGLEXimports
 
     gctBOOL debuggable;
 
+    gctINT  contextFlags;
+
+    gctBOOL  coreProfile;
+
+    gctINT   version;
     /* Device DLL interface */
     void *device;
     gctUINT deviceIndex;
+
 
     /* Operating system dependent data goes here */
     void *other;

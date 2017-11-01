@@ -81,6 +81,59 @@ void VSC_OPTN_SCPPOptions_Usage(
     IN struct _VIR_DUMPER* dumper
     );
 
+/* Long Parameter Optimization Options */
+typedef struct _VSC_OPTN_PARAMOPTOPTIONS
+{
+    /* Must be first element */
+    VSC_OPTN_BASE optnBase;
+    gctUINT longArrayThreshold;
+    gctUINT32 before_shader;
+    gctUINT32 after_shader;
+} VSC_OPTN_ParamOptOptions;
+
+#define VSC_OPTN_ParamOptOptions_GetSwitchOn(option)                VSC_OPTN_GetSwitchOn(&(option)->optnBase)
+#define VSC_OPTN_ParamOptOptions_SetSwitchOn(option, s)             VSC_OPTN_SetSwitchOn(&(option)->optnBase, (s))
+#define VSC_OPTN_ParamOptOptions_GetPassId(option)                  VSC_OPTN_GetPassId(&(option)->optnBase)
+#define VSC_OPTN_ParamOptOptions_SetPassId(option, s)               VSC_OPTN_SetPassId(&(option)->optnBase, (s))
+#define VSC_OPTN_ParamOptOptions_GetTrace(option)                   VSC_OPTN_GetTrace(&(option)->optnBase)
+#define VSC_OPTN_ParamOptOptions_SetTrace(option, t)                VSC_OPTN_SetTrace(&(option)->optnBase, (t))
+
+#define VSC_OPTN_ParamOptOptions_TRACE_INPUT_SHADER                 0x1
+#define VSC_OPTN_ParamOptOptions_TRACE_INPUT_FUNC                   0x2
+#define VSC_OPTN_ParamOptOptions_TRACE_INPUT_BB                     0x4
+#define VSC_OPTN_ParamOptOptions_TRACE_DETAIL                       0x8
+#define VSC_OPTN_ParamOptOptions_TRACE_OUTPUT_BB                    0x10
+#define VSC_OPTN_ParamOptOptions_TRACE_OUTPUT_FUNC                  0x20
+#define VSC_OPTN_ParamOptOptions_TRACE_OUTPUT_SHADER                0x40
+
+#define VSC_OPTN_ParamOptOptions_GetLongArrayThreshold(option)            ((option)->longArrayThreshold)
+#define VSC_OPTN_ParamOptOptions_SetLongArrayThreshold(option, l)         ((option)->longArrayThreshold = (l))
+#define VSC_OPTN_ParamOptOptions_GetBeforeShader(option)            ((option)->before_shader)
+#define VSC_OPTN_ParamOptOptions_SetBeforeShader(option, b)         ((option)->before_shader = (b))
+#define VSC_OPTN_ParamOptOptions_GetAfterShader(option)             ((option)->after_shader)
+#define VSC_OPTN_ParamOptOptions_SetAfterShader(option, a)          ((option)->after_shader = (a))
+
+#define VSC_OPTN_ParamOptOptions_TRACE 0x1
+
+void VSC_OPTN_ParamOptOptions_SetDefault(
+    IN OUT VSC_OPTN_ParamOptOptions* options,
+    IN gctUINT longArrayThreshold
+    );
+
+void VSC_OPTN_ParamOptOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_ParamOptOptions* options
+    );
+
+void VSC_OPTN_ParamOptOptions_Dump(
+    IN VSC_OPTN_ParamOptOptions* options,
+    IN struct _VIR_DUMPER* dumper
+    );
+
+void VSC_OPTN_ParamOptOptions_Usage(
+    IN struct _VIR_DUMPER* dumper
+    );
+
 /* Loop Optimizations Options */
 typedef struct _VSC_OPTN_LOOPOPTSOPTIONS
 {
@@ -88,6 +141,8 @@ typedef struct _VSC_OPTN_LOOPOPTSOPTIONS
     VSC_OPTN_BASE optnBase;
 
     gctUINT32 opts;
+    gctINT32 fullUnrollingFactor;
+    gctINT32 partialUnrollingFactor;
     gctUINT32 before_shader;
     gctUINT32 after_shader;
 } VSC_OPTN_LoopOptsOptions;
@@ -95,35 +150,39 @@ typedef struct _VSC_OPTN_LOOPOPTSOPTIONS
 #define VSC_OPTN_LoopOptsOptions_GetSwitchOn(option)            VSC_OPTN_GetSwitchOn(&(option)->optnBase)
 #define VSC_OPTN_LoopOptsOptions_SetSwitchOn(option, s)         VSC_OPTN_SetSwitchOn(&(option)->optnBase, (s))
 
-#define VSC_OPTN_LoopOptsOptions_OPTS_NONE                      0x0
-#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION            0x1
-#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT            0x2
-#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING            0x4
+#define VSC_OPTN_LoopOptsOptions_OPTS_NONE                              0x0
+#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION                    0x1
+#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT                    0x2
+#define VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING                    0x4
 
-#define VSC_OPTN_LoopOptsOptions_GetOpts(option)                ((option)->opts)
-#define VSC_OPTN_LoopOptsOptions_SetOpts(option, o)             ((option)->opts = (o))
-#define VSC_OPTN_LoopOptsOptions_GetTrace(option)               VSC_OPTN_GetTrace(&(option)->optnBase)
-#define VSC_OPTN_LoopOptsOptions_SetTrace(option, t)            VSC_OPTN_SetTrace(&(option)->optnBase, (t))
+#define VSC_OPTN_LoopOptsOptions_GetOpts(option)                        ((option)->opts)
+#define VSC_OPTN_LoopOptsOptions_SetOpts(option, o)                     ((option)->opts = (o))
+#define VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(option)         ((option)->fullUnrollingFactor)
+#define VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(option, f)      ((option)->fullUnrollingFactor = (f))
+#define VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(option)      ((option)->partialUnrollingFactor)
+#define VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(option, p)   ((option)->partialUnrollingFactor = (p))
+#define VSC_OPTN_LoopOptsOptions_GetTrace(option)                       VSC_OPTN_GetTrace(&(option)->optnBase)
+#define VSC_OPTN_LoopOptsOptions_SetTrace(option, t)                    VSC_OPTN_SetTrace(&(option)->optnBase, (t))
 
-#define VSC_OPTN_LoopOptsOptions_TRACE_SHADER_INPUT             0x1
-#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_INPUT               0x2
-#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_LOOP_ANALYSIS       0x4
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_INPUT     0x8
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION                0x10
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT    0x20
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_INPUT     0x40
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT                0x80
-#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_OUTPUT    0x100
-#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_INPUT        0x200
-#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL                   0x400
-#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_OUTPUT       0x800
-#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_OUTPUT              0x1000
-#define VSC_OPTN_LoopOptsOptions_TRACE_SHADER_OUTPUT            0x2000
+#define VSC_OPTN_LoopOptsOptions_TRACE_SHADER_INPUT                     0x1
+#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_INPUT                       0x2
+#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_LOOP_ANALYSIS               0x4
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_INPUT             0x8
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION                        0x10
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT            0x20
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_INPUT             0x40
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT                        0x80
+#define VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT_FUNC_OUTPUT            0x100
+#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_INPUT                0x200
+#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL                           0x400
+#define VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_OUTPUT               0x800
+#define VSC_OPTN_LoopOptsOptions_TRACE_FUNC_OUTPUT                      0x1000
+#define VSC_OPTN_LoopOptsOptions_TRACE_SHADER_OUTPUT                    0x2000
 
-#define VSC_OPTN_LoopOptsOptions_GetBeforeShader(option)      ((option)->before_shader)
-#define VSC_OPTN_LoopOptsOptions_SetBeforeShader(option, b)   ((option)->before_shader = (b))
-#define VSC_OPTN_LoopOptsOptions_GetAfterShader(option)       ((option)->after_shader)
-#define VSC_OPTN_LoopOptsOptions_SetAfterShader(option, a)    ((option)->after_shader = (a))
+#define VSC_OPTN_LoopOptsOptions_GetBeforeShader(option)               ((option)->before_shader)
+#define VSC_OPTN_LoopOptsOptions_SetBeforeShader(option, b)            ((option)->before_shader = (b))
+#define VSC_OPTN_LoopOptsOptions_GetAfterShader(option)                ((option)->after_shader)
+#define VSC_OPTN_LoopOptsOptions_SetAfterShader(option, a)             ((option)->after_shader = (a))
 
 void VSC_OPTN_LoopOptsOptions_SetDefault(
     IN OUT VSC_OPTN_LoopOptsOptions* options,
@@ -1337,6 +1396,7 @@ void VSC_OPTN_ILFLinkOptions_SetDefault(
     );
 
 #define VSC_OPTN_SCPP_COUNT 1
+#define VSC_OPTN_PARAMOPT_COUNT 1
 #define VSC_OPTN_LoopOpts_COUNT 1
 #define VSC_OPTN_CFO_COUNT 1
 #define VSC_OPTN_UF_AUBO_COUNT 1
@@ -1367,6 +1427,7 @@ typedef struct _VSC_OPTN_OPTIONS
     gctBOOL                     initialized;
     gctBOOL                     reset;
     VSC_OPTN_SCPPOptions        scpp_options[VSC_OPTN_SCPP_COUNT];
+    VSC_OPTN_ParamOptOptions    paopt_options[VSC_OPTN_PARAMOPT_COUNT];
     VSC_OPTN_LoopOptsOptions    loopopts_options[VSC_OPTN_LoopOpts_COUNT];
     VSC_OPTN_CFOOptions         cfo_options[VSC_OPTN_CFO_COUNT];
     VSC_OPTN_UF_AUBOOptions     aubo_options[VSC_OPTN_UF_AUBO_COUNT];
@@ -1398,6 +1459,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
 {
     VSC_PASS_OPTN_TYPE_NONE   = 0,
     VSC_PASS_OPTN_TYPE_SCPP,
+    VSC_PASS_OPTN_TYPE_PAOPT,
     VSC_PASS_OPTN_TYPE_LOOPOPTS,
     VSC_PASS_OPTN_TYPE_CFO,
     VSC_PASS_OPTN_TYPE_AUBO,
@@ -1426,6 +1488,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
 } VSC_PASS_OPTN_TYPE;
 
 #define VSC_OPTN_Options_GetSCPPOptions(option, i)         (&((option)->scpp_options[i]))
+#define VSC_OPTN_Options_GetPARAMOPTOptions(option, i)     (&((option)->paopt_options[i]))
 #define VSC_OPTN_Options_GetLoopOptsOptions(option, i)     (&((option)->loopopts_options[i]))
 #define VSC_OPTN_Options_GetCFOOptions(option, i)          (&((option)->cfo_options[i]))
 #define VSC_OPTN_Options_GetAUBOOptions(option, i)         (&((option)->aubo_options[i]))

@@ -55,7 +55,7 @@ typedef struct DisplayInfoStructRec
 
 typedef struct __GLdeviceStructRec
 {
-    GLboolean (*devUpdateDrawable)(__GLdrawablePrivate *drawable, GLvoid* rtHandle, GLvoid* depthHandle, GLvoid *stencilHandle);
+    GLboolean (*devUpdateDrawable)(__GLdrawablePrivate *drawable);
 
     GLvoid (*devDestroyDrawable)(__GLdrawablePrivate *drawable);
 
@@ -74,13 +74,9 @@ typedef struct __GLdeviceStructRec
     GLvoid (*devInitialize)();
     GLboolean (*devDeinitialize)();
 
-    GLint ( *devDescribePixelFormat)(GLint iPixelFormat, GLuint nBytes, GLvoid* ppfd, GLboolean bDisplayableOnly);
+    GLint (*devDescribePixelFormat)(GLint iPixelFormat, GLuint nBytes, GLvoid* ppfd, GLboolean bDisplayableOnly);
     GLboolean (*devSetPixelFormat)(GLint iPixelFormat);
     DisplayInfoStruct DisplayInfo;
-#endif
-
-#if defined(_LINUX_) && defined(OPENGL40)
-    GLuint (*devGetESVersion)();
 #endif
 
     GLboolean IsRotated;

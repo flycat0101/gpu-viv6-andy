@@ -55,6 +55,12 @@ typedef enum _VSC_LIB_LINK_TYPE
     /* frontfacing is counter clockwise, make to NOT Facing
      * value to make HW happy */
     VSC_LIB_LINK_TYPE_FRONTFACING_CCW               = 3,
+
+    /*
+    ** For non-polygon primitive, the value of gl_FrontFacing should be always TRUE,
+    ** but for some cases HW can't meet this requirement, so compiler forces change it to TRUE.
+    */
+    VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT       = 4,
 }VSC_LIB_LINK_TYPE;
 
 typedef enum _VSC_RES_OP_BIT

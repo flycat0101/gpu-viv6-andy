@@ -494,7 +494,7 @@ _noPrevDefineForTemp(
     )
 {
     gcOPT_CODE iterCode;
-    const gctUINT16 tempIndex = Code->instruction.tempIndex;
+    const gctUINT32 tempIndex = Code->instruction.tempIndex;
 
     if (Code->prevDefines)
         return gcvFALSE;
@@ -1779,7 +1779,7 @@ gcOpt_OptimizeMOVInstructions(
                           userCode->instruction.source0Indexed == code->instruction.tempIndex);
 
                 userCode->instruction.source0 = gcmSL_SOURCE_SET(userCode->instruction.source0, Indexed, indexed);
-                userCode->instruction.source0Indexed = code->instruction.source0Index;
+                userCode->instruction.source0Indexed = (gctUINT16)code->instruction.source0Index;
                 /* Update data flow. */
                 gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer, &userCode->dependencies0, code));
 
@@ -2821,7 +2821,7 @@ _findRerollPattern(
 
     if (gcmSL_OPCODE_GET(Code->instruction.opcode, Opcode) == gcSL_LOAD)
     {
-        gctINT       loadResultTemp;
+        gctUINT32    loadResultTemp;
         gctINT       patternLength = 0;
         /* 1. legality check for load instruction */
         /*    now only handle case that offset is constant */
@@ -2984,7 +2984,7 @@ _findNextRerollPattern(
 
     if (gcmSL_OPCODE_GET(Code->instruction.opcode, Opcode) == gcSL_LOAD)
     {
-        gctINT       loadResultTemp;
+        gctUINT      loadResultTemp;
         gctINT       patternLength = 0;
 
         /* 1. legality check for load instruction */
@@ -3297,7 +3297,7 @@ _createIncreaseLoopIndex(
                       | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
                       | gcmSL_TARGET_SET(0, Format, Info->indexFormat);
 
-    inst->tempIndex   = (gctUINT16)(Optimizer->tempCount+1);  /* use the next temp register */
+    inst->tempIndex   = (Optimizer->tempCount+1);  /* use the next temp register */
     inst->tempIndexed = 0;
 
     /* source 0: */
@@ -3305,7 +3305,7 @@ _createIncreaseLoopIndex(
                          | gcmSL_SOURCE_SET(0, Indexed,gcSL_NOT_INDEXED)
                          | gcmSL_SOURCE_SET(0, Format, Info->indexFormat)
                          | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX);
-    inst->source0Index   = (gctUINT16)Info->loopIndex;
+    inst->source0Index   = Info->loopIndex;
     inst->source0Indexed = 0;
 
     /* source 1: stride */
@@ -3344,7 +3344,7 @@ _createMovToLoopIndex(
                       | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
                       | gcmSL_TARGET_SET(0, Format, Info->indexFormat);
 
-    inst->tempIndex   = (gctUINT16)Info->loopIndex;
+    inst->tempIndex   = Info->loopIndex;
     inst->tempIndexed = 0;
 
     gcmASSERT((gctUINT32) Info->indexFormat == gcmSL_TARGET_GET(intmTempInst->temp, Format));
@@ -3391,7 +3391,7 @@ _createConditionJump(
                       | gcmSL_TARGET_SET(0, Condition, gcSL_LESS_OR_EQUAL)
                       | gcmSL_TARGET_SET(0, Format, Info->indexFormat);
 
-    inst->tempIndex   = (gctUINT16)LoopStartCode->id;  /* jump to loop start */
+    inst->tempIndex   = LoopStartCode->id;  /* jump to loop start */
     inst->tempIndexed = 0;
 
     /* source 0: */
@@ -3400,7 +3400,7 @@ _createConditionJump(
                          | gcmSL_SOURCE_SET(0, Format, Info->indexFormat)
                          | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX);
 
-    inst->source0Index   = (gctUINT16)Info->loopIndex;
+    inst->source0Index   = Info->loopIndex;
     inst->source0Indexed = 0;
 
     /* source 1: end index */
@@ -3438,7 +3438,7 @@ _fixLoopBody(
     IN      gcOPT_CODE       LoopGenResultCode
     )
 {
-    gctINT loadResultTemp;
+    gctUINT32 loadResultTemp;
     /* only handle loop start with gcSL_LOAD case now */
     gcmASSERT(gcmSL_OPCODE_GET(LoopStart->instruction.opcode, Opcode) == gcSL_LOAD);
 
@@ -3446,13 +3446,13 @@ _fixLoopBody(
     if (gcmSL_INDEX_GET(LoopGenResultCode->instruction.source0Index, Index) == loadResultTemp)
     {
         LoopGenResultCode->instruction.source1Index =
-                                      (gctUINT16)Info->lastReductionTempIndex;
+                                     Info->lastReductionTempIndex;
     }
     else
     {
         gcmASSERT(LoopGenResultCode->instruction.source1Index == loadResultTemp);
         LoopGenResultCode->instruction.source0Index =
-                                      (gctUINT16)Info->lastReductionTempIndex;
+                                      Info->lastReductionTempIndex;
     }
     return ;
 }
@@ -3691,9 +3691,31 @@ static gctBOOL
 _updateIndex(
     IN gcOPTIMIZER    Optimizer,
     IN gcOPT_FUNCTION Function,
-    IN gctINT         OldTempIndexStart,
-    IN gctINT         TempIndexCount,
-    IN gctINT         NewTempIndexStart,
+    IN gctUINT32      OldTempIndexStart,
+    IN gctUINT32      TempIndexCount,
+    IN gctUINT32      NewTempIndexStart,
+    OUT gctUINT32 *   IndexPtr
+    )
+{
+    if (*IndexPtr >= OldTempIndexStart &&
+        *IndexPtr < OldTempIndexStart + TempIndexCount &&
+        _isTempRegLocal(Optimizer, Function, *IndexPtr))
+    {
+        gctINT  tempOffset = NewTempIndexStart - OldTempIndexStart;
+        /* Adjust temporary register count. */
+        *IndexPtr +=  tempOffset;
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL
+_updateIndexed(
+    IN gcOPTIMIZER    Optimizer,
+    IN gcOPT_FUNCTION Function,
+    IN gctUINT        OldTempIndexStart,
+    IN gctUINT        TempIndexCount,
+    IN gctUINT        NewTempIndexStart,
     OUT gctUINT16 *   IndexPtr
     )
 {
@@ -3708,7 +3730,6 @@ _updateIndex(
     }
     return gcvFALSE;
 }
-
 /* return TRUE if the Code has tempIndex renamed */
 static gctBOOL
 _renameTempIndex(
@@ -3758,7 +3779,7 @@ _renameTempIndex(
             if (gcmSL_TARGET_GET(inst->temp, Indexed) != gcSL_NOT_INDEXED)
             {
                 /* fix indexed register */
-                if (_updateIndex(Optimizer, Function, OldTempIndexStart,
+                if (_updateIndexed(Optimizer, Function, OldTempIndexStart,
                         TempIndexCount, NewTempIndexStart,&inst->tempIndexed))
                 {
                     renamed = gcvTRUE;
@@ -3772,7 +3793,7 @@ _renameTempIndex(
             for (i = 0; i < 2; i++)
             {
                 gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
-                gctUINT16 * index  = (i==0) ? &inst->source0Index
+                gctUINT32 * index  = (i==0) ? &inst->source0Index
                                             : &inst->source1Index;
 
                 if (RenameInput)
@@ -3812,7 +3833,7 @@ _renameTempIndex(
                                                  : &inst->source1Indexed;
 
                     /* fix indexed register */
-                    if (_updateIndex(Optimizer, Function, OldTempIndexStart,
+                    if (_updateIndexed(Optimizer, Function, OldTempIndexStart,
                             TempIndexCount, NewTempIndexStart,indexed))
                     {
                         renamed = gcvTRUE;
@@ -3939,7 +3960,7 @@ _RemapTempIndexForExpandFunction(
                 }
                 if (gcmSL_TARGET_GET(code->instruction.temp, Enable) != gcSL_ENABLE_NONE)
                 {
-                    gctUINT16   tempIndex = code->instruction.tempIndex;
+                    gctUINT32   tempIndex = code->instruction.tempIndex;
 
                     /* check against each argument */
                     for (j = 0; j < (gctINT)Function->argumentCount; j++)
@@ -3996,7 +4017,7 @@ _RemapTempIndexForExpandFunction(
 
                         if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
                         {
-                            gctUINT16 * index  = (i==0) ? &inst->source0Index
+                            gctUINT32 * index  = (i==0) ? &inst->source0Index
                                                         : &inst->source1Index;
                             /* check against each argument */
                             for (j = 0; j < (gctINT)Function->argumentCount; j++)
@@ -4109,7 +4130,7 @@ _ExpandOneFunctionCall(
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_RET)
         {
             gcmSL_OPCODE_UPDATE(code->instruction.opcode, Opcode, gcSL_JMP);
-            code->instruction.tempIndex = (gctUINT16) codeNext->id;
+            code->instruction.tempIndex = codeNext->id;
 
             /* Set caller and callee. */
             code->callee = codeNext;
@@ -4151,6 +4172,11 @@ _ExpandOneFunctionCall(
         !WillRemoveFunction &&
         gcmOPT_hasFeature(FB_INLINE_RENAMETEMP)
         && !inlineAllFunctionForCTS
+        /* if a function has its callee be inlined, its tempRegCount may be bloated to a very big number
+         * which can cause rename to even bigger number, it may exceed the gcSL UR limits (65536/4),
+         * to avoid this, just disable rename for the inlined body */
+        && (!Function->shaderFunction ||
+            !(IsFunctionHasBigGapInTempReg(Function->shaderFunction) && RealCallerCount > 2 && gcSHADER_GetTempCount(Optimizer->shader) > 10000) )
         )
     {
         gctINT oldTempIndexStart = Function->tempIndexStart;
@@ -4199,6 +4225,10 @@ _ExpandOneFunctionCall(
 
         if (callerFunction->shaderFunction)
         {
+            if (tempCount > callerFunction->shaderFunction->tempIndexCount + 400)
+            {
+                SetFunctionFlags(callerFunction->shaderFunction, gcvFUNC_HAS_TEMPREG_BIGGAP);
+            }
             callerFunction->shaderFunction->tempIndexStart = tempStart;
             callerFunction->shaderFunction->tempIndexEnd = tempEnd;
             callerFunction->shaderFunction->tempIndexCount = tempCount;
@@ -4243,7 +4273,7 @@ _GetInlineBudget(
         }
         else
         {
-            instMax = 512 * gcmOPT_INLINELEVEL();
+            instMax = 1024 * gcmOPT_INLINELEVEL();
         }
     }
     else
@@ -5241,7 +5271,7 @@ static gceSTATUS _EvaluateConstantInstruction(
     IN gcOPTIMIZER Optimizer,
     IN gcOPT_CODE Code,
     OUT gctSOURCE_t *SourceUint,
-    OUT gctUINT16 * SourceIndex,
+    OUT gctUINT32 * SourceIndex,
     OUT gctUINT16 * SourceIndexed,
     OUT gctBOOL * NeedToPropagate
     )
@@ -5252,7 +5282,7 @@ static gceSTATUS _EvaluateConstantInstruction(
     gcOPT_CODE code = Code;
     gctSOURCE_t source, source1;
     gctSOURCE_t sourceUint = 0;
-    gctUINT16 sourceIndex = 0;
+    gctUINT32 sourceIndex = 0;
     gctUINT16 sourceIndexed = 0;
     gctUINT32 value = 0, value0, value1;
     gcSL_FORMAT format0, format1, targetFormat;
@@ -6212,14 +6242,14 @@ static gctBOOL _IsCodeMultiDependencies(
     IN gcOPT_LIST DepList,
     IN gcOPT_CODE Code,
     IN gctSOURCE_t SourceUint,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT16 SourceIndexed,
     OUT gctBOOL *RemoveAllDep
     )
 {
     gctBOOL isMulti = gcvTRUE;
     gctSOURCE_t sourceUint = 0;
-    gctUINT16 sourceIndex = 0;
+    gctUINT32 sourceIndex = 0;
     gctUINT16 sourceIndexed = 0;
     gctBOOL needToPropagate = gcvFALSE;
     gctBOOL allDepSameValue = gcvTRUE;
@@ -6549,11 +6579,11 @@ gcOpt_PropagateArgumentConstants(
                                                 | gcmSL_TARGET_SET(0, Precision, optFunction->arguments[arg].precision)
                                                 | gcmSL_TARGET_SET(0, Format, (funcInfo[INDEX(tempIndex, channel)].Value.Format)) ;
                     movCode->instruction.tempIndexed = 0;
-                    movCode->instruction.tempIndex = (gctUINT16)tempIndex;
+                    movCode->instruction.tempIndex = tempIndex;
 
                     movCode->instruction.source0        = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                         | gcmSL_SOURCE_SET(0, Format, funcInfo[INDEX(tempIndex, channel)].Value.Format);
-                    movCode->instruction.source0Index   = (gctUINT16 ) (funcInfo[INDEX(tempIndex, channel)].Value.v & 0xFFFF);
+                    movCode->instruction.source0Index   = (funcInfo[INDEX(tempIndex, channel)].Value.v & 0xFFFF);
                     movCode->instruction.source0Indexed = (gctUINT16) (funcInfo[INDEX(tempIndex, channel)].Value.v >> 16);
 
                     ++constPropagated;
@@ -6613,7 +6643,7 @@ gcOpt_PropagateConstants(
     gcOPT_CODE code;
     gctUINT constPropagated = 0;
     gctSOURCE_t sourceUint = 0;
-    gctUINT16 sourceIndex = 0;
+    gctUINT32 sourceIndex = 0;
     gctUINT16 sourceIndexed = 0;
     gctBOOL needToPropagate;
     gctBOOL needRebuildFlow = gcvFALSE;
@@ -6925,7 +6955,7 @@ gcOpt_PropagateConstants(
                                                   negative indexing for sampler */
 
                     codeUser->instruction.source0Indexed =
-                        gcmSL_INDEX_SET(codeUser->instruction.source0Indexed, Index, indexedValue);
+                        (gctUINT16)gcmSL_INDEX_SET(codeUser->instruction.source0Indexed, Index, indexedValue);
 
                     /* Remove dependency and user. */
                     if (!useOnBothSource0AndSource1)
@@ -6986,14 +7016,14 @@ gcOpt_PropagateConstants(
                     /* This is a invalid index, it may be skip by any previous JMPs. */
                     if (variable && variable->arraySize > 1)
                     {
-                        if ((codeUser->instruction.source0Index + (gctUINT16)indexedValue) >=
-                            (variable->tempIndex + (gctUINT16)variable->arraySize))
+                        if ((codeUser->instruction.source0Index + indexedValue) >=
+                            (variable->tempIndex + variable->arraySize))
                         {
                             validIndex = gcvFALSE;
                         }
                     }
 
-                    if ((codeUser->instruction.source0Index + (gctUINT16)indexedValue) >= (gctUINT16)Optimizer->tempCount)
+                    if ((codeUser->instruction.source0Index + indexedValue) >= Optimizer->tempCount)
                     {
                         validIndex = gcvFALSE;
                     }
@@ -7006,8 +7036,7 @@ gcOpt_PropagateConstants(
                         gcmSL_SOURCE_SET(source, Indexed, gcSL_NOT_INDEXED);
                     codeUser->instruction.source0Indexed = 0;
 
-                    codeUser->instruction.source0Index +=
-                                            (gctUINT16)indexedValue;
+                    codeUser->instruction.source0Index += indexedValue;
 
                     /* Remove dependency and user. */
                     if (!useOnBothSource0AndSource1)
@@ -7089,7 +7118,7 @@ gcOpt_PropagateConstants(
                     gcSL_FORMAT  valueFormat;
                     /* the indexed value is constant, change the sampler
                     * index to orig_sampler_index + constant */
-                    gcmASSERT(codeUser->instruction.source1Indexed ==
+                    gcmASSERT((gctUINT)codeUser->instruction.source1Indexed ==
                         code->instruction.tempIndex );
                     /* set source1 as not indexed */
                     codeUser->instruction.source1 =
@@ -7126,7 +7155,7 @@ gcOpt_PropagateConstants(
                                                   negative indexing for sampler */
 
                     codeUser->instruction.source1Indexed =
-                        gcmSL_INDEX_SET(codeUser->instruction.source1Indexed, Index, indexedValue);
+                        (gctUINT16)gcmSL_INDEX_SET(codeUser->instruction.source1Indexed, Index, indexedValue);
 
                     /* Remove dependency and user. */
                     if (!useOnBothSource0AndSource1)
@@ -7187,14 +7216,14 @@ gcOpt_PropagateConstants(
                     /* This is a invalid index, it may be skip by any previous JMPs. */
                     if (variable && variable->arraySize > 1)
                     {
-                        if ((codeUser->instruction.source1Index + (gctUINT16)indexedValue) >=
-                            (variable->tempIndex + (gctUINT16)variable->arraySize))
+                        if ((codeUser->instruction.source1Index + indexedValue) >=
+                            (variable->tempIndex + variable->arraySize))
                         {
                             validIndex = gcvFALSE;
                         }
                     }
 
-                    if ((codeUser->instruction.source1Index + (gctUINT16)indexedValue) >= (gctUINT16)Optimizer->tempCount)
+                    if ((codeUser->instruction.source1Index + indexedValue) >= Optimizer->tempCount)
                     {
                         validIndex = gcvFALSE;
                     }
@@ -7208,8 +7237,7 @@ gcOpt_PropagateConstants(
                     codeUser->instruction.source1Indexed = 0;
 
                     /* set the sampler index */
-                    codeUser->instruction.source1Index +=
-                                            (gctUINT16)indexedValue;
+                    codeUser->instruction.source1Index += indexedValue;
 
                     /* Remove dependency and user. */
                     if (!useOnBothSource0AndSource1)
@@ -7272,7 +7300,7 @@ _GetLTCValue(
     gctBOOL match = gcvTRUE;
     gcSHADER shader = Optimizer->shader;
     gctSOURCE_t source = (Source == 0) ? Code->instruction.source0 : Code->instruction.source1;
-    gctUINT16 sourceIndex = (Source == 0) ? Code->instruction.source0Index : Code->instruction.source1Index;
+    gctUINT32 sourceIndex = (Source == 0) ? Code->instruction.source0Index : Code->instruction.source1Index;
     gcOPT_LIST  depList = (Source == 0) ? Code->dependencies0 : Code->dependencies1;
     gcSL_TYPE type = gcmSL_SOURCE_GET(source, Type);
     gcSL_SWIZZLE swizzle[4];
@@ -8053,8 +8081,7 @@ gcOpt_ConditionalizeCode(
                     /* update caller-callee relation */
                     callerCode->callee = code;
                     /* update label in instruction */
-                    gcmSL_JMP_TARGET(&(callerCode->instruction)) =
-                                                   (gctUINT16)code->id;
+                    gcmSL_JMP_TARGET(&(callerCode->instruction)) = code->id;
                 }
                 /* move theUserCode's caller list to new code */
                 gcmASSERT(code->callers == gcvNULL);
@@ -8112,7 +8139,7 @@ _analyzeGlPositionDependency(
     IN gcOPTIMIZER Optimizer
     )
 {
-    gctINT      posTemp;
+    gctINT32    posTemp;
     gcOPT_CODE  code, nextCode;
 
 
@@ -8140,7 +8167,7 @@ _analyzeGlPositionDependency(
             if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) !=
                                                         gcSL_NOT_INDEXED)
                 continue;
-            if (code->instruction.tempIndex == posTemp &&
+            if (code->instruction.tempIndex == (gctUINT32)posTemp &&
                 (enable & gcSL_ENABLE_Z)) {
                 /* the gl_Position.z is enabled, check if is depended on
                    gl_Position.w directly or indirectly:
@@ -8166,7 +8193,7 @@ _analyzeGlPositionDependency(
                            gcmSL_SOURCE_GET(code1->instruction.source0, Type) == gcSL_TEMP)
                     {
                         /* get the source register*/
-                        gctUINT16 srcTemp = code1->instruction.source0Index;
+                        gctUINT32 srcTemp = code1->instruction.source0Index;
                         /* get the swizzle of the enabled component */
                         gctUINT16 srcSwizzle1 =
                             _GetSwizzle(code1Enable1 == gcSL_ENABLE_X ? gcSL_SWIZZLE_X :
@@ -8180,7 +8207,7 @@ _analyzeGlPositionDependency(
                                         code1Enable2 == gcSL_ENABLE_Z ? gcSL_SWIZZLE_Z :
                                                                        gcSL_SWIZZLE_W,
                                         code1->instruction.source0);
-                        if ((srcTemp == posTemp && srcSwizzle1 == gcSL_SWIZZLE_W) ||
+                        if ((srcTemp == (gctUINT32)posTemp && srcSwizzle1 == gcSL_SWIZZLE_W) ||
                             (srcSwizzle1 == srcSwizzle2))
                         {
                             /* found the gl_position.z depends on gl_position.w */
@@ -8193,7 +8220,7 @@ _analyzeGlPositionDependency(
                            gcmSL_SOURCE_GET(code1->instruction.source0, Type) == gcSL_TEMP)
                     {
                         /* get the source register*/
-                        gctUINT16 srcTemp = code1->instruction.source0Index;
+                        gctUINT32 srcTemp = code1->instruction.source0Index;
                         /* get the swizzle of the enabled component */
                         gctUINT16 srcSwizzle =
                             _GetSwizzle(code1Enable1 == gcSL_ENABLE_X ? gcSL_SWIZZLE_X :
@@ -8201,7 +8228,7 @@ _analyzeGlPositionDependency(
                                         code1Enable1 == gcSL_ENABLE_Z ? gcSL_SWIZZLE_Z :
                                                                         gcSL_SWIZZLE_W,
                                         code1->instruction.source0);
-                        if (srcTemp == posTemp && srcSwizzle == gcSL_SWIZZLE_W )
+                        if (srcTemp == (gctUINT32)posTemp && srcSwizzle == gcSL_SWIZZLE_W )
                         {
                             /* found the gl_position.z depends on gl_position.w */
                             dependOnW = gcvTRUE;
@@ -8231,7 +8258,7 @@ _analyzeGlPositionDependency(
                             gcmSL_SOURCE_GET(src0, Indexed) == gcSL_NOT_INDEXED)
                         {
                             /* get the source register*/
-                            gctUINT16 srcTemp = code1->instruction.source0Index;
+                            gctUINT32 srcTemp = code1->instruction.source0Index;
                             /* get the swizzle of the enabled component */
                             gctUINT16 srcSwizzle =
                                 _GetSwizzle(code1Enable1 == gcSL_ENABLE_X ? gcSL_SWIZZLE_X :
@@ -8239,7 +8266,7 @@ _analyzeGlPositionDependency(
                                             code1Enable1 == gcSL_ENABLE_Z ? gcSL_SWIZZLE_Z :
                                                                             gcSL_SWIZZLE_W,
                                             code1->instruction.source0);
-                            if (srcTemp == posTemp && srcSwizzle == gcSL_SWIZZLE_W )
+                            if (srcTemp == (gctUINT32)posTemp && srcSwizzle == gcSL_SWIZZLE_W )
                             {
                                 /* found the gl_position.z depends on gl_position.w */
                                 dependOnW = gcvTRUE;
@@ -8252,7 +8279,7 @@ _analyzeGlPositionDependency(
                             gcmSL_SOURCE_GET(src1, Indexed) == gcSL_NOT_INDEXED)
                         {
                             /* get the source register*/
-                            gctUINT16 srcTemp = code1->instruction.source1Index;
+                            gctUINT32 srcTemp = code1->instruction.source1Index;
                             /* get the swizzle of the enabled component */
                             gctUINT16 srcSwizzle =
                                 _GetSwizzle(code1Enable1 == gcSL_ENABLE_X ? gcSL_SWIZZLE_X :
@@ -8260,7 +8287,7 @@ _analyzeGlPositionDependency(
                                             code1Enable1 == gcSL_ENABLE_Z ? gcSL_SWIZZLE_Z :
                                                                             gcSL_SWIZZLE_W,
                                             code1->instruction.source1);
-                            if (srcTemp == posTemp && srcSwizzle == gcSL_SWIZZLE_W )
+                            if (srcTemp == (gctUINT32)posTemp && srcSwizzle == gcSL_SWIZZLE_W )
                             {
                                 /* found the gl_position.z depends on gl_position.w */
                                 dependOnW = gcvTRUE;
@@ -8290,7 +8317,7 @@ _InsertInitializerInstAtEntry(
     )
 {
     gctBOOL instAdded = gcvFALSE;
-    gctUINT16 tempIndex = (Source == 0)
+    gctUINT32 tempIndex = (Source == 0)
                                 ? Code->instruction.source0Index : Code->instruction.source1Index;
     gcOPT_CODE beginCode;
     gctSOURCE_t source = (Source == 0)
@@ -9926,7 +9953,7 @@ gcOpt_MergeBranchCode(
             else
             {
                 mergedCode[i]->instruction.temp = gcmSL_TARGET_SET(mergedCode[i]->instruction.temp, Condition, reversedCond);
-                mergedCode[i]->instruction.tempIndex = (gctUINT16)(lastCode->id + 1);
+                mergedCode[i]->instruction.tempIndex = (lastCode->id + 1);
                 mergedCode[i]->callee = lastCode->next;
                 gcmVERIFY_OK(gcOpt_AddCodeToList(Optimizer, &mergedCode[i]->callee->callers, mergedCode[i]));
             }
@@ -10600,11 +10627,11 @@ gcOptimizeShader(
         gcmVERIFY_OK(_removeUnusedArguments(Shader));
     }
 
-    if (dumpOptimizer)
-    {
-        gcOpt_Dump(LogFile, "Final shader after gcOptimizeShader()", gcvNULL, Shader);
-        gcOpt_DumpMessage(gcvNULL, LogFile, "gcOptimizeShader: end\n");
-    }
+        if (dumpOptimizer)
+        {
+            gcOpt_Dump(LogFile, "Final shader after gcOptimizeShader()", gcvNULL, Shader);
+            gcOpt_DumpMessage(gcvNULL, LogFile, "gcOptimizeShader: end\n");
+        }
     /*gcOpt_GenShader(Shader, LogFile);*/
 
     /* Return the status. */

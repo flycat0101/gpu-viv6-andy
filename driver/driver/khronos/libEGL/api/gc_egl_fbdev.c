@@ -51,6 +51,7 @@ typedef struct _FBPixmap *  PlatformPixmapType;
 /* Structure that defines a display. */
 struct _FBDisplay
 {
+    uint32_t                signature;
     gctINT                  index;
     gctINT                  file;
     gctSIZE_T               physical;
@@ -271,6 +272,8 @@ fbdev_GetDisplayByIndex(
         {
             break;
         }
+
+        display->signature = gcmCC('F', 'B', 'D', 'V');
 
         display->index    = DisplayIndex;
         display->memory   = gcvNULL;
@@ -2578,7 +2581,11 @@ _QueryWindowInfo(
                                      sizeof (fbdevDISPLAY_INFO),
                                      &dInfo);
 
+#ifdef EMULATOR
+    if (gcvTRUE)
+#else
     if (gcmIS_ERROR(status))
+#endif
     {
         Info->fbDirect     = EGL_FALSE;
         Info->logical      = gcvNULL;
@@ -2937,8 +2944,17 @@ _BindWindow(
             case gcvSURF_X8R8G8B8:
             case gcvSURF_A4R4G4B4:
             case gcvSURF_X4R4G4B4:
-            case gcvSURF_R5G6B5:
                 formatSupported = EGL_TRUE;
+                break;
+            case gcvSURF_R5G6B5:
+                if (Surface->config.alphaSize == 0)
+                {
+                    formatSupported = EGL_TRUE;
+                }
+                else
+                {
+                    formatSupported = EGL_FALSE;
+                }
                 break;
             default:
                 formatSupported = EGL_FALSE;

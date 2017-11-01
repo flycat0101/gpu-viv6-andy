@@ -101,7 +101,7 @@ VX_PRIVATE_API vx_uint32 vxComputePatchOffset(vx_uint32 x, vx_uint32 y, const vx
             + patchAddr->stride_y * ((patchAddr->scale_y * y) / VX_SCALE_UNITY);
 }
 
-VX_PRIVATE_API vx_uint32 vxComputePlaneOffset(vx_image image, vx_uint32 x, vx_uint32 y, vx_uint32 planeIndex)
+VX_INTERNAL_API vx_uint32 vxComputePlaneOffset(vx_image image, vx_uint32 x, vx_uint32 y, vx_uint32 planeIndex)
 {
     vxmASSERT(image);
     vxmASSERT(planeIndex < image->memory.planeCount);
@@ -325,7 +325,21 @@ VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
     }
     else if (image->parent != VX_NULL)
     {
+        vx_uint32 planeIndex;
         vxoReference_Release((vx_reference_ptr)&image->parent, VX_TYPE_IMAGE, VX_REF_INTERNAL);
+        for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+        {
+            image->memory.logicals[planeIndex]                  = VX_NULL;
+            image->memory.strides[planeIndex][VX_DIM_CHANNEL]   = 0;
+            image->memory.strides[planeIndex][VX_DIM_X]         = 0;
+            image->memory.strides[planeIndex][VX_DIM_Y]         = 0;
+
+            if (image->memory.writeLocks[planeIndex] != VX_NULL)
+            {
+                vxDestroyMutex(image->memory.writeLocks[planeIndex]);
+                image->memory.writeLocks[planeIndex] = VX_NULL;
+            }
+        }
     }
     else if (image->importType != VX_MEMORY_TYPE_NONE)
     {
@@ -413,15 +427,34 @@ VX_INTERNAL_API void vxoImage_FreeMemory(vx_image image)
 
 VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
 {
+#if defined(WIN32)
+    vx_uint32 planeIndex;
+
     vxmASSERT(image);
 
-#if defined(WIN32)
-
-    /* For CTS, vxCreateImageFromChannel.ChannelFromHandle/ */
+    /* For CTS, vxCreateImageFromHandle */
     image->memory.allocated = vx_true_e;
 
+    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+    {
+        if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
+        {
+            goto OnError;
+        }
+    }
     return vx_true_e;
+OnError:
+    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+    {
+        if (image->memory.writeLocks[planeIndex] != VX_NULL)
+        {
+            vxDestroyMutex(image->memory.writeLocks[planeIndex]);
+            image->memory.writeLocks[planeIndex]  = VX_NULL;
+        }
+    }
+    return vx_false_e;
 #else
+    vxmASSERT(image);
     return vxoMemory_WrapUserMemory(image->base.context, &image->memory);
 #endif
 }
@@ -512,6 +545,8 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
         subImage->memory.dims[planeIndex][VX_DIM_X] = subImage->width;
         subImage->memory.dims[planeIndex][VX_DIM_Y] = subImage->height;
         subImage->memory.logicals[planeIndex]       = &image->memory.logicals[planeIndex][offset];
+
+        vxCreateMutex(&subImage->memory.writeLocks[planeIndex]);
 
         /* keep offset to allow vxSwapImageHandle update ROI pointers*/
         subImage->memory.offset[planeIndex]            = offset;
@@ -1098,10 +1133,6 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
         image->memory.strides[planeIndex][VX_DIM_X]         = addrs[planeIndex].stride_x;
         image->memory.strides[planeIndex][VX_DIM_Y]         = addrs[planeIndex].stride_y;
 
-        if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
-        {
-            goto OnError;
-        }
     }
 
     if (!vxoImage_WrapUserMemory(image)) goto OnError;
@@ -1109,15 +1140,6 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
     return image;
 
 OnError:
-    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
-    {
-        if (image->memory.writeLocks[planeIndex] != VX_NULL)
-        {
-            vxDestroyMutex(image->memory.writeLocks[planeIndex]);
-            image->memory.writeLocks[planeIndex]  = VX_NULL;
-        }
-    }
-
     vxReleaseImage(&image);
 
     return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
@@ -1623,7 +1645,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
     */
     if ((image->memory.logicals[0] == NULL) && (vxoImage_AllocateMemory(image) == vx_false_e))
     {
-        vxError("No memory!\n");
+        vxError("No memory1!\n");
         status = VX_ERROR_NO_MEMORY;
         goto exit;
     }
@@ -1800,7 +1822,7 @@ exit:
     return status;
 } /* vxCopyImagePatch() */
 
-
+#if MAP_UNMAP_REFERENCE
 VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
     vx_image image,
     const vx_rectangle_t* rect,
@@ -2046,7 +2068,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
 
                         vx_uint32 len = vxComputePatchRangeSize((rect.end_x - rect.start_x), &addr);
 
-                        vxTrace(VX_TRACE_MEMORY, "%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, srcOffset, pSrc, dstOffset, len);
+                        vxError("%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, srcOffset, pSrc, dstOffset, len);
 
                         if (pDstLine && pSrc)
                             memcpy(pDstLine, pSrcLine, len);
@@ -2082,6 +2104,172 @@ exit:
 
     return status;
 } /* vxUnmapImagePat*/
+#else
+VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
+    vx_image image,
+    const vx_rectangle_t* rect,
+    vx_uint32 plane_index,
+    vx_map_id* map_id,
+    vx_imagepatch_addressing_t* addr,
+    void** ptr,
+    vx_enum usage,
+    vx_enum mem_type,
+    vx_uint32 flags)
+{
+    vx_uint32 start_x = rect ? rect->start_x : 0u;
+    vx_uint32 start_y = rect ? rect->start_y : 0u;
+    vx_uint32 end_x   = rect ? rect->end_x : 0u;
+    vx_uint32 end_y   = rect ? rect->end_y : 0u;
+    vx_bool zero_area = ((((end_x - start_x) == 0) || ((end_y - start_y) == 0)) ? vx_true_e : vx_false_e);
+    vx_status status = VX_FAILURE;
+
+    /* bad parameters */
+    if ((rect == NULL) || (map_id == NULL) || (addr == NULL) || (ptr == NULL) )
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+    }
+
+    /* bad references */
+    if (!vxoImage_IsValid(image))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        goto exit;
+    }
+
+    /* determine if virtual before checking for memory */
+    if (image->base.isVirtual == vx_true_e)
+    {
+        if (image->base.accessible == vx_false_e)
+        {
+            /* User tried to access a "virtual" image. */
+            vxError("Can not access a virtual image\n");
+            status = VX_ERROR_OPTIMIZED_AWAY;
+            goto exit;
+        }
+        /* framework trying to access a virtual image, this is ok. */
+    }
+
+    /* more bad parameters */
+    if (zero_area == vx_false_e &&
+        (/*(plane_index >= image->memory.nptrs) ||*/
+        (plane_index >= image->planeCount) ||
+        (start_x >= end_x) ||
+        (start_y >= end_y) ||
+        (end_x > image->width) ||
+        (end_y > image->height)
+        ))
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+    }
+
+    /* verify has not been call yet or will not be called (immediate mode)
+    * this is a trick to "touch" an image so that it can be created
+    */
+    if ((image->memory.logicals[0] == NULL) && (vxoImage_AllocateMemory(image) == vx_false_e))
+    {
+        vxError("No memory2!\n");
+        status = VX_ERROR_NO_MEMORY;
+        goto exit;
+    }
+
+    /* can't write to constant */
+    if ((image->isUniform == vx_true_e) &&
+        ((usage == VX_WRITE_ONLY) || (usage == VX_READ_AND_WRITE)))
+    {
+        status = VX_ERROR_NOT_SUPPORTED;
+        vxError("Can't write to constant data, only read!\n");
+        vxAddLogEntry(&image->base, status, "Can't write to constant data, only read!\n");
+        goto exit;
+    }
+
+    /*************************************************************************/
+    vxError("MapImagePatch from "VX_FMT_REF" to ptr %p from {%u,%u} to {%u,%u} plane %u\n",
+        image, *ptr, start_x, start_y, end_x, end_y, plane_index);
+
+    /* MAP mode */
+    {
+        vx_size size;
+        vx_memory_map_extra_s extra;
+        vx_uint8* buf = 0;
+
+        size = vxComputeImagePatchSize(image, rect, plane_index);
+
+        extra.image_data.plane_index = plane_index;
+        extra.image_data.rect        = *rect;
+
+        if (vx_true_e == vxoContext_MemoryMap(image->base.context, (vx_reference)image, size, usage, mem_type, flags, &extra, (void **)&buf, map_id))
+        {
+            /* use the addressing of the internal format */
+            addr->dim_x    = end_x - start_x;
+            addr->dim_y    = end_y - start_y;
+            addr->stride_x = image->memory.strides[plane_index][VX_DIM_X];
+            addr->stride_y = image->memory.strides[plane_index][VX_DIM_Y];
+            addr->step_x   = image->scales[plane_index][VX_DIM_X];
+            addr->step_y   = image->scales[plane_index][VX_DIM_Y];
+            addr->scale_x  = VX_SCALE_UNITY / image->scales[plane_index][VX_DIM_X];
+            addr->scale_y  = VX_SCALE_UNITY / image->scales[plane_index][VX_DIM_Y];
+            *ptr = buf;
+            vxoReference_Increment(&image->base, VX_REF_EXTERNAL);
+
+            status = VX_SUCCESS;
+        }
+        else
+        {
+            vxError("failed to map image\n");
+            status = VX_FAILURE;
+        }
+    }
+
+exit:
+    return status;
+} /* vxMapImagePatch() */
+
+VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id map_id)
+{
+    vx_status status = VX_FAILURE;
+
+    /* bad references */
+    if (!vxoImage_IsValid(image))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        goto exit;
+    }
+
+    /* bad parameters */
+    if (vxoContext_FindMemoryMap(image->base.context, (vx_reference)image, map_id) != vx_true_e)
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to unmap image patch\n");
+        return status;
+    }
+
+    {
+        vx_context       context = image->base.context;
+        vx_memory_map_s* map     = &context->memoryMaps[map_id];
+
+        if (map->used &&
+            map->ref == (vx_reference)image)
+        {
+            /* freeing mapping buffer */
+            vxoContext_MemoryUnmap(context, map_id);
+
+            vxoReference_Decrement(&image->base, VX_REF_EXTERNAL);
+
+            status = VX_SUCCESS;
+        }
+        else
+        {
+            vxError("failed to unmap image\n");
+            status = VX_FAILURE;
+        }
+    }
+
+exit:
+    return status;
+} /* vxUnmapImagePat*/
+#endif
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetImageValidRectangle(vx_image image, const vx_rectangle_t* rect)
 {

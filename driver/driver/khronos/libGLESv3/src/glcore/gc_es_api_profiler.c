@@ -25,7 +25,6 @@ GLchar *__glesTracerFuncNames[] = {
 };
 
 extern GLint __glesApiTraceMode;
-extern GLint __glesApiProfileMode;
 
 #if VIVANTE_PROFILER
 

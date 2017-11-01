@@ -553,7 +553,6 @@ gcChipUtilsDumpSurfaceRAW(
     gctINT stride = 0, layerSize = 0;
     char level[6] = "+.raw";
     GLchar fName[__GLES_MAX_FILENAME_LEN]= {0};
-    __GLsurfRawHead rawHead;
     const GLchar *formatName = "";
 
     gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d", gc, surfView, fileName, yInverted);
@@ -644,23 +643,12 @@ gcChipUtilsDumpSurfaceRAW(
         resolveRTView.surf = gcvNULL;
     }
 
-    /* Prepare file header */
-    __GL_MEMZERO(&rawHead, sizeof(rawHead));
-    rawHead.width = width;
-    rawHead.height = height;
-    rawHead.stride = (GLuint)stride;
-    rawHead.layerSize = (GLuint)layerSize;
-    gcmVERIFY_OK(gcoOS_StrCopySafe(rawHead.formatName, 64, formatName));
-
     gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
     gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
     gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, formatName));
     gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
 
     gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
-
-    /* Write raw file header. */
-    gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, sizeof(rawHead), &rawHead));
 
     if (logical[0])
     {
@@ -696,54 +684,112 @@ gcChipUtilsDumpSurfaceCOMPRAW(
     GLboolean yInverted
     )
 {
-    gctFILE file = gcvNULL;
+    gctFILE compressedDatafile = gcvNULL;
+    gctFILE tileStatusDatafile = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER logical[3]  = {0};
+    gctPOINTER tileStatusLogical = {0};
     gctUINT height = 0;
     gctINT stride = 0;
-    char level[10] = "+.compraw";
-    GLchar fName[__GLES_MAX_FILENAME_LEN]= {0};
-    const GLchar *formatName = "";
+    char compressedlevel[16] = "+compressed.raw";
+    char tileStatuslevel[16] = "+tilestatus.raw";
+    GLchar compressedfName[__GLES_MAX_FILENAME_LEN] = {0};
+    GLchar tileStatusfName[__GLES_MAX_FILENAME_LEN] = {0};
 
     gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d", gc, surfView, fileName, yInverted);
 
     do
     {
-        gcsSURF_FORMAT_INFO_PTR srcFmtInfo;
+        gcmERR_BREAK(gcoSURF_GetAlignedSize(surfView->surf, gcvNULL, &height, &stride));
 
-        gcmERR_BREAK(gcoSURF_GetSize(surfView->surf, gcvNULL, &height, gcvNULL));
-        gcmERR_BREAK(gcoSURF_GetAlignedSize(surfView->surf, gcvNULL, gcvNULL, &stride));
-        gcmERR_BREAK(gcoSURF_GetFormatInfo(surfView->surf, &srcFmtInfo));
-        formatName = srcFmtInfo->formatName;
-
-        /* Commit resolve command and stall hardware. */
+        /* Commit command and stall hardware. */
         gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
         gcmERR_BREAK(gcoSURF_Lock(surfView->surf, gcvNULL, logical));
 
-        level[0] = '-';
+        compressedlevel[0] = '-';
     } while (GL_FALSE);
 
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, formatName));
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, compressedlevel));
 
-    gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, compressedfName, gcvFILE_CREATE, &compressedDatafile));
+
+    tileStatusLogical = surfView->surf->tileStatusNode.logical;
+
+    if (tileStatusLogical)
+    {
+        gctUINT tileCount = 2 * surfView->surf->tileStatusNode.size;
+        gctUINT8_PTR tileStatusBuffer = (gctUINT8_PTR)tileStatusLogical;
+        gctUINT8_PTR compressedRawBuffer = (gctUINT8_PTR)logical[0];
+        gctUINT8_PTR outputBuffer = gcvNULL;
+        gctUINT8_PTR tempBuffer;
+        gctUINT8 tileStatus;
+        gctUINT cmpBytes;
+        gctINT burstSize = 32;
+        gctINT tileSize = 256;
+        gctUINT tsBits = 4;
+        gctINT burst;
+        gctUINT i;
+
+        gcoOS_Allocate(gcvNULL, height * stride, (gctPOINTER *)&outputBuffer);
+        gcoOS_MemFill(outputBuffer, 0, height * stride);
+
+        tempBuffer = outputBuffer;
+
+        for (i = 0; i < tileCount; i++)
+        {
+            tileStatus = (i % 2 == 0) ? (tileStatusBuffer[i / 2] & 0xf) : ((tileStatusBuffer[i / 2] >> tsBits) & 0xf);
+
+            if (tileStatus == 15 || tileStatus == 14 || tileStatus == 0)
+            {
+                burst = 0;
+            }
+            else if (tileStatus <= 7)
+            {
+                burst = tileStatus & 0x7;
+                cmpBytes = burst * burstSize;
+                gcoOS_MemCopy(tempBuffer, compressedRawBuffer, cmpBytes);
+            }
+            tempBuffer += tileSize;
+            compressedRawBuffer += tileSize;
+        }
+
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, compressedDatafile, stride * height, outputBuffer));
+        gcoOS_Free(gcvNULL, outputBuffer);
+    }
+
+    if (gcvNULL != compressedDatafile)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, compressedDatafile));
+    }
+
+    tileStatuslevel[0] = '-';
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, tileStatuslevel));
+
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, tileStatusfName, gcvFILE_CREATE, &tileStatusDatafile));
+
+    if (tileStatusLogical)
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, tileStatusDatafile, surfView->surf->tileStatusNode.size, tileStatusLogical));
+    }
+
+    if (gcvNULL != tileStatusDatafile)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, tileStatusDatafile));
+    }
 
     if (logical[0])
     {
-        /* Write pixel data. */
-        gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, stride * height, logical[0]));
-
         /* Unlock linear surface. */
         gcmVERIFY_OK(gcoSURF_Unlock(surfView->surf, logical[0]));
         logical[0] = gcvNULL;
-    }
-
-    if (gcvNULL != file)
-    {
-        /* Close tga file. */
-        gcmVERIFY_OK(gcoOS_Close(gcvNULL, file));
     }
 
     gcmFOOTER();

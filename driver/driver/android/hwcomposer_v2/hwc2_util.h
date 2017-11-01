@@ -356,7 +356,27 @@ extern __thread int __hwc2_traceDepth;
     } while (0)
 
 #  define __hwc2_trace_error(inout, err) \
-    __hwc2_trace(inout, "error=%s(%d)", error_name(err), err)
+    do { \
+        const char *___s; \
+        if (likely(!__hwc2_traceEnabled)) { \
+            ALOGE("%s#%d: error=%d(%s)", \
+                __FUNCTION__, __LINE__, err, error_name(err)); \
+            break; \
+        } \
+        if (inout == 0) { \
+            ___s = "+ "; \
+        } else if (inout == 1) { \
+            ___s = "- "; \
+            __hwc2_traceDepth--; \
+        } else { \
+            ___s = "  "; \
+        } \
+        ALOGE("%*s%s%s#%d: error=%d(%s)", __hwc2_traceDepth * 2, "", \
+             ___s, __FUNCTION__, __LINE__, err, error_name(err)); \
+        if (inout == 0) { \
+            __hwc2_traceDepth++; \
+        } \
+    } while (0)
 
 #  define __hwc2_trace_region(region) \
     do { \
@@ -390,7 +410,10 @@ extern __thread int __hwc2_traceDepth;
     do {} while (0)
 
 #  define __hwc2_trace_error(inout, err) \
-    do {} while (0)
+    do { \
+        ALOGE("%s#%d: error=%d(%s)", \
+            __FUNCTION__, __LINE__, err, error_name(err)); \
+    } while (0)
 
 #  define __hwc2_trace_region(region) \
     do {} while (0)

@@ -3692,7 +3692,7 @@ gckOS_GetKernelLogicalEx(
 
         case gcvPOOL_SYSTEM:
             /* System memory. */
-            logical = device->contiguousBase;
+            logical = device->contiguousLogical;
             break;
 
         default:
@@ -6459,6 +6459,16 @@ gckOS_QueryOption(
     else if (!strcmp(Option, "mmu"))
     {
         *Value = device->args.mmu;
+        return gcvSTATUS_OK;
+    }
+    else if (!strcmp(Option, "contiguousSize"))
+    {
+        *Value = device->contiguousSize;
+        return gcvSTATUS_OK;
+    }
+    else if (!strcmp(Option, "contiguousBase"))
+    {
+        *Value = (gctUINT32)device->contiguousBase;
         return gcvSTATUS_OK;
     }
     else if (!strcmp(Option, "recovery"))

@@ -63,6 +63,16 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/driver/android/gralloc \
 	$(AQROOT)/compiler/libVSC/include \
 
+ifeq ($(DRM_GRALLOC),1)
+LOCAL_C_INCLUDES += \
+    external/libdrm \
+    external/libdrm/include/drm \
+    external/drm_gralloc
+
+LOCAL_C_INCLUDES += \
+    hardware/imx/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/source/libEGL.map
@@ -78,6 +88,12 @@ LOCAL_SHARED_LIBRARIES := \
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
 LOCAL_SHARED_LIBRARIES += \
 	libsync
+endif
+
+ifeq ($(DRM_GRALLOC),1)
+LOCAL_SHARED_LIBRARIES += \
+    libgralloc_drm \
+    libdrm_vivante
 endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)

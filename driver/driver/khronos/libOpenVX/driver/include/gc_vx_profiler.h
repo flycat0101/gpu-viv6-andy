@@ -20,50 +20,16 @@
 typedef struct _vx_profiler
 {
     gctBOOL         enable;
-    gctBOOL         perVxfinish;
+    /* If true, the counter is per-graph-process,
+    ** else is per-node-process(default).
+    */
+    gctBOOL         perGraphProcess;
 
     gctUINT32       frameNumber;
-    gctUINT32       frameMaxNum;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       frameStartCPUTimeusec;
-    gctUINT64       frameEndCPUTimeusec;
 }
 vx_profiler_s;
-
-#define gcmWRITE_CONST(ConstValue) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = ConstValue; \
-        gcmERR_BREAK(gcoPROFILER_Write(context->phal, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_VALUE(IntData) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = IntData; \
-        gcmERR_BREAK(gcoPROFILER_Write(context->phal, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_COUNTER(Counter, Value) \
-    gcmWRITE_CONST(Counter); \
-    gcmWRITE_VALUE(Value)
-
-/* Write a string value (char*). */
-#define gcmWRITE_STRING(String) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 length; \
-        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
-        gcmERR_BREAK(gcoPROFILER_Write(context->phal, gcmSIZEOF(length), &length)); \
-        gcmERR_BREAK(gcoPROFILER_Write(context->phal, length, String)); \
-    } \
-    while (gcvFALSE)
 
 gctINT vxoProfiler_Initialize(vx_context context);
 void vxoProfiler_Destroy(vx_context context);

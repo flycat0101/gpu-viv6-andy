@@ -21,43 +21,7 @@
 
 #if VIVANTE_PROFILER
 
-GLboolean _glffIsSyncMode = gcvTRUE;
 gctINT _glffProfileMode = -1;
-
-
-#define gcmWRITE_CONST(ConstValue) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = ConstValue; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_VALUE(IntData) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = IntData; \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_COUNTER(Counter, Value) \
-    gcmWRITE_CONST(Counter); \
-    gcmWRITE_VALUE(Value)
-
-/* Write a string value (char*). */
-#define gcmWRITE_STRING(String) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 length; \
-        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(length), &length)); \
-        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, length, String)); \
-    } \
-    while (gcvFALSE)
 
 void
 _glffProfilerInitialize(
@@ -67,9 +31,6 @@ _glffProfilerInitialize(
     gceSTATUS status = gcvSTATUS_OK;
     gctCHAR *env = gcvNULL;
     glsPROFILER * profiler = &Context->profiler;
-#ifdef ANDROID
-    gctBOOL matchResult = gcvFALSE;
-#endif
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -104,7 +65,7 @@ _glffProfilerInitialize(
         gcmFOOTER_NO();
         return;
     case 0:
-        gcoPROFILER_NEW_Disable();
+        gcoPROFILER_Disable();
         profiler->enable = gcvFALSE;
         gcmFOOTER_NO();
         return;
@@ -147,7 +108,7 @@ _glffProfilerInitialize(
         gcmFOOTER_NO();
         return;
     }
-    gcmONERROR(gcoPROFILER_NEW_Construct(&Context->profilerObj));
+    gcmONERROR(gcoPROFILER_Construct(&Context->profilerObj));
 
     profiler->useGlfinish = gcvFALSE;
     gcoOS_GetEnv(gcvNULL, "VP_USE_GLFINISH", &env);
@@ -156,29 +117,17 @@ _glffProfilerInitialize(
         profiler->useGlfinish = gcvTRUE;
     }
 
-    gcoOS_GetEnv(gcvNULL, "VP_SYNC_MODE", &env);
-    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+    profiler->perDrawMode = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VP_PERDRAW_MODE", &env);
+    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
     {
-        Context->profilerObj->isSyncMode =
-        _glffIsSyncMode = gcvFALSE;
+        profiler->perDrawMode =
+        Context->profilerObj->perDrawMode = gcvTRUE;
     }
 
-    gcoOS_GetEnv(gcvNULL, "VP_OUTPUT", &env);
-    if ((env != gcvNULL) && *env != '\0')
-    {
-        Context->profilerObj->fileName = env;
-    }
+    Context->profilerObj->profilerClient = gcvCLIENT_OPENGLES11;
 
-#ifdef ANDROID
-    gcoOS_GetEnv(gcvNULL, "VP_PROCESS_NAME", &env);
-    if ((env != gcvNULL) && (env[0] != 0)) matchResult = (gcoOS_DetectProcessByName(env) ? gcvTRUE : gcvFALSE);
-    if (matchResult != gcvTRUE) {
-        gcmFOOTER_NO();
-        return;
-    }
-#endif
-
-    if (gcoPROFILER_NEW_Enable(Context->profilerObj) != gcvSTATUS_OK)
+    if (gcoPROFILER_Enable(Context->profilerObj) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER_NO();
@@ -190,18 +139,11 @@ _glffProfilerInitialize(
     profiler->frameNumber = 0;
     profiler->frameBegun = gcvFALSE;
     profiler->finishNumber = 0;
-    profiler->finishBegun = gcvFALSE;
     profiler->drawCount = 0;
-    profiler->perDraw = gcvFALSE;
-    profiler->perFrame = gcvFALSE;
-    profiler->useFBO = gcvFALSE;
     profiler->writeDrawable = gcvFALSE;
 
-    gcoOS_GetTime(&profiler->frameStart);
-    profiler->frameStartTimeusec =
-    profiler->finishStartTimeusec = profiler->frameStart;
-
-    _glffProfilerSet(Context, GL1_PROFILER_BEGIN, 0);
+    gcoOS_GetTime(&profiler->frameStartTimeusec);
+    _glffProfilerWrite(Context, GL1_PROFILER_WRITE_HEADER);
 
 OnError:
     /* Return the error. */
@@ -220,7 +162,7 @@ _glffProfilerDestroy(
     if (profiler->enable)
     {
         profiler->enable = gcvFALSE;
-        gcmVERIFY_OK(gcoPROFILER_NEW_Destroy(Context->profilerObj));
+        gcmVERIFY_OK(gcoPROFILER_Destroy(Context->profilerObj));
     }
 
     /* Success. */
@@ -235,7 +177,7 @@ _glffProfilerWrite(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT rev;
-    gcoPROFILER profiler = Context->profilerObj;
+    gcoPROFILER Profiler = Context->profilerObj;
     gctSTRING infoCompany = "Vivante Corporation";
     gctSTRING infoVersion = "1.3";
     gctCHAR infoRevision[255] = { '\0' };   /* read from hw */
@@ -283,7 +225,7 @@ _glffProfilerWrite(
         gcmWRITE_STRING(infoRevision);
         gcmWRITE_CONST(VPC_INFODRIVER);
         gcmWRITE_STRING(infoDriver);
-#if gcdNULL_DRIVER >= 2
+#if gcdNULL_DRIVER
         {
             char* infoDiverMode = "NULL Driver";
             gcmWRITE_CONST(VPC_INFODRIVERMODE);
@@ -312,45 +254,12 @@ _glffProfilerWrite(
 
         if (!Context->profiler.frameBegun && Context->profiler.need_dump)
         {
-            gcoPROFILER_NEW_GetPos(Context->profilerObj, &Context->profiler.frameBegunPos);
             gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
             Context->profiler.frameBegun = gcvTRUE;
         }
         break;
 
-    case GL1_PROFILER_WRITE_FINISH_BEGIN:
-
-        if (!Context->profiler.writeDrawable && Context->draw)
-        {
-            gctUINT width, height;
-            gctUINT offset = 0;
-            gctCHAR  infoScreen[255] = { '\0' };
-            gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
-            gcmONERROR(gcoSURF_GetSize(Context->draw, &width, &height, gcvNULL));
-            gcmONERROR(gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
-                &offset, "%d x %d", width, height));
-            gcmWRITE_CONST(VPC_INFOSCREENSIZE);
-            gcmWRITE_STRING(infoScreen);
-
-            gcmWRITE_CONST(VPG_END);
-            Context->profiler.writeDrawable = gcvTRUE;
-        }
-
-        if (!Context->profiler.finishBegun && Context->profiler.need_dump)
-        {
-            if (Context->profiler.frameBegun)
-            {
-                gcmONERROR(gcoPROFILER_NEW_Seek(Context->profilerObj, Context->profiler.frameBegunPos, gcvFILE_SEEK_SET));
-            }
-            gcmWRITE_COUNTER(VPG_FINISH, Context->profiler.finishNumber);
-            gcmONERROR(gcoPROFILER_NEW_Seek(Context->profilerObj, 0, gcvFILE_SEEK_END));
-            Context->profiler.finishBegun = gcvTRUE;
-            Context->profiler.frameBegun = gcvFALSE;
-        }
-        break;
-
     case GL1_PROFILER_WRITE_FRAME_END:
-
         /*write time*/
         if (Context->profiler.need_dump)
         {
@@ -520,15 +429,11 @@ _glffProfilerWrite(
         Context->profiler.drawPointCount_11 = 0;
         Context->profiler.drawLineCount_11 = 0;
         Context->profiler.drawTriangleCount_11 = 0;
-        Context->profiler.drawVertexCount_11 = 0;
-        Context->profiler.textureUploadSize = 0;
         Context->profiler.drawCount = 0;
         Context->profiler.totalDriverTime = 0;
 
-        if (Context->profiler.timeEnable)
-        {
-            gcmONERROR(gcoOS_GetTime(&Context->profiler.frameStartTimeusec));
-        }
+        gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
+
         break;
     default:
         gcmASSERT(0);
@@ -599,71 +504,49 @@ _glffProfilerSet(
 
     switch (Enum)
     {
-    case GL1_PROFILER_BEGIN:
-
-        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_HEADER));
-        gcmONERROR(gcoPROFILER_NEW_Begin(Context->profilerObj, gcvCOUNTER_OP_NONE));
-        break;
-
     case GL1_PROFILER_FRAME_END:
-
-        /*if this thread has eglSwapBuffers, regardless of VP_USE_GLFINISH,
-        the delimeter in glFinish and glFlush is useless*/
-        profiler->useGlfinish = gcvFALSE;
 
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
         profiler->drawCount = 0;
         profiler->curFrameNumber++;
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
 
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(Context->profilerObj, gcvCOUNTER_OP_NONE));
+        gcmONERROR(gcoPROFILER_End(Context->profilerObj, gcvCOUNTER_OP_FRAME, Context->profiler.frameNumber));
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_END));
-
-        gcmONERROR(gcoPROFILER_NEW_Flush(Context->profilerObj));
+        gcmONERROR(gcoPROFILER_Flush(Context->profilerObj));
 
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_RESET));
-        gcmONERROR(gcoOS_GetTime(&profiler->frameStartTimeusec));
         /* Next frame. */
         if (profiler->need_dump)
+        {
             profiler->frameNumber++;
+        }
         profiler->frameBegun = gcvFALSE;
         break;
 
     case GL1_PROFILER_FINISH_BEGIN:
 
-        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FINISH_BEGIN));
-        gcmONERROR(gcoPROFILER_NEW_End(Context->profilerObj, profiler->finishNumber, gcvCOUNTER_OP_FINISH));
+        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_FINISH));
+        profiler->drawCount = 0;
 
         break;
 
     case GL1_PROFILER_FINISH_END:
 
-        gcmONERROR(gcoOS_GetTime(&profiler->finishEndTimeusec));
-
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(Context->profilerObj, gcvCOUNTER_OP_FINISH));
-        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_END));
-        gcmONERROR(gcoPROFILER_NEW_Flush(Context->profilerObj));
-
-        if (Context->profiler.timeEnable)
-        {
-            gcmONERROR(gcoOS_GetTime(&profiler->finishStartTimeusec));
-        }
-        if (profiler->need_dump)
-            profiler->finishNumber++;
-        profiler->finishBegun = gcvFALSE;
-        break;
-
-    case GL1_PROFILER_END:
-
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
-        profiler->drawCount = 0;
-        profiler->curFrameNumber++;
-        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
-
-        gcmONERROR(gcoPROFILER_NEW_EndFrame(Context->profilerObj, gcvCOUNTER_OP_NONE));
+        gcmONERROR(gcoPROFILER_End(Context->profilerObj, gcvCOUNTER_OP_FINISH, Context->profiler.finishNumber));
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_END));
+        gcmONERROR(gcoPROFILER_Flush(Context->profilerObj));
 
-        gcmONERROR(gcoPROFILER_NEW_Flush(Context->profilerObj));
+        gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_RESET));
+        /* Next frame. */
+        if (profiler->need_dump)
+        {
+            profiler->finishNumber++;
+            profiler->frameNumber++;
+        }
+        profiler->frameBegun = gcvFALSE;
         break;
 
     case GL1_PROFILER_PRIMITIVE_TYPE:
@@ -693,27 +576,16 @@ _glffProfilerSet(
         break;
 
     case GL1_PROFILER_DRAW_BEGIN:
-        if (profiler->perDraw == gcvFALSE)
-        {
-            profiler->perDraw = gcvTRUE;
-            profiler->drawCount = 0;
-        }
+
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_NEW_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
 
         break;
 
     case GL1_PROFILER_DRAW_END:
-        gcmONERROR(gcoPROFILER_NEW_End(Context->profilerObj, profiler->drawCount, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_End(Context->profilerObj, gcvCOUNTER_OP_DRAW, profiler->drawCount));
         profiler->drawCount++;
         break;
-
-    case GL1_TEXUPLOAD_SIZE:
-        Context->profiler.textureUploadSize += gcmPTR2INT32(Value);
-        break;
-    case GL1_PROFILER_SYNC_MODE:
-        gcmFOOTER_NO();
-        return _glffIsSyncMode;
 
     default:
         break;

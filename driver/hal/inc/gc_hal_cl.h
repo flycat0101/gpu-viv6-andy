@@ -88,6 +88,7 @@ typedef struct _gcoCL_DEVICE_INFO
     gctBOOL             TxIntegerSupport;
     gctBOOL             halti2;                   /* Halit2 support */
     gctBOOL             multiWGPack;
+    gctBOOL             asyncBLT;
 
     gceCHIPMODEL        chipModel;
     gctUINT32           chipRevision;
@@ -706,26 +707,16 @@ gcoCL_SetSignal(
 **
 **  INPUT:
 **
-**      gctSIZE_T StateBufferSize
-**          The number of bytes in the 'StateBuffer'.
-**
-**      gctPOINTER StateBuffer
-**          Pointer to the states that make up the shader program.
-**
-**      gcsHINT_PTR Hints
-**          Pointer to a gcsHINT structure that contains information required
-**          when loading the shader states.
+**      gcsPROGRAM_STATE ProgramState
+**          Program state.
 */
 gceSTATUS
 gcoCL_LoadKernel(
-    IN gctSIZE_T    StateBufferSize,
-    IN gctPOINTER   StateBuffer,
-    IN gcsHINT_PTR  Hints
+    IN gcsPROGRAM_STATE ProgramState
     );
 
 gceSTATUS
 gcoCL_InvokeKernel(
-    IN gcSHADER     Kernel,
     IN gctUINT      WorkDim,
     IN size_t       GlobalWorkOffset[3],
     IN size_t       GlobalScale[3],

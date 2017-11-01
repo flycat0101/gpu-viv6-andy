@@ -2189,7 +2189,7 @@ _AddSource(
                                  _GetSwizzleName(Swizzle, buf),
                                  _GetFormatName(Format)));
 
-    return gcSHADER_AddSource(binary, Type, (gctUINT16)SourceIndex, Swizzle, Format, gcSHADER_PRECISION_DEFAULT);
+    return gcSHADER_AddSource(binary, Type, SourceIndex, Swizzle, Format, gcSHADER_PRECISION_DEFAULT);
 }
 
 static gceSTATUS
@@ -3138,33 +3138,29 @@ _EmitSource(
             cltELEMENT_TYPE elementType;
 
             elementType = clmGEN_CODE_elementType_GET(Source->dataType);
+            format = clConvDataTypeToFormat(Source->dataType);
 
             if(clmIsElementTypeFloating(elementType)) {
                 floatConstant[0] = Source->u.sourceConstant.floatValue;
-                format = gcSL_FLOAT;
                 constantPtr = (void *)floatConstant;
             }
             else if(clmIsElementTypeBoolean(elementType)) {
                 intConstant[0] = Source->u.sourceConstant.boolValue;
-                format = gcSL_BOOLEAN;
                 constantPtr = (void *)intConstant;
             }
             else if(clmIsElementTypeInteger(elementType)) {
                 if(clmIsElementTypeUnsigned(elementType)) {
                     uintConstant[0] = Source->u.sourceConstant.uintValue;
-                    format = gcSL_UINT32;
                     constantPtr = (void *)uintConstant;
                 }
                 else {
                     intConstant[0] = Source->u.sourceConstant.intValue;
-                    format = gcSL_INTEGER;
                     constantPtr = (void *)intConstant;
                 }
             }
             else if(clmIsElementTypeEvent(elementType) ||
                     clmIsElementTypeSampler(elementType)) {
                 uintConstant[0] = Source->u.sourceConstant.uintValue;
-                format = gcSL_UINT32;
                 constantPtr = (void *)uintConstant;
             }
             else {

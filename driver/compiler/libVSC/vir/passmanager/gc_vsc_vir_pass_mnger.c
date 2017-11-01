@@ -124,6 +124,11 @@ void vscSPM_Initialize(VSC_SHADER_PASS_MANAGER* pShPassMnger,
     /* TODO: Will reconsider followings later */
     pShader->pCompilerCfg = &pCompilerParam->cfg;
     VIR_Shader_SetDumpOptions(pShader, VSC_OPTN_Options_GetDumpOptions(pOptions));
+
+    if (pCompilerParam->cfg.ctx.isPatchLib)
+    {
+        VIR_Shader_SetFlag(pShader, VIR_SHFLAG_PATCH_LIB);
+    }
 }
 
 void vscSPM_Finalize(VSC_SHADER_PASS_MANAGER* pShPassMnger, gctBOOL bFinalizeSharedPMP)
@@ -245,23 +250,31 @@ static VSC_ErrCode _DestroyShaderPassResources(VSC_PASS_PROPERTY* pPassProp,
 
         resDestroyReq.data = pGlobalResDestroyReq->data | pPerShResDestroyReqArray[i].data;
 
-        bNeedDestroyCg = resDestroyReq.s.bInvalidateCg;
+        bNeedDestroyCg = resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCgUnmodified;
 
-        bNeedDestroyCfg = (resDestroyReq.s.bInvalidateCg || resDestroyReq.s.bInvalidateCfg);
+        bNeedDestroyCfg = ((resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateCfg && !resDestroyReq.s.bCfgUnmodified));
 
-        bNeedDestroyRdFlow = (resDestroyReq.s.bInvalidateCg || resDestroyReq.s.bInvalidateCfg ||
-                              resDestroyReq.s.bInvalidateRdFlow);
+        bNeedDestroyRdFlow = ((resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCgUnmodified) ||
+                                (resDestroyReq.s.bInvalidateCfg && !resDestroyReq.s.bCfgUnmodified) ||
+                                (resDestroyReq.s.bInvalidateRdFlow && !resDestroyReq.s.bRdFlowUnmodified));
 
-        bNeedDestroyDu = (resDestroyReq.s.bInvalidateCg || resDestroyReq.s.bInvalidateCfg ||
-                          resDestroyReq.s.bInvalidateRdFlow || resDestroyReq.s.bInvalidateDu);
+        bNeedDestroyDu = ((resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCfgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateCfg && !resDestroyReq.s.bCfgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateRdFlow && !resDestroyReq.s.bRdFlowUnmodified) ||
+                            (resDestroyReq.s.bInvalidateDu && !resDestroyReq.s.bDuUnmodified));
 
-        bNeedDestroyWeb = (resDestroyReq.s.bInvalidateCg || resDestroyReq.s.bInvalidateCfg ||
-                           resDestroyReq.s.bInvalidateRdFlow || resDestroyReq.s.bInvalidateDu ||
-                           resDestroyReq.s.bInvalidateWeb);
+        bNeedDestroyWeb = ((resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateCfg && !resDestroyReq.s.bCfgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateRdFlow && !resDestroyReq.s.bRdFlowUnmodified) ||
+                            (resDestroyReq.s.bInvalidateDu && !resDestroyReq.s.bDuUnmodified) ||
+                            (resDestroyReq.s.bInvalidateWeb && !resDestroyReq.s.bWebUnmodified));
 
-        bNeedDestroyLvFlow = (resDestroyReq.s.bInvalidateCg || resDestroyReq.s.bInvalidateCfg ||
-                              resDestroyReq.s.bInvalidateRdFlow || resDestroyReq.s.bInvalidateDu ||
-                              resDestroyReq.s.bInvalidateLvFlow);
+        bNeedDestroyLvFlow = ((resDestroyReq.s.bInvalidateCg && !resDestroyReq.s.bCgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateCfg && !resDestroyReq.s.bCfgUnmodified) ||
+                            (resDestroyReq.s.bInvalidateRdFlow && !resDestroyReq.s.bRdFlowUnmodified) ||
+                            (resDestroyReq.s.bInvalidateDu && !resDestroyReq.s.bDuUnmodified) ||
+                            (resDestroyReq.s.bInvalidateLvFlow && !resDestroyReq.s.bLvFlowUnmodified));
 
         if (bNeedDestroyLvFlow)
         {

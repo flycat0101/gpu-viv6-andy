@@ -211,7 +211,7 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
 /*
 ** format map information for patch
 */
-#define __GL_CHIP_PATCH_FMT_MAX         36
+#define __GL_CHIP_PATCH_FMT_MAX         64
 static __GLchipFmtMapInfo __glChipFmtMapInfo_patch[__GL_CHIP_PATCH_FMT_MAX];
 extern __GLformatInfo __glFormatInfoTable[];
 
@@ -312,6 +312,7 @@ gcChipInitFormatMapInfo(
     GLuint patchHalfFloatCount       = 0;
     GLuint patch8bitMsaaCount        = 0;
     GLuint patchD32FCount            = 0;
+    GLuint patchAstcCount            = 0;
     GLuint patchFmtMapInfoCount      = 0;
     static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
@@ -341,6 +342,38 @@ gcChipInitFormatMapInfo(
     {
         {gcvSURF_D32F,   gcvSURF_D24X8, gcvSURF_D24X8, -1},
         {gcvSURF_S8D32F, gcvSURF_D24S8, gcvSURF_D24S8, -1},
+    };
+
+    __GLChipPatchFmt patchAstcFmts[] =
+    {
+        {gcvSURF_ASTC4x4,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC5x4,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC5x5,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC6x5,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC6x6,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x5,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x6,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x8,           gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x5,          gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x6,          gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x8,          gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x10,         gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC12x10,         gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC12x12,         gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC4x4_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC5x4_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC5x5_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC6x5_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC6x6_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x5_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x6_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC8x8_SRGB,      gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x5_SRGB,     gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x6_SRGB,     gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x8_SRGB,     gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC10x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC12x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_ASTC12x12_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
     };
 
     GLuint halfFloatTableSize = 0;
@@ -373,9 +406,10 @@ gcChipInitFormatMapInfo(
 
     for (i = 0; i < __GL_FMT_MAX; ++i)
     {
+#ifdef OPENGL40
         if ( __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN )
             continue;
-
+#endif
         gcmONERROR(gcoTEXTURE_GetClosestFormat(chipCtx->hal, __glChipFmtMapInfo[i].requestFormat, &__glChipFmtMapInfo[i].readFormat));
         gcmONERROR(gco3D_GetClosestRenderFormat(chipCtx->engine, __glChipFmtMapInfo[i].requestFormat, &__glChipFmtMapInfo[i].writeFormat));
         gcmONERROR(gcoTEXTURE_GetClosestFormatEx(chipCtx->hal, __glChipFmtMapInfo[i].requestFormat, gcvTEXTURE_3D, &patch3DFormat));
@@ -429,6 +463,15 @@ gcChipInitFormatMapInfo(
                 patchD32FCount++;
             }
         }
+
+        for (j = 0; j < gcmCOUNTOF(patchAstcFmts); ++j)
+        {
+            if (patchAstcFmts[j].requestFormat == __glChipFmtMapInfo[i].requestFormat)
+            {
+                patchAstcFmts[j].entry = i;
+                patchAstcCount++;
+            }
+        }
     }
 
     /* case0 */
@@ -452,6 +495,9 @@ gcChipInitFormatMapInfo(
     /* case6: D32F */
     patchFmtMapInfoCount += patchD32FCount;
 
+    /* case7: ASTC */
+    patchFmtMapInfoCount += patchAstcCount;
+
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
     if (patchFmtMapInfoCount)
@@ -465,8 +511,10 @@ gcChipInitFormatMapInfo(
             /* 1. build format map information to patch 2d array/3d texture */
             for (i = 0; i < __GL_FMT_MAX; i++)
             {
+#ifdef OPENGL40
                 if ( __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN )
                     continue;
+#endif
                 gcmONERROR(gcoTEXTURE_GetClosestFormatEx(chipCtx->hal, __glChipFmtMapInfo[i].requestFormat, gcvTEXTURE_3D, &patch3DFormat));
 
                 if ((patch3DFormat != __glChipFmtMapInfo[i].readFormat) && (index < __GL_CHIP_PATCH_FMT_MAX))
@@ -576,6 +624,25 @@ gcChipInitFormatMapInfo(
                 __glChipFmtMapInfo_patch[index].readFormat    = patchZ32FFmts[i].readFormat;
                 __glChipFmtMapInfo_patch[index].writeFormat   = patchZ32FFmts[i].writeFormat;
                 __glChipFmtMapInfo_patch[index].patchCase     = __GL_CHIP_FMT_PATCH_D32F;
+                __glChipFmtMapInfo_patch[index].flags         = 0;
+
+                gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
+            }
+            index++;
+        }
+
+        /* 8: ASTC */
+        for (i = 0; i < gcmCOUNTOF(patchAstcFmts); ++i)
+        {
+            GLint entry = patchAstcFmts[i].entry;
+
+            GL_ASSERT(entry != -1);
+            if ((entry != -1) && (index < __GL_CHIP_PATCH_FMT_MAX))
+            {
+                __glChipFmtMapInfo_patch[index].requestFormat = patchAstcFmts[i].requestFormat;
+                __glChipFmtMapInfo_patch[index].readFormat    = patchAstcFmts[i].readFormat;
+                __glChipFmtMapInfo_patch[index].writeFormat   = patchAstcFmts[i].writeFormat;
+                __glChipFmtMapInfo_patch[index].patchCase     = __GL_CHIP_FMT_PATCH_ASTC;
                 __glChipFmtMapInfo_patch[index].flags         = 0;
 
                 gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
@@ -842,7 +909,7 @@ __glChipMapBufferRange(
 #if gcdDUMP
             if (access & GL_MAP_READ_BIT)
             {
-                gcmDUMP(gcvNULL, "#verify mapped bufobj");
+                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj");
                 gcmDUMP_BUFFER(gcvNULL,
                                "verify",
                                physical,
@@ -965,7 +1032,8 @@ __glChipUnMapBufferObject(
                                                              (gctSIZE_T)bufObj->mapOffset,
                                                              (gctSIZE_T)bufObj->mapLength,
                                                              gcvCACHE_FLUSH));
-                gcmONERROR(gcoBUFOBJ_GPUCacheOperation(bufInfo->bufObj));
+ //               gcmONERROR(gcoBUFOBJ_SetCPUWrite(bufInfo->bufObj, gcvTRUE));
+                 gcmONERROR(gcoBUFOBJ_GPUCacheOperation(bufInfo->bufObj));
 
                 gcoBUFOBJ_Dump(bufInfo->bufObj);
             }

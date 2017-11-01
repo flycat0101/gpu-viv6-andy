@@ -28,7 +28,7 @@ typedef struct _CONVERTER
     VSC_HASH_TABLE       *FuncTable;
     VSC_HASH_TABLE       *UniformTable;
 #if SAVE_TEMP_REGISTER
-    gctUINT16             TmpRegs[TEMP_REGISTER_COUNT];
+    gctUINT32             TmpRegs[TEMP_REGISTER_COUNT];
 #endif
     VSC_PRIMARY_MEM_POOL  MemPool;
 }
@@ -457,6 +457,9 @@ _ConvBuiltinVirType2Format(
         case VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW:
         case VIR_TYPE_SAMPLER_2D_MS:
         case VIR_TYPE_SAMPLER_2D_MS_ARRAY:
+        case VIR_TYPE_SAMPLER_2D_RECT:
+        case VIR_TYPE_SAMPLER_2D_RECT_SHADOW:
+        case VIR_TYPE_SAMPLER_1D_SHADOW:
             return gcSL_FLOAT;
 
         case VIR_TYPE_ISAMPLER_2D:
@@ -466,6 +469,9 @@ _ConvBuiltinVirType2Format(
         case VIR_TYPE_ISAMPLER_2D_ARRAY:
         case VIR_TYPE_ISAMPLER_2D_MS:
         case VIR_TYPE_ISAMPLER_2D_MS_ARRAY:
+        case VIR_TYPE_ISAMPLER_2D_RECT:
+        case VIR_TYPE_ISAMPLER_1D_ARRAY:
+        case VIR_TYPE_ISAMPLER_1D:
             return gcSL_INTEGER;
 
         case VIR_TYPE_USAMPLER_2D:
@@ -475,6 +481,9 @@ _ConvBuiltinVirType2Format(
         case VIR_TYPE_USAMPLER_2D_ARRAY:
         case VIR_TYPE_USAMPLER_2D_MS:
         case VIR_TYPE_USAMPLER_2D_MS_ARRAY:
+        case VIR_TYPE_USAMPLER_2D_RECT:
+        case VIR_TYPE_USAMPLER_1D_ARRAY:
+        case VIR_TYPE_USAMPLER_1D:
             return gcSL_UINT32;
         default:
             gcmASSERT(0);
@@ -631,6 +640,20 @@ _ConvVirType2ShaderType(
         return gcSHADER_USAMPLER_2D_ARRAY;
     case VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW:
         return gcSHADER_SAMPLER_2D_ARRAY_SHADOW;
+    /* OpenGL 4.0 types */
+
+    case VIR_TYPE_SAMPLER_2D_RECT:
+        return gcSHADER_SAMPLER_2D_RECT;
+    case VIR_TYPE_ISAMPLER_2D_RECT:
+        return gcSHADER_ISAMPLER_2D_RECT;
+    case VIR_TYPE_USAMPLER_2D_RECT:
+        return gcSHADER_USAMPLER_2D_RECT;
+    case VIR_TYPE_SAMPLER_2D_RECT_SHADOW:
+        return gcSHADER_SAMPLER_2D_RECT_SHADOW;
+    case VIR_TYPE_ISAMPLER_1D_ARRAY:
+        return gcSHADER_ISAMPLER_1D_ARRAY;
+    case VIR_TYPE_USAMPLER_1D_ARRAY:
+        return gcSHADER_USAMPLER_1D_ARRAY;
     default:
         break;
     }
@@ -1242,7 +1265,7 @@ _GetRegisterIndex(
     return 0;
 }
 
-static gctUINT16
+static gctUINT32
 _GetIndexedRegisterIndex(
     IN Converter        *Converter,
     IN VIR_Instruction  *VirInst,
@@ -1250,11 +1273,11 @@ _GetIndexedRegisterIndex(
     IN gctUINT          relIndexing
     )
 {
-    gctUINT16       indexRegister;
+    gctUINT32       indexRegister;
 
     if (VIR_Shader_isRegAllocated(Converter->VirShader))
     {
-        indexRegister = (gctUINT16) relIndexing;
+        indexRegister =  relIndexing;
     }
     else
     {
@@ -1263,12 +1286,12 @@ _GetIndexedRegisterIndex(
             gcmASSERT(!VirInst->_parentUseBB &&
                       VIR_Inst_GetFunction(VirInst) != gcvNULL);
 
-            indexRegister = (gctUINT16)_GetRegisterIndex(Converter,
+            indexRegister = (gctUINT32)_GetRegisterIndex(Converter,
                 VIR_Function_GetSymFromId(VIR_Inst_GetFunction(VirInst), relIndexing), Operand);
         }
         else
         {
-            indexRegister = (gctUINT16) relIndexing;
+            indexRegister = (gctUINT32) relIndexing;
         }
 
         if (VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE)
@@ -1451,7 +1474,7 @@ _ConvVirOperand2Target(
             Converter->Shader,
             _ConvVirOpcode2Opcode(Opcode),
             Condition,
-            (gctUINT16)0,
+            0,
             gcSL_ENABLE_NONE,
             gcSL_INVALID,
             gcSHADER_PRECISION_DEFAULT,
@@ -1469,7 +1492,7 @@ _ConvVirOperand2Target(
             Converter->Shader,
             _ConvVirOpcode2Opcode(Opcode),
             Condition,
-            (gctUINT16)0,
+            0,
             gcSL_ENABLE_NONE,
             gcSL_INVALID,
             gcSHADER_PRECISION_DEFAULT,
@@ -1555,7 +1578,7 @@ _ConvVirOperand2Target(
 
             gctINT          relIndexing = VIR_Operand_GetRelIndexing(Operand);
 
-            gctUINT16       indexRegister =
+            gctUINT32       indexRegister =
                 _GetIndexedRegisterIndex(Converter, VirInst, Operand, relIndexing);
 
             gcSL_FORMAT         format      = _ConvVirType2Format(Converter, type);
@@ -1567,10 +1590,10 @@ _ConvVirOperand2Target(
                 Converter->Shader,
                 opcode,
                 Condition,
-                (gctUINT16)index,
+                index,
                 enable,
                 indexed,
-                indexRegister,
+                (gctUINT16)indexRegister,
                 format,
                 precision,
                 SrcLoc);
@@ -1638,7 +1661,7 @@ _ConvVirOperand2Source(
 {
     gceSTATUS   status         = gcvSTATUS_OK;
     gctSOURCE_t *source        = gcvNULL;
-    gctUINT16   *sourceIndex   = gcvNULL;
+    gctUINT32   *sourceIndex   = gcvNULL;
     gcSL_INSTRUCTION inst      = gcvNULL;
 
     gcmASSERT(Converter->Shader != gcvNULL &&
@@ -1685,7 +1708,7 @@ _ConvVirOperand2Source(
 
             gctINT          relIndexing = VIR_Operand_GetRelIndexing(Operand);
 
-            gctUINT16       indexRegister =
+            gctUINT32       indexRegister =
                 _GetIndexedRegisterIndex(Converter, VirInst, Operand, relIndexing);
             gcSL_SWIZZLE    swizzle     = _GetRegisterSwizzle(Converter, Operand, VirInst);
             gcSHADER_AddSourceSamplerIndexed(
@@ -1699,7 +1722,7 @@ _ConvVirOperand2Source(
         }
         else
         {
-            gctUINT16           indexRegister =
+            gctUINT32           indexRegister =
                 _GetIndexedRegisterIndex(Converter, VirInst, Operand, VIR_Operand_GetRelIndexing(Operand));
             gcUNIFORM           uniform = gcvNULL;
             gctINT              arrayIndex = 0;
@@ -1739,7 +1762,7 @@ _ConvVirOperand2Source(
 
             gctINT          relIndexing = VIR_Operand_GetRelIndexing(Operand);
 
-            gctUINT16       indexRegister =
+            gctUINT32       indexRegister =
                 _GetIndexedRegisterIndex(Converter, VirInst, Operand, relIndexing);
 
             gcSL_FORMAT         format      = _ConvVirType2Format(Converter, type);
@@ -1759,10 +1782,10 @@ _ConvVirOperand2Source(
             gcSHADER_AddSourceIndexedWithPrecision(
                 Converter->Shader,
                 srcKind,
-                (gctUINT16)index,
+                index,
                 swizzle,
                 indexed,
-                indexRegister,
+                (gctUINT16)indexRegister,
                 format,
                 precision);
 
@@ -1842,8 +1865,8 @@ _CloneVirOpnd2TmpOpnd(
     IN OUT Converter            *Converter,
     IN     VIR_Instruction      *Inst,
     IN     VIR_Operand          *Opnd,
-    IN     gctUINT16            TempRegIndex,
-    IN OUT gctUINT16            *TempReg,
+    IN     gctUINT32            TempRegIndex,
+    IN OUT gctUINT32            *TempReg,
     IN OUT VIR_Enable           *Enable,
     IN OUT gcSL_FORMAT          *Format,
     IN OUT gcSHADER_PRECISION   *Precision
@@ -1856,9 +1879,9 @@ _CloneVirOpnd2TmpOpnd(
 
     gcmASSERT(TempRegIndex < TEMP_REGISTER_COUNT);
 #if SAVE_TEMP_REGISTER
-    if(Converter->TmpRegs[TempRegIndex] == 0xffff)
+    if(Converter->TmpRegs[TempRegIndex] == (gctUINT32)-1)
     {
-        *TempReg = (gctUINT16)gcSHADER_NewTempRegs(Converter->Shader, 1, gcShaderTy);
+        *TempReg = gcSHADER_NewTempRegs(Converter->Shader, 1, gcShaderTy);
         Converter->TmpRegs[TempRegIndex] = *TempReg;
     }
     else
@@ -1866,7 +1889,7 @@ _CloneVirOpnd2TmpOpnd(
         *TempReg = Converter->TmpRegs[TempRegIndex];
     }
 #else
-    *TempReg = (gctUINT16)gcSHADER_NewTempRegs(Converter->Shader, 1, gcShaderTy);
+    *TempReg = gcSHADER_NewTempRegs(Converter->Shader, 1, gcShaderTy);
 #endif
     *Enable      = VIR_Inst_GetRelEnable(Converter, Inst, Opnd);
     *Format      = _ConvVirType2Format(Converter, type);
@@ -1994,7 +2017,7 @@ _ConvVirInst2Inst(
                 /* gcSL_LOAD   t, 2, 3 */
                 /* gcSL_ATOMOP 1, t, 4 */
 
-            gctUINT16       tmpReg;
+            gctUINT32       tmpReg;
             gcSL_FORMAT     format;
             VIR_Enable      enable;
             gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
@@ -2038,7 +2061,7 @@ _ConvVirInst2Inst(
                     /* gcSL_ADD    t, 2, 3 */
                     /* gcSL_STORE1 1, t, 4 */
 
-                gctUINT16       tmpReg;
+                gctUINT32       tmpReg;
                 gcSL_FORMAT     format;
                 VIR_Enable      enable;
                 gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
@@ -2070,7 +2093,7 @@ _ConvVirInst2Inst(
         /* sad dest, src0, src1, src2 */
     case VIR_OP_SAD:
         {
-            gctUINT16       tmpReg;
+            gctUINT32       tmpReg;
             VIR_Enable      enable;
             gcSL_FORMAT     format;
 
@@ -2098,7 +2121,7 @@ _ConvVirInst2Inst(
         /* madsat dest, src0, src1, src2 */
     case VIR_OP_MADSAT:
         {
-            gctUINT16       tmpReg;
+            gctUINT32       tmpReg;
             VIR_Enable      enable;
             gcSL_FORMAT     format;
 
@@ -2126,7 +2149,7 @@ _ConvVirInst2Inst(
         /* mix dest, src0, src1, src2 */
     case VIR_OP_MIX:
         {
-            gctUINT16       tmpReg;
+            gctUINT32       tmpReg;
             VIR_Enable      enable;
             gcSL_FORMAT     format;
 
@@ -2157,7 +2180,7 @@ _ConvVirInst2Inst(
         /* select.condition dest, src0, src1, src2 */
     case VIR_OP_SELECT:
         {
-            gctUINT16       dest0;
+            gctUINT32       dest0;
             gcSL_FORMAT     format;
             VIR_Enable      enable;
             gcSHADER_PRECISION precision;
@@ -2184,7 +2207,7 @@ _ConvVirInst2Inst(
         /* select.condition dest, src0, src1, src2 */
     case VIR_OP_CSELECT:
         {
-            gctUINT16       tmpReg = 0;
+            gctUINT32       tmpReg = 0;
             VIR_Enable      enable = VIR_ENABLE_NONE;
             gcSL_FORMAT     format = gcSL_INVALID;
             gcSL_SWIZZLE    swizzle = gcSL_SWIZZLE_INVALID;
@@ -2248,7 +2271,7 @@ _ConvVirInst2Inst(
             /* cmp.nz    dst, dst0, src2 */
     case VIR_OP_CMOV:
         {
-            gctUINT16       tmpReg;
+            gctUINT32       tmpReg;
             gcSL_FORMAT     format;
             VIR_Enable      enable;
             gcSL_SWIZZLE    swizzle;
@@ -2306,7 +2329,7 @@ _ConvVirInst2Inst(
                             Converter->Shader,
                             _GetOpcodeByTexldModifier(texldOperand,
                                                       (Vir_TexldModifier_Name)i),
-                            (gctUINT16)0,
+                            0,
                             gcSL_ENABLE_NONE,
                             gcSL_FLOAT,
                             gcSHADER_PRECISION_DEFAULT,
@@ -2376,7 +2399,7 @@ _ConvVirInst2Inst(
 
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Swizzle, swizzle);
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Type, gcSL_TEMP);
-                    inst->source0Index = (gctUINT16)index;
+                    inst->source0Index = (gctUINT32)index;
                 }
                 else
                 {
@@ -2389,7 +2412,7 @@ _ConvVirInst2Inst(
             }
             else
             {
-                gctUINT16       tmpReg;
+                gctUINT32       tmpReg;
                 VIR_Enable      enable;
                 gcSHADER_PRECISION precision;
 
@@ -2410,7 +2433,7 @@ _ConvVirInst2Inst(
 
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Swizzle, gcSL_SWIZZLE_XXXX);
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Type, gcSL_TEMP);
-                    inst->source0Index = (gctUINT16)tmpReg;
+                    inst->source0Index = tmpReg;
                 }
                 else
                 {
@@ -2418,7 +2441,7 @@ _ConvVirInst2Inst(
                     inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0,
                         Indexed, gcSL_INDEXED_X);
-                    inst->source0Indexed = tmpReg;
+                    inst->source0Indexed = (gctUINT16)tmpReg;
                 }
             }
         }
@@ -2448,7 +2471,7 @@ _ConvVirInst2Inst(
             }
             else
             {
-                gctUINT16       tmpReg;
+                gctUINT32       tmpReg;
                 gcSL_FORMAT     format;
                 VIR_Enable      enable;
                 gcSHADER_PRECISION precision;
@@ -2463,7 +2486,7 @@ _ConvVirInst2Inst(
                 _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
                 inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                 inst->temp = gcmSL_TARGET_SET(inst->temp, Indexed, gcSL_INDEXED_X);
-                inst->tempIndexed = tmpReg;
+                inst->tempIndexed = (gctUINT16)tmpReg;
                 _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
             }
         }
@@ -2666,7 +2689,7 @@ _ConvVirFunction2Function(
             }
 
             gcFUNCTION_AddArgument(Func, 0xffff,
-                (gctUINT16)_GetRegisterIndex(Converter, sym, gcvNULL),
+                (gctUINT32)_GetRegisterIndex(Converter, sym, gcvNULL),
                 _ConvVirType2Enable(type),
                 io,
                 VIR_Symbol_GetPrecision(sym),
@@ -2926,6 +2949,9 @@ gcSHADER_ConvFromVIR(
         {
             Shader->shaderLayout.compute.workGroupSize[i] = VirShader->shaderLayout.compute.workGroupSize[i];
         }
+        Shader->shaderLayout.compute.isWorkGroupSizeFixed = VirShader->shaderLayout.compute.isWorkGroupSizeFixed;
+        Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = VirShader->shaderLayout.compute.isWorkGroupSizeAdjusted;
+        Shader->shaderLayout.compute.adjustedWorkGroupSize = VirShader->shaderLayout.compute.adjustedWorkGroupSize;
         break;
     case VIR_SHADER_TESSELLATION_CONTROL:
         Shader->shaderLayout.tcs.tcsPatchOutputVertices = VirShader->shaderLayout.tcs.tcsPatchOutputVertices;
@@ -3196,7 +3222,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                     /* Create lodMinMax. */
                     gcmONERROR(gcSHADER_AddUniformEx1(Shader,
                                                       VIR_Shader_GetSymNameString(VirShader, virUniformSym),
-                                                      gcSHADER_FLOAT_X3,
+                                                      gcSHADER_FLOAT_X4,
                                                       gcSHADER_PRECISION_MEDIUM,
                                                       -1,
                                                       -1,
@@ -3257,6 +3283,54 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                                                       &levelBaseSizeIndex,
                                                       &levelBaseSizeUniform));
                     virUniform->gcslIndex = levelBaseSizeIndex;
+                }
+                else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_WORK_THREAD_COUNT)
+                {
+                    gctINT16 workThreadCountIndex;
+                    gcUNIFORM workThreadCountUniform;
+
+                    /* Create workThreadCount. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                      VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                      gcSHADER_UINT16_X1,
+                                                      gcSHADER_PRECISION_MEDIUM,
+                                                      -1,
+                                                      -1,
+                                                      -1,
+                                                      0,
+                                                      gcvNULL,
+                                                      gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT,
+                                                      0,
+                                                      -1,
+                                                      -1,
+                                                      gcIMAGE_FORMAT_DEFAULT,
+                                                      &workThreadCountIndex,
+                                                      &workThreadCountUniform));
+                    virUniform->gcslIndex = workThreadCountIndex;
+                }
+                else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_WORK_GROUP_COUNT)
+                {
+                    gctINT16 workGroupCountIndex;
+                    gcUNIFORM workGroupCountUniform;
+
+                    /* Create workGroupCount. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                      VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                      gcSHADER_UINT16_X1,
+                                                      gcSHADER_PRECISION_MEDIUM,
+                                                      -1,
+                                                      -1,
+                                                      -1,
+                                                      0,
+                                                      gcvNULL,
+                                                      gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT,
+                                                      0,
+                                                      -1,
+                                                      -1,
+                                                      gcIMAGE_FORMAT_DEFAULT,
+                                                      &workGroupCountIndex,
+                                                      &workGroupCountUniform));
+                    virUniform->gcslIndex = workGroupCountIndex;
                 }
                 else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_CONST_BORDER_VALUE)
                 {
@@ -3383,8 +3457,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 gcmASSERT(sym != gcvNULL);
 
                 /* to-do: assert they have the same name (builtin name)*/
-                attribute->inputIndex =
-                    (gctUINT16) VIR_Symbol_GetHwRegId(sym);
+                attribute->inputIndex =  VIR_Symbol_GetHwRegId(sym);
 
                 if (isSymUnused(sym))
                 {
@@ -3446,7 +3519,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                         outputIndex += rows;
                     }
 
-                    Shader->outputs[i]->tempIndex = (gctUINT16) VIR_Symbol_GetHwRegId(sym);
+                    Shader->outputs[i]->tempIndex = VIR_Symbol_GetHwRegId(sym);
                 }
                 gcmASSERT(outputIndex ==
                           VIR_IdList_Count(VIR_Shader_GetOutputVregs(VirShader)));
@@ -3489,7 +3562,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
                             if (kind == variable->nameLength)
                             {
-                                variable->tempIndex = (gctUINT16) VIR_Symbol_GetHwRegId(sym);
+                                variable->tempIndex = VIR_Symbol_GetHwRegId(sym);
                             }
                         }
                     }

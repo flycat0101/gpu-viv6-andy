@@ -1332,6 +1332,12 @@ GLint GLAPIENTRY __GLES_APINAME(GetFragDataLocation)(GLuint program, const GLcha
     return gc->apiDispatchTable.GetFragDataLocation(gc, program, name);
 }
 
+GLvoid GLAPIENTRY __GLES_APINAME(BindFragDataLocation)(GLuint program, GLuint colorNumber, const GLchar *name)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->BindFragDataLocation(gc, program, colorNumber, name);
+}
+
 GLvoid GLAPIENTRY __GLES_APINAME(Uniform1ui)(GLint location, GLuint v0)
 {
     __GL_GET_CONTEXT;
@@ -3473,9 +3479,21 @@ GLvoid GLAPIENTRY __GLES_APINAME(PixelZoom)( GLfloat xfactor, GLfloat yfactor ){
 GLvoid GLAPIENTRY __GLES_APINAME(PixelTransferf)( GLenum pname, GLfloat param ){}
 GLvoid GLAPIENTRY __GLES_APINAME(PixelTransferi)( GLenum pname, GLint param ){}
 GLvoid GLAPIENTRY __GLES_APINAME(PixelStoref)( GLenum pname, GLfloat param ){}
-GLvoid GLAPIENTRY __GLES_APINAME(PixelMapfv)( GLenum map, GLsizei mapsize, const GLfloat *values ){}
-GLvoid GLAPIENTRY __GLES_APINAME(PixelMapuiv)( GLenum map, GLsizei mapsize, const GLuint *values ){}
-GLvoid GLAPIENTRY __GLES_APINAME(PixelMapusv)( GLenum map, GLsizei mapsize, const GLushort *values ){}
+GLvoid GLAPIENTRY __GLES_APINAME(PixelMapfv)( GLenum map, GLsizei mapsize, const GLfloat *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->PixelMapfv(gc, map, mapsize, values);
+}
+GLvoid GLAPIENTRY __GLES_APINAME(PixelMapuiv)( GLenum map, GLsizei mapsize, const GLuint *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->PixelMapuiv(gc, map, mapsize, values);
+}
+GLvoid GLAPIENTRY __GLES_APINAME(PixelMapusv)( GLenum map, GLsizei mapsize, const GLushort *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->PixelMapusv(gc, map, mapsize, values);
+}
 GLvoid GLAPIENTRY __GLES_APINAME(GetClipPlane)( GLenum plane, GLdouble *equation )
 {
     __GL_GET_CONTEXT;
@@ -3505,9 +3523,21 @@ GLvoid GLAPIENTRY __GLES_APINAME(GetMaterialiv)( GLenum face, GLenum pname, GLin
     __GL_GET_CONTEXT;
     gc->currentImmediateTable->GetMaterialiv(gc, face, pname, params);
 }
-GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapfv)( GLenum map, GLfloat *values ){}
-GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapuiv)( GLenum map, GLuint *values ){}
-GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapusv)( GLenum map, GLushort *values ){}
+GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapfv)( GLenum map, GLfloat *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->GetPixelMapfv(gc, map, values);
+}
+GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapuiv)( GLenum map, GLuint *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->GetPixelMapuiv(gc, map, values);
+}
+GLvoid GLAPIENTRY __GLES_APINAME(GetPixelMapusv)( GLenum map, GLushort *values )
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->GetPixelMapusv(gc, map, values);
+}
 GLvoid GLAPIENTRY __GLES_APINAME(GetPolygonStipple)( GLubyte *mask )
 {
     __GL_GET_CONTEXT;
@@ -4989,6 +5019,270 @@ GLint x, GLvoid * buf)
 
 #endif
 
+GLvoid GLAPIENTRY __GLES_APINAME(GetUniformdv)(GLuint program, GLint location, GLdouble* params)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.GetUniformdv(gc, program, location, params);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform1d)(GLint location, GLdouble x)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform1d(gc, location, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform1dv)(GLint location, GLsizei count, const GLdouble* v)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform1dv(gc, location, count, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform2d)(GLint location, GLdouble x, GLdouble y)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform2d(gc, location, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform2dv)(GLint location, GLsizei count, const GLdouble* v)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform2dv(gc, location, count, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform3d)(GLint location, GLdouble x, GLdouble y, GLdouble z)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform3d(gc, location, x, y, z);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform3dv)(GLint location, GLsizei count, const GLdouble* v)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform3dv(gc, location, count, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform4d)(GLint location, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform4d(gc, location, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(Uniform4dv)(GLint location, GLsizei count, const GLdouble* v)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.Uniform4dv(gc, location, count, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix2dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix3dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix4dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix2x3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix2x3dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix2x4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix2x4dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix3x2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix3x2dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix3x4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix3x4dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix4x2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix4x2dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(UniformMatrix4x3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble* value)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.UniformMatrix4x3dv(gc, location, count, transpose, value);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(ClampColor)(GLenum target, GLenum clamp)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->ClampColor(gc, target, clamp);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(BeginConditionalRender)(GLuint id, GLenum mode)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->BeginConditionalRender(gc, id, mode);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(EndConditionalRender)()
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->EndConditionalRender(gc);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI1i)(GLuint index, GLint x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI1i(gc, index, x);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI2i)(GLuint index, GLint x, GLint y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI2i(gc, index, x, y);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI3i)(GLuint index, GLint x, GLint y, GLint z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI3i(gc, index, x, y, z);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI1ui)(GLuint index, GLuint x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI1ui(gc, index, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI2ui)(GLuint index, GLuint x, GLuint y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI2ui(gc, index, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI3ui)(GLuint index, GLuint x, GLuint y, GLuint z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI3ui(gc, index, x, y, z);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI1iv)(GLuint index, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI1iv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI2iv)(GLuint index, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI2iv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI3iv)(GLuint index, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI3iv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI1uiv)(GLuint index, const GLuint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI1uiv(gc, index, v);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI2uiv)(GLuint index, const GLuint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI2uiv(gc, index, v);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI3uiv)(GLuint index, const GLuint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI3uiv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI4bv)(GLuint index, const GLbyte *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI4bv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI4sv)(GLuint index, const GLshort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI4sv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI4ubv)(GLuint index, const GLubyte *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI4ubv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttribI4usv)(GLuint index, const GLushort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttribI4usv(gc, index, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(FramebufferTexture1D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->FramebufferTexture1D(gc, target, attachment, textarget, texture, level);
+}
+
+
+GLvoid GLAPIENTRY __GLES_APINAME(FramebufferTexture3D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->FramebufferTexture3D(gc, target, attachment, textarget, texture, level, zoffset);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(PrimitiveRestartIndex)(GLuint index)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->PrimitiveRestartIndex(gc, index);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(GetActiveUniformName)(GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->GetActiveUniformName(gc, program, uniformIndex, bufSize, length, uniformName);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(MultiDrawArrays)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->MultiDrawArrays(gc, mode, first, count, primcount);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(MultiDrawElements)(GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->MultiDrawElements(gc, mode, count, type, indices, primcount);
+}
 
 __GLesRawDispatchTableStruct __glVIVV_DispatchFuncTable =
 {

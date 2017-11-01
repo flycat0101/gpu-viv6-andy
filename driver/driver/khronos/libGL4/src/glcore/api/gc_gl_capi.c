@@ -15,8 +15,6 @@
 //#include "gc_gl_context.h"
 #include "gc_es_context.h"
 #include "gc_gl_api_inline.c"
-#include "gc_gl_debug.h"
-
 
 
 #if defined(_WIN32)
@@ -27,8 +25,6 @@
 __GL_INLINE GLvoid __glColor3fv(__GLcontext *gc, GLfloat *v)
 {
     GLfloat *current;
-//    __GL_SETUP();
-
 
     if (gc->input.preVertexFormat & __GL_C3F_BIT)
     {
@@ -151,8 +147,6 @@ __GL_INLINE GLvoid __glColor3fv(__GLcontext *gc, GLfloat *v)
 __GL_INLINE GLvoid __glColor4fv(__GLcontext *gc, GLfloat *v)
 {
     GLfloat *current;
-//    __GL_SETUP();
-
 
     if (gc->input.preVertexFormat & __GL_C4F_BIT)
     {
@@ -264,7 +258,6 @@ __GL_INLINE GLvoid __glColor4ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b
     GLuint *uintptr;
     GLfloat *current;
     GLfloat fr, fg, fb, fa;
- //   __GL_SETUP();
 
     if (gc->input.preVertexFormat & __GL_C4UB_BIT)
     {
@@ -375,21 +368,11 @@ __GL_INLINE GLvoid __glColor4ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b
 
 GLvoid APIENTRY __glim_Color3ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3ub", DT_GLubyte, r, DT_GLubyte, g, DT_GLubyte, b, DT_GLnull);
-#endif
-
     __glColor4ub(gc, r, g, b, 255);
 }
 
 GLvoid APIENTRY __glim_Color3ubv(__GLcontext *gc, const GLubyte *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3ubv", DT_GLubyte_ptr, v, DT_GLnull);
-#endif
-
     __glColor4ub(gc, v[0], v[1], v[2], 255);
 }
 
@@ -398,11 +381,6 @@ GLvoid APIENTRY __glim_Color3b(__GLcontext *gc, GLbyte r, GLbyte g, GLbyte b)
     GLubyte ur = __GL_B_TO_UBYTE(r);
     GLubyte ug = __GL_B_TO_UBYTE(g);
     GLubyte ub = __GL_B_TO_UBYTE(b);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3b", DT_GLbyte, r, DT_GLbyte, g, DT_GLbyte, b, DT_GLnull);
-#endif
 
     __glColor4ub(gc, ur, ug, ub, 255);
 }
@@ -413,21 +391,11 @@ GLvoid APIENTRY __glim_Color3bv(__GLcontext *gc, const GLbyte *v)
     GLubyte ug = __GL_B_TO_UBYTE(v[1]);
     GLubyte ub = __GL_B_TO_UBYTE(v[2]);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3bv", DT_GLbyte_ptr, v, DT_GLnull);
-#endif
-
     __glColor4ub(gc, ur, ug, ub, 255);
 }
 
 GLvoid APIENTRY __glim_Color4ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b, GLubyte a)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4ub", DT_GLubyte, r, DT_GLubyte, g, DT_GLubyte, b, DT_GLubyte, a, DT_GLnull);
-#endif
-
     __glColor4ub(gc, r, g, b, a);
 }
 
@@ -437,11 +405,6 @@ GLvoid APIENTRY __glim_Color4ubv(__GLcontext *gc, const GLubyte *v)
      GLubyte ug = __GL_UB_TO_FLOAT(v[1]);
      GLubyte ub = __GL_UB_TO_FLOAT(v[2]);
      GLubyte ua  = __GL_UB_TO_FLOAT(v[3]);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4ubv", DT_GLubyte_ptr, v, DT_GLnull);
-#endif
 
     __glColor4ub(gc, ur, ug, ub, ua);
 }
@@ -453,11 +416,6 @@ GLvoid APIENTRY __glim_Color4b(__GLcontext *gc, GLbyte r, GLbyte g, GLbyte b, GL
     GLubyte ub = __GL_B_TO_UBYTE(b);
     GLubyte ua = __GL_B_TO_UBYTE(a);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4b", DT_GLbyte, r, DT_GLbyte, g, DT_GLbyte, b, DT_GLbyte, a, DT_GLnull);
-#endif
-
     __glColor4ub(gc, ur, ug, ub, ua);
 }
 
@@ -468,22 +426,12 @@ GLvoid APIENTRY __glim_Color4bv(__GLcontext *gc, const GLbyte *v)
     GLubyte ub = __GL_B_TO_UBYTE(v[2]);
     GLubyte ua = __GL_B_TO_UBYTE(v[3]);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4bv", DT_GLbyte_ptr, v, DT_GLnull);
-#endif
-
     __glColor4ub(gc, ur, ug, ub, ua);
 }
 
 GLvoid APIENTRY __glim_Color3f(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3f", DT_GLfloat, r, DT_GLfloat, g, DT_GLfloat, b, DT_GLnull);
-#endif
 
     fv[0] = r;
     fv[1] = g;
@@ -493,22 +441,12 @@ GLvoid APIENTRY __glim_Color3f(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b)
 
 GLvoid APIENTRY __glim_Color3fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3fv", DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glColor3fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Color4f(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4f", DT_GLfloat, r, DT_GLfloat, g, DT_GLfloat, b, DT_GLfloat, a, DT_GLnull);
-#endif
 
     fv[0] = r;
     fv[1] = g;
@@ -519,22 +457,12 @@ GLvoid APIENTRY __glim_Color4f(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b,
 
 GLvoid APIENTRY __glim_Color4fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4fv", DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glColor4fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Color3d(__GLcontext *gc, GLdouble r, GLdouble g, GLdouble b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3d", DT_GLdouble, r, DT_GLdouble, g, DT_GLdouble, b, DT_GLnull);
-#endif
 
     fv[0] = r;
     fv[1] = g;
@@ -546,11 +474,6 @@ GLvoid APIENTRY __glim_Color3dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3dv", DT_GLdouble_ptr, *v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -560,11 +483,6 @@ GLvoid APIENTRY __glim_Color3dv(__GLcontext *gc, const GLdouble *v)
 GLvoid APIENTRY __glim_Color3i(__GLcontext *gc, GLint r, GLint g, GLint b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3i", DT_GLint, r, DT_GLint, g, DT_GLint, b, DT_GLnull);
-#endif
 
     fv[0] = __GL_I_TO_FLOAT(r);
     fv[1] = __GL_I_TO_FLOAT(g);
@@ -576,11 +494,6 @@ GLvoid APIENTRY __glim_Color3iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_I_TO_FLOAT(v[0]);
     fv[1] = __GL_I_TO_FLOAT(v[1]);
     fv[2] = __GL_I_TO_FLOAT(v[2]);
@@ -590,11 +503,6 @@ GLvoid APIENTRY __glim_Color3iv(__GLcontext *gc, const GLint *v)
 GLvoid APIENTRY __glim_Color3ui(__GLcontext *gc, GLuint r, GLuint g, GLuint b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3ui", DT_GLuint, r, DT_GLuint, g, DT_GLuint, b, DT_GLnull);
-#endif
 
     fv[0] = __GL_UI_TO_FLOAT(r);
     fv[1] = __GL_UI_TO_FLOAT(g);
@@ -606,11 +514,6 @@ GLvoid APIENTRY __glim_Color3uiv(__GLcontext *gc, const GLuint *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3uiv", DT_GLuint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_UI_TO_FLOAT(v[0]);
     fv[1] = __GL_UI_TO_FLOAT(v[1]);
     fv[2] = __GL_UI_TO_FLOAT(v[2]);
@@ -620,11 +523,6 @@ GLvoid APIENTRY __glim_Color3uiv(__GLcontext *gc, const GLuint *v)
 GLvoid APIENTRY __glim_Color3s(__GLcontext *gc, GLshort r, GLshort g, GLshort b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3s", DT_GLshort, r, DT_GLshort, g, DT_GLshort, b, DT_GLnull);
-#endif
 
     fv[0] = __GL_S_TO_FLOAT(r);
     fv[1] = __GL_S_TO_FLOAT(g);
@@ -636,11 +534,6 @@ GLvoid APIENTRY __glim_Color3sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_S_TO_FLOAT(v[0]);
     fv[1] = __GL_S_TO_FLOAT(v[1]);
     fv[2] = __GL_S_TO_FLOAT(v[2]);
@@ -650,11 +543,6 @@ GLvoid APIENTRY __glim_Color3sv(__GLcontext *gc, const GLshort *v)
 GLvoid APIENTRY __glim_Color3us(__GLcontext *gc, GLushort r, GLushort g, GLushort b)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3us", DT_GLushort, r, DT_GLushort, g, DT_GLushort, b, DT_GLnull);
-#endif
 
     fv[0] = __GL_US_TO_FLOAT(r);
     fv[1] = __GL_US_TO_FLOAT(g);
@@ -666,11 +554,6 @@ GLvoid APIENTRY __glim_Color3usv(__GLcontext *gc, const GLushort *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color3usv", DT_GLushort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_US_TO_FLOAT(v[0]);
     fv[1] = __GL_US_TO_FLOAT(v[1]);
     fv[2] = __GL_US_TO_FLOAT(v[2]);
@@ -680,11 +563,6 @@ GLvoid APIENTRY __glim_Color3usv(__GLcontext *gc, const GLushort *v)
 GLvoid APIENTRY __glim_Color4d(__GLcontext *gc, GLdouble r, GLdouble g, GLdouble b, GLdouble a)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4d", DT_GLdouble, r, DT_GLdouble, g, DT_GLdouble, b, DT_GLdouble, a, DT_GLnull);
-#endif
 
     fv[0] = r;
     fv[1] = g;
@@ -697,11 +575,6 @@ GLvoid APIENTRY __glim_Color4dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4dv", DT_GLdouble_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = v[0];
     fv[1] = v[1];
     fv[2] = v[2];
@@ -712,11 +585,6 @@ GLvoid APIENTRY __glim_Color4dv(__GLcontext *gc, const GLdouble *v)
 GLvoid APIENTRY __glim_Color4i(__GLcontext *gc, GLint r, GLint g, GLint b, GLint a)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4i", DT_GLint, r, DT_GLint, g, DT_GLint, b, DT_GLint, a, DT_GLnull);
-#endif
 
     fv[0] = __GL_I_TO_FLOAT(r);
     fv[1] = __GL_I_TO_FLOAT(g);
@@ -729,11 +597,6 @@ GLvoid APIENTRY __glim_Color4iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_I_TO_FLOAT(v[0]);
     fv[1] = __GL_I_TO_FLOAT(v[1]);
     fv[2] = __GL_I_TO_FLOAT(v[2]);
@@ -744,11 +607,6 @@ GLvoid APIENTRY __glim_Color4iv(__GLcontext *gc, const GLint *v)
 GLvoid APIENTRY __glim_Color4ui(__GLcontext *gc, GLuint r, GLuint g, GLuint b, GLuint a)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4ui", DT_GLuint, r, DT_GLuint, g, DT_GLuint, b, DT_GLuint, a, DT_GLnull);
-#endif
 
     fv[0] = __GL_UI_TO_FLOAT(r);
     fv[1] = __GL_UI_TO_FLOAT(g);
@@ -761,11 +619,6 @@ GLvoid APIENTRY __glim_Color4uiv(__GLcontext *gc, const GLuint *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4uiv", DT_GLuint_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_UI_TO_FLOAT(v[0]);
     fv[1] = __GL_UI_TO_FLOAT(v[1]);
     fv[2] = __GL_UI_TO_FLOAT(v[2]);
@@ -776,11 +629,6 @@ GLvoid APIENTRY __glim_Color4uiv(__GLcontext *gc, const GLuint *v)
 GLvoid APIENTRY __glim_Color4s(__GLcontext *gc, GLshort r, GLshort g, GLshort b, GLshort a)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4s", DT_GLshort, r, DT_GLshort, g, DT_GLshort, b, DT_GLshort, a, DT_GLnull);
-#endif
 
     fv[0] = __GL_S_TO_FLOAT(r);
     fv[1] = __GL_S_TO_FLOAT(g);
@@ -793,11 +641,6 @@ GLvoid APIENTRY __glim_Color4sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_S_TO_FLOAT(v[0]);
     fv[1] = __GL_S_TO_FLOAT(v[1]);
     fv[2] = __GL_S_TO_FLOAT(v[2]);
@@ -809,11 +652,6 @@ GLvoid APIENTRY __glim_Color4us(__GLcontext *gc, GLushort r, GLushort g, GLushor
 {
     GLfloat fv[4];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4us", DT_GLushort, r, DT_GLushort, g, DT_GLushort, b, DT_GLushort, a, DT_GLnull);
-#endif
-
     fv[0] = __GL_US_TO_FLOAT(r);
     fv[1] = __GL_US_TO_FLOAT(g);
     fv[2] = __GL_US_TO_FLOAT(b);
@@ -824,11 +662,6 @@ GLvoid APIENTRY __glim_Color4us(__GLcontext *gc, GLushort r, GLushort g, GLushor
 GLvoid APIENTRY __glim_Color4usv(__GLcontext *gc, const GLushort *v)
 {
     GLfloat fv[4];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Color4usv", DT_GLushort_ptr, v, DT_GLnull);
-#endif
 
     fv[0] = __GL_US_TO_FLOAT(v[0]);
     fv[1] = __GL_US_TO_FLOAT(v[1]);

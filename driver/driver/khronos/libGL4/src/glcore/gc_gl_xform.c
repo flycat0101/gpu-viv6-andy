@@ -12,7 +12,7 @@
 
 
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
+
 
 #if defined(_WIN32)
 #pragma warning(disable: 4244)
@@ -20,15 +20,15 @@
 
 /*
 ** An amazing thing has happened.  More than 2^32 changes to the projection
-** matrix has occured.  Run through the modelView and projection stacks
-** and reset the sequence numbers to force a revalidate on next usage.
+** matrix has occurred.  Run through the modelView and projection stacks
+** and reset the sequence numbers to force a re-validate on next usage.
 */
 GLvoid __glInvalidateSequenceNumbers(__GLcontext *gc)
 {
     __GLtransform *tr, *lasttr;
     GLuint s;
 
-    /* Make all mvp matricies refer to sequence number zero */
+    /* Make all mvp matrices refer to sequence number zero */
     s = 0;
     tr = &gc->transform.modelViewStack[0];
     lasttr = tr + gc->constants.maxModelViewStackDepth;
@@ -340,7 +340,7 @@ GLvoid __glMultiplyMatrix(__GLcontext *gc, __GLmatrix *m, GLvoid *data)
 GLvoid __glDoLoadMatrix(__GLcontext *gc, const __GLmatrix *m)
 {
     __GLtransform *tr, *otr;
-    GLuint unit,index;
+    GLuint unit;
 
     switch (gc->state.transform.matrixMode) {
       case GL_MODELVIEW:
@@ -391,7 +391,7 @@ __GL_INLINE GLvoid __glDoMultMatrix(__GLcontext *gc, GLvoid *data,
                                   GLvoid (*multiply)(__GLcontext *gc, __GLmatrix *m, GLvoid *data))
 {
     __GLtransform *tr, *otr;
-    GLuint unit,index;
+    GLuint unit;
 
     switch (gc->state.transform.matrixMode) {
       case GL_MODELVIEW:
@@ -671,11 +671,6 @@ GLvoid APIENTRY __glim_MatrixMode(__GLcontext *gc, GLenum mode)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_MatrixMode", DT_GLenum, mode, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     switch (mode)
@@ -706,11 +701,6 @@ GLvoid APIENTRY __glim_LoadIdentity(__GLcontext *gc)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadIdentity", DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     (*gc->transform.loadIdentity)(gc);
@@ -720,11 +710,6 @@ GLvoid APIENTRY __glim_LoadMatrixf(__GLcontext *gc, const GLfloat *m)
 {
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadMatrixf", DT_GLfloat_ptr, m, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -753,11 +738,6 @@ GLvoid APIENTRY __glim_LoadTransposeMatrixf(__GLcontext *gc, const GLfloat *m)
 {
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadTransposeMatrixf", DT_GLfloat_ptr, m, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -788,11 +768,6 @@ GLvoid APIENTRY __glim_LoadMatrixd(__GLcontext *gc, const GLdouble *m)
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadMatrixd", DT_GLdouble_ptr, m, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     m1.matrix[0][0] = m[0];
@@ -820,11 +795,6 @@ GLvoid APIENTRY __glim_LoadTransposeMatrixd(__GLcontext *gc, const GLdouble *m)
 {
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_LoadTransposeMatrixd", DT_GLdouble_ptr, m, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -855,11 +825,6 @@ GLvoid APIENTRY __glim_MultMatrixf(__GLcontext *gc, const GLfloat *m)
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_MultMatrixf", DT_GLfloat_ptr, m, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     m1.matrix[0][0] = m[0];
@@ -889,11 +854,6 @@ GLvoid APIENTRY __glim_MultTransposeMatrixf(__GLcontext *gc, const GLfloat *m)
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_MultTransposeMatrixf", DT_GLfloat_ptr, m, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     m1.matrix[0][0] = m[0];
@@ -921,11 +881,6 @@ GLvoid APIENTRY __glim_MultMatrixd(__GLcontext *gc, const GLdouble *m)
 {
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_MultMatrixd", DT_GLdouble_ptr, m, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -955,11 +910,6 @@ GLvoid APIENTRY __glim_MultTransposeMatrixd(__GLcontext *gc, const GLdouble *m)
     __GLmatrix m1;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_MultTransposeMatrixd", DT_GLdouble_ptr, m, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     m1.matrix[0][0] = m[0];
@@ -987,11 +937,6 @@ GLvoid APIENTRY __glim_Rotatef(__GLcontext *gc, GLfloat angle, GLfloat x, GLfloa
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rotatef", DT_GLfloat, angle, DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     __glDoRotate(gc, angle, x, y, z);
@@ -1000,11 +945,6 @@ GLvoid APIENTRY __glim_Rotatef(__GLcontext *gc, GLfloat angle, GLfloat x, GLfloa
 GLvoid APIENTRY __glim_Rotated(__GLcontext *gc, GLdouble angle, GLdouble x, GLdouble y, GLdouble z)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Rotated", DT_GLdouble, angle, DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -1015,11 +955,6 @@ GLvoid APIENTRY __glim_Scalef(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Scalef", DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     __glDoScale(gc, x, y, z);
@@ -1028,11 +963,6 @@ GLvoid APIENTRY __glim_Scalef(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z)
 GLvoid APIENTRY __glim_Scaled(__GLcontext *gc, GLdouble x, GLdouble y, GLdouble z)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Scaled", DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -1043,11 +973,6 @@ GLvoid APIENTRY __glim_Translatef(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Translatef", DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     __glDoTranslate(gc, x, y, z);
@@ -1056,11 +981,6 @@ GLvoid APIENTRY __glim_Translatef(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat
 GLvoid APIENTRY __glim_Translated(__GLcontext *gc, GLdouble x, GLdouble y, GLdouble z)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Translated", DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -1071,11 +991,6 @@ GLvoid APIENTRY __glim_PushMatrix(__GLcontext *gc)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PushMatrix", DT_GLnull);
-#endif
-
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     (*gc->transform.pushMatrix)(gc);
@@ -1084,11 +999,6 @@ GLvoid APIENTRY __glim_PushMatrix(__GLcontext *gc)
 GLvoid APIENTRY __glim_PopMatrix(__GLcontext *gc)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_PopMatrix", DT_GLnull);
-#endif
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -1102,12 +1012,6 @@ GLvoid APIENTRY __glim_Frustum(__GLcontext *gc, GLdouble left, GLdouble right,
     __GLmatrix m;
     __GLfloat deltaX, deltaY, deltaZ;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Frustum", DT_GLdouble, left, DT_GLdouble,right, DT_GLdouble,bottom, DT_GLdouble,top,
-        DT_GLdouble,zNear, DT_GLdouble,zFar, DT_GLnull);
-#endif
 
     deltaX = right - left;
     deltaY = top - bottom;
@@ -1140,12 +1044,6 @@ GLvoid APIENTRY __glim_Ortho(__GLcontext *gc, GLdouble left, GLdouble right, GLd
     GLdouble deltax, deltay, deltaz;
     GLdouble zero;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Ortho", DT_GLdouble, left, DT_GLdouble, right, DT_GLdouble, bottom,
-        DT_GLdouble, top, DT_GLdouble, zNear, DT_GLdouble, zFar, DT_GLnull);
-#endif
 
     deltax = right - left;
     deltay = top - bottom;

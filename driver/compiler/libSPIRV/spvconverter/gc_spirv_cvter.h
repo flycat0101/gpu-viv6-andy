@@ -30,6 +30,35 @@ typedef enum SPV_SPECFLAG
     SPV_SPECFLAG_SPECIFIED_LOCAL_SIZE   = 0x00000002,
 } Spv_SpecFlag;
 
+typedef enum SPV_ATTACHMENTFLAG
+{
+    SPV_ATTACHMENTFLAG_NONE             = 0x00000000,
+    SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER = 0x00000001,
+    SPV_ATTACHMENTFLAG_MULTI_SAMPLE     = 0x00000002,
+} Spv_AttachmentFlag;
+
+typedef struct
+{
+    gctUINT32 format;
+    Spv_AttachmentFlag attachmentFlag;
+}SpvAttachmentDesc;
+
+#define __SPV_MAX_RENDER_TARGETS 4
+typedef struct SpvRenderSubPassInfoRec
+{
+    gctUINT32 input_attachment_index[__SPV_MAX_RENDER_TARGETS];
+
+}SpvRenderSubPassInfo;
+
+typedef struct
+{
+    gctUINT attachmentCount;
+    SpvAttachmentDesc * attachments;
+
+    gctUINT subPassInfoCount;
+    SpvRenderSubPassInfo *subPassInfo;
+}SpvRenderPassInfo;
+
 typedef struct SpvDecodeInfo{
     gctUINT * binary;
     gctUINT sizeInByte;
@@ -38,7 +67,7 @@ typedef struct SpvDecodeInfo{
     gctUINT localSize[3];
     gctUINT tcsInputVertices;
     gctPOINTER funcCtx;
-    gctPOINTER renderpassInfo;
+    SpvRenderPassInfo* renderpassInfo;
     gctUINT subPass;
 }SpvDecodeInfo;
 

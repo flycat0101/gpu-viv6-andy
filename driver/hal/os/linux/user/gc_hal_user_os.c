@@ -208,7 +208,7 @@ OnError:;
 }
 #endif
 
-#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
+#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D || gcdDUMP_2DVG
 static void
 _SetDumpFileInfo(
     )
@@ -219,7 +219,7 @@ _SetDumpFileInfo(
     gcsTLS_PTR tls;
 #endif
 
-#if gcdDUMP || gcdDUMP_2D
+#if gcdDUMP || gcdDUMP_2D || gcdDUMP_2DVG
     #define DUMP_FILE_PREFIX   "hal"
 #else
     #define DUMP_FILE_PREFIX   "api"
@@ -622,6 +622,7 @@ _OpenGalLib(
     gctSTRING   fullPath = gcvNULL;
     gctINT32    len;
     gctHANDLE   handle = gcvNULL;
+    gctSTRING   saveptr = gcvNULL;
 
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
@@ -644,7 +645,7 @@ _OpenGalLib(
             }
 
             strncpy(envPath, path, len);
-            oneEnvPath = strtok(envPath, ":");
+            oneEnvPath = strtok_r(envPath, ":", &saveptr);
 
             while (oneEnvPath != NULL)
             {
@@ -657,7 +658,7 @@ _OpenGalLib(
                     break;
                 }
 
-                oneEnvPath = strtok(NULL, ":");
+                oneEnvPath = strtok_r(NULL, ":", &saveptr);
             }
         }
 
@@ -1374,7 +1375,7 @@ _GetTLS(
             gcmONERROR(gcoOS_AtomIncrement(gcPLS.os, gcPLS.reference, gcvNULL));
         }
 
-#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
+#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D || gcdDUMP_2DVG
         _SetDumpFileInfo();
 #endif
     }
@@ -1507,7 +1508,7 @@ gceSTATUS gcoOS_CopyTLS(IN gcsTLS_PTR Source)
 
     tls->currentHardware = gcvNULL;
 
-#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
+#if gcdDUMP || gcdDUMP_API || gcdDUMP_2D || gcdDUMP_2DVG
     _SetDumpFileInfo();
 #endif
 
@@ -4674,23 +4675,24 @@ gceSTATUS gcoOS_HexStrToFloat(IN gctCONST_STRING String,
     gctCONST_STRING delim = "x.p";
     gctFLOAT b=0.0, exp=0.0;
     gctINT s=0;
+    gctSTRING saveptr;
 
     gcmHEADER_ARG("String=%s", gcmOPT_STRING(String));
     gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(Float != gcvNULL);
 
-    pch = strtok((gctSTRING)String, delim);
+    pch = strtok_r((gctSTRING)String, delim, &saveptr);
     if (pch == NULL) goto onError;
 
-    pch = strtok(NULL, delim);
+    pch = strtok_r(NULL, delim, &saveptr);
     if (pch == NULL) goto onError;
     gcmVERIFY_OK(gcoOS_StrToFloat(pch, &b));
 
-    pch = strtok(NULL, delim);
+    pch = strtok_r(NULL, delim, &saveptr);
     if (pch == NULL) goto onError;
     gcmVERIFY_OK(gcoOS_HexStrToInt(pch, &s));
 
-    pch = strtok(NULL, delim);
+    pch = strtok_r(NULL, delim, &saveptr);
     if (pch == NULL) goto onError;
     gcmVERIFY_OK(gcoOS_StrToFloat(pch, &exp));
 

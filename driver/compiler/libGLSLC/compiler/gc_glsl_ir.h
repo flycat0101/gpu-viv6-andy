@@ -361,7 +361,8 @@ typedef enum _sleTES_PRIMITIVE_MODE
 typedef enum _sleTES_VERTEX_SPACING
 {
     slvTES_VERTEX_SPACING_NONE                          = -1,
-    slvTES_VERTEX_SPACING_EQUAL_SPACING,
+    slvTES_VERTEX_SPACING_DEFAULT                       = 0,
+    slvTES_VERTEX_SPACING_EQUAL_SPACING                 = 0,
     slvTES_VERTEX_SPACING_FRACTIONAL_EVEN_SPACING,
     slvTES_VERTEX_SPACING_FRACTIONAL_ODD_SPACING,
 } slvTES_VERTEX_SPACING;
@@ -369,7 +370,8 @@ typedef enum _sleTES_VERTEX_SPACING
 typedef enum _sleTES_ORDERING
 {
     slvTES_ORDERING_NONE                                = -1,
-    slvTES_ORDERING_CCW,
+    slvTES_ORDERING_DEFAULT                             = 0,
+    slvTES_ORDERING_CCW                                 = 0,
     slvTES_ORDERING_CW,
 } slvTES_ORDERING;
 
@@ -416,8 +418,8 @@ typedef struct _slsLAYOUT_QUALIFIER
     do \
     { \
         gcoOS_ZeroMemory(Layout, gcmSIZEOF(slsLAYOUT_QUALIFIER)); \
-        (Layout)->tesVertexSpacing      = slvTES_VERTEX_SPACING_EQUAL_SPACING; \
-        (Layout)->tesOrdering           = slvTES_ORDERING_CCW; \
+        (Layout)->tesVertexSpacing      = slvTES_VERTEX_SPACING_NONE; \
+        (Layout)->tesOrdering           = slvTES_ORDERING_NONE; \
         (Layout)->tesPointMode          = slvTES_POINT_MODE_NONE; \
         (Layout)->gsPrimitive           = slvGS_PRIMITIVE_NONE; \
         (Layout)->gsInvocationTime      = -1; \
@@ -1359,21 +1361,31 @@ slsNAME_Dump(
 
 typedef enum _sleNAME_SPACE_TYPE
 {
-    slvNAME_SPACE_NONE          = 0,
-    slvNAME_SPACE_BUILTIN       = 1,
-    slvNAME_SPACE_DECL_SET      = 2,
-    slvNAME_SPACE_STATE_SET     = 3,
-    slvNAME_SPACE_FUNCTION      = 4,
-    slvNAME_SPACE_IO_BLOCK      = 5,
-    slvNAME_SPACE_STRUCT        = 6
+    slvNAME_SPACE_TYPE_NONE          = 0,
+    slvNAME_SPACE_TYPE_BUILTIN       = 1,
+    slvNAME_SPACE_TYPE_DECL_SET      = 2,
+    slvNAME_SPACE_TYPE_STATE_SET     = 3,
+    slvNAME_SPACE_TYPE_SELECT_SET    = 4,
+    slvNAME_SPACE_TYPE_LOOP_SET      = 5,
+    slvNAME_SPACE_TYPE_FUNCTION      = 6,
+    slvNAME_SPACE_TYPE_IO_BLOCK      = 7,
+    slvNAME_SPACE_TYPE_STRUCT        = 8
 }
 sleNAME_SPACE_TYPE;
+
+typedef enum _sleNAME_SPACE_FLAGS
+{
+    sleNAME_SPACE_FLAGS_NONE                = 0,
+    sleNAME_SPACE_FLAGS_RETURN_INSERTED     = 1,
+}
+sleNAME_SPACE_FLAGS;
 
 typedef struct _slsNAME_SPACE
 {
     slsDLINK_NODE            node;
     struct _slsNAME_SPACE *  parent;
     sleNAME_SPACE_TYPE       nameSpaceType;
+    sleNAME_SPACE_FLAGS      nameSpaceFlags;
     slsDLINK_LIST            names;
     slsDLINK_LIST            subSpaces;
     /* Precision has same scope rule as variables, so put it */
@@ -1570,6 +1582,11 @@ slsNAME_SPACE *
 sloCOMPILER_GetCurrentSpace(
 IN sloCOMPILER Compiler
 );
+
+slsNAME_SPACE *
+sloCOMPILER_GetCurrentFunctionSpace(
+    IN sloCOMPILER Compiler
+    );
 
 slsNAME_SPACE *
 sloCOMPILER_GetGlobalSpace(

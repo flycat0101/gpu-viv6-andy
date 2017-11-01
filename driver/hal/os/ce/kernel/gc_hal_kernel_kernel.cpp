@@ -256,6 +256,7 @@ gceSTATUS gckKERNEL_MapVideoMemory(
                                       gcvCORE_MAJOR,
                                       InUserSpace,
                                       Address,
+                                      gcvPOOL_DEFAULT,
                                       Logical);
 }
 /*******************************************************************************
@@ -287,6 +288,7 @@ gceSTATUS gckKERNEL_MapVideoMemoryEx(
     IN gceCORE   Core,
     IN gctBOOL InUserSpace,
     IN gctUINT32 Address,
+    IN gcePOOL Pool,
     OUT gctPOINTER * Logical
     )
 {

@@ -42,7 +42,9 @@
 **
 */
 gceSTATUS
-gcoCLHardware_Construct()
+gcoCLHardware_Construct(
+    void
+    )
 {
     gceSTATUS status;
     gcmHEADER();
@@ -6114,8 +6116,7 @@ gceSTATUS
 gco3D_SetTarget(
     IN gco3D Engine,
     IN gctUINT32 TargetIndex,
-    IN gcoSURF Surface,
-    IN gctUINT32 SliceIndex,
+    IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex
     )
 {
@@ -6132,10 +6133,10 @@ gco3D_UnsetTarget(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS gco3D_SetDepth(
+gceSTATUS
+gco3D_SetDepth(
     IN gco3D Engine,
-    IN gcoSURF Surface,
-    IN gctUINT32 SliceIndex
+    IN gcsSURF_VIEW *SurfView
     )
 {
     return gcvSTATUS_OK;
@@ -6447,7 +6448,6 @@ gceSTATUS gco3D_EnableDither(
 
 gceSTATUS gco3D_SetColorWrite(
     IN gco3D Engine,
-    IN gctUINT Index,
     IN gctUINT8 Enable
     )
 {
@@ -6616,7 +6616,8 @@ gceSTATUS gco3D_SetAlphaCompare(
 
 gceSTATUS gco3D_SetAlphaReference(
     IN gco3D Engine,
-    IN gctUINT8 Reference
+    IN gctUINT8 Reference,
+    IN gctFLOAT FloatReference
     )
 {
     return gcvSTATUS_OK;
@@ -6677,7 +6678,7 @@ gco3D_DrawInstancedPrimitives(
     IN gco3D Engine,
     IN gcePRIMITIVE Type,
     IN gctBOOL DrawIndex,
-    IN gctSIZE_T StartVertex,
+    IN gctINT    StartVertex,
     IN gctSIZE_T StartIndex,
     IN gctSIZE_T PrimitiveCount,
     IN gctSIZE_T VertexCount,
@@ -7070,7 +7071,7 @@ gco3D_GetQuery(
     IN gctUINT32    Size,
     IN gctPOINTER   Locked,
     OUT gctINT32 * Index
-    );
+    )
 {
     return gcvSTATUS_OK;
 }
@@ -7143,6 +7144,7 @@ gco3D_SetSampleMask(
 }
 
 
+gceSTATUS
 gco3D_EnableSampleShading(
     IN gco3D Engine,
     IN gctBOOL Enable
@@ -7206,6 +7208,123 @@ gco3D_QueryReset(
     )
 {
     return gcvSTATUS_FALSE;
+}
+
+gceSTATUS
+gco3D_DrawIndirectPrimitives(
+    IN gco3D Engine,
+    IN gcePRIMITIVE Type,
+    IN gctBOOL DrawIndex,
+    IN gctINT BaseOffset,
+    IN gcoBUFOBJ BufObj
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_DrawNullPrimitives(
+    IN gco3D Engine
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_DrawPattern(
+    IN gco3D Engine,
+    IN gcsFAST_FLUSH_PTR FastFlushInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_GetClosestRenderFormat(
+    IN gco3D Engine,
+    IN gceSURF_FORMAT InFormat,
+    OUT gceSURF_FORMAT* OutFormat
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_IsProgramSwitched(
+    IN gco3D Engine
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_MultiDrawIndirectPrimitives(
+    IN gco3D Engine,
+    IN gcePRIMITIVE Type,
+    IN gctBOOL DrawIndex,
+    IN gctINT BaseOffset,
+    IN gctINT DrawCount,
+    IN gctINT Stride,
+    IN gcoBUFOBJ BufObj
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_Set3DEngine(
+     IN gco3D Engine
+     )
+{
+    return gcvSTATUS_OK;
+}
+
+ gceSTATUS
+ gco3D_SetAlphaKill(
+     IN gco3D Engine,
+     IN gctBOOL AlphaKill,
+     IN gctBOOL ColorKill
+     )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_SetEarlyDepthFromAPP(
+    IN gco3D Engine,
+    IN gctBOOL EarlyDepthFromAPP
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_SetPatchVertices(
+    IN gco3D Engine,
+    IN gctINT PatchVertices
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_SetPrimitiveIdEnable(
+    IN gco3D Engine,
+    IN gctBOOL Enable
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gco3D_SetRADepthWrite(
+    IN gco3D Engine,
+    IN gctBOOL Disable,
+    IN gctBOOL psReadZ,
+    IN gctBOOL psReadW
+    )
+{
+    return gcvSTATUS_OK;
 }
 
 

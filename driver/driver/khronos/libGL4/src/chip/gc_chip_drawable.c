@@ -24,6 +24,7 @@ extern GLboolean  createRenderBuffer(__GLcontext *gc, glsCHIPBUFFERCREATE * chip
 extern GLvoid initAccumOperationPatch(__GLcontext* gc);
 extern gceSTATUS __glChipDestroyRenderBuffer(glCHIPBUFFERDESSTROY* chipDestroyInfo);
 #endif
+
 /***************************************************************************/
 /* Implementation for internal functions                                   */
 /***************************************************************************/
@@ -38,12 +39,12 @@ gcChipPickDrawBuffersForDrawable(
     gcsSURF_VIEW         rtViews[__GL_MAX_DRAW_BUFFERS];
     gcsSURF_VIEW         dView = {gcvNULL, 0, 1};
     gcsSURF_VIEW         sView = {gcvNULL, 0, 1};
-    GLint               sBpp = 0;
-    GLboolean           yInverted = GL_FALSE;
-    GLuint              samples = 0;
-    GLuint              i;
-    gceSTATUS           status = gcvSTATUS_OK;
-    GLuint              rtNum = 0;
+    GLint                sBpp = 0;
+    GLboolean            yInverted = GL_FALSE;
+    GLuint               samples = 0;
+    gceSTATUS            status = gcvSTATUS_OK;
+    GLuint               i;
+    GLuint rtNum = 0;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
@@ -55,21 +56,109 @@ gcChipPickDrawBuffersForDrawable(
 
     if (drawable)
     {
-#ifdef OPENGL40
-        gcsRECT clearRect = {0, };
+        gcsRECT clearRect = {0};
         gctBOOL fullClear = gcvFALSE;
+
+#ifdef OPENGL40
         gctBOOL bDrawToFront = gcvFALSE;
-        rtViews[0].surf = (gcoSURF)drawable->rtHandle[0];
-        dView.surf      = (gcoSURF)drawable->depthHandle;
-        sView.surf      = (gcoSURF)drawable->stencilHandle;
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        {
+            switch (gc->state.raster.drawBuffers[i])
+            {
+            case GL_FRONT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                if (drawable->modes.stereoMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                }
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            case GL_FRONT_LEFT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            case GL_FRONT_RIGHT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            case GL_BACK:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                if (drawable->modes.stereoMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                }
+                break;
+
+            case GL_BACK_LEFT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                break;
+
+            case GL_BACK_RIGHT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                break;
+
+            case GL_LEFT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                gc->state.raster.drawBuffers[0] = GL_FRONT_LEFT;
+                if (gc->modes.doubleBufferMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                }
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            case GL_RIGHT:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                if (gc->modes.doubleBufferMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                }
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            case GL_FRONT_AND_BACK:
+                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                if (drawable->modes.stereoMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                }
+                if (gc->modes.doubleBufferMode)
+                {
+                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                    if (drawable->modes.stereoMode)
+                    {
+                        rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                    }
+                }
+                bDrawToFront  = GL_TRUE;
+                break;
+
+            }
+        }
+
+        if (bDrawToFront)
+        {
+            gc->flags |= __GL_CONTEXT_DRAW_TO_FRONT;
+        }
+        else
+        {
+            gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
+        }
+#else
+        rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[0];
+#endif
 
         if (gc->flags & __GL_CONTEXT_SKIP_PRESERVE_CLEAR_RECT)
         {
+            /* Assume all RT should have same dimension */
             if (gc->state.enables.scissorTest)
             {
                 GLint width, height;
                 __GLscissor *pScissor = &gc->state.scissor;
-                gcmVERIFY_OK(gcoSURF_GetSize(rtViews[0].surf, (gctUINT *) &width, (gctUINT *) &height, gcvNULL));
+                gcmVERIFY_OK(gcoSURF_GetSize(rtViews[0].surf, (gctUINT*)&width, (gctUINT*)&height, gcvNULL));
 
                 clearRect.left   = __GL_MIN(__GL_MAX(0, pScissor->scissorX), width);
                 clearRect.top    = __GL_MIN(__GL_MAX(0, pScissor->scissorY), height);
@@ -89,123 +178,27 @@ gcChipPickDrawBuffersForDrawable(
                 fullClear = gcvTRUE;
             }
         }
-        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+
+        for (i = 0; i < rtNum; ++i)
         {
-            if (gc->state.raster.drawBuffers[i] == GL_FRONT_LEFT)
-            {
-                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
-                bDrawToFront  = GL_TRUE;
-            }
-            else
-            {
-                if (gc->state.raster.drawBuffers[i] == GL_FRONT)
-                {
-                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
-                    if(drawable->modes.stereoMode)
-                    {
-                        rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-                    }
-                    bDrawToFront  = GL_TRUE;
-                }
-                else
-                {
-                    if (gc->state.raster.drawBuffers[i] == GL_FRONT_RIGHT)
-                    {
-                        rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-                        bDrawToFront  = GL_TRUE;
-                    }
-                    else
-                    {
-                        if (gc->state.raster.drawBuffers[i] == GL_BACK_LEFT)
-                        {
-                            rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX];
-                        }
-                        else
-                        {
-                            if (gc->state.raster.drawBuffers[i] == GL_BACK)
-                            {
-                                rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX];
-                                if(drawable->modes.stereoMode)
-                                {
-                                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-                                }
-                            }
-                            else
-                            {
-                                if (gc->state.raster.drawBuffers[i] == GL_BACK_RIGHT)
-                                {
-                                    rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandle[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-                                }
-                            }
+            gcoSURF thisRT = rtViews[i].surf;
+            gcoSURF prevRT = (gcoSURF)drawable->prevRtHandles[i];
 
-                        }
-                    }
-                }
-            }
-
-            if (rtViews[i].surf && drawable->prevRtHandle &&
-                !gcoSURF_QueryFlags(rtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED) &&
-                gcoSURF_QueryFlags(rtViews[i].surf, gcvSURF_FLAG_CONTENT_PRESERVED))
+            if (thisRT && prevRT &&
+                !gcoSURF_QueryFlags(thisRT, gcvSURF_FLAG_CONTENT_UPDATED) &&
+                gcoSURF_QueryFlags(thisRT, gcvSURF_FLAG_CONTENT_PRESERVED))
             {
-
                 if (!fullClear)
                 {
-                    gcoSURF prev = (gcoSURF) drawable->prevRtHandle;
-                    gcmVERIFY_OK(gcoSURF_Preserve(prev, rtViews[i].surf, &clearRect));
+                    gcmVERIFY_OK(gcoSURF_Preserve(prevRT, thisRT, &clearRect));
                 }
 
-                gcmVERIFY_OK(gcoSURF_SetFlags(rtViews[i].surf, gcvSURF_FLAG_CONTENT_PRESERVED, gcvFALSE));
+                gcmVERIFY_OK(gcoSURF_SetFlags(thisRT, gcvSURF_FLAG_CONTENT_PRESERVED, gcvFALSE));
             }
         }
-#else
-        rtViews[0].surf = (gcoSURF)drawable->rtHandle;
+
         dView.surf      = (gcoSURF)drawable->depthHandle;
         sView.surf      = (gcoSURF)drawable->stencilHandle;
-
-        if (rtViews[0].surf && drawable->prevRtHandle &&
-            !gcoSURF_QueryFlags(rtViews[0].surf, gcvSURF_FLAG_CONTENT_UPDATED) &&
-            gcoSURF_QueryFlags(rtViews[0].surf, gcvSURF_FLAG_CONTENT_PRESERVED))
-        {
-            gcsRECT clearRect = {0, };
-            gctBOOL fullClear = gcvFALSE;
-
-            if (gc->flags & __GL_CONTEXT_SKIP_PRESERVE_CLEAR_RECT)
-            {
-                if (gc->state.enables.scissorTest)
-                {
-                    GLint width, height;
-                    __GLscissor *pScissor = &gc->state.scissor;
-                    gcmVERIFY_OK(gcoSURF_GetSize(rtViews[0].surf, (gctUINT *) &width, (gctUINT *) &height, gcvNULL));
-
-                    clearRect.left   = __GL_MIN(__GL_MAX(0, pScissor->scissorX), width);
-                    clearRect.top    = __GL_MIN(__GL_MAX(0, pScissor->scissorY), height);
-                    clearRect.right  = __GL_MIN(__GL_MAX(0, pScissor->scissorX + pScissor->scissorWidth), width);
-                    clearRect.bottom = __GL_MIN(__GL_MAX(0, pScissor->scissorY + pScissor->scissorHeight), height);
-
-                    if ((clearRect.left   == 0) &&
-                        (clearRect.top    == 0) &&
-                        (clearRect.right  == (gctINT) width) &&
-                        (clearRect.bottom == (gctINT) height))
-                    {
-                        fullClear = gcvTRUE;
-                    }
-                }
-                else
-                {
-                    fullClear = gcvTRUE;
-                }
-            }
-
-            if (!fullClear)
-            {
-                gcoSURF prev = (gcoSURF) drawable->prevRtHandle;
-                gcmVERIFY_OK(gcoSURF_Preserve(prev, rtViews[0].surf, &clearRect));
-            }
-
-            gcmVERIFY_OK(gcoSURF_SetFlags(rtViews[0].surf, gcvSURF_FLAG_CONTENT_PRESERVED, gcvFALSE));
-        }
-#endif
-
 
         if (rtViews[0].surf)
         {
@@ -227,17 +220,6 @@ gcChipPickDrawBuffersForDrawable(
         {
             sBpp = drawable->dsFormatInfo->stencilSize;
         }
-
-#ifdef OPENGL40
-        if (bDrawToFront)
-        {
-            gc->flags |= __GL_CONTEXT_DRAW_TO_FRONT;
-        }
-        else
-        {
-            gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
-        }
-#endif
     }
 
     if (chipCtx->drawStencilMask != (GLuint) ((1 << sBpp) - 1))
@@ -246,7 +228,7 @@ gcChipPickDrawBuffersForDrawable(
         chipCtx->chipDirty.uDefer.sDefer.stencilRef = 1;
     }
 
-    gc->state.raster.mrtEnable = GL_FALSE;
+    gc->state.raster.mrtEnable = (rtNum > 1);
 
     gcmONERROR(gcChipSetDrawBuffers(gc,
                                     0,
@@ -276,53 +258,52 @@ gcChipPickReadBufferForDrawable(
     gcsSURF_VIEW         rtView = {gcvNULL, 0, 1};
     gcsSURF_VIEW         dView  = {gcvNULL, 0, 1};
     gcsSURF_VIEW         sView  = {gcvNULL, 0, 1};
-    GLboolean           yInverted = GL_FALSE;
-    gceSTATUS           status = gcvSTATUS_OK;
-    GLuint                 rtIndex;
+    GLboolean            yInverted = GL_FALSE;
+    gceSTATUS            status = gcvSTATUS_OK;
+    GLuint               readIdx = 0;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     if (readable)
     {
 #ifdef OPENGL40
-    switch (gc->state.pixel.readBuffer)
-    {
-        case GL_FRONT_LEFT:
-        case GL_LEFT:
+        switch (gc->state.pixel.readBuffer)
+        {
         case GL_FRONT:
-            rtView.surf = (gcoSURF)readable->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+        case GL_LEFT:
+        case GL_FRONT_LEFT:
+        case GL_FRONT_AND_BACK:
+            readIdx = __GL_DRAWBUFFER_FRONTLEFT_INDEX;
+            break;
+
+        case GL_RIGHT:
+        case GL_FRONT_RIGHT:
+            readIdx = __GL_DRAWBUFFER_FRONTRIGHT_INDEX;
             break;
 
         case GL_BACK_LEFT:
         case GL_BACK:
-            rtView.surf = (gcoSURF)readable->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX];
-         break;
-
-        case GL_RIGHT:
-        case GL_FRONT_RIGHT:
-            rtView.surf = (gcoSURF)readable->rtHandle[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-       break;
+            readIdx = __GL_DRAWBUFFER_BACKLEFT_INDEX;
+            break;
 
         case GL_BACK_RIGHT:
-            rtView.surf = (gcoSURF)readable->rtHandle[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-        break;
-
+            readIdx = __GL_DRAWBUFFER_BACKRIGHT_INDEX;
+            break;
 
         default:
             break;
-    }
-#else
-        rtView.surf = (gcoSURF)readable->rtHandle;
+        }
 #endif
+        rtView.surf = (gcoSURF)readable->rtHandles[readIdx];
         dView.surf  = (gcoSURF)readable->depthHandle;
         sView.surf  = (gcoSURF)readable->stencilHandle;
 
 #if gcdENABLE_BLIT_BUFFER_PRESERVE
-        if (rtView.surf && readable->prevRtHandle &&
+        if (rtView.surf && readable->prevRtHandles[readIdx] &&
             !gcoSURF_QueryFlags(rtView.surf, gcvSURF_FLAG_CONTENT_UPDATED) &&
             gcoSURF_QueryFlags(rtView.surf, gcvSURF_FLAG_CONTENT_PRESERVED))
         {
-            gcoSURF prev = (gcoSURF) readable->prevRtHandle;
+            gcoSURF prev = (gcoSURF)readable->prevRtHandles[readIdx];
             gcmVERIFY_OK(gcoSURF_Preserve(prev, rtView.surf, gcvNULL));
             gcmVERIFY_OK(gcoSURF_SetFlags(rtView.surf, gcvSURF_FLAG_CONTENT_PRESERVED, gcvFALSE));
         }
@@ -382,7 +363,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean
@@ -420,31 +400,48 @@ __glChipDetachDrawable(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLdrawablePrivate *drawable = gc->drawablePrivate;
     __GLdrawablePrivate *readable = gc->readablePrivate;
-
-    gcoSURF *surfList;
+    gcoSURF surfList[__GL_MAX_DRAW_BUFFERS * 2 + 4];
     GLuint surfCount = 0;
-    gcmHEADER_ARG("gc=0x%x", gc);
+    GLuint i;
 
-    surfList = (gcoSURF*)(*gc->imports.calloc)(gc, __GL_CHIP_SURF_COUNT, sizeof(GLuint*));
+    gcmHEADER_ARG("gc=0x%x", gc);
 
     if (drawable)
     {
-        if (drawable->rtHandle)
-            surfList[surfCount++] = (gcoSURF)drawable->rtHandle;
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        {
+            if (drawable->rtHandles[i])
+            {
+                surfList[surfCount++] = (gcoSURF)drawable->rtHandles[i];
+            }
+        }
         if (drawable->depthHandle)
+        {
             surfList[surfCount++] = (gcoSURF)drawable->depthHandle;
+        }
         if (drawable->stencilHandle)
+        {
             surfList[surfCount++] = (gcoSURF)drawable->stencilHandle;
+        }
     }
 
     if (readable)
     {
-        if (readable->rtHandle)
-            surfList[surfCount++] = (gcoSURF)readable->rtHandle;
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        {
+            if (readable->rtHandles[i])
+            {
+                surfList[surfCount++] = (gcoSURF)readable->rtHandles[i];
+            }
+        }
         if (readable->depthHandle)
+        {
             surfList[surfCount++] = (gcoSURF)readable->depthHandle;
+        }
         if (readable->stencilHandle)
+        {
             surfList[surfCount++] = (gcoSURF)readable->stencilHandle;
+        }
     }
 
     GL_ASSERT(surfCount <= __GL_CHIP_SURF_COUNT);
@@ -454,8 +451,6 @@ __glChipDetachDrawable(
         gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
     }
 
-    (*gc->imports.free)(gc, surfList);
-
     gcmFOOTER_NO();
     return;
 }
@@ -463,18 +458,15 @@ __glChipDetachDrawable(
 
 GLboolean
 __glChipUpdateDrawable(
-    __GLdrawablePrivate *drawable,
-    GLvoid* rtHandle,
-    GLvoid* depthHandle,
-    GLvoid *stencilHandle
+    __GLdrawablePrivate *drawable
     )
 {
     gcePATCH_ID patchId = gcvPATCH_INVALID;
     __GLchipDrawable *chipDrawable = (__GLchipDrawable*)drawable->privateData;
     gceSTATUS status = gcvSTATUS_OK;
+    GLboolean ret;
 
-    gcmHEADER_ARG("drawable=0x%x rtHandle=0x%x depthHandle=0x%x stencilHandle=0x%x",
-                   drawable, rtHandle, depthHandle, stencilHandle);
+    gcmHEADER_ARG("drawable=%p", drawable);
 
     /* Get PatchID from HAL in the very beginning */
     gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
@@ -488,12 +480,6 @@ __glChipUpdateDrawable(
         gcoOS_ZeroMemory(chipDrawable, gcmSIZEOF(__GLchipDrawable));
         drawable->privateData = chipDrawable;
     }
-
-    chipDrawable->width          = drawable->width;
-    chipDrawable->height         = drawable->height;
-    chipDrawable->rtSurface      = (gcoSURF)rtHandle;
-    chipDrawable->depthSurface   = (gcoSURF)depthHandle;
-    chipDrawable->stencilSurface = (gcoSURF)stencilHandle;
 
     /* Only enable stencil opt for those conformance tests */
     if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
@@ -524,12 +510,10 @@ __glChipUpdateDrawable(
         }
     }
 
-    gcmFOOTER_ARG("return=%d", GL_TRUE);
-    return GL_TRUE;
-
 OnError:
-    gcmFOOTER_ARG("return=%d", GL_FALSE);
-    return GL_FALSE;
+    ret = gcmIS_ERROR(status) ? GL_FALSE : GL_TRUE;
+    gcmFOOTER_ARG("return=%d", ret);
+    return ret;
 }
 
 GLvoid
@@ -727,7 +711,7 @@ GLvoid notifyChangeBufferSizePBuffer(__GLcontext * gc)
         /*Flush before destroy,since maybe command buffer still refer to these resources*/
 
         /* Free all video memory */
-        if(draw->dp.freeBuffers)
+        if (draw->dp.freeBuffers)
             draw->dp.freeBuffers(draw, GL_TRUE);
 
         if(draw->width != 0 && draw->height != 0)
@@ -793,7 +777,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
             chipCreateInfo.poolType = gcvPOOL_DEFAULT;
             chipCreateInfo.surfType = gcvSURF_RENDER_TARGET;
 
-            retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF *)&draw->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
+            retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF*)&draw->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
 
             /* set multisample parameters */
             chipCreateInfo.sampleBuffers = draw->modes.sampleBuffers;
@@ -806,7 +790,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
                 chipCreateInfo.poolType = gcvPOOL_DEFAULT;
                 chipCreateInfo.surfType = gcvSURF_RENDER_TARGET;
                 chipCreateInfo.bufInfo = (GLvoid *)&draw->drawBuffers[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-                retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF *)&draw->rtHandle[__GL_DRAWBUFFER_FRONTRIGHT_INDEX]);
+                retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF*)&draw->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX]);
             }
 
             if((draw->modes.doubleBufferMode) && (retValue))
@@ -817,14 +801,14 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
                 chipCreateInfo.poolType = gcvPOOL_DEFAULT;
                 chipCreateInfo.surfType = gcvSURF_RENDER_TARGET;
                 chipCreateInfo.bufInfo = (GLvoid *)&draw->backBuffer[__GL_BACK_BUFFER0];
-                retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF *)&draw->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
+                retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF*)&draw->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
                 /*backrightbuffer: create the backright buffer*/
                 if ((draw->modes.stereoMode) && (retValue))
                 {
                     draw->drawBuffers[__GL_DRAWBUFFER_BACKRIGHT_INDEX].deviceFormatInfo = pformatInfo;
                     chipCreateInfo.flags = __GL_BACK_BUFFER;
                     chipCreateInfo.bufInfo = (GLvoid *)&draw->drawBuffers[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-                    retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF *)&draw->rtHandle[__GL_DRAWBUFFER_BACKRIGHT_INDEX]);
+                    retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF*)&draw->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX]);
                 }
             }
 
@@ -922,9 +906,9 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
         }
     }
 
-    if ( retValue )
+    if (retValue)
     {
-        __glChipUpdateDrawable(draw, draw->rtHandle, draw->depthHandle, draw->stencilHandle);
+        __glChipUpdateDrawable(draw);
     }
     gcmFOOTER_NO();
     return;
@@ -981,28 +965,28 @@ GLvoid exchangeBufferHandles(__GLcontext *gc, __GLdrawablePrivate * draw, GLbool
         if(draw->modes.doubleBufferMode)
         {
             pTemp = *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]);
-            pRtSurf = draw->rtHandle[__GL_BACK_BUFFER0_INDEX];
+            pRtSurf = draw->rtHandles[__GL_BACK_BUFFER0_INDEX];
 
             *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]) = *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX]);
-            draw->rtHandle[__GL_BACK_BUFFER0_INDEX] = draw->rtHandle[__GL_FRONT_BUFFER_INDEX];
+            draw->rtHandles[__GL_BACK_BUFFER0_INDEX] = draw->rtHandles[__GL_FRONT_BUFFER_INDEX];
 
             *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX]) = pTemp;
-            draw->rtHandle[__GL_FRONT_BUFFER_INDEX] = pRtSurf;
+            draw->rtHandles[__GL_FRONT_BUFFER_INDEX] = pRtSurf;
 
         }
         else if(draw->modes.tripleBufferMode)
         {
-            pTemp                       = *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]);
-            pRtSurf = draw->rtHandle[__GL_BACK_BUFFER0_INDEX];
+            pTemp = *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]);
+            pRtSurf = draw->rtHandles[__GL_BACK_BUFFER0_INDEX];
 
-            *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX])    = *(chipDraw->drawBuffers[__GL_BACK_BUFFER1_INDEX]);
-            draw->rtHandle[__GL_BACK_BUFFER0_INDEX] = draw->rtHandle[__GL_BACK_BUFFER1_INDEX];
+            *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]) = *(chipDraw->drawBuffers[__GL_BACK_BUFFER1_INDEX]);
+            draw->rtHandles[__GL_BACK_BUFFER0_INDEX] = draw->rtHandles[__GL_BACK_BUFFER1_INDEX];
 
-            *(chipDraw->drawBuffers[__GL_BACK_BUFFER1_INDEX])    = *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX]);
-            draw->rtHandle[__GL_BACK_BUFFER1_INDEX] = draw->rtHandle[__GL_FRONT_BUFFER_INDEX];
+            *(chipDraw->drawBuffers[__GL_BACK_BUFFER1_INDEX]) = *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX]);
+            draw->rtHandles[__GL_BACK_BUFFER1_INDEX] = draw->rtHandles[__GL_FRONT_BUFFER_INDEX];
 
-            *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX])    = pTemp;
-            draw->rtHandle[__GL_FRONT_BUFFER_INDEX] = pRtSurf;
+            *(chipDraw->drawBuffers[__GL_FRONT_BUFFER_INDEX]) = pTemp;
+            draw->rtHandles[__GL_FRONT_BUFFER_INDEX] = pRtSurf;
 
         }
         __glChipChangeDrawBuffers(gc);

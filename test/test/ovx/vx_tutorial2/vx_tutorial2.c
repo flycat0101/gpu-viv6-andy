@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
     vx_map_id map_id = 0;
 
     /* read image data */
-    srcFile = fopen("lena_gray.bmp", "rb");
+    srcFile = fopen("test_gray.bmp", "rb");
     if(NULL==srcFile)
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");
@@ -164,6 +164,8 @@ int main(int argc, char* argv[])
         GraphVX = vxCreateGraph(ContextVX);
         if(NULL!=GraphVX)
         {
+            vx_border_t borderMode = {VX_BORDER_REPLICATE, 0};
+
             imgObj[0] = vxCreateImage(ContextVX, imgWid, imgHei, VX_DF_IMAGE_U8);
             imgObj[1] = vxCreateImage(ContextVX, imgWid, imgHei, VX_DF_IMAGE_U8);
             imgObj[2] = vxCreateImage(ContextVX, imgWid, imgHei, VX_DF_IMAGE_U8);
@@ -196,6 +198,15 @@ int main(int argc, char* argv[])
             if(!(vxNode[0]&&vxNode[1]&&vxNode[2]&&vxNode[3]&&vxNode[4]))
             {
                 printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
+
+                status = -1;
+                goto exit;
+            }
+
+            if(VX_SUCCESS != vxSetNodeAttribute(vxNode[0], VX_NODE_BORDER, &borderMode, sizeof(vx_border_t)) ||
+                vxSetNodeAttribute(vxNode[1], VX_NODE_BORDER, &borderMode, sizeof(vx_border_t)))
+            {
+                printf("%s:%d, %s\n", __FILE__, __LINE__, "set border mode error.");
 
                 status = -1;
                 goto exit;
@@ -305,7 +316,7 @@ int main(int argc, char* argv[])
     imgAddr[1] = NULL;
 
     /* output image */
-    destFile = fopen("lena_sobel.bmp", "wb");
+    destFile = fopen("test_out.bmp", "wb");
     if(NULL==destFile)
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");

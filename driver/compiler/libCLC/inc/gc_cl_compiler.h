@@ -420,6 +420,11 @@ cloCOMPILER_SetBasicTypePacked(
 IN cloCOMPILER Compiler
 );
 
+gceSTATUS
+cloCOMPILER_SetLongUlongPatch(
+IN cloCOMPILER Compiler
+);
+
 #ifdef __cplusplus
 }
 #endif

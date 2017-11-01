@@ -60,6 +60,7 @@ gcoQUEUE_Construct(
     queue->head = queue->tail = gcvNULL;
 
     queue->recordCount = 0;
+    queue->maxUnlockBytes= 0;
 
     queue->chunks = gcvNULL;
 
@@ -190,6 +191,18 @@ gcoQUEUE_AppendEvent(
     /* update count */
     Queue->recordCount++;
 
+    if (Interface->command == gcvHAL_UNLOCK_VIDEO_MEMORY &&
+        Interface->u.UnlockVideoMemory.asynchroneous &&
+        Interface->u.UnlockVideoMemory.pool > gcvPOOL_UNKNOWN &&
+        Interface->u.UnlockVideoMemory.pool <= gcvPOOL_SYSTEM
+       )
+    {
+        if (Queue->maxUnlockBytes < Interface->u.UnlockVideoMemory.bytes)
+        {
+            Queue->maxUnlockBytes = Interface->u.UnlockVideoMemory.bytes;
+        }
+    }
+
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -226,6 +239,7 @@ gcoQUEUE_Free(
 
     /* Update count */
     Queue->recordCount = 0;
+    Queue->maxUnlockBytes = 0;
 
     /* Success. */
     gcmFOOTER_NO();

@@ -1173,14 +1173,22 @@ VIR_BB_ChangeSuccBBs(
 
 void
 VIR_BB_RemoveBranch(
-    VIR_BASIC_BLOCK* bb
+    VIR_BASIC_BLOCK* bb,
+    gctBOOL setNop
     )
 {
     VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
 
     gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)));
 
-    VIR_Function_RemoveInstruction(BB_GET_FUNC(bb), bbEnd);
+    if(setNop)
+    {
+        VIR_Function_ChangeInstToNop(BB_GET_FUNC(bb), bbEnd);
+    }
+    else
+    {
+        VIR_Function_RemoveInstruction(BB_GET_FUNC(bb), bbEnd);
+    }
     {
         VSC_ADJACENT_LIST_ITERATOR succEdgeIter;
         VIR_CFG_EDGE* succEdge;

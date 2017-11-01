@@ -11,9 +11,9 @@
 ##############################################################################
 
 
-lib_LTLIBRARIES = libSPIRV.la
+lib_LTLIBRARIES = libSPIRV_viv.la
 
-libSPIRV_la_SOURCES = \
+libSPIRV_viv_la_SOURCES = \
     spvconverter/gc_spirv_mempool.c \
     spvconverter/gc_spirv_to_vir.c \
     spvconverter/gc_spriv_disassmble.c
@@ -31,12 +31,12 @@ AM_CPPFLAGS = \
 AM_CFLAGS = \
     $(GCC_CFLAGS)
 
-libSPIRV_la_LIBADD = \
+libSPIRV_viv_la_LIBADD = \
     -ldl -lm \
     $(top_builddir)/hal/user/libGAL.la \
     $(top_builddir)/compiler/libVSC/libVSC.la
 
-libSPIRV_la_LDFLAGS = \
+libSPIRV_viv_la_LDFLAGS = \
     -version-number 1:0 \
     -Wl,-z,defs \
     -Wl,--version-script,$(srcdir)/spvconverter/spvconverter.map

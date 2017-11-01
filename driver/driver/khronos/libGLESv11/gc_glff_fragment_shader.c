@@ -241,7 +241,7 @@ static gceSTATUS _Set_uColor(
 
         status = glfSetUniformFromVectors(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             &Context->clearColor,
             valueArray,
             1
@@ -261,7 +261,7 @@ static gceSTATUS _Set_uColor(
 
         status =  glfSetUniformFromVectors(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             &Context->aColorInfo.currValue,
             valueArray,
             1
@@ -288,7 +288,7 @@ static gceSTATUS _Set_uFogFactors(
         /* Set the uniform. */
         status = glfSetUniformFromFractions(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             Context->fogStates.linearFactor0,
             Context->fogStates.linearFactor1,
             0, 0
@@ -303,7 +303,7 @@ static gceSTATUS _Set_uFogFactors(
         /* Set the uniform. */
         status = glfSetUniformFromFractions(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             Context->fogStates.expFactor,
             0.0f, 0.0f, 0.0f
             );
@@ -317,7 +317,7 @@ static gceSTATUS _Set_uFogFactors(
         /* Set the uniform. */
         status = glfSetUniformFromFractions(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             Context->fogStates.exp2Factor,
             0, 0, 0
             );
@@ -340,7 +340,7 @@ static gceSTATUS _Set_uFogColor(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromVectors(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->fogStates.color,
         valueArray,
         1
@@ -374,7 +374,7 @@ static gceSTATUS _Set_uTexColor(
     status = gcUNIFORM_SetFracValue(
         Uniform,
         Context->texture.pixelSamplers,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         valueArray
         );
 
@@ -407,7 +407,7 @@ static gceSTATUS _Set_uTexCombScale(
     status = gcUNIFORM_SetFracValue(
         Uniform,
         Context->texture.pixelSamplers,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         valueArray
         );
 
@@ -429,7 +429,7 @@ static gceSTATUS _Set_uFlipPointSprite(
     {
         status = glfSetUniformFromFractions(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             0, 0, 0, 0
             );
     }
@@ -437,7 +437,7 @@ static gceSTATUS _Set_uFlipPointSprite(
     {
         status = glfSetUniformFromFractions(
             Uniform,
-            Context->currProgram->hints,
+            Context->currProgram->programState.hints,
             1, 0, 0, 0
             );
     }
@@ -457,7 +457,7 @@ static gceSTATUS _Set_uAlphaRef(
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
     status = glfSetUniformFromFloats(
         Uniform,
-        Context->currProgram->hints,
+        Context->currProgram->programState.hints,
         &Context->alphaStates.testReference,
         gcvNULL,
         gcvNULL,

@@ -105,6 +105,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeSystemMemoryWrapper(
 static const VkExtensionProperties g_InstanceExtensions[] =
 {
     {VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_SPEC_VERSION},
+    {VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, VK_KHR_get_physical_device_properties2},
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR) || (ANDROID_SDK_VERSION < 24)
     {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_SURFACE_SPEC_VERSION},
 #endif
@@ -446,6 +447,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyInstance(
             phyDev->mutex = gcvNULL;
 
             vscDestroyPrivateData(&phyDev->vscCoreSysCtx, phyDev->vscCoreSysCtx.hPrivData);
+        }
+
+        if (inst->chipPriv)
+        {
+            __VK_FREE(inst->chipPriv);
         }
 
         __VK_FREE(inst);

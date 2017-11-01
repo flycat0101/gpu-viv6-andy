@@ -420,6 +420,34 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_UINT64_X8, 4, 4, 4, gcSHADER_UINT64_X8, gcSHADER_UINT64_X1, gceTK_UINT64, "ulong8", gcvFALSE},
     { gcSHADER_UINT64_X16, 4, 4, 8, gcSHADER_UINT64_X16, gcSHADER_UINT64_X1, gceTK_UINT64, "ulong16", gcvFALSE},
 
+    { gcSHADER_FLOAT64_X1, 1, 1, 1, gcSHADER_FLOAT_X1, gcSHADER_FLOAT_X1, gceTK_FLOAT, "double", gcvFALSE},
+    { gcSHADER_FLOAT64_X2, 2, 2, 1, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X1, gceTK_FLOAT, "double2", gcvFALSE},
+    { gcSHADER_FLOAT64_X3, 3, 3, 1, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X1, gceTK_FLOAT, "double3", gcvFALSE},
+    { gcSHADER_FLOAT64_X4, 4, 4, 1, gcSHADER_FLOAT_X4, gcSHADER_FLOAT_X1, gceTK_FLOAT, "double4", gcvFALSE},
+    { gcSHADER_FLOAT64_2X2, 2, 2, 2, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat2", gcvFALSE},
+    { gcSHADER_FLOAT64_3X3, 3, 3, 3, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat3", gcvFALSE},
+    { gcSHADER_FLOAT64_4X4, 4, 4, 4, gcSHADER_FLOAT_X4, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat4", gcvFALSE},
+    { gcSHADER_FLOAT64_2X3, 3, 3, 2, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat2x3", gcvFALSE},
+    { gcSHADER_FLOAT64_2X4, 4, 4, 2, gcSHADER_FLOAT_X4, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat2x4", gcvFALSE},
+    { gcSHADER_FLOAT64_3X2, 2, 2, 3, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat3x2", gcvFALSE},
+    { gcSHADER_FLOAT64_3X4, 4, 4, 3, gcSHADER_FLOAT_X4, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat3x4", gcvFALSE},
+    { gcSHADER_FLOAT64_4X2, 2, 2, 4, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat4x2", gcvFALSE},
+    { gcSHADER_FLOAT64_4X3, 3, 3, 4, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X1, gceTK_FLOAT, "dmat4x3", gcvFALSE},
+    { gcSHADER_FLOAT64_X8, 4, 4, 2, gcSHADER_FLOAT_X8, gcSHADER_FLOAT_X1, gceTK_FLOAT, "double8", gcvFALSE},
+    { gcSHADER_FLOAT64_X16, 4, 4, 4, gcSHADER_FLOAT_X16,gcSHADER_FLOAT_X1, gceTK_FLOAT, "double16", gcvFALSE},
+
+    /* OpenGL 4.0 types */
+    { gcSHADER_SAMPLER_2D_RECT, 1, 1, 1, gcSHADER_SAMPLER_2D_RECT, gcSHADER_SAMPLER_2D_RECT, gceTK_SAMPLER, "sampler2DRect", gcvFALSE},
+    { gcSHADER_ISAMPLER_2D_RECT, 1, 1, 1, gcSHADER_ISAMPLER_2D_RECT, gcSHADER_ISAMPLER_2D_RECT, gceTK_SAMPLER, "isampler2DRect", gcvFALSE},
+    { gcSHADER_USAMPLER_2D_RECT, 1, 1, 1, gcSHADER_USAMPLER_2D_RECT, gcSHADER_USAMPLER_2D_RECT, gceTK_SAMPLER, "usampler2DRect", gcvFALSE},
+    { gcSHADER_SAMPLER_2D_RECT_SHADOW, 1, 1, 1, gcSHADER_SAMPLER_2D_RECT_SHADOW, gcSHADER_SAMPLER_2D_RECT_SHADOW, gceTK_SAMPLER, "sampler2DRectShadow", gcvFALSE},
+    { gcSHADER_ISAMPLER_1D_ARRAY, 1, 1, 1, gcSHADER_ISAMPLER_1D_ARRAY, gcSHADER_ISAMPLER_1D_ARRAY, gceTK_SAMPLER, "isampler1DArray", gcvFALSE},
+    { gcSHADER_USAMPLER_1D_ARRAY, 1, 1, 1, gcSHADER_USAMPLER_1D_ARRAY, gcSHADER_USAMPLER_1D_ARRAY, gceTK_SAMPLER, "usampler1DArray", gcvFALSE},
+    { gcSHADER_ISAMPLER_1D, 1, 1, 1, gcSHADER_ISAMPLER_1D, gcSHADER_ISAMPLER_1D, gceTK_SAMPLER, "isampler1D", gcvFALSE},
+    { gcSHADER_USAMPLER_1D, 1, 1, 1, gcSHADER_USAMPLER_1D, gcSHADER_USAMPLER_1D, gceTK_SAMPLER, "usampler1D", gcvFALSE},
+    { gcSHADER_SAMPLER_1D_SHADOW, 1, 1, 1, gcSHADER_SAMPLER_1D_SHADOW, gcSHADER_SAMPLER_1D_SHADOW, gceTK_SAMPLER, "sampler1DShadow", gcvFALSE},
+
+
     { gcSHADER_UNKONWN_TYPE, 0, 0, 0, gcSHADER_UNKONWN_TYPE, gcSHADER_UNKONWN_TYPE, gceTK_UNKOWN, "UNKONWN_TYPE", gcvFALSE},
 };
 
@@ -1660,7 +1688,7 @@ gcSHADER_SetMaxKernelFunctionArgs(
 /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Shader != gcvNULL);
 
-    Shader->maxKernelFunctionArgs = (gctUINT16) MaxKernelFunctionArgs;
+    Shader->maxKernelFunctionArgs = MaxKernelFunctionArgs;
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2272,6 +2300,9 @@ _gcSHADER_Clean(
 
     gcoOS_ZeroMemory(Shader->shaderLayout.compute.workGroupSize,
                      gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize));
+    Shader->shaderLayout.compute.isWorkGroupSizeFixed = gcvFALSE;
+    Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = gcvFALSE;
+    Shader->shaderLayout.compute.adjustedWorkGroupSize = gcvFALSE;
 
     /* Free any storage blocks. */
     if (Shader->storageBlocks != gcvNULL)
@@ -2668,6 +2699,10 @@ gcSHADER_Copy(
         Shader->shaderLayout.compute.workGroupSize[0] = Source->shaderLayout.compute.workGroupSize[0];
         Shader->shaderLayout.compute.workGroupSize[1] = Source->shaderLayout.compute.workGroupSize[1];
         Shader->shaderLayout.compute.workGroupSize[2] = Source->shaderLayout.compute.workGroupSize[2];
+
+        Shader->shaderLayout.compute.isWorkGroupSizeFixed = Source->shaderLayout.compute.isWorkGroupSizeFixed;
+        Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = Source->shaderLayout.compute.isWorkGroupSizeAdjusted;
+        Shader->shaderLayout.compute.adjustedWorkGroupSize = Source->shaderLayout.compute.adjustedWorkGroupSize;
         break;
 
     case gcSHADER_TYPE_TES:
@@ -3212,11 +3247,6 @@ gcSHADER_Copy(
             label->referenced     = reference;
         }
     }
-
-    /* Copy the work group size. */
-    gcoOS_MemCopy(Shader->shaderLayout.compute.workGroupSize,
-                  Source->shaderLayout.compute.workGroupSize,
-                  gcmSIZEOF(Source->shaderLayout.compute.workGroupSize));
 
     /***** Storage blocks ***********************************************************/
 
@@ -3766,12 +3796,12 @@ OnError:
 #define _gcd_OCL_NUM_BUILTIN_ATTRIBUTES  3
 #define _gcd_OCL_NUM_BUILTIN_UNIFORMS    256
 
-#define _gcmIsOrdinaryLabel(BuiltinIndex, Label)  ((Label) < (gctUINT16) (~0 - (BuiltinIndex)->totalAllFunctionCount))
+#define _gcmIsOrdinaryLabel(BuiltinIndex, Label)  ((Label) < (gctUINT32) (~0 - (BuiltinIndex)->totalAllFunctionCount))
 
 typedef struct _gcsEXTERN_FUNCTION_ITEM {
     VSC_UNI_LIST_NODE node;
     gctSTRING    externSymbol;
-    gctUINT16    label;
+    gctUINT32    label;
     gctBOOL      defined;
     gctBOOL      redefined;
     gctBOOL      isKernelFunction;
@@ -3848,7 +3878,7 @@ _AdjustInstAttributes(
 
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_ATTRIBUTE)
             {
-                gctINT16  indexVal;
+                gctINT32  indexVal;
                 gctINT    index;
 
                 if(i == 0)
@@ -3894,7 +3924,7 @@ _AdjustInstUniforms(
 
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_UNIFORM)
             {
-                gctINT16  indexVal;
+                gctINT32  indexVal;
                 gctINT    index;
 
                 if(i == 0)
@@ -3952,7 +3982,7 @@ _AdjustInstTempRegs(
                     !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
                     code->tempIndex >= _gcdOCL_NumMemoryAddressRegs)
                 {
-                    code->tempIndex = (gctUINT16) IndexMap[code->tempIndex];
+                    code->tempIndex =  IndexMap[code->tempIndex];
                 }
 
                 if (gcmSL_TARGET_GET(code->temp, Indexed) != gcSL_NOT_INDEXED &&
@@ -3978,7 +4008,7 @@ _AdjustInstTempRegs(
                         !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
                         code->source0Index >= _gcdOCL_NumMemoryAddressRegs)
                     {
-                        code->source0Index = (gctUINT16) IndexMap[code->source0Index];
+                        code->source0Index = IndexMap[code->source0Index];
                     }
                     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED &&
                         (!HasMemoryAddr ||
@@ -3994,7 +4024,7 @@ _AdjustInstTempRegs(
                         !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
                         code->source1Index >= _gcdOCL_NumMemoryAddressRegs)
                     {
-                        code->source1Index = (gctUINT16) IndexMap[code->source1Index];
+                        code->source1Index = IndexMap[code->source1Index];
                     }
                     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED &&
                         (!HasMemoryAddr ||
@@ -4426,16 +4456,16 @@ _MergeOneKernel(
             {
                 /* fix up jmp/call. */
                 if (gcmSL_OPCODE_GET(To->code[i].opcode, Opcode) == gcSL_JMP) {
-                    To->code[i].tempIndex += (gctUINT16)labelOffset;
+                    To->code[i].tempIndex += labelOffset;
                 }
                 else if(gcmSL_OPCODE_GET(To->code[i].opcode, Opcode) == gcSL_CALL)
                 {
-                    if((gctINT16) To->code[i].tempIndex < 0)
+                    if((gctINT32)To->code[i].tempIndex < 0)
                     {
-                        labelIndex = (gctUINT16)~0 - To->code[i].tempIndex + currentFunctionCount;
-                        labelId = (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
-                        To->code[i].tempIndex = (gctUINT16)labelId;
-                        labelIndex = (gctUINT16)~0 - labelId;
+                        labelIndex = ~0 - To->code[i].tempIndex + currentFunctionCount;
+                        labelId = BuiltinIndex->labelMap[labelIndex].newLabel;
+                        To->code[i].tempIndex = labelId;
+                        labelIndex = ~0 - labelId;
                         label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
                         if(!label)
@@ -4462,7 +4492,7 @@ _MergeOneKernel(
                         reference->referenced = i;
                         label->referenced     = reference;
                     }
-                    else To->code[i].tempIndex += (gctUINT16)labelOffset;
+                    else To->code[i].tempIndex += labelOffset;
                 }
             } /* for */
 
@@ -4487,11 +4517,11 @@ _MergeOneKernel(
                 }
                 else
                 {
-                    gctUINT16 labelId;
+                    gctUINT32 labelId;
 
-                    labelIndex = (gctUINT16)~0 - srcLabel->label + currentFunctionCount;
-                    labelId = (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
-                    labelIndex = (gctUINT16)~0 - labelId;
+                    labelIndex = (gctUINT32)~0 - srcLabel->label + currentFunctionCount;
+                    labelId = (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
+                    labelIndex = (gctUINT32)~0 - labelId;
                     label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
                     if(!label)
@@ -4538,7 +4568,7 @@ _MergeOneKernel(
         gcFUNCTION fromFunction;
         gcSHADER_LABEL label;
         gctUINT labelIndex;
-        gctUINT16 labelId;
+        gctUINT32 labelId;
 
         /* Check array count. */
         gcmASSERT(To->functionArraySize >= (To->functionCount + From->functionCount));
@@ -4553,8 +4583,8 @@ _MergeOneKernel(
             if(GetFunctionFlags(fromFunction) & gcvFUNC_EXTERN) {
                 gcsFUNCTION_ARGUMENT_PTR arguments;
 
-                labelIndex = (gctUINT16)~0 - fromFunction->label + currentFunctionCount;
-                labelIndex = (gctUINT16)~0 - (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
+                labelIndex = (gctUINT32)~0 - fromFunction->label + currentFunctionCount;
+                labelIndex = (gctUINT32)~0 - (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
                 arguments = BuiltinIndex->labelMap[labelIndex].arguments;
 
                 for (j = 0; j < fromFunction->argumentCount; j++)
@@ -4584,10 +4614,10 @@ _MergeOneKernel(
             function->tempIndexCount   = fromFunction->tempIndexCount;
             function->codeStart   += oldCodeCount;
 
-            labelIndex = (gctUINT16)~0 - fromFunction->label + currentFunctionCount;
-            labelId = (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
+            labelIndex = (gctUINT32)~0 - fromFunction->label + currentFunctionCount;
+            labelId = (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
             function->label = labelId;
-            labelIndex = (gctUINT16)~0 - labelId;
+            labelIndex = (gctUINT32)~0 - labelId;
             label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
             if(!label)
@@ -4626,7 +4656,7 @@ _MergeOneKernel(
                     gcoOS_MemCopy(&function->arguments[j],
                                   &fromFunction->arguments[j],
                                   sizeof(gcsFUNCTION_ARGUMENT));
-                    function->arguments[j].index = (gctUINT16)tempIndexMap[fromFunction->arguments[j].index];
+                    function->arguments[j].index = tempIndexMap[fromFunction->arguments[j].index];
                 }
             }
 
@@ -4669,7 +4699,7 @@ _MergeOneKernel(
                                       fromFunction->localVariables[j]->arrayLengthList,
                                       variable->arrayLengthCount * gcmSIZEOF(gctINT));
                     }
-                    variable->tempIndex += (gctUINT16)tempIndexOffset;
+                    variable->tempIndex += tempIndexOffset;
                 }
             }
             To->functions[To->functionCount++] = function;
@@ -4684,7 +4714,7 @@ _MergeOneKernel(
         gcKERNEL_FUNCTION fromKernelFunction;
         gcSHADER_LABEL label;
         gctUINT labelIndex;
-        gctUINT16 labelId;
+        gctUINT32 labelId;
         gcSL_INSTRUCTION code;
 
         /* Check array count. */
@@ -4700,8 +4730,8 @@ _MergeOneKernel(
             {
                 gcsFUNCTION_ARGUMENT_PTR arguments;
 
-                labelIndex = (gctUINT16)~0 - fromKernelFunction->label + currentFunctionCount;
-                labelIndex = (gctUINT16)~0 - (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
+                labelIndex = (gctUINT32)~0 - fromKernelFunction->label + currentFunctionCount;
+                labelIndex = (gctUINT32)~0 - (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
                 arguments = BuiltinIndex->labelMap[labelIndex].arguments;
 
                 for (j = 0; j < fromKernelFunction->argumentCount; j++)
@@ -4737,13 +4767,13 @@ _MergeOneKernel(
             /* Update the kernel function call. */
             code = &To->code[kernelFunction->codeStart + kernelFunction->codeCount - 1];
             gcmASSERT((gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_CALL);
-            code->tempIndex = (gctUINT16)kernelFunction->codeStart;
+            code->tempIndex = kernelFunction->codeStart;
 
             /* Update the labels. */
-            labelIndex = (gctUINT16)~0 - fromKernelFunction->label + currentFunctionCount;
-            labelId = (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
+            labelIndex = (gctUINT32)~0 - fromKernelFunction->label + currentFunctionCount;
+            labelId = (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
             kernelFunction->label = labelId;
-            labelIndex = (gctUINT16)~0 - labelId;
+            labelIndex = (gctUINT32)~0 - labelId;
             label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
             if (!label)
@@ -4785,7 +4815,7 @@ _MergeOneKernel(
                     gcoOS_MemCopy(&kernelFunction->arguments[j],
                                   &fromKernelFunction->arguments[j],
                                   sizeof(gcsFUNCTION_ARGUMENT));
-                    kernelFunction->arguments[j].index = (gctUINT16)tempIndexMap[fromKernelFunction->arguments[j].index];
+                    kernelFunction->arguments[j].index = tempIndexMap[fromKernelFunction->arguments[j].index];
                 }
             }
 
@@ -4874,7 +4904,7 @@ _MergeOneKernel(
                                       fromKernelFunction->localVariables[j]->arrayLengthList,
                                       variable->arrayLengthCount * gcmSIZEOF(gctINT));
                     }
-                    variable->tempIndex += (gctUINT16)tempIndexOffset;
+                    variable->tempIndex += tempIndexOffset;
                 }
             }
 
@@ -5013,7 +5043,7 @@ _MergeOneKernel(
             }
             variable->index = (gctUINT16)currIndex;
             indexMap[i] = currIndex++;
-            variable->tempIndex = (gctUINT16)tempIndexMap[variable->tempIndex];
+            variable->tempIndex = tempIndexMap[variable->tempIndex];
         }
 
         /* update structure variable indices */
@@ -5133,7 +5163,7 @@ static gctUINT
 _UsedReservedTempReg(
     IN gcSHADER Kernel,
     IN gcKERNEL_FUNCTION KernelFunction,
-    IN gctINT ReservedTempReg
+    IN gctUINT32 ReservedTempReg
     )
 {
     gctUINT i;
@@ -5359,7 +5389,7 @@ gcSHADER_MergeKernel(
         VSC_UL_ITERATOR iter;
         VSC_UNI_LIST_NODE* node;
         gctUINT allFunctionCount, currentFunctionCount;
-        gctUINT16 currentFunctionLabel;
+        gctUINT32 currentFunctionLabel;
         gctUINT tempRegCount = maxLocalTempRegCount;
         gctUINT tempIndexOffset;
         gctBOOL hasError;
@@ -5396,7 +5426,7 @@ gcSHADER_MergeKernel(
 
         allFunctionCount = 0;
         currentFunctionCount = 0;
-        currentFunctionLabel = (gctUINT16)~0;
+        currentFunctionLabel = (gctUINT32)~0;
         for (i = 0; i < KernelCount; i++)
         {
             gcSHADER kernel = KernelArray[i];
@@ -5430,7 +5460,7 @@ gcSHADER_MergeKernel(
                             else
                             {
                                 functionSymbolItem->defined = gcvTRUE;
-                                labelIndex = (gctUINT16)~0 - functionSymbolItem->label;
+                                labelIndex = (gctUINT32)~0 - functionSymbolItem->label;
                                 builtinIndex.labelMap[labelIndex].arguments = kernelFunction->arguments;
                                 builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                             }
@@ -5447,7 +5477,7 @@ gcSHADER_MergeKernel(
                         functionSymbolItem->redefined = gcvFALSE;
                         functionSymbolItem->label = --currentFunctionLabel;
                         if(functionSymbolItem->defined) {
-                            labelIndex = (gctUINT16)~0 - functionSymbolItem->label;
+                            labelIndex = (gctUINT32)~0 - functionSymbolItem->label;
                             builtinIndex.labelMap[labelIndex].arguments = kernelFunction->arguments;
                             builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                         }
@@ -5455,7 +5485,7 @@ gcSHADER_MergeKernel(
                         vscHTBL_DirectSet(externFunctionHT, kernelFunction->name, functionSymbolItem);
                         vscUNILST_Append(&functionSymbolList, (VSC_UNI_LIST_NODE*)functionSymbolItem);
                     }
-                    labelIndex = (gctUINT16)~0 - kernelFunction->label + currentFunctionCount;
+                    labelIndex = (gctUINT32)~0 - kernelFunction->label + currentFunctionCount;
                     builtinIndex.labelMap[labelIndex].newLabel = functionSymbolItem->label;
 
                     allFunctionCount++;
@@ -5480,7 +5510,7 @@ gcSHADER_MergeKernel(
                                 else
                                 {
                                     functionSymbolItem->defined = gcvTRUE;
-                                    labelIndex = (gctUINT16)~0 - functionSymbolItem->label;
+                                    labelIndex = (gctUINT32)~0 - functionSymbolItem->label;
                                     builtinIndex.labelMap[labelIndex].arguments = function->arguments;
                                     builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                                 }
@@ -5497,7 +5527,7 @@ gcSHADER_MergeKernel(
                             functionSymbolItem->redefined = gcvFALSE;
                             functionSymbolItem->label = --currentFunctionLabel;
                             if(functionSymbolItem->defined) {
-                                labelIndex = (gctUINT16)~0 - functionSymbolItem->label;
+                                labelIndex = (gctUINT32)~0 - functionSymbolItem->label;
                                 builtinIndex.labelMap[labelIndex].arguments = function->arguments;
                                 builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                             }
@@ -5512,7 +5542,7 @@ gcSHADER_MergeKernel(
                         newLabel = function->label - currentFunctionCount;
                     }
 
-                    labelIndex = (gctUINT16)~0 - function->label + currentFunctionCount;
+                    labelIndex = (gctUINT32)~0 - function->label + currentFunctionCount;
                     builtinIndex.labelMap[labelIndex].newLabel = newLabel;
                     allFunctionCount++;
                 }
@@ -5715,7 +5745,7 @@ gcSHADER_MergeKernel(
             /* Add mov of constant memory base address uniform to its corresponding reserved temp */
             gcSHADER_AddOpcode(mergedKernel,
                                gcSL_MOV,
-                               (gctUINT16)_gcdOCL_ConstantMemoryAddressRegIndex,
+                               (gctUINT32)_gcdOCL_ConstantMemoryAddressRegIndex,
                                gcSL_ENABLE_X,
                                gcSL_UINT32,
                                gcSHADER_PRECISION_HIGH,
@@ -5794,14 +5824,14 @@ gcSHADER_MergeKernel(
                     tempIndex = GetShaderTempRegCount(mergedKernel);
                     gcmONERROR(gcSHADER_AddOpcode(mergedKernel,
                                                   gcSL_ADD,
-                                                  (gctUINT16)tempIndex,
+                                                  tempIndex,
                                                   gcSL_ENABLE_X,
                                                   gcSL_UINT32,
                                                   gcSHADER_PRECISION_HIGH,
                                                   0));
                     gcmONERROR(gcSHADER_AddSource(mergedKernel,
                                                   gcSL_TEMP,
-                                                  (gctUINT16)_gcdOCL_ConstantMemoryAddressRegIndex,
+                                                  _gcdOCL_ConstantMemoryAddressRegIndex,
                                                   gcSL_SWIZZLE_XXXX,
                                                   gcSL_UINT32,
                                                   gcSHADER_PRECISION_HIGH));
@@ -5822,14 +5852,14 @@ gcSHADER_MergeKernel(
                     tempIndex = GetShaderTempRegCount(mergedKernel);
                     gcmONERROR(gcSHADER_AddOpcode(mergedKernel,
                                                   gcSL_ADD,
-                                                  (gctUINT16)tempIndex,
+                                                  tempIndex,
                                                   gcSL_ENABLE_X,
                                                   gcSL_UINT32,
                                                   gcSHADER_PRECISION_HIGH,
                                                   0));
                     gcmONERROR(gcSHADER_AddSource(mergedKernel,
                                                   gcSL_TEMP,
-                                                  (gctUINT16)_gcdOCL_PrivateMemoryAddressRegIndex,
+                                                  _gcdOCL_PrivateMemoryAddressRegIndex,
                                                   gcSL_SWIZZLE_XXXX,
                                                   gcSL_UINT32,
                                                   gcSHADER_PRECISION_HIGH));
@@ -5978,7 +6008,7 @@ gcSHADER_MergeKernel(
 
                     if(variable)
                     {
-                        variable->tempIndex += (gctUINT16)tempIndexOffset;
+                        variable->tempIndex += tempIndexOffset;
                     }
                 }
 
@@ -6149,6 +6179,61 @@ _markUsedKernelFunction(gcKERNEL_FUNCTION KernelFunction)
     }
 }
 
+static gceSTATUS
+_MapKernelArgUniforms(
+    IN gcSHADER Shader
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcKERNEL_FUNCTION   kernelFunction = GetShaderCurrentKernelFunction(Shader);
+    gcUNIFORM           argUniform = gcvNULL, uniform = gcvNULL;
+    gctUINT32           uniformArgCount, i;
+
+    uniformArgCount = kernelFunction->uniformArgumentCount;
+
+    gcmASSERT(uniformArgCount <= GetShaderUniformCount(Shader));
+
+    /* We need to make sure that they are the same uniforms first. */
+    for (i = 0; i < uniformArgCount; i++)
+    {
+        argUniform = kernelFunction->uniformArguments[i];
+        uniform = Shader->uniforms[i];
+
+        if (!hasUniformKernelArgKind(uniform))
+        {
+            return status;
+        }
+
+        if (argUniform->nameLength != uniform->nameLength)
+        {
+            return status;
+        }
+        if (argUniform->nameLength > 0 &&
+            !(gcmIS_SUCCESS(gcoOS_StrNCmp(argUniform->name, uniform->name, argUniform->nameLength))))
+        {
+            return status;
+        }
+    }
+
+    /* Now use the uniformArgument to replace the original uniform. */
+    for (i = 0; i < uniformArgCount; i++)
+    {
+        if (Shader->uniforms[i] == kernelFunction->uniformArguments[i])
+            continue;
+
+        if (Shader->uniforms[i]->arrayLengthList != gcvNULL)
+        {
+            gcmASSERT(Shader->uniforms[i]->arrayLengthCount > 0);
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->uniforms[i]->arrayLengthList));
+        }
+
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->uniforms[i]));
+
+        Shader->uniforms[i] = kernelFunction->uniformArguments[i];
+    }
+
+    return status;
+}
 
 /*******************************************************************************
 **  gcSHADER_LoadKernel
@@ -6204,7 +6289,9 @@ gcSHADER_LoadKernel(
 
     Shader->globalUniformCount = Shader->uniformCount;
 
-    if (maxKernelFunctionArgs > 0) {
+    /* Map the kernel function argument uniforms to the uniform list. */
+    if (maxKernelFunctionArgs > 0)
+    {
         /* Check array count */
         if (Shader->uniformArraySize <= Shader->uniformCount + maxKernelFunctionArgs) {
             /* Reallocate a new array of object pointers. */
@@ -6233,6 +6320,10 @@ gcSHADER_LoadKernel(
                 Shader->uniforms[i] = gcvNULL;
             }
         }
+    }
+    else if (gcShaderAfterLink(Shader))
+    {
+        _MapKernelArgUniforms(Shader);
     }
 
     /* check if the entry kernel calling any other kernel:
@@ -6725,6 +6816,11 @@ gcSHADER_Load(
             previousVersionAdjustment += sizeof(binaryUniform->address);
         }
 
+        if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_RES_OP_FLAG)
+        {
+            previousVersionAdjustment += sizeof(binaryUniform->resOpFlag);
+        }
+
         allocBytes = Shader->uniformCount * sizeof(gcUNIFORM);
         /* Allocate the array of gcUNIFORM structure pointers. */
         status = gcoOS_Allocate(gcvNULL,
@@ -6810,13 +6906,15 @@ gcSHADER_Load(
                 uniform->nextSibling = binaryUniform->nextSibling;
                 uniform->prevSibling = binaryUniform->prevSibling;
                 uniform->parent = binaryUniform->parent;
-                if (binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_NORMAL ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_BLOCK_MEMBER  ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_LOD_MIN_MAX ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION ||
-                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS)
+                if (binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_NORMAL                      ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS               ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_BLOCK_MEMBER                ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_LOD_MIN_MAX                 ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE             ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION             ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS  ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT           ||
+                    binaryUniform->varCategory == gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT)
                     uniform->u.type = (gcSHADER_TYPE) binaryUniform->u.type;
                 else
                     uniform->u.numStructureElement = binaryUniform->u.numStructureElement;
@@ -6981,6 +7079,17 @@ gcSHADER_Load(
                 uniform->address            = binaryUniform->address;
             }
             uniform->RAPriority         = 0;
+
+            if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_RES_OP_FLAG)
+            {
+                uniform->resOpFlag = gcUNIFORM_RES_OP_FLAG_NONE;
+            }
+            else
+            {
+                gcoOS_MemCopy((gctPOINTER)&uniform->resOpFlag,
+                              binaryUniform->resOpFlag,
+                              sizeof(gctINT32));
+            }
 
             /* substract fields which are not in the file version */
             binarySize -= previousVersionAdjustment;
@@ -7300,7 +7409,9 @@ gcSHADER_Load(
             output->arraySize               = binaryOutput->arraySize;
             output->flags_                  = (gctUINT32)
                                               (binaryOutput->flags1 | (binaryOutput->flags2 << 16));
-            output->tempIndex               = binaryOutput->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&output->tempIndex,
+                        (gctPOINTER)&binaryOutput->tempIndex,
+                        sizeof(output->tempIndex));
             output->shaderMode              = gcSHADER_SHADER_DEFAULT;
             output->layoutQualifier         = gcvLAYOUT_QUALIFIER_NONE;
             output->ioBlockIndex            = binaryOutput->ioBlockIndex;
@@ -7703,7 +7814,9 @@ gcSHADER_Load(
             variable->flags    = binaryVariable->flags;
             variable->arraySize    = binaryVariable->arraySize;
             variable->arrayLengthCount = binaryVariable->arrayLengthCount;
-            variable->tempIndex    = binaryVariable->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&variable->tempIndex,
+                        (gctPOINTER)&binaryVariable->tempIndex,
+                        sizeof(variable->tempIndex));
             variable->nameLength   = binaryVariable->nameLength;
             variable->name[length] = '\0';
 
@@ -8181,7 +8294,7 @@ gcSHADER_Load(
             function->tempIndexCount     = binaryFunction->tempIndexCount;
             function->codeStart     = binaryFunction->codeStart;
             function->codeCount     = binaryFunction->codeCount;
-            function->label         = binaryFunction->label;
+            function->label         = (gctUINT32)binaryFunction->label;
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_CL12_VERSION)
             {
                 function->flags = gcvFUNC_NOATTR;
@@ -8248,7 +8361,9 @@ gcSHADER_Load(
                 {
                     argument = &function->arguments[j];
 
-                    argument->index     = binaryArgument->index;
+                    gcoOS_MemCopy((gctPOINTER)&argument->index,
+                                (gctPOINTER)&binaryArgument->index,
+                                sizeof(argument->index));
                     argument->enable    = binaryArgument->enable;
                     argument->qualifier = binaryArgument->qualifier;
                     argument->precision = binaryArgument->precision;
@@ -8404,7 +8519,9 @@ gcSHADER_Load(
                    }
                     variable->flags        = binaryVariable->flags;
                     variable->arraySize    = binaryVariable->arraySize;
-                    variable->tempIndex    = binaryVariable->tempIndex;
+                    gcoOS_MemCopy((gctPOINTER)&variable->tempIndex,
+                                (gctPOINTER)&binaryVariable->tempIndex,
+                                sizeof(variable->tempIndex));
                     variable->nameLength   = binaryVariable->nameLength;
                     variable->name[length] = '\0';
 
@@ -8473,22 +8590,32 @@ gcSHADER_Load(
 
     /* workgroupSize for compute shader */
     /* curPos should be added the previsou element size. */
+    curPos += gcmSIZEOF(gctINT);
     if (Shader->type == gcSHADER_TYPE_COMPUTE)
     {
-        curPos += gcmSIZEOF(gctINT);
         gcoOS_MemCopy(&Shader->shaderLayout.compute.workGroupSize,
                       curPos,
                       gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize));
         bytes -= gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize);
-    }
-
-    if (Shader->type == gcSHADER_TYPE_COMPUTE)
-    {
         curPos += sizeof(Shader->shaderLayout.compute.workGroupSize);
-    }
-    else
-    {
-        curPos += sizeof(gctINT);
+
+        gcoOS_MemCopy(&Shader->shaderLayout.compute.isWorkGroupSizeFixed,
+                      curPos,
+                      gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed));
+        bytes -= gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed);
+        curPos += sizeof(Shader->shaderLayout.compute.isWorkGroupSizeFixed);
+
+        gcoOS_MemCopy(&Shader->shaderLayout.compute.isWorkGroupSizeAdjusted,
+                      curPos,
+                      gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted));
+        bytes -= gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted);
+        curPos += sizeof(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted);
+
+        gcoOS_MemCopy(&Shader->shaderLayout.compute.adjustedWorkGroupSize,
+                      curPos,
+                      gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize));
+        bytes -= gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
+        curPos += sizeof(Shader->shaderLayout.compute.adjustedWorkGroupSize);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -8719,9 +8846,13 @@ gcSHADER_Load(
 
     while (wclipListCount > 0)
     {
+        gctINT index, data0, data1;
         gcoOS_MemCopy(&binaryList, curPos, sizeof(binaryList));
+        gcoOS_MemCopy(&index, (gctPOINTER)&binaryList.index, gcmSIZEOF(gctINT));
+        gcoOS_MemCopy(&data0, (gctPOINTER)&binaryList.data0, gcmSIZEOF(gctINT));
+        gcoOS_MemCopy(&data1, (gctPOINTER)&binaryList.data1, gcmSIZEOF(gctINT));
 
-        gcSHADER_InsertList(Shader, &Shader->wClipTempIndexList, binaryList.index, binaryList.data0, binaryList.data1);
+        gcSHADER_InsertList(Shader, &Shader->wClipTempIndexList, index, data0, data1);
 
         curPos += gcmSIZEOF(struct _gcBINARY_LIST);
         bytes  -= gcmSIZEOF(struct _gcBINARY_LIST);
@@ -8736,9 +8867,13 @@ gcSHADER_Load(
 
     while (wclipListCount > 0)
     {
+        gctINT index, data0, data1;
         gcoOS_MemCopy(&binaryList, curPos, sizeof(binaryList));
+        gcoOS_MemCopy(&index, (gctPOINTER)&binaryList.index, gcmSIZEOF(gctINT));
+        gcoOS_MemCopy(&data0, (gctPOINTER)&binaryList.data0, gcmSIZEOF(gctINT));
+        gcoOS_MemCopy(&data1, (gctPOINTER)&binaryList.data1, gcmSIZEOF(gctINT));
 
-        gcSHADER_InsertList(Shader, &Shader->wClipUniformIndexList, binaryList.index, binaryList.data0, binaryList.data1);
+        gcSHADER_InsertList(Shader, &Shader->wClipUniformIndexList, index, data0, data1);
 
         curPos += gcmSIZEOF(struct _gcBINARY_LIST);
         bytes  -= gcmSIZEOF(struct _gcBINARY_LIST);
@@ -9114,6 +9249,9 @@ gcSHADER_Save(
     if (Shader->type == gcSHADER_TYPE_COMPUTE)
     {
         bytes += gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize);
+        bytes += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed);
+        bytes += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted);
+        bytes += gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -9324,6 +9462,10 @@ gcSHADER_Save(
         gcoOS_MemCopy(binary->flags,
                       (gctPOINTER)&uniform->_flags,
                       sizeof(gceUNIFORM_FLAGS));
+
+        gcoOS_MemCopy(binary->resOpFlag,
+                      (gctPOINTER)&uniform->resOpFlag,
+                      sizeof(gctUINT32));
         /* HALTI extras */
         binary->blockIndex = uniform->blockIndex;
         gcoOS_MemCopy(binary->arrayStride,
@@ -9461,7 +9603,9 @@ gcSHADER_Save(
         binary->flags1              = (gctUINT16)(output->flags_ & 0xFFFF);
         binary->flags2              = (gctUINT16)((output->flags_ >> 16) & 0xFFFF);
         binary->arraySize           = (gctINT8) output->arraySize;
-        binary->tempIndex           = output->tempIndex;
+        gcoOS_MemCopy((gctPOINTER)&binary->tempIndex,
+                      (gctPOINTER)&output->tempIndex,
+                      sizeof(output->tempIndex));
         binary->precision           = (gctINT16) output->precision;
         binary->nameLength          = (gctINT16) output->nameLength;
         binary->ioBlockIndex        = (gctINT16) output->ioBlockIndex;
@@ -9553,7 +9697,9 @@ gcSHADER_Save(
 
         binary->arraySize  = (gctINT8) variable->arraySize;
         binary->arrayLengthCount = (gctUINT16) variable->arrayLengthCount;
-        binary->tempIndex  = variable->tempIndex;
+        gcoOS_MemCopy((gctPOINTER)&binary->tempIndex,
+                      (gctPOINTER)&variable->tempIndex,
+                      sizeof(variable->tempIndex));
         binary->nameLength = (gctINT16) variable->nameLength;
         binary->precision  = variable->precision;
         binary->flags      = variable->flags;
@@ -9732,7 +9878,7 @@ gcSHADER_Save(
         binary->tempIndexCount      = (gctUINT16) function->tempIndexCount;
         binary->codeStart           = (gctUINT16) function->codeStart;
         binary->codeCount           = (gctUINT16) function->codeCount;
-        binary->label               = function->label;
+        binary->label               = (gctINT16)function->label;
         binary->nameLength          = (gctINT16) function->nameLength;
 
         gcmASSERT((gctUINT32)binary->tempIndexStart == function->tempIndexStart);
@@ -9764,7 +9910,9 @@ gcSHADER_Save(
             binary = (gcBINARY_ARGUMENT) buffer;
 
             /* Fill in binary argument. */
-            binary->index      = argument->index;
+            gcoOS_MemCopy((gctPOINTER)&binary->index,
+                          (gctPOINTER)&argument->index,
+                          sizeof(argument->index));
             binary->enable     = argument->enable;
             binary->qualifier  = argument->qualifier;
             binary->precision  = argument->precision;
@@ -9800,7 +9948,9 @@ gcSHADER_Save(
                 binary->u.numStructureElement = (gctUINT8)variable->u.numStructureElement;
 
             binary->arraySize  = (gctINT8) variable->arraySize;
-            binary->tempIndex  = variable->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&binary->tempIndex,
+                          (gctPOINTER)&variable->tempIndex,
+                          sizeof(variable->tempIndex));
             binary->nameLength = (gctINT16) variable->nameLength;
             binary->precision  = variable->precision;
             binary->flags      = variable->flags;
@@ -9858,6 +10008,15 @@ gcSHADER_Save(
     {
         gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.workGroupSize, gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize));
         buffer += gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize);
+
+        gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.isWorkGroupSizeFixed, gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed));
+        buffer += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed);
+
+        gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.isWorkGroupSizeAdjusted, gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted));
+        buffer += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted);
+
+        gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.adjustedWorkGroupSize, gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize));
+        buffer += gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -9929,9 +10088,9 @@ gcSHADER_Save(
         {
             struct _gcBINARY_LIST binary_list;
 
-            binary_list.index = list->index;
-            binary_list.data0 = list->data0;
-            binary_list.data1 = list->data1;
+            gcoOS_MemCopy((gctPOINTER)&binary_list.index, (gctPOINTER)&list->index, sizeof(list->index));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data0, (gctPOINTER)&list->data0, sizeof(list->data0));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data1, (gctPOINTER)&list->data1, sizeof(list->data1));
 
             gcoOS_MemCopy(buffer, &binary_list, sizeof(binary_list));
 
@@ -9952,9 +10111,9 @@ gcSHADER_Save(
         {
             struct _gcBINARY_LIST binary_list;
 
-            binary_list.index = list->index;
-            binary_list.data0 = list->data0;
-            binary_list.data1 = list->data1;
+            gcoOS_MemCopy((gctPOINTER)&binary_list.index, (gctPOINTER)&list->index, sizeof(list->index));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data0, (gctPOINTER)&list->data0, sizeof(list->data0));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data1, (gctPOINTER)&list->data1, sizeof(list->data1));
 
             gcoOS_MemCopy(buffer, &binary_list, sizeof(binary_list));
 
@@ -10446,6 +10605,11 @@ gcSHADER_LoadEx(
             previousVersionAdjustment += sizeof(binaryUniform->address);
         }
 
+        if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_RES_OP_FLAG)
+        {
+            previousVersionAdjustment += sizeof(binaryUniform->resOpFlag);
+        }
+
         /* Allocate the array of gcUNIFORM structure pointers. */
         status = gcoOS_Allocate(gcvNULL,
                                Shader->uniformCount * sizeof(gcUNIFORM),
@@ -10623,6 +10787,17 @@ gcSHADER_LoadEx(
             else
             {
                 uniform->dummyUniformIndex = binaryUniform->dummyUniformIndex;
+            }
+
+            if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_RES_OP_FLAG)
+            {
+                uniform->resOpFlag = gcUNIFORM_RES_OP_FLAG_NONE;
+            }
+            else
+            {
+                gcoOS_MemCopy((gctPOINTER)&uniform->resOpFlag,
+                              binaryUniform->resOpFlag,
+                              sizeof(gctINT32));
             }
 
             /* Copy name. */
@@ -11002,7 +11177,7 @@ gcSHADER_LoadEx(
             output->type         = (gcSHADER_TYPE) binaryOutput->type;
             output->origType     = (gcSHADER_TYPE) binaryOutput->origType;
             output->arraySize    = binaryOutput->arraySize;
-            output->tempIndex    = binaryOutput->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&output->tempIndex, (gctPOINTER)&binaryOutput->tempIndex, sizeof(gctINT32));
             output->flags_       = (gctUINT32)(binaryOutput->flags1 | (binaryOutput->flags2 << 16));
             output->location     = -1;
             output->nextSibling  = binaryOutput->nextSibling;
@@ -11206,13 +11381,19 @@ gcSHADER_LoadEx(
                 variable->prevSibling = binaryVariable->prevSibling;
                 variable->parent = binaryVariable->parent;
 
-                if (binaryVariable->varCategory == gcSHADER_VAR_CATEGORY_NORMAL ||
-                    binaryVariable->varCategory == gcSHADER_VAR_CATEGORY_BLOCK_MEMBER)
+                if (isVariableSimple(variable))
+                {
                     variable->u.type = (gcSHADER_TYPE) binaryVariable->u.type;
+                }
                 else
+                {
                     variable->u.numStructureElement = binaryVariable->u.numStructureElement;
+                }
+
                 if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_VARIABLE_TYPE_QUALIFIER_FILE_VERSION)
+                {
                     variable->qualifier = gcvTYPE_QUALIFIER_NONE;
+                }
                 else
                 {
                     variable->qualifier = binaryVariable->qualifier;
@@ -11256,7 +11437,7 @@ gcSHADER_LoadEx(
             variable->flags        = binaryVariable->flags;
             variable->arraySize    = binaryVariable->arraySize;
             variable->arrayLengthCount = binaryVariable->arrayLengthCount;
-            variable->tempIndex    = binaryVariable->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&variable->tempIndex, (gctPOINTER)&binaryVariable->tempIndex, sizeof(variable->tempIndex));
             variable->nameLength   = binaryVariable->nameLength;
             variable->name[length] = '\0';
 
@@ -11435,7 +11616,7 @@ gcSHADER_LoadEx(
             function->tempIndexCount     = binaryFunction->tempIndexCount;
             function->codeStart     = binaryFunction->codeStart;
             function->codeCount     = binaryFunction->codeCount;
-            function->label         = binaryFunction->label;
+            function->label         = (gctUINT32)binaryFunction->label;
             function->die           = binaryFunction->die;
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_CL12_VERSION)
             {
@@ -11506,7 +11687,7 @@ gcSHADER_LoadEx(
                 for (j=0; j<function->argumentCount; j++) {
                     argument = &function->arguments[j];
 
-                    argument->index     = binaryArgument->index;
+                    gcoOS_MemCopy((gctPOINTER)&argument->index, (gctPOINTER)&binaryArgument->index, sizeof(argument->index));
                     argument->enable    = binaryArgument->enable;
                     argument->qualifier = binaryArgument->qualifier;
                     argument->precision = binaryArgument->precision;
@@ -11679,7 +11860,7 @@ gcSHADER_LoadEx(
 
                     variable->flags        = binaryVariable->flags;
                     variable->arraySize    = binaryVariable->arraySize;
-                    variable->tempIndex    = binaryVariable->tempIndex;
+                    gcoOS_MemCopy((gctPOINTER)&variable->tempIndex, (gctPOINTER)&binaryVariable->tempIndex, sizeof(variable->tempIndex));
                     variable->nameLength   = binaryVariable->nameLength;
                     variable->name[length] = '\0';
 
@@ -11892,7 +12073,7 @@ gcSHADER_LoadEx(
             kernelFunction->argumentArrayCount   =
             kernelFunction->argumentCount        = binaryKernelFunc->argumentCount;
             kernelFunction->arguments            = gcvNULL;
-            kernelFunction->label                = binaryKernelFunc->label;
+            kernelFunction->label                = (gctUINT32)binaryKernelFunc->label;
             gcoOS_MemCopy(&kernelFunction->localMemorySize, &binaryKernelFunc->localMemorySize, sizeof(gctUINT32));
 
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_CL12_VERSION)
@@ -11983,7 +12164,7 @@ gcSHADER_LoadEx(
                 for (j=0; j<kernelFunction->argumentCount; j++) {
                     argument = &kernelFunction->arguments[j];
 
-                    argument->index     = binaryArgument->index;
+                    gcoOS_MemCopy((gctPOINTER)&argument->index, (gctPOINTER)&binaryArgument->index, sizeof(argument->index));
                     argument->enable    = binaryArgument->enable;
                     argument->qualifier = binaryArgument->qualifier;
                     argument->precision = binaryArgument->precision;
@@ -12501,7 +12682,7 @@ gcSHADER_LoadEx(
                     variable->flags        = binaryVariable->flags;
                     variable->arraySize    = binaryVariable->arraySize;
                     variable->arrayLengthCount = (gctINT)binaryVariable->arrayLengthCount;
-                    variable->tempIndex    = binaryVariable->tempIndex;
+                    gcoOS_MemCopy((gctPOINTER)&variable->tempIndex, (gctPOINTER)&binaryVariable->tempIndex, sizeof(variable->tempIndex));
                     variable->nameLength   = binaryVariable->nameLength;
                     variable->name[length] = '\0';
 
@@ -12751,6 +12932,19 @@ gcSHADER_LoadEx(
     /* _maxLocalTempRegCount */
     curPos += sizeof(gctUINT16);
     Shader->_maxLocalTempRegCount = *(gctUINT16 *) curPos;
+    bytes -= sizeof(gctUINT16);
+
+    /* WorkGroupSize. */
+    curPos += sizeof(gctUINT16);
+    Shader->shaderLayout.compute.isWorkGroupSizeFixed = (gctBOOL)(*(gctUINT16 *) curPos);
+    bytes -= sizeof(gctUINT16);
+
+    curPos += sizeof(gctUINT16);
+    Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = (gctBOOL)(*(gctUINT16 *) curPos);
+    bytes -= sizeof(gctUINT16);
+
+    curPos += sizeof(gctUINT16);
+    Shader->shaderLayout.compute.adjustedWorkGroupSize = (gctBOOL)(*(gctUINT16 *) curPos);
     bytes -= sizeof(gctUINT16);
 
     /* Point to the optimization option. */
@@ -13344,6 +13538,11 @@ gcSHADER_SaveEx(
     /* _maxLocalTempRegCount */
     bytes += sizeof(gctUINT16);
 
+    /* workGroupSize for compute shader*/
+    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT16);
+
     /* Optimization option. */
     bytes += sizeof(gctUINT);
 
@@ -13542,6 +13741,10 @@ gcSHADER_SaveEx(
                       &uniform->typeNameOffset,
                       sizeof(binary->typeNameOffset));
 
+        gcoOS_MemCopy(binary->resOpFlag,
+                      (gctPOINTER)&uniform->resOpFlag,
+                      sizeof(gctUINT32));
+
         if (binary->arrayLengthCount > 0)
         {
             /* Compute number of bytes to copy. */
@@ -13647,7 +13850,7 @@ gcSHADER_SaveEx(
         binary->origType    = output->origType;
         binary->type        = output->type;
         binary->arraySize   = (gctINT8) output->arraySize;
-        binary->tempIndex   = output->tempIndex;
+        gcoOS_MemCopy((gctPOINTER)&binary->tempIndex, &output->tempIndex, sizeof(output->tempIndex));
         binary->flags1      = (gctUINT16)(output->flags_ & 0xFFFF);
         binary->flags2      = (gctUINT16)((output->flags_ >> 16) & 0xFFFF);
         binary->precision   = gcSHADER_PRECISION_DEFAULT;
@@ -13707,7 +13910,10 @@ gcSHADER_SaveEx(
         binary->qualifier  = variable->qualifier;
         binary->arraySize  = (gctINT8) variable->arraySize;
         binary->arrayLengthCount = (gctUINT16) variable->arrayLengthCount;
-        binary->tempIndex  = variable->tempIndex;
+
+        gcoOS_MemCopy(&binary->tempIndex,
+                      &variable->tempIndex,
+                      sizeof(binary->tempIndex));
 
         gcoOS_MemCopy(&binary->arrayStride,
                       &variable->arrayStride,
@@ -13776,7 +13982,7 @@ gcSHADER_SaveEx(
         binary->tempIndexCount      = (gctUINT16) function->tempIndexCount;
         binary->codeStart           = (gctUINT16) function->codeStart;
         binary->codeCount           = (gctUINT16) function->codeCount;
-        binary->label               = function->label;
+        binary->label               = (gctINT16)function->label;
         binary->nameLength          = (gctINT16) function->nameLength;
         binary->die                 = function->die;
 
@@ -13808,7 +14014,7 @@ gcSHADER_SaveEx(
             binary = (gcBINARY_ARGUMENT) buffer;
 
             /* Fill in binary argument. */
-            binary->index      = argument->index;
+            gcoOS_MemCopy((gctPOINTER)&binary->index, &argument->index, sizeof(argument->index));
             binary->enable     = argument->enable;
             binary->qualifier  = argument->qualifier;
             binary->precision  = argument->precision;
@@ -13849,7 +14055,7 @@ gcSHADER_SaveEx(
             binary->qualifier  = variable->qualifier;
             binary->arraySize  = (gctINT8) variable->arraySize;
             binary->arrayLengthCount = (gctUINT16)variable->arrayLengthCount;
-            binary->tempIndex  = variable->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&binary->tempIndex, &variable->tempIndex, sizeof(variable->tempIndex));
 
             gcoOS_MemCopy(&binary->arrayStride,
                           &variable->arrayStride,
@@ -13914,7 +14120,7 @@ gcSHADER_SaveEx(
 
         /* Fill in binary function. */
         binary->argumentCount       = (gctINT16) kernelFunction->argumentCount;
-        binary->label               = kernelFunction->label;
+        binary->label               = (gctINT16)kernelFunction->label;
         gcoOS_MemCopy(&binary->localMemorySize, &kernelFunction->localMemorySize, sizeof(gctUINT32));
         gcoOS_MemCopy(&binary->flags, &kernelFunction->flags, sizeof(gctUINT32));
         binary->uniformArgumentCount = (gctINT16) kernelFunction->uniformArgumentCount;
@@ -13960,7 +14166,7 @@ gcSHADER_SaveEx(
             binary = (gcBINARY_ARGUMENT) buffer;
 
             /* Fill in binary argument. */
-            binary->index           = argument->index;
+            gcoOS_MemCopy((gctPOINTER)&binary->index, &argument->index, sizeof(argument->index));
             binary->enable          = argument->enable;
             binary->qualifier       = argument->qualifier;
             binary->precision       = argument->precision;
@@ -14117,7 +14323,7 @@ gcSHADER_SaveEx(
             binary->qualifier  = variable->qualifier;
             binary->arraySize  = (gctINT8) variable->arraySize;
             binary->arrayLengthCount = (gctUINT16)variable->arrayLengthCount;
-            binary->tempIndex  = variable->tempIndex;
+            gcoOS_MemCopy((gctPOINTER)&binary->tempIndex, &variable->tempIndex, sizeof(variable->tempIndex));
 
             gcoOS_MemCopy(&binary->arrayStride,
                           &variable->arrayStride,
@@ -14219,6 +14425,15 @@ gcSHADER_SaveEx(
     buffer += sizeof(gctUINT16);
     gcmASSERT(Shader->_maxLocalTempRegCount < 0x00FFFF);
 
+    /* WorkGroupSize. */
+    *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.isWorkGroupSizeFixed;
+    buffer += sizeof(gctUINT16);
+
+    *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.isWorkGroupSizeAdjusted;
+    buffer += sizeof(gctUINT16);
+
+    *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.adjustedWorkGroupSize;
+    buffer += sizeof(gctUINT16);
 
     /* Optimization option. */
     /**(gctUINT *) buffer = (gctUINT) Shader->optimizationOption;*/
@@ -19452,7 +19667,7 @@ gcSHADER_AddOutput(
     IN gctCONST_STRING Name,
     IN gcSHADER_TYPE Type,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_PRECISION Precision
     )
 {
@@ -19586,7 +19801,7 @@ _AddOutputEx(
     IN gcSHADER_PRECISION Precision,
     IN gctBOOL IsArray,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctINT FieldIndex,
     IN gctBOOL IsInvariant,
     IN gctBOOL IsPrecise,
@@ -19681,7 +19896,7 @@ _AddOutputEx(
         output->typeNameVarIndex      = -1;
 
         /* Don't update temp register count if this temp register is invalid. */
-        if (TempRegister != (gctUINT16)-1)
+        if (TempRegister != (gctUINT32)-1)
         {
             gcSHADER_UpdateTempRegCount(Shader, TempRegister);
         }
@@ -19732,7 +19947,7 @@ _AddOutputEx(
 **      gctUINT32 Length
 **          Array length of the output to add.  'Length' must be at least 1.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the output value.
 **
 **      gctINT Location
@@ -19751,7 +19966,7 @@ gcSHADER_AddOutputWithLocation(
     IN gcSHADER_PRECISION Precision,
     IN gctBOOL IsArray,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_SHADERMODE ShaderMode,
     IN gctINT Location,
     IN gctINT FieldIndex,
@@ -19823,7 +20038,7 @@ gcSHADER_AddOutputWithLocation(
 **      gctUINT Index
 **          Index of output to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the output value.
 **
 **  OUTPUT:
@@ -19835,7 +20050,7 @@ gcSHADER_AddOutputIndexed(
     IN gcSHADER Shader,
     IN gctCONST_STRING Name,
     IN gctUINT32 Index,
-    IN gctUINT16 TempIndex
+    IN gctUINT32 TempIndex
     )
 {
     gctUINT32 i;
@@ -20059,7 +20274,7 @@ gcSHADER_GetOutputByName(
 **        gcSHADER Shader
 **            Pointer to a gcSHADER object.
 **
-**        gctUINT16 TempIndex
+**        gctUINT32 TempIndex
 **            Temp index of output to retrieve.
 **
 **
@@ -20071,7 +20286,7 @@ gcSHADER_GetOutputByName(
 gceSTATUS
 gcSHADER_GetOutputByTempIndex(
     IN gcSHADER Shader,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     OUT gcOUTPUT * Output
     )
 {
@@ -20239,7 +20454,7 @@ gcSHADER_ReallocateVariables(
 **      gctUINT32 Length
 **          Array length of the variable to add.  'Length' must be at least 1.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the variable value.
 **
 **  OUTPUT:
@@ -20252,7 +20467,7 @@ gcSHADER_AddVariable(
     IN gctCONST_STRING Name,
     IN gcSHADER_TYPE Type,
     IN gctUINT32 Length,
-    IN gctUINT16 TempRegister
+    IN gctUINT32 TempRegister
     )
 {
     gctUINT32 nameLength=0, bytes;
@@ -20370,7 +20585,7 @@ OnError:
 **      gctUINT32 Length
 **          Array length of the variable to add.  'Length' must be at least 1.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the variable value.
 **
 **      gcSHADER_VAR_CATEGORY varCategory
@@ -20397,7 +20612,7 @@ gcSHADER_AddVariableEx(
     IN gcSHADER_TYPE Type,
     IN gctINT ArrayLengthCount,
     IN gctINT * ArrayLengthList,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcSHADER_VAR_CATEGORY varCategory,
     IN gctUINT8 Precision,
     IN gctUINT16 numStructureElement,
@@ -20603,7 +20818,7 @@ gcSHADER_AddVariableEx(
 **      gctCONST_STRING Name
 **          Name of the variable to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that holds the variable value.
 **
 **      gcsSHADER_VAR_INFO *VarInfo
@@ -20618,7 +20833,7 @@ gceSTATUS
 gcSHADER_AddVariableEx1(
     IN gcSHADER Shader,
     IN gctCONST_STRING Name,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gcsSHADER_VAR_INFO *VarInfo,
     OUT gctINT16* ThisVarIndex
     )
@@ -20697,7 +20912,7 @@ gcSHADER_AddVariableEx1(
 **        gceVARIABLE_UPDATE_FLAGS flag
 **            Flag which property of variable will be updated.
 **
-**      gctUINT16 newValue
+**      gctUINT newValue
 **          New value to update.
 **
 **  OUTPUT:
@@ -20725,7 +20940,7 @@ gcSHADER_UpdateVariable(
     switch (flag)
     {
     case gcvVARIABLE_UPDATE_TEMPREG:
-        variable->tempIndex = (gctUINT16) newValue;
+        variable->tempIndex =  newValue;
         break;
     case gcvVARIABLE_UPDATE_TYPE_QUALIFIER:
         variable->qualifier = (gctTYPE_QUALIFIER)newValue;
@@ -21373,7 +21588,7 @@ _ExpandCode(
 **      gcSL_OPCODE Opcode
 **          Opcode to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21388,7 +21603,7 @@ gceSTATUS
 gcSHADER_AddOpcode(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision,
@@ -21462,7 +21677,7 @@ gcSHADER_AddOpcode(
 **      gcSL_CONDITION Condition
 **          Condition of the opcode.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21478,7 +21693,7 @@ gcSHADER_AddOpcode2(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision,
@@ -21551,7 +21766,7 @@ gcSHADER_AddOpcode2(
 **      gcSL_OPCODE Opcode
 **          Opcode to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21578,7 +21793,7 @@ gceSTATUS
 gcSHADER_AddOpcodeIndexed(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -21656,7 +21871,7 @@ gcSHADER_AddOpcodeIndexed(
 **      gcSL_OPCODE Opcode
 **          Opcode to add.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21686,7 +21901,7 @@ gceSTATUS
 gcSHADER_AddOpcodeIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -21766,7 +21981,7 @@ gcSHADER_AddOpcodeIndexedWithPrecision(
 **      gcSL_CONDITION Condition
 **          Condition to check.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21794,7 +22009,7 @@ gcSHADER_AddOpcodeConditionIndexed(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
@@ -21875,7 +22090,7 @@ gcSHADER_AddOpcodeConditionIndexed(
 **      gcSL_CONDITION Condition
 **          Condition to check.
 **
-**      gctUINT16 TempRegister
+**      gctUINT32 TempRegister
 **          Temporary register index that acts as the target of the opcode.
 **
 **      gctUINT8 Enable
@@ -21906,7 +22121,7 @@ gcSHADER_AddOpcodeConditionIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT16 TempRegister,
+    IN gctUINT32 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
@@ -22255,7 +22470,7 @@ gcSHADER_AddOpcodeConditional(
     /* Initialize the opcode portion of the instruction. */
     gcmSL_OPCODE_UPDATE(code->opcode, Opcode, Opcode);
     code->temp        = gcmSL_TARGET_SET(0, Condition, Condition);
-    code->tempIndex   = (gctUINT16) Label;
+    code->tempIndex   = Label;
     code->srcLoc      = srcLoc;
 
     if ((Opcode == gcSL_JMP) || (Opcode == gcSL_CALL) )
@@ -22376,7 +22591,7 @@ gcSHADER_AddOpcodeConditionalFormatted(
     gcmSL_OPCODE_UPDATE(code->opcode, Opcode, Opcode);
     code->temp        = gcmSL_TARGET_SET(0, Condition, Condition)
                       | gcmSL_TARGET_SET(0, Format, Format);
-    code->tempIndex   = (gctUINT16) Label;
+    code->tempIndex   =  Label;
     code->srcLoc      = srcLoc;
 
     if ((Opcode == gcSL_JMP) || (Opcode == gcSL_CALL) )
@@ -22503,7 +22718,7 @@ gcSHADER_AddOpcodeConditionalFormattedEnable(
     code->temp        = gcmSL_TARGET_SET(0, Condition, Condition)
                       | gcmSL_TARGET_SET(0, Enable, Enable)
                       | gcmSL_TARGET_SET(0, Format, Format);
-    code->tempIndex   = (gctUINT16) Label;
+    code->tempIndex   = Label;
     code->srcLoc      = srcLoc;
 
     if ((Opcode == gcSL_JMP) || (Opcode == gcSL_CALL) )
@@ -22830,6 +23045,55 @@ gcSHADER_UpdateSourcePacked(
 }
 
 /*******************************************************************************
+**  gcSHADER_UpdateResOpType
+**
+**  Update the resOpType
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gcSL_OPCODE_RES_TYPE ResOpType
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateResOpType(
+    IN gcSHADER Shader,
+    IN gcSL_OPCODE_RES_TYPE OpCodeResType
+    )
+{
+    gcSL_INSTRUCTION code;
+
+    gcmHEADER_ARG("Shader=0x%x InstrIndex=%d  Components=%d",
+                   Shader, InstrIndex, Components);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+    if (Shader->instrIndex == gcSHADER_OPCODE)
+    {
+        code = Shader->code + Shader->lastInstruction - 1;
+    }
+    else
+    {
+        code = Shader->code + Shader->lastInstruction;
+    }
+
+    code->opcode = gcmSL_OPCODE_SET(code->opcode, RES_TYPE, OpCodeResType);
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+/*******************************************************************************
 **  gcSHADER_AddRoundingMode
 **
 **  Add rounding mode to a gcSHADER object.
@@ -23030,7 +23294,7 @@ gcSHADER_NewTempRegs(
 **      gcSL_TYPE Type
 **          Type of the source operand.
 **
-**      gctUINT16 SourceIndex
+**      gctUINT32 SourceIndex
 **          Index of the source operand.
 **
 **      gctUINT8 Swizzle
@@ -23044,7 +23308,7 @@ gceSTATUS
 gcSHADER_AddSource(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_FORMAT Format,
     IN gcSHADER_PRECISION Precision
@@ -23082,7 +23346,7 @@ gcSHADER_AddSource(
 **      gcSL_TYPE Type
 **          Type of the source operand.
 **
-**      gctUINT16 SourceIndex
+**      gctUINT32 SourceIndex
 **          Index of the source operand.
 **
 **      gctUINT8 Swizzle
@@ -23102,7 +23366,7 @@ gceSTATUS
 gcSHADER_AddSourceIndexed(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -23120,7 +23384,6 @@ gcSHADER_AddSourceIndexed(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
-
     /* Point to the current instruction. */
     code = Shader->code + Shader->lastInstruction;
 
@@ -23181,7 +23444,7 @@ gcSHADER_AddSourceIndexed(
 **      gcSL_TYPE Type
 **          Type of the source operand.
 **
-**      gctUINT16 SourceIndex
+**      gctUINT32 SourceIndex
 **          Index of the source operand.
 **
 **      gctUINT8 Swizzle
@@ -23203,7 +23466,7 @@ gceSTATUS
 gcSHADER_AddSourceIndexedWithPrecision(
     IN gcSHADER Shader,
     IN gcSL_TYPE Type,
-    IN gctUINT16 SourceIndex,
+    IN gctUINT32 SourceIndex,
     IN gctUINT8 Swizzle,
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
@@ -23363,7 +23626,7 @@ gcSHADER_AddSourceAttributeIndexed(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%x Attribute=0x%x Swizzle=%u Index=%d Mode=%d "
@@ -23520,7 +23783,7 @@ gcSHADER_AddSourceUniformIndexed(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%08x Uniform=0x%08x Swizzle=%u Index=%d Mode=%d "
@@ -23777,7 +24040,7 @@ gcSHADER_AddSourceAttributeIndexedFormatted(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%x Attribute=0x%x Swizzle=%u Index=%d Mode=%d "
@@ -23894,7 +24157,7 @@ gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%x Attribute=0x%x Swizzle=%u Index=%d Mode=%d "
@@ -24013,7 +24276,7 @@ gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
     gctINT16 outputIndex;
 
@@ -24184,7 +24447,7 @@ gcSHADER_AddSourceUniformIndexedFormatted(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%08x Uniform=0x%08x Swizzle=%u Index=%d Mode=%d "
@@ -24314,7 +24577,7 @@ gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(
 {
     gcSL_INSTRUCTION code;
     gctSOURCE_t source;
-    gctUINT16 index;
+    gctUINT32 index;
     gctUINT16 indexRegister;
 
     gcmHEADER_ARG("Shader=0x%08x Uniform=0x%08x Swizzle=%u Index=%d Mode=%d "
@@ -24909,8 +25172,7 @@ gcSHADER_Pack(
                 /* Update the reference with the correct label location. */
                 gcmASSERT(gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_CALL ||
                           gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_JMP);
-                Shader->code[link->referenced].tempIndex =
-                    (gctUINT16) label->defined;
+                Shader->code[link->referenced].tempIndex = label->defined;
 
                 /* Free the gcSHADER_LINK structure. */
                 gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
@@ -26518,6 +26780,31 @@ gcGetOptionFromEnv(
                 {
                     /* turn on ocl relaxing local address space in OCV */
                     Option->oclOcvLocalAddressSpace = gcvTRUE;
+                }
+            }
+
+             /*
+              * Handle OCL in OPENCV mode
+              *
+              *   VC_OPTION=-OCLOPENCV:0|1
+              *
+              */
+            gcoOS_StrStr(p, "-OCLOPENCV:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-OCLOPENCV:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off ocl in OPENCV mode */
+                    Option->oclOpenCV = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on ocl in OPENCV mode */
+                    Option->oclOpenCV = gcvTRUE;
                 }
             }
 
@@ -29197,7 +29484,7 @@ gcSHADER_AddFunction(
     function->tempIndexStart          = Shader->_tempRegCount;
     function->tempIndexCount          = 0;
 
-    function->label              = (gctUINT16) (~0 - Shader->kernelFunctionCount - Shader->functionCount);
+    function->label              = (gctUINT32) (~0 - Shader->kernelFunctionCount - Shader->functionCount);
     function->flags              = gcvFUNC_NOATTR;
 
     function->codeStart          = 0;
@@ -29359,7 +29646,7 @@ gcSHADER_AddKernelFunction(
     kernelFunction->propertyValueCount      = 0;
     kernelFunction->propertyValues          = gcvNULL;
 
-    kernelFunction->label              = (gctUINT16) (~0 - Shader->kernelFunctionCount - Shader->functionCount);
+    kernelFunction->label              = (gctUINT32) (~0 - Shader->kernelFunctionCount - Shader->functionCount);
     kernelFunction->flags              = gcvFUNC_NOATTR;
     kernelFunction->codeStart = 0;
     kernelFunction->codeCount = 0;
@@ -29584,7 +29871,7 @@ gceSTATUS
 gcFUNCTION_AddArgument(
     IN gcFUNCTION Function,
     IN gctUINT16 VariableIndex,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctUINT8 Enable,
     IN gctUINT8 Qualifier,
     IN gctUINT8 Precision,
@@ -29632,8 +29919,8 @@ gcFUNCTION_AddArgument(
 gceSTATUS
 gcFUNCTION_GetArgument(
     IN gcFUNCTION Function,
-    IN gctUINT16 Index,
-    OUT gctUINT16_PTR Temp,
+    IN gctUINT32 Index,
+    OUT gctUINT32_PTR Temp,
     OUT gctUINT8_PTR Enable,
     OUT gctUINT8_PTR Swizzle
     )
@@ -30589,7 +30876,7 @@ gceSTATUS
 gcKERNEL_FUNCTION_AddArgument(
     IN gcKERNEL_FUNCTION Function,
     IN gctUINT16 VariableIndex,
-    IN gctUINT16 TempIndex,
+    IN gctUINT32 TempIndex,
     IN gctUINT8 Enable,
     IN gctUINT8 Qualifier
     )
@@ -30630,8 +30917,8 @@ gcKERNEL_FUNCTION_AddArgument(
 gceSTATUS
 gcKERNEL_FUNCTION_GetArgument(
     IN gcKERNEL_FUNCTION Function,
-    IN gctUINT16 Index,
-    OUT gctUINT16_PTR Temp,
+    IN gctUINT32 Index,
+    OUT gctUINT32_PTR Temp,
     OUT gctUINT8_PTR Enable,
     OUT gctUINT8_PTR Swizzle
     )
@@ -31579,6 +31866,9 @@ _findBuiltinVariableTempIndex(
             case gcSL_BOUNDING_BOX:
                 BuiltinsTempIndex->BoundingBoxTempIndex = variable->tempIndex;
                 break;
+            case gcSL_FOG_COORD:
+                BuiltinsTempIndex->FogCoordTempIndex = variable->tempIndex;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -31702,7 +31992,7 @@ static void _checkSrcHighp(gcSL_INSTRUCTION code, gctINT srcIdx, gcShaderCodeInf
 
     if (gcmSL_SOURCE_GET(source, Precision) == gcSL_PRECISION_HIGH &&
         (srcType != gcSL_ATTRIBUTE || /* exclude position */
-         gcmSL_INDEX_GET(index, Index) != CodeInfo->builtinsTempIndex.PositionTempIndex) &&
+         gcmSL_INDEX_GET(index, Index) != (gctUINT32)CodeInfo->builtinsTempIndex.PositionTempIndex) &&
         opcode != gcSL_NORM /* we support highp NORM */)
     {
         if (srcType == gcSL_UNIFORM || srcType == gcSL_CONSTANT)
@@ -31985,7 +32275,7 @@ _CheckCodeUniformUsage(
 
         if (gcmSL_SOURCE_GET(source, Type) == gcSL_UNIFORM)
         {
-            gctINT16  indexVal = (i == 0) ? Code->source0Index
+            gctINT32  indexVal = (i == 0) ? Code->source0Index
                                           : Code->source1Index;
             gctINT    index    = gcmSL_INDEX_GET(indexVal, Index);
             gctINT    lastUniformIndex = index;
@@ -32122,7 +32412,7 @@ _CheckCodeUniformUsage(
                                               (i == 0) &&
                                               gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(Code->opcode, Opcode));
                 gcUNIFORM   uniform;
-                gctINT16    indexVal = (i == 0) ? Code->source0Index
+                gctINT32    indexVal = (i == 0) ? Code->source0Index
                                                 : Code->source1Index;
                 gctINT      index    = gcmSL_INDEX_GET(indexVal, Index);
                 gctBOOL     isMLSampler = gcvFALSE;
@@ -33378,6 +33668,7 @@ gcCreateReadImageDirective(
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
     IN gctBOOL                  PatchUnnormReadImage,
+    IN gctBOOL                  imageLoad,
     OUT gcPatchDirective  **    PatchDirectivePtr
     )
 {
@@ -33427,6 +33718,7 @@ gcCreateReadImageDirective(
     readImage->channelDataType    = ChannelDataType;
     readImage->channelOrder       = ChannelOrder;
     readImage->imageType          = ImageType;
+    readImage->useImageLoad       = imageLoad;
 
     gcmFOOTER();
     return status;
@@ -33440,6 +33732,7 @@ gcCreateWriteImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
+    IN gctBOOL                  imageStore,
     OUT gcPatchDirective  **    PatchDirectivePtr
     )
 {
@@ -33487,6 +33780,7 @@ gcCreateWriteImageDirective(
     writeImage->channelDataType    = ChannelDataType;
     writeImage->channelOrder       = ChannelOrder;
     writeImage->imageType          = ImageType;
+    writeImage->imageStore         = imageStore;
 
     gcmFOOTER();
     return status;
@@ -34159,13 +34453,13 @@ gcSHADER_InsertNOP2BeforeCode(
 
         if (opcode == gcSL_CALL)
         {
-            if ((code->tempIndex > (gctUINT16)CodeIndex &&
-                 code->tempIndex < (gctUINT16)(origCodeCount + 10))
+            if ((code->tempIndex > CodeIndex &&
+                 code->tempIndex < (origCodeCount + 10))
                 ||
-                (code->tempIndex == (gctUINT16)CodeIndex &&
+                (code->tempIndex == CodeIndex &&
                  !MergeWithCodeIndexFunc))
             {
-                code->tempIndex += (gctUINT16)AddCodeCount;
+                code->tempIndex += AddCodeCount;
             }
         }
 
@@ -34174,19 +34468,19 @@ gcSHADER_InsertNOP2BeforeCode(
             /* Jmp to the new instruction. */
             if (ReplaceJmp)
             {
-                if (code->tempIndex > (gctUINT16)CodeIndex &&
-                    code->tempIndex < (gctUINT16)(origCodeCount + 10))
+                if (code->tempIndex > CodeIndex &&
+                    code->tempIndex < (origCodeCount + 10))
                 {
-                    code->tempIndex += (gctUINT16)AddCodeCount;
+                    code->tempIndex += AddCodeCount;
                 }
             }
             /* Jmp to the original instruction. */
             else
             {
-                if (code->tempIndex >= (gctUINT16)CodeIndex &&
-                    code->tempIndex < (gctUINT16)(origCodeCount + 10))
+                if (code->tempIndex >= CodeIndex &&
+                    code->tempIndex < (origCodeCount + 10))
                 {
-                    code->tempIndex += (gctUINT16)AddCodeCount;
+                    code->tempIndex += AddCodeCount;
                 }
             }
         }
@@ -34326,7 +34620,7 @@ gcSHADER_MoveCodeListBeforeCode(
         /* If the target is in the original code list, update it with offset. */
         if (code->tempIndex >= CodeHead && code->tempIndex <= CodeTail)
         {
-            code->tempIndex = (gctUINT16)((gctINT16)code->tempIndex + idxOffset);
+            code->tempIndex = code->tempIndex + idxOffset;
         }
     }
 
@@ -35011,6 +35305,31 @@ OnError:
     gcmFOOTER();
     return;
 }
+
+gceSTATUS
+gcFreeProgramState(
+    IN gcsPROGRAM_STATE ProgramState
+    )
+{
+    gcmHEADER();
+    if (ProgramState.hints)
+    {
+        gcmVERIFY_OK(gcHINTS_Destroy(ProgramState.hints));
+        gcmOS_SAFE_FREE(gcvNULL, ProgramState.hints);
+    }
+
+    if (ProgramState.stateBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, ProgramState.stateBuffer);
+    }
+
+    ProgramState.stateBufferSize = 0;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+
 
 #if !DX_SHADER
 gceSTATUS

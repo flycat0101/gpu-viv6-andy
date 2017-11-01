@@ -692,29 +692,13 @@ VX_API_ENTRY vx_node VX_API_CALL vxLeakyReluLayer(
 
 VX_API_ENTRY vx_node VX_API_CALL vxBatchNormalizationLayer(
     vx_graph                    graph,
-    vx_bool                     global,
-    vx_float32                  maf,
     vx_float32                  eps,
     vx_tensor                   mean,
     vx_tensor                   variance,
     vx_tensor                   gamma,
     vx_tensor                   beta,
-    vx_tensor                   outputs
-    );
-
-VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
-    vx_graph                    graph,
-    vx_tensor                   score,
-    vx_tensor                   bbox,
-    vx_tensor                   outputs
-    );
-
-VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
-    vx_graph                    graph,
-    vx_tensor                   input_data,
-    vx_tensor                   input_rois,
-    vx_enum                     pool_type,
-    vx_tensor                   output_arr
+    vx_tensor                   input,
+    vx_tensor                   output
     );
 
 VX_API_ENTRY vx_node VX_API_CALL vxConcat2Layer(
@@ -722,6 +706,21 @@ VX_API_ENTRY vx_node VX_API_CALL vxConcat2Layer(
     vx_tensor in0,
     vx_tensor in1,
     vx_tensor out
+    );
+
+VX_API_ENTRY vx_node VX_API_CALL vxConcatIndefiniteLayer(
+    vx_graph graph,
+    vx_tensor *in,
+    vx_uint32 num,
+    vx_uint32 axis,
+    vx_tensor out
+    );
+
+VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    vx_uint32                   stride,
+    vx_tensor                   outputs
     );
 
 #ifdef __cplusplus

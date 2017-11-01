@@ -117,6 +117,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_ANDROID_WEBGL,
     gcvPATCH_ANDROID_COMPOSITOR,
     gcvPATCH_CTS_TEXTUREVIEW,
+    gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION,
     gcvPATCH_WATER2_CHUKONG,
     gcvPATCH_GOOGLEEARTH,
     gcvPATCH_LEANBACK,
@@ -143,6 +144,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_GLU4,            /* gfx4.0 glu.*/
     gcvPATCH_MRVELBM20,
     gcvPATCH_OGLES3OQ,
+    gcvPATCH_ANDROID_CTS_UIRENDERING,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -153,6 +155,15 @@ typedef enum _gcePATCH_ID
                                          (patchId) == gcvPATCH_FIREFOX          || \
                                          (patchId) == gcvPATCH_ANDROID_WEBGL    || \
                                          (patchId) == gcvPATCH_ANDROID_BROWSER)
+
+
+enum
+{
+    gcvHINT_BIT_0 = 1 << 0,
+    gcvHINT_BIT_1 = 1 << 1,
+    gcvHINT_BIT_2 = 1 << 2,
+};
+
 #endif /* gcdENABLE_3D */
 
 

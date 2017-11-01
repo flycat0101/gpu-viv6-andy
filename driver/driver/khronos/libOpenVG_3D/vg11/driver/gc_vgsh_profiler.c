@@ -20,47 +20,7 @@
 #include "gc_hal_user.h"
 
 #if VIVANTE_PROFILER
-
-
-#define VGPROFILER_HAL Context->phal
-
-
-#define gcmWRITE_CONST(ConstValue) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = ConstValue; \
-        gcmERR_BREAK(gcoPROFILER_Write(VGPROFILER_HAL, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_VALUE(IntData) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctINT32 value = IntData; \
-        gcmERR_BREAK(gcoPROFILER_Write(VGPROFILER_HAL, gcmSIZEOF(value), &value)); \
-    } \
-    while (gcvFALSE)
-
-#define gcmWRITE_COUNTER(Counter, Value) \
-    gcmWRITE_CONST(Counter); \
-    gcmWRITE_VALUE(Value)
-
-/* Write a string value (char*). */
-#define gcmWRITE_STRING(String) \
-    do \
-    { \
-        gceSTATUS status; \
-        gctSIZE_T length; \
-        length = gcoOS_StrLen((gctSTRING)String, gcvNULL); \
-        gcmERR_BREAK(gcoPROFILER_Write(VGPROFILER_HAL, gcmSIZEOF(length), &length)); \
-        gcmERR_BREAK(gcoPROFILER_Write(VGPROFILER_HAL, length, String)); \
-    } \
-    while (gcvFALSE)
-
-
-
+gctINT _vgshProfileMode = -1;
 /*******************************************************************************
 **    InitializeVGProfiler
 **
@@ -72,101 +32,187 @@
 **            Pointer to a new VGContext object.
 */
 void
-InitializeVGProfiler(
+_vgshProfilerInitialize(
     _VGContext * Context
     )
 {
-    gceSTATUS status;
-    gctUINT rev;
-    char *env;
+    gceSTATUS status = gcvSTATUS_OK;
+    char *env = gcvNULL;
+    _VGProfiler * profiler = &Context->profiler;
 
-    gcoOS_GetEnv(Context->os, "VIV_PROFILE", &env);
-    if ((env == gcvNULL) || (env[0] == 0) || (env[0] == '0'))
+    gcmHEADER_ARG("Context=0x%x", Context);
+
+    _vgshProfileMode = -1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &env)) && env)
     {
-        Context->profiler.enable = gcvFALSE;
+         if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+        {
+            _vgshProfileMode = 0;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
+        {
+            _vgshProfileMode = 1;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "2")))
+        {
+            _vgshProfileMode = 2;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "3")))
+        {
+            _vgshProfileMode = 3;
+        }
+    }
+
+    /* Clear the profiler. */
+    gcoOS_ZeroMemory(&Context->profiler, gcmSIZEOF(_VGProfiler));
+    profiler->useVGfinish = gcvFALSE;
+
+    switch (_vgshProfileMode)
+    {
+    case -1:
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    case 0:
+        gcoPROFILER_Disable();
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    case 1:
+        profiler->enableOutputCounters = gcvTRUE;
+
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_NUM", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameCount = frameNum;
+        }
+        break;
+    case 2:
+        profiler->enableOutputCounters = gcvFALSE;
+        profiler->useVGfinish = gcvTRUE;
+        break;
+    case 3:
+        profiler->enableOutputCounters = gcvFALSE;
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_START", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameStartNumber = frameNum;
+        }
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_END", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameEndNumber = frameNum;
+        }
+        break;
+    default:
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
         return;
     }
 
-    if(VGPROFILER_HAL == gcvNULL)
+    gcmONERROR(gcoPROFILER_Construct(&Context->profilerObj));
+
+    profiler->useVGfinish = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VP_USE_VGFINISH", &env);
+    if ((env != gcvNULL) && (env[0] == '1'))
     {
-        gctPOINTER pointer = gcvNULL;
-        gcoOS_Allocate(gcvNULL,
-                       gcmSIZEOF(struct _gcoHAL),
-                       &pointer);
-        gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
-        VGPROFILER_HAL = (gcoHAL) pointer;
+        profiler->useVGfinish = gcvTRUE;
     }
 
-    status = gcoPROFILER_Initialize(VGPROFILER_HAL, gcvNULL, gcvTRUE);
-
-    switch (status)
+    profiler->perDrawMode = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VP_PERDRAW_MODE", &env);
+    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
     {
-        case gcvSTATUS_OK:
-            break;
-        case gcvSTATUS_MISMATCH:
-        case gcvSTATUS_NOT_SUPPORTED:/*fall through*/
-        default:
-            Context->profiler.enable = gcvFALSE;
-
-            if(VGPROFILER_HAL != gcvNULL)
-                gcoOS_Free(gcvNULL, VGPROFILER_HAL);
-
-            return;
+        profiler->perDrawMode =
+        Context->profilerObj->perDrawMode = gcvTRUE;
     }
 
+    Context->profilerObj->profilerClient = gcvCLIENT_OPENVG;
 
-    /* Clear the profiler. */
-    gcoOS_ZeroMemory(&Context->profiler, gcmSIZEOF(Context->profiler));
-
-    gcoOS_GetEnv(Context->os, "VP_COUNTER_FILTER", &env);
-    if ((env == gcvNULL) || (env[0] ==0))
+    if (gcoPROFILER_Enable(Context->profilerObj) != gcvSTATUS_OK)
     {
-        Context->profiler.drvEnable =
-            Context->profiler.timeEnable =
-            Context->profiler.memEnable = gcvTRUE;
-    }
-    else
-    {
-        gctSIZE_T bitsLen = gcoOS_StrLen(env, gcvNULL);
-        if (bitsLen > 0)
-        {
-            Context->profiler.timeEnable = (env[0] == '1');
-        }
-        else
-        {
-            Context->profiler.timeEnable = gcvTRUE;
-        }
-        if (bitsLen > 1)
-        {
-            Context->profiler.memEnable = (env[1] == '1');
-        }
-        else
-        {
-            Context->profiler.memEnable = gcvTRUE;
-        }
-        if (bitsLen > 4)
-        {
-            Context->profiler.drvEnable = (env[4] == '1');
-        }
-        else
-        {
-            Context->profiler.drvEnable = gcvTRUE;
-        }
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
     }
 
-    Context->profiler.enable = gcvTRUE;
+    profiler->enable = gcvTRUE;
+    profiler->curFrameNumber = 0;
+    profiler->drawCount = 0;
 
+    gcoOS_GetTime(&profiler->frameStartTimeusec);
+
+    _vgshProfilerWrite(Context, VG_PROFILER_WRITE_HEADER);
+
+OnError:
+    /* Return the error. */
+    gcmFOOTER_NO();
+}
+
+/*******************************************************************************
+**    _DestroyVGProfiler
+**
+**    Initialize the profiler for the context provided.
+**
+**    Arguments:
+**
+**        VGContext Context
+**            Pointer to a new VGContext object.
+*/
+void
+_vgshProfilerDestroy(
+    _VGContext * Context
+    )
+{
+    gcmHEADER_ARG("Context=0x%x", Context);
+    if (Context->profiler.enable)
     {
+        Context->profiler.enable = gcvFALSE;
+        gcmVERIFY_OK(gcoPROFILER_Destroy(Context->profilerObj));
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+}
+
+gceSTATUS
+_vgshProfilerWrite(
+    _VGContext * Context,
+    VGuint Enum
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT rev;
+    gcoPROFILER Profiler = Context->profilerObj;
+    char* infoCompany = "Vivante Corporation";
+    char* infoVersion = "1.3";
+    char  infoRevision[255] = {'\0'};   /* read from hw */
+    char* infoRenderer = Context->chipName;
+    char* infoDriver = "OpenVG 1.1";
+    gctUINT offset = 0;
+    gctUINT32 totalVGCalls = 0;
+    gctUINT32 totalVGDrawCalls = 0;
+    gctUINT32 totalVGStateChangeCalls = 0;
+    gctUINT32 maxrss, ixrss, idrss, isrss;
+    gctINT32 i;
+
+    gcmHEADER_ARG("Context=0x%x, Enum=%d", Context, Enum);
+
+    switch (Enum)
+    {
+    case VG_PROFILER_WRITE_HEADER:
         /* Write Generic Info. */
-        char* infoCompany = "Vivante Corporation";
-        char* infoVersion = "1.3";
-        char  infoRevision[255] = {'\0'};   /* read from hw */
-        char* infoRenderer = Context->chipName;
-        char* infoDriver = "OpenVG 1.1";
-        gctUINT offset = 0;
         rev = Context->revision;
 #define BCD(digit)      ((rev >> (digit * 4)) & 0xF)
-        gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
         gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
         if (BCD(3) == 0)
         {
@@ -182,7 +228,6 @@ InitializeVGProfiler(
                 BCD(3), BCD(2), BCD(1), BCD(0));
         }
 
-
         gcmWRITE_CONST(VPG_INFO);
 
         gcmWRITE_CONST(VPC_INFOCOMPANY);
@@ -195,98 +240,48 @@ InitializeVGProfiler(
         gcmWRITE_STRING(infoRevision);
         gcmWRITE_CONST(VPC_INFODRIVER);
         gcmWRITE_STRING(infoDriver);
-
-        gcmWRITE_CONST(VPG_END);
-    }
-
-
-    gcoOS_GetTime(&Context->profiler.frameStart);
-    Context->profiler.frameStartTimeusec     = Context->profiler.frameStart;
-    Context->profiler.primitiveStartTimeusec = Context->profiler.frameStart;
-    gcoOS_GetCPUTime(&Context->profiler.frameStartCPUTimeusec);
-}
-
-/*******************************************************************************
-**    _DestroyVGProfiler
-**
-**    Initialize the profiler for the context provided.
-**
-**    Arguments:
-**
-**        VGContext Context
-**            Pointer to a new VGContext object.
-*/
-void
-DestroyVGProfiler(
-    _VGContext * Context
-    )
-{
-    if (Context->profiler.enable)
-    {
-        Context->profiler.enable = gcvFALSE;
-        gcmVERIFY_OK(gcoPROFILER_Destroy(VGPROFILER_HAL));
-
-        if(VGPROFILER_HAL != gcvNULL)
-            gcoOS_Free(gcvNULL, VGPROFILER_HAL);
-
-    }
-}
-
-#define PRINT_XML(counter)    _Print(Context, "<%s value=\"%d\"/>\n", \
-                                   #counter, Context->profiler.counter)
-#define PRINT_XML2(counter)    _Print(Context, "<%s value=\"%d\"/>\n", \
-                                   #counter, counter)
-#define PRINT_XMLF(counter)    _Print(Context, "<%s value=\"%f\"/>\n", \
-                                   #counter, Context->profiler.counter)
-
-
-/* Function for printing frame number only once */
-static void
-beginFrame(
-    _VGContext * Context
-    )
-{
-    if (Context->profiler.enable)
-    {
-        if (!Context->profiler.frameBegun)
+#if gcdNULL_DRIVER >= 2
         {
+            char* infoDiverMode = "NULL Driver";
+            gcmWRITE_CONST(VPC_INFODRIVERMODE);
+            gcmWRITE_STRING(infoDiverMode);
+        }
+#endif
+        break;
 
+    case VG_PROFILER_WRITE_FRAME_BEGIN:
+        if (!Context->profiler.frameBegun && Context->profiler.need_dump)
+        {
+            if (Context->profiler.frameNumber == 0 && Context->targetImage.surface)
+            {
+                gctUINT width, height;
+                gctUINT offset = 0;
+                gctCHAR  infoScreen[255] = { '\0' };
+                gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
+                gcoSURF_GetSize(Context->targetImage.surface, &width, &height, gcvNULL);
+                gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
+                    &offset, "%d x %d", width, height);
+                gcmWRITE_CONST(VPC_INFOSCREENSIZE);
+                gcmWRITE_STRING(infoScreen);
+
+                gcmWRITE_CONST(VPG_END);
+            }
             gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
-
             Context->profiler.frameBegun = 1;
         }
-    }
-}
+        break;
 
-static void
-endFrame(
-    _VGContext* Context
-    )
-{
-    int i;
-    gctUINT32 totalVGCalls = 0;
-    gctUINT32 totalVGDrawCalls = 0;
-    gctUINT32 totalVGStateChangeCalls = 0;
-    gctUINT32 maxrss, ixrss, idrss, isrss;
+    case VG_PROFILER_WRITE_FRAME_END:
+        gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_FRAME, Context->profiler.frameNumber));
 
-    if (Context->profiler.enable)
-    {
-        beginFrame(Context);
-
-        if (Context->profiler.timeEnable)
+        /*write time*/
+        if (Context->profiler.need_dump)
         {
             gcmWRITE_CONST(VPG_TIME);
-
-            gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32)(Context->profiler.frameEndTimeusec
-                - Context->profiler.frameStartTimeusec));
+            gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32)(Context->profiler.frameEndTimeusec - Context->profiler.frameStartTimeusec));
             gcmWRITE_COUNTER(VPC_CPUTIME, (gctINT32)Context->profiler.totalDriverTime);
-
             gcmWRITE_CONST(VPG_END);
 
-        }
-
-        if (Context->profiler.memEnable)
-        {
             gcoOS_GetMemoryUsage(&maxrss, &ixrss, &idrss, &isrss);
 
             gcmWRITE_CONST(VPG_MEM);
@@ -298,17 +293,13 @@ endFrame(
 
             gcmWRITE_CONST(VPG_END);
 
-        }
-
-        if (Context->profiler.drvEnable)
-        {
             /* write api time counters */
             gcmWRITE_CONST(VPG_VG11_TIME);
             for (i = 0; i < NUM_API_CALLS; ++i)
             {
                 if (Context->profiler.apiCalls[i] > 0)
                 {
-                    gcmWRITE_COUNTER(VPG_VG11_TIME + 1 + i, (gctINT32) Context->profiler.apiTimes[i]);
+                    gcmWRITE_COUNTER(VPG_VG11_TIME + 1 + i, (gctINT32)Context->profiler.apiTimes[i]);
                 }
             }
             gcmWRITE_CONST(VPG_END);
@@ -320,11 +311,9 @@ endFrame(
                 if (Context->profiler.apiCalls[i] > 0)
                 {
                     gcmWRITE_COUNTER(VPG_VG11 + 1 + i, Context->profiler.apiCalls[i]);
-
-
                     totalVGCalls += Context->profiler.apiCalls[i];
 
-                    switch(i + APICALLBASE)
+                    switch (i + APICALLBASE)
                     {
                     case VGDRAWPATH:
                     case VGDRAWIMAGE:
@@ -362,6 +351,7 @@ endFrame(
 
                 /* Clear variables for next frame. */
                 Context->profiler.apiCalls[i] = 0;
+                Context->profiler.apiTimes[i] = 0;
             }
 
             gcmWRITE_COUNTER(VPC_VG11CALLS, totalVGCalls);
@@ -371,118 +361,170 @@ endFrame(
             gcmWRITE_COUNTER(VPC_VG11FILLCOUNT, Context->profiler.drawFillCount);
             gcmWRITE_COUNTER(VPC_VG11STROKECOUNT, Context->profiler.drawStrokeCount);
 
+
             gcmWRITE_CONST(VPG_END);
-
+            gcmWRITE_CONST(VPG_END);
         }
+        break;
 
-        gcoPROFILER_EndFrame(VGPROFILER_HAL);
-
-        gcmWRITE_CONST(VPG_END);
-
-
-        gcoPROFILER_Flush(VGPROFILER_HAL);
+    case VG_PROFILER_WRITE_FRAME_RESET:
+        for (i = 0; i < NUM_API_CALLS; ++i)
+        {
+            Context->profiler.apiCalls[i] = 0;
+            Context->profiler.apiTimes[i] = 0;
+            Context->profiler.totalDriverTime = 0;
+        }
 
         /* Clear variables for next frame. */
-        Context->profiler.drawFillCount   = 0;
+        Context->profiler.drawFillCount = 0;
         Context->profiler.drawStrokeCount = 0;
-        if (Context->profiler.timeEnable)
-        {
-            Context->profiler.frameStartCPUTimeusec =
-                Context->profiler.frameEndCPUTimeusec;
-            gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
-        }
+        Context->profiler.drawCount = 0;
+        Context->profiler.totalDriverTime = 0;
 
-        /* Next frame. */
-        Context->profiler.frameNumber++;
-        Context->profiler.frameBegun = 0;
+        gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
+        break;
+    default:
+        gcmASSERT(0);
+        break;
     }
+
+OnError:
+
+    gcmFOOTER_NO();
+    return status;
 }
 
-gctBOOL
-vgProfiler(
-    gctPOINTER Profiler,
-    gctUINT32 Enum,
-    gctHANDLE Value
-    )
+VGboolean
+_vgshProfilerSet(
+    IN _VGContext * Context,
+    IN VGuint Enum,
+    IN gctHANDLE Value
+)
 {
-    _VGContext* context;
-    gcmHEADER();
+    _VGProfiler * profiler = &Context->profiler;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    OVG_GET_CONTEXT(gcvFALSE);
+    gcmHEADER_ARG("Context=0x%x, Enum=%d, Value=0x%x", Context, Enum, Value);
 
-    if (! context->profiler.enable)
+    if (Context == gcvNULL || !profiler->enable)
     {
-        gcmFOOTER_ARG("return=%s", "gcvFALSE");
-        return gcvFALSE;
+        gcmFOOTER_ARG("return=%d", VG_FALSE);
+        return VG_FALSE;
+    }
+
+    switch (_vgshProfileMode)
+    {
+    case 1:
+        if (profiler->frameCount == 0 || profiler->frameNumber < profiler->frameCount)
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = VG_FALSE;
+        }
+        break;
+    case 2:
+        if (profiler->enableOutputCounters)
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = VG_FALSE;
+        }
+        break;
+    case 3:
+        if ((profiler->frameStartNumber == 0 && profiler->frameEndNumber == 0) ||
+            (profiler->curFrameNumber >= profiler->frameStartNumber && profiler->curFrameNumber <= profiler->frameEndNumber))
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = VG_FALSE;
+        }
+        break;
+    default:
+        gcmFOOTER_ARG("return=%d", VG_FALSE);
+        return VG_FALSE;
     }
 
     switch (Enum)
     {
     case VG_PROFILER_FRAME_END:
-        if (context->profiler.timeEnable)
-        {
-            gcoOS_GetTime(&context->profiler.frameEndTimeusec);
-            gcoOS_GetCPUTime(&context->profiler.frameEndCPUTimeusec);
-        }
-        endFrame(context);
-        break;
 
-    case VG_PROFILER_PRIMITIVE_END:
-        /*endPrimitive(context);*/
+        gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
+        profiler->drawCount = 0;
+        profiler->curFrameNumber++;
+        gcmONERROR(_vgshProfilerWrite(Context, VG_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(_vgshProfilerWrite(Context, VG_PROFILER_WRITE_FRAME_END));
+        gcmONERROR(gcoPROFILER_Flush(Context->profilerObj));
+
+        gcmONERROR(_vgshProfilerWrite(Context, VG_PROFILER_WRITE_FRAME_RESET));
+
+        /* Next frame. */
+        if (profiler->need_dump)
+        {
+            profiler->frameNumber++;
+            profiler->frameBegun = 0;
+        }
         break;
 
     case VG_PROFILER_PRIMITIVE_TYPE:
-        if (context->profiler.drvEnable)
-        {
-            context->profiler.primitiveType = gcmPTR2INT32(Value);
-        }
+        profiler->primitiveType = gcmPTR2INT32(Value);
         break;
 
     case VG_PROFILER_PRIMITIVE_COUNT:
-        if (!context->profiler.drvEnable)
-            break;
-
-        context->profiler.primitiveCount = gcmPTR2INT32(Value);
-
-        switch (context->profiler.primitiveType)
+        profiler->primitiveCount = gcmPTR2INT32(Value);
+        switch (profiler->primitiveType)
         {
         case VG_PATH:
-            context->profiler.drawPathCount += gcmPTR2INT32(Value);
+            profiler->drawPathCount += gcmPTR2INT32(Value);
             break;
         case VG_GLYPH:
-            context->profiler.drawGlyphCount += gcmPTR2INT32(Value);
+            profiler->drawGlyphCount += gcmPTR2INT32(Value);
             break;
         case VG_IMAGE:
-            context->profiler.drawImageCount += gcmPTR2INT32(Value);
+            profiler->drawImageCount += gcmPTR2INT32(Value);
             break;
         }
         break;
 
-    case VG_PROFILER_STROKE:
-        if (context->profiler.drvEnable)
-        {
-            context->profiler.drawStrokeCount += gcmPTR2INT32(Value);
-        }
+   case VG_PROFILER_STROKE:
+        profiler->drawStrokeCount += gcmPTR2INT32(Value);
         break;
 
     case VG_PROFILER_FILL:
-        if (context->profiler.drvEnable)
-        {
-            context->profiler.drawFillCount += gcmPTR2INT32(Value);
-        }
+        profiler->drawFillCount += gcmPTR2INT32(Value);
+        break;
+
+    case VG_PROFILER_DRAW_BEGIN:
+
+        gcmONERROR(_vgshProfilerWrite(Context, VG_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
+
+        break;
+
+    case VG_PROFILER_DRAW_END:
+        gcmONERROR(gcoPROFILER_End(Context->profilerObj, gcvCOUNTER_OP_DRAW, profiler->drawCount));
+        profiler->drawCount++;
         break;
 
     default:
-        if (!context->profiler.drvEnable)
-            break;
-
         if ((Enum > APICALLBASE) && (Enum - APICALLBASE < NUM_API_CALLS))
         {
-            context->profiler.apiCalls[Enum - APICALLBASE]++;
+            profiler->apiCalls[Enum - APICALLBASE]++;
         }
         break;
     }
-    gcmFOOTER_ARG("return=%s", "gcvTRUE");
-    return gcvTRUE;
+
+    gcmFOOTER_ARG("return=%d", VG_TRUE);
+    return VG_TRUE;
+
+OnError:
+    gcmFOOTER_ARG("return=%d", VG_FALSE);
+    return VG_FALSE;
 }
+
 #endif

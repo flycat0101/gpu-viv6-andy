@@ -210,10 +210,7 @@ typedef struct _vgCORE
     gctBOOL                    invalidCache;
 
     /*shader states*/
-    gctSIZE_T            statesSize;
-    gctPOINTER            states;
-    gcsHINT_PTR            hints;
-
+    gcsPROGRAM_STATE     programState;
 
     /*bind vertex*/
     gcoVERTEX            vertex;

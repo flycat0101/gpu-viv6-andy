@@ -763,7 +763,7 @@ gceSTATUS
 gcoVX_AllocateMemory(
     IN gctUINT32        Size,
     OUT gctPOINTER*     Logical,
-    OUT gctPHYS_ADDR*   Physical,
+    OUT gctUINT32*      Physical,
     OUT gcsSURF_NODE_PTR* Node
     )
 {
@@ -789,8 +789,8 @@ gcoVX_AllocateMemory(
     gcmONERROR(gcsSURF_NODE_Construct(
         node,
         Size,
-        256,
-        gcvSURF_ICACHE,
+        64,
+        gcvSURF_VERTEX,
         gcvALLOC_FLAG_NONE,
         gcvPOOL_DEFAULT
         ));
@@ -803,7 +803,7 @@ gcoVX_AllocateMemory(
     if (node && node->pool != gcvPOOL_UNKNOWN)
     {
         *Logical    = logical;
-        *Physical   = (gctPHYS_ADDR*)(gctSIZE_T)physical;
+        *Physical   = physical;
         *Node       = node;
     }
 
@@ -838,7 +838,7 @@ gcoVX_FreeMemory(
 
         /* Unlock the buffer. */
         gcmONERROR(gcoHARDWARE_Unlock(Node,
-                                      gcvSURF_ICACHE));
+                                      gcvSURF_VERTEX));
 
         /* Create an event to free the video memory. */
         gcmONERROR(gcsSURF_NODE_Destroy(Node));
@@ -857,9 +857,7 @@ OnError:
 
 gceSTATUS
 gcoVX_LoadKernelShader(
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
+    IN gcsPROGRAM_STATE ProgramState
     )
 {
 
@@ -867,7 +865,7 @@ gcoVX_LoadKernelShader(
     gceAPI    currentApi;
 
     gcmHEADER_ARG("StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
-                  StateBufferSize, StateBuffer, Hints);
+                  ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
 
     /* Set the hardware type. */
@@ -899,10 +897,8 @@ gcoVX_LoadKernelShader(
     /* gcmONERROR(gcoCLHardware_Construct()) ; */
 
     /* Load kernel states. */
-    status = gcLoadKernel(gcvNULL,
-                          StateBufferSize,
-                          StateBuffer,
-                          Hints);
+    status = gcLoadShaders(gcvNULL,
+                           ProgramState);
 
 OnError:
     /* Return the status. */
@@ -1022,6 +1018,7 @@ gceSTATUS
 gcoVX_ProgrammCrossEngine(
     IN gctPOINTER             Data,
     IN gceVX_ACCELERATOR_TYPE Type,
+    IN gctPOINTER             Options,
     IN OUT gctUINT32_PTR      *Instruction
     )
 {
@@ -1035,7 +1032,7 @@ gcoVX_ProgrammCrossEngine(
         gcmONERROR(gcoHARDWAREVX_ProgrammeTPEngine(gcvNULL, Data, Instruction));
         break;
     case gcvVX_ACCELERATOR_NN:
-        gcmONERROR(gcoHARDWAREVX_ProgrammeNNEngine(gcvNULL, Data, Instruction));
+        gcmONERROR(gcoHARDWAREVX_ProgrammeNNEngine(gcvNULL, Data, Options, Instruction));
         break;
     default:
         gcmASSERT(0);
@@ -1128,7 +1125,7 @@ OnError:
 gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32 *         Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     )
@@ -1136,6 +1133,7 @@ gcoVX_AllocateMemoryEx(
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
+    gctPOINTER pointer = gcvNULL;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
@@ -1149,8 +1147,6 @@ gcoVX_AllocateMemoryEx(
         bytes = gcmALIGN(*Bytes, 64);
     }
 
-    {
-    gctPOINTER pointer = gcvNULL;
 
     /* Allocate node. */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -1163,14 +1159,14 @@ gcoVX_AllocateMemoryEx(
         node,
         bytes,
         64,
-        gcvSURF_INDEX,
+        gcvSURF_VERTEX,
         gcvALLOC_FLAG_NONE,
         gcvPOOL_DEFAULT
         ));
 
     /* Lock the cl buffer. */
     gcmONERROR(gcoHARDWARE_Lock(node,
-                                (gctUINT32 *) Physical,
+                                Physical,
                                 Logical));
 
     /* Return allocated number of bytes. */
@@ -1178,8 +1174,6 @@ gcoVX_AllocateMemoryEx(
 
     /* Return node. */
     *Node = node;
-    }
-
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
@@ -1200,7 +1194,7 @@ OnError:
 
 gceSTATUS
 gcoVX_FreeMemoryEx(
-    IN gctPHYS_ADDR         Physical,
+    IN gctUINT32            Physical,
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
     IN gcsSURF_NODE_PTR     Node
@@ -1212,13 +1206,12 @@ gcoVX_FreeMemoryEx(
     gcmHEADER_ARG("Physical=0x%x Logical=0x%x Bytes=%u Node=0x%x",
                   Physical, Logical, Bytes, Node);
 
-
     /* Do we have a buffer allocated? */
     if (Node && Node->pool != gcvPOOL_UNKNOWN)
     {
         /* Unlock the index buffer. */
         gcmONERROR(gcoHARDWARE_Unlock(Node,
-                                      gcvSURF_INDEX));
+                                      gcvSURF_VERTEX));
 
         /* Create an event to free the video memory. */
         gcmONERROR(gcsSURF_NODE_Destroy(Node));

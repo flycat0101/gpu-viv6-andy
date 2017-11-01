@@ -318,9 +318,46 @@ VX_API_ENTRY vx_tensor_addressing VX_API_CALL vxCreateTensorAddressing(vx_contex
 */
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseTensorAddressing(vx_tensor_addressing *tensor_addr);
 
+/*! \brief Return a new tensor referencing the same memory location but with different shape.
+* \param [in] tensor The input tensor data to reshape.
+* \param [in] num_of_dims Size of each dimension. If one component is special value -1,
+* the size of that dimension is computed so that the total size remains the same as input tensor.
+* If is is [-1], then flatten is performed which turns tensor into 1-D.
+* \param [in] size The size of the container to which \a num_of_dims points.
+* \return a vx_tensor that has shaped.
+* \return VX_NULL if an error occurred.
+* \ingroup group_tensor
+*/
+VX_API_ENTRY vx_tensor VX_API_CALL vxReshapeTensor(vx_tensor tensor, vx_int32* num_of_dims, vx_uint32 sizes);
+
 /*==============================================================================
     NN Nodes
 =============================================================================*/
+
+typedef struct _vx_nn_convolution_params_t
+{
+    vx_size dilation_x;                 /* "inflate" the kernel by inserting zeros between the kernel elements in the x direction.
+                                            The value is the number of zeros to insert. */
+    vx_size dilation_y;                 /* "inflate" the kernel by inserting zeros between the kernel elements in the y direction.
+                                            The value is the number of zeros to insert. */
+    vx_enum down_scale_size_rounding;   /* Rounding method for calculating output dimensions. See vx_nn_rounding_type_e  */
+    vx_enum overflow_policy;            /* A VX_TYPE_ENUM of the vx_convert_policy_e enumeration.  */
+    vx_size padding_x;                  /* Number of elements added at each side in the x dimension of the input.  */
+    vx_size padding_y;                  /* Number of elements added at each side in the y dimension of the input.  */
+    vx_enum rounding_policy;            /* A VX_TYPE_ENUM of the vx_round_policy_e enumeration.*/
+} vx_nn_convolution_params_t;
+
+typedef struct vx_nn_convolution_params_ext_t
+{
+    vx_nn_convolution_params_t khr;          /* Khronos standard structure head */
+    vx_size padding_x_right;                 /* Number of elements added at each side in the right of x dimension of the input,
+                                               "padding_x" is for the left */
+    vx_size padding_y_bottom;                /* Number of elements added at each side in the bottom of y dimension of the input.
+                                                "padding_y" is for the top */
+    vx_enum pad_mode;                        /* A VX_TYPE_ENUM of the vx_pad_mode_e enumeration. */
+    vx_scalar pad_const;                     /* pad const value if setting pad mode to const. */
+} vx_nn_convolution_params_ext_t;
+
 /*! \brief [Graph] Creates a Convolutional Network Convolution Layer Node.
 * \details This function implement Convolutional Network Convolution layer.
 * In case the input and output <tt>\ref vx_tensor</tt> are signed 16. A fixed point calculation is performed with round and saturate according to the number of accumulator bits. \n
@@ -363,12 +400,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseTensorAddressing(vx_tensor_addressin
 * \ingroup group_cnn
 */
 VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(vx_graph graph, vx_tensor inputs, vx_tensor weights, vx_tensor biases,
-    vx_uint32 pad_x,
-    vx_uint32 pad_y,
-    vx_uint8 accumulator_bits,
-    vx_enum overflow_policy,
-    vx_enum rounding_policy,
-    vx_enum down_scale_size_rounding,
+    const vx_nn_convolution_params_t * convolution_params,
+    vx_size size_of_convolution_params,
     vx_tensor outputs);
 
 /*! \brief [Graph] Creates a Fully connected Convolutional Network Layer Node.
@@ -490,7 +523,35 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer(vx_graph graph, vx_tensor 
 */
 VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(vx_graph graph, vx_tensor inputs, vx_enum func, vx_int32 a,vx_int32 b, vx_tensor outputs);
 
+typedef struct _vx_nn_convolution_relu_pooling_params_t
+{
+    vx_size   dilation_x;                /* "inflate" the kernel by inserting zeros between the kernel elements in the x direction.
+                                              The value is the number of zeros to insert. */
+    vx_size   dilation_y;                /* "inflate" the kernel by inserting zeros between the kernel elements in the y direction.
+                                              The value is the number of zeros to insert. */
+    vx_uint32  pad_x_left;                /* Number of elements added at each side in the left of x dimension of the input. */
+    vx_uint32  pad_x_right;               /* Number of elements added at each side in the right of x dimension of the input. */
+    vx_uint32  pad_y_top;                 /* Number of elements added at each side in the top of y dimension of the input. */
+    vx_uint32  pad_y_bottom;              /* Number of elements added at each side in the bottom of y dimension of the input. */
+    vx_uint8   accumulator_bits;
+    vx_enum    overflow_policy;           /* A VX_TYPE_ENUM of the vx_convert_policy_e enumeration. */
+    vx_enum    rounding_policy;           /* A VX_TYPE_ENUM of the vx_round_policy_e enumeration. */
+    vx_enum    down_scale_size_rounding;  /* Rounding method for calculating output dimensions. See vx_nn_rounding_type_e */
+    vx_bool    enable_relu;               /* Enable Relu layer function or not. */
+    vx_enum    pool_type;                 /* Either max pooling or average pooling (see vx_nn_pooling_type_e). */
+    vx_uint32  pool_size_x;               /* Size of the pooling region in the x dimension */
+    vx_uint32  pool_size_y;               /* Size of the pooling region in the y dimension. */
+    vx_enum    pad_mode;                  /* A VX_TYPE_ENUM of the vx_pad_mode_e enumeration. */
+    vx_scalar  pad_const;                 /* The order const value if setting pad mode to const. */
+} vx_nn_convolution_relu_pooling_params_t;
 
+VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    vx_weights_biases_parameter weights_biases,
+    const vx_nn_convolution_relu_pooling_params_t * convolution_relu_pooling_params,
+    vx_size                     size_of_convolution_relu_pooling_params,
+    vx_tensor                   outputs);
 
 
 /*! \brief [Graph] Performs element wise multiplications on element values in the input tensor data's with a scale.
@@ -511,6 +572,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(vx_graph graph, vx_tensor inp
 * \retval * Node handle.
 */
 VX_API_ENTRY vx_node VX_API_CALL vxTensorMultiplyNode(vx_graph graph, vx_tensor in1, vx_tensor in2, vx_scalar scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_tensor out);
+
+/*! \brief [Graph] Performs arithmetic addition on element values in the input tensor data's.
+ * \param [in] graph The handle to the graph.
+ * \param [in] in1 input tensor data,.
+ * \param [in] in2 input tensor data, inputs must be of equal in dimensions.
+ * else, If in one of the vx_mddata dimension is 1.
+ * That dimension is considered as a const on all the dimension terms.
+ * And will perform as if the values are duplicated on all terms in that dimensions.
+ * After the expansion. The dimensions are equal.
+ * \param [in] policy A vx_convert_policy_e enumeration.
+ * \param [out] out The output tensor data with the same dimensions as the input tensor data's.
+ * \ingroup group_tensor
+ * \return <tt> vx_node</tt>.
+ * \retval 0 Node could not be created.
+ * \retval * Node handle.
+ */
+VX_API_ENTRY vx_node VX_API_CALL vxTensorDivideNode(vx_graph graph, vx_tensor in1, vx_tensor in2, vx_scalar scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_tensor out);
 
 /*! \brief [Graph] Performs arithmetic addition on element values in the input tensor data's.
  * \param [in] graph The handle to the graph.
@@ -573,6 +651,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTableLookupNode(vx_graph graph, vx_tens
 */
 VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(vx_graph graph, vx_tensor in, vx_tensor out, vx_uint32 dim1, vx_uint32 dim2);
 
+/*! \brief [Graph] Performs matrices transformation on input tensor.
+* The node transpose the tensor according to the matrices that perm gives.
+* \param [in] graph The handle to the graph.
+* \param [in] in input tensor data,
+* \param [out] out output tensor data,
+* \param [in] perm that is the matrices to transpose. If not given, do full reversed transpose according to the input tensor dimension.
+* \param [in] sizes_of_perm that is the dimension of perm.
+* \ingroup group_tensor
+* \return <tt> vx_node</tt>.
+* \retval 0 Node could not be created.
+* \retval * Node handle.
+*/
+VX_API_ENTRY vx_node VX_API_CALL vxTensorPermuteNode(vx_graph graph, vx_tensor in, vx_tensor out, vx_uint32* perm, vx_uint32 sizes_of_perm);
+
+VX_API_ENTRY vx_node VX_API_CALL vxTensorCopyNode(vx_graph graph, vx_tensor src, vx_tensor dst);
+
 /*! \brief [Graph] Performs transpose on the input tensor.
 * The node normalizte all the image of the inputs tensor
 * \param [in] graph The handle to the graph.
@@ -586,6 +680,140 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(vx_graph graph, vx_tensor
 VX_API_ENTRY vx_node VX_API_CALL vxNormalizeImageLayer ( vx_graph graph,
                                                        vx_tensor inputs,
                                                        vx_tensor outputs );
+
+/*! \brief Input parameters for ROI pooling operation.
+ * \ingroup group_cnn
+ */
+typedef struct _vx_nn_roi_pool_params_t
+{
+    vx_enum     pool_type;  /*!< \brief Of type <tt>\ref vx_nn_pooling_type_e</tt>. Only <tt>\ref VX_NN_POOLING_MAX</tt> pooling is supported. */
+} vx_nn_roi_pool_params_t;
+
+typedef struct _vx_nn_roi_pool_params_ext_t
+{
+    vx_nn_roi_pool_params_t     khr;          /* Khronos standard structure head */
+    vx_float32                  spatial_scale;              /* The ratio of image to feature map (Range: 0 < spatial_scale <= 1) */
+    vx_int32                    pooled_height;              /* The height of roi pooling (Range: 0 < pool_height <= height of input_data) */
+    vx_int32                    pooled_width;               /* The width of roi pooling(Range: 0 < pool_height <= width of input_data) */
+} vx_nn_roi_pool_params_ext_t;
+
+/*! \brief [Graph] Creates a Convolutional Network ROI pooling node
+ * \details Pooling is done on the width and height dimensions of the <tt>\ref vx_tensor</tt>. The ROI Pooling get an array of roi rectangles, and an input tensor.
+ * The kernel crop the width and height dimensions of the input tensor with the ROI rectangles and down scale the result to the size of the output tensor. The output tensor width and height are the pooled width and pooled height.
+ * The down scale method is determined by the pool_type.
+ * \param [in] graph The handle to the graph.
+ * \param [in] inputs The input tensor data. 3 lower dimensions represent a single input, 4th dimension for batch of inputs is optional. Dimension layout is [width, height, #IFM, #batches].
+ * See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+ * Implementations must support input tensor data types indicated by the extension strings 'KHR_NN_8' or 'KHR_NN_8 KHR_NN_16'.
+ * \param [in] inputs_rois The roi array tensor. ROI array with dimensions [4, roi_count, #batches] where the first dimension represents 4 coordinates of the top left and bottom right corners of the roi rectangles, based on the input tensor width and height.
+ * #batches is optional and must be the same as in inputs. roi_count is the number of ROI rectangles.
+ * \param [in] pool_type Of type <tt>\ref vx_nn_pooling_type_e</tt>. Only <tt>\ref VX_NN_POOLING_MAX</tt> pooling is supported.
+ * \param [in] size_of_roi_params Size in bytes of roi_pool_params.
+ * \param [out] output_arr The output tensor. Output will have [output_width, output_height, #IFM, #batches] dimensions. #batches is optional and must be the same as in inputs.
+ * \ingroup group_cnn
+ * \return <tt> vx_node</tt>.
+ * \returns A node reference <tt>\ref vx_node</tt>. Any possible errors preventing a
+ * successful creation should be checked using <tt>\ref vxGetStatus</tt>.
+ */
+VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(vx_graph graph, vx_tensor input_data, vx_tensor input_rois,const vx_nn_roi_pool_params_t *roi_pool_params,vx_size size_of_roi_params, vx_tensor output_arr);
+
+/*! \brief Input parameters for a deconvolution operation.
+ * \ingroup group_cnn
+ */
+typedef struct _vx_nn_deconvolution_params_t
+{
+    vx_size padding_x;                 /*!< \brief Number of elements subtracted at each side in the x dimension of the input. */
+    vx_size padding_y;                 /*!< \brief Number of elements subtracted at each side in the y dimension of the input. */
+    vx_enum overflow_policy;         /*!< \brief A <tt> VX_TYPE_ENUM</tt> of the <tt> vx_convert_policy_e</tt> enumeration. */
+    vx_enum rounding_policy;         /*!< \brief A <tt> VX_TYPE_ENUM</tt> of the <tt> vx_round_policy_e</tt> enumeration. */
+    vx_size a_x;                 /*!< \brief user-specified quantity used to distinguish between the \f$upscale_x\f$ different possible output sizes. */
+    vx_size a_y;                 /*!< \brief user-specified quantity used to distinguish between the \f$upscale_y\f$ different possible output sizes. */
+} vx_nn_deconvolution_params_t;
+
+typedef struct vx_nn_deconvolution_params_ext_t
+{
+    vx_nn_deconvolution_params_t khr; /* Khronos standard structure head */
+    vx_size padding_x_right;                 /* Number of elements subtracted at each side in the right of x dimension of the input.
+                                                "padding_x" is for the left */
+    vx_size padding_y_bottom;                /* Number of elements subtracted at each side in the bottom of y dimension of the input.
+                                                "padding_y" is for the top */
+    vx_int32 channel_group;                  /* Number of separate groups for deconvolution (Range: 0 <= groups <= size of z dimension of
+                                                input; size of z dimension of input can be divided by groups) */
+    vx_enum pad_mode;                        /* A VX_TYPE_ENUM of the vx_pad_mode_e enumeration. */
+    vx_scalar pad_const;                     /* The pad const value if setting pad mode to const. */
+} vx_nn_deconvolution_params_ext_t;
+
+/*! \brief [Graph] Creates a Convolutional Network Deconvolution Layer Node.
+ * \details  Deconvolution denote a sort of reverse convolution, which importantly and confusingly is not actually a proper mathematical deconvolution.
+ * Convolutional Network Deconvolution is up-sampling of an image by learned Deconvolution coefficients.
+ * The operation is similar to convolution but can be implemented by up-sampling the inputs with zeros insertions between the inputs,
+ * and convolving the Deconvolution kernels on the up-sampled result.
+ * For fixed-point data types, a fixed point calculation is performed with round and saturate according to the number of accumulator bits. The number of the accumulator bits are implementation defined,
+ * and should be at least 16.\n
+ * round: rounding according the <tt>vx_round_policy_e</tt> enumeration. \n
+ * saturate: A saturation according the <tt>vx_convert_policy_e</tt> enumeration.
+ * The following equation is implemented: \n
+ * \f$ outputs[j,k,i] =  saturate(round(\sum_{l} \sum_{m,n}(inputs_{upscaled}[j-m,k-n,l] \times weights[m,n,l,i])+biasses[j,k,i])) \f$\n
+ * Where \f$m,n\f$ are indexes on the convolution matrices. \f$ l\f$ is an index on all the convolutions per input.\f$ i\f$ is an index per output.
+ * \f$ j,k \f$ are the inputs/outputs spatial indexes.
+ * Deconvolution is done on the width and height dimensions of the <tt>\ref vx_tensor</tt>. Therefore, we use here the term x for the width dimension and y for the height dimension.\n
+ * before the Deconvolution is done, up-scaling the width and height dimensions with zeros is performed.
+ * The relation between input to output is as follows: \n
+ * \f$ width_{output} = round( (width_{input} -1) * upscale_x  - 2 * padding_x + kernel_x + a_x) \f$\n
+ * and \n
+ * \f$ height_{output} = round( (height_{input} - 1) * upscale_y - 2 * padding_y + kernel_y + a_y) \f$\n
+ * where \f$width_{input}\f$ is the size of the input width dimension. \f$height_{input}\f$ is the size of the input height dimension.
+ * \f$width_{output}\f$ is the size of the output width dimension. \f$height_{output}\f$ is the size of the output height dimension.
+ * \f$kernel_x\f$ and \f$kernel_y\f$ are the convolution sizes in width and height. \f$a_x\f$ and \f$a_y\f$ are user-specified quantity used to distinguish between the \f$upscale_x\f$ and \f$upscale_y\f$ different possible output sizes
+ * \f$upscale_x\f$ and \f$upscale_y\f$ are calculated by the relation between input and output.
+ * rounding is done according to <tt>\ref vx_nn_rounding_type_e</tt>.
+ * \param [in] graph The handle to the graph.
+ * \param [in] inputs The input tensor. 3 lower dimensions represent a single input, and an optional 4th dimension for batch of inputs. Dimension layout is [width, height, #IFM, #batches].
+ * See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+ * Implementations must support input tensor data types indicated by the extension strings 'KHR_NN_8' or 'KHR_NN_8 KHR_NN_16'.
+ * \param [in] weights The 4d weights with dimensions [width, height, #IFM, #OFM]. See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+ * \param [in] biases Optional, ignored if NULL. The biases have one dimension [#OFM]. Implementations must support input tensor data type same as the inputs.
+ * \param [in] deconvolution_params Pointer to parameters of type <tt>\ref vx_nn_deconvolution_params_t</tt>
+ * \param [in] size_of_deconv_params Size in bytes of deconvolution_params.
+ * \param [out] outputs The output tensor. The output has the same number of dimensions as the input.
+ * \ingroup group_cnn
+ * \return <tt> vx_node</tt>.
+ * \returns A node reference <tt>\ref vx_node</tt>. Any possible errors preventing a
+ * successful creation should be checked using <tt>\ref vxGetStatus</tt>.
+ */
+VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(vx_graph graph, vx_tensor inputs, vx_tensor weights, vx_tensor  biases, const vx_nn_deconvolution_params_t *deconvolution_params, vx_size size_of_deconv_params, vx_tensor outputs);
+
+/*! \brief [Graph] Creates a Convolutional Network L2Normalize Layer Node.
+* \param [in] graph The handle to the graph.
+* \param [in]  The input tensor. 3 lower dimensions represent a single input, and an optional 4th dimension for batch of inputs. Dimension layout is [width, height, #IFM, #batches].
+ * See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+* \param [out] outputs The output tensor data. Output will have the same number of dimensions as input.
+* \ingroup group_cnn
+* \return <tt> vx_node</tt>.
+* \retval 0 Node could not be created.
+* \retval * Node handle.
+*/
+VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer(vx_graph graph, vx_tensor inputs, vx_tensor outputs);
+typedef struct _vx_nn_rpn_params_t
+{
+    vx_uint32       feature_stride;  /* Image feature stride.  */
+    vx_uint32       min_size;        /* The smallest rectangular box size */
+    vx_uint32       pre_nms_topn;    /* Before NMS, take pre_nms_topn rectangulars for NMS. */
+    vx_uint32       post_nms_topn;   /* After NMS, take post_nms_topn rectangulars for proposals output */
+    vx_float32      nms_thresh;      /* The IOU threshold */
+} vx_nn_rpn_params_t;
+
+VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
+    vx_graph                    graph,
+    vx_tensor                   score,
+    vx_tensor                   bbox,
+    vx_tensor                   anchors,
+    vx_tensor                   img_info,
+    const vx_nn_rpn_params_t *  rpn_params,
+    vx_size                     size_of_rpn_params,
+    vx_tensor                   roi_output,
+    vx_tensor                   score_output
+    );
 
 #ifdef __cplusplus
 }

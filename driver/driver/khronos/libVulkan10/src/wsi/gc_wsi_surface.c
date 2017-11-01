@@ -20,41 +20,48 @@ __GetSurfaceOperation(
     )
 {
     VkIcdSurfaceBase *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceBase *, surface);
-    switch ((int) surf->platform)
+    if (surf)
     {
+        switch ((int)surf->platform)
+        {
 #ifdef VK_USE_PLATFORM_MIR_KHR
-    case VK_ICD_WSI_PLATFORM_MIR:
-        return &__vkMirSurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_MIR:
+            return &__vkMirSurfaceOperation;
 #endif
 
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
-    case VK_ICD_WSI_PLATFORM_WAYLAND:
-        return &__vkWaylandSurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_WAYLAND:
+            return &__vkWaylandSurfaceOperation;
 #endif
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
-    case VK_ICD_WSI_PLATFORM_WIN32:
-        return &__vkWin32SurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_WIN32:
+            return &__vkWin32SurfaceOperation;
 #endif
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
-    case VK_ICD_WSI_PLATFORM_XCB:
-        return &__vkXcbSurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_XCB:
+            return &__vkXcbSurfaceOperation;
 #endif
 
 #ifdef VK_USE_PLATFORM_XLIB_KHR
-    case VK_ICD_WSI_PLATFORM_XLIB:
-        return &__vkXlibSurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_XLIB:
+            return &__vkXlibSurfaceOperation;
 #endif
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
-    case __VK_ICD_WSI_PLATFORM_ANDROID:
-        return &__vkAndroidSurfaceOperation;
+        case __VK_ICD_WSI_PLATFORM_ANDROID:
+            return &__vkAndroidSurfaceOperation;
 #endif
 
-    case VK_ICD_WSI_PLATFORM_DISPLAY:
-    default:
-        return &__vkDisplaySurfaceOperation;
+        case VK_ICD_WSI_PLATFORM_DISPLAY:
+        default:
+            return &__vkDisplaySurfaceOperation;
+        }
+    }
+    else
+    {
+        return gcvNULL;
     }
 }
 
@@ -65,7 +72,10 @@ void VKAPI_CALL __vk_DestroySurfaceKHR(
     )
 {
     __vkSurfaceOperation *operation = __GetSurfaceOperation(surface);
-    operation->DestroySurface(instance, surface, pAllocator);
+    if (operation)
+    {
+        operation->DestroySurface(instance, surface, pAllocator);
+    }
 }
 
 VkResult VKAPI_CALL __vk_GetPhysicalDeviceSurfaceSupportKHR(

@@ -5060,10 +5060,19 @@ gcoHARDWARE_QueryCommandBuffer(
 
             if (Hardware->features[gcvFEATURE_PROBE])
             {
-                gctSTRING profilemode = gcvNULL;
-                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode));
-                if (profilemode != gcvNULL &&
-                    gcoOS_StrCmp(profilemode, "0") == gcvSTATUS_LARGER)
+                /*only reserved more size for probe when enable profile*/
+                gctSTRING profileGLmode = gcvNULL;
+                gctSTRING profileVXmode = gcvNULL;
+                gctSTRING profileCLmode = gcvNULL;
+                gctSTRING probeDisalbed = gcvNULL;
+                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profileGLmode));
+                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_VX_PROFILE", &profileVXmode));
+                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_CL_PROFILE", &profileCLmode));
+                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VP_DISABLE_PROBE", &probeDisalbed));
+                if (!((probeDisalbed != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(probeDisalbed, "1"))) &&
+                    ((profileGLmode != gcvNULL && gcoOS_StrCmp(profileGLmode, "0") == gcvSTATUS_LARGER) ||
+                    (profileVXmode != gcvNULL && gcoOS_StrCmp(profileVXmode, "0") == gcvSTATUS_LARGER) ||
+                    (profileCLmode != gcvNULL && gcoOS_StrCmp(profileCLmode, "0") == gcvSTATUS_LARGER)))
                 {
                     if (Hardware->config->gpuCoreCount > 1)
                     {
@@ -7243,18 +7252,22 @@ gcoHARDWARE_QueryNNConfig(
     gceSTATUS status = gcvSTATUS_OK;
     vx_nn_config* NNConfig = (vx_nn_config*) Config;
 
-    gcmHEADER_ARG("Hardware=0x%x Count=%p", Hardware, NNConfig);
+    gcmHEADER_ARG("Hardware=%p NNConfig=%p", Hardware, NNConfig);
 
     gcmGETHARDWARE(Hardware);
 
     if (NNConfig != gcvNULL)
     {
-        NNConfig->nnMadPerCoure = Hardware->config->nnConfig.nnMadPerCoure;
+        NNConfig->nnMadPerCore = Hardware->config->nnConfig.nnMadPerCore;
         NNConfig->nnCoreCount   = Hardware->config->nnConfig.nnCoreCount;
         NNConfig->nnInputBufferDepth = Hardware->config->nnConfig.nnInputBufferDepth;
         NNConfig->nnAccumBufferDepth = Hardware->config->nnConfig.nnAccumBufferDepth;
         NNConfig->nnDPAmount = Hardware->config->nnConfig.nnDPAmount;
         NNConfig->nnL2CacheSize = Hardware->config->nnConfig.nnL2CacheSize;
+        NNConfig->vipSRAMSize = Hardware->config->nnConfig.vipSRAMSize;
+        NNConfig->tpCoreCount = Hardware->config->nnConfig.tpCoreCount;
+        NNConfig->tpPwlLUTCount = Hardware->config->nnConfig.tpPwlLUTCount;
+        NNConfig->tpPwlLUTSize = Hardware->config->nnConfig.tpPwlLUTSize;
         NNConfig->isSet = gcvTRUE;
     }
 

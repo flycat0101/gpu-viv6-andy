@@ -49,7 +49,7 @@ typedef struct __GLfogStateRec {
     GLfloat density, start, end;
     GLfloat oneOverEMinusS;
     GLfloat index;
-#if defined(USE_LENDIAN)
+#ifdef __GL_LITTLE_ENDIAN
     union {
         GLuint composite;
         struct {
@@ -132,41 +132,24 @@ typedef struct __GLcurrentStateRec
     union
     {
         union
-
         {
-
             struct
-
             {
-
                 __GLcoord vertex;
-
                 GLfloat   weight[__GL_MAX_WEIGHT_SUPPORT];
-
                 __GLcoord normal;
-
                 __GLcolor color;
-
                 __GLcolor color2;
-
                 GLfloat   fog;
-
                 GLfloat   padding1[3];
-
                 GLboolean edgeflag;
-
                 GLubyte   padding2[15];
-
                 __GLcoord filler;
-
                 __GLcoord texture[__GL_MAX_TEXTURE_COORDS];
-
                 __GLcoord attribute[__GL_MAX_PROGRAM_VERTEX_ATTRIBUTES];
-
             };
 
             __GLcoord currentState[__GL_TOTAL_VERTEX_ATTRIBUTES];
-
         };
 #else
         __GLcoord attribute[__GL_MAX_VERTEX_ATTRIBUTES];
@@ -200,6 +183,7 @@ typedef struct __GLpolygonStateRec
     GLenum frontMode;
     GLenum backMode;
     GLuint bothFaceFill;
+    GLfloat bias;
 #endif
     GLenum cullFace;
     GLenum frontFace;
@@ -207,9 +191,6 @@ typedef struct __GLpolygonStateRec
     /* Polygon offset */
     GLfloat factor;
     GLfloat units;
-#ifdef OPENGL40
-    GLfloat bias;
-#endif
 } __GLpolygonState;
 
 /*
@@ -371,22 +352,16 @@ typedef struct __GLrasterStateRec
 */
 typedef struct __GLpixelPackModeRec
 {
-#ifndef OPENGL40
     GLuint alignment;
     GLuint lineLength;
-    GLuint imageHeight;
-    GLuint skipPixels;
     GLuint skipLines;
+    GLuint skipPixels;
     GLuint skipImages;
-#else
-    GLuint alignment;
+    GLuint imageHeight;
+
+#ifdef OPENGL40
     GLuint swapEndian;
     GLuint lsbFirst;
-    GLuint lineLength;
-    GLuint skipLines;
-    GLuint skipPixels;
-    GLuint skipImages;
-    GLuint imageHeight;
 #endif
 } __GLpixelPackMode;
 
@@ -405,24 +380,20 @@ typedef struct __GLclientPixelStateRec
 /*
 ** Hint state.  Contains all the user controllable hint state.
 */
+typedef struct __GLhitStateRec
+{
 #ifdef OPENGL40
-typedef struct {
     GLenum perspectiveCorrection;
     GLenum pointSmooth;
     GLenum lineSmooth;
     GLenum polygonSmooth;
     GLenum fog;
-    GLenum generateMipmap;
     GLenum textureCompressionHint;
-    GLenum fsDerivative;
-} __GLhintState;
-#else
-typedef struct __GLhitStateRec
-{
+#endif
     GLenum generateMipmap;
     GLenum fsDerivative;
 } __GLhintState;
-#endif
+
 
 /*
 ** Scissor state from user.
@@ -443,12 +414,10 @@ typedef struct __GLmultisampleStateRec {
     GLboolean alphaToCoverage;
     GLboolean alphaToOne;
     GLboolean coverage;
-    GLboolean coverageInvert;
-    GLfloat   coverageValue;
-#else
-    GLboolean coverageInvert;
-    GLfloat   coverageValue;
 #endif
+    GLboolean coverageInvert;
+    GLfloat   coverageValue;
+
     GLbitfield sampleMaskValue;
     GLfloat   minSampleShadingValue;
 } __GLmultisampleState;
@@ -524,24 +493,17 @@ typedef struct __GLmultisampleEnableStateRec
 typedef struct __GLenableStateRec
 {
 #ifdef OPENGL40
-
     __GLTransformEnableState   transform;
-
     __GLLightingEnableState    lighting;
     __GLEvalEnableState        eval;
     __GLTextureEnableState     texUnits[__GL_MAX_TEXTURE_UNITS];
-     __GLColorBufferEnableState colorBuffer;
-    __GLPolygonEnableState     polygon;
     __GLDepthEnableState       depthBuffer;
     __GLLineEnableState        line;
     __GLConvolutionEnableState convolution;
-    __GLMultisampleEnableState multisample;
     __GLProgramEnableState     program;
     GLboolean                  pointSmooth;
     GLboolean                  fog;
     GLboolean                  scissor; //adopt the same name as OPENGLES
-    GLboolean                  scissorTest;
-    GLboolean                  stencilTest;
     GLboolean                  stencilTestTwoSideExt;
     GLboolean                  colorSum;
     GLboolean                  colorTable;
@@ -550,16 +512,14 @@ typedef struct __GLenableStateRec
     GLboolean                  histogram;
     GLboolean                  minmax;
     GLboolean                  depthBoundTest; //adopt the same name as OPENGLES
-    GLboolean                  depthTest;
     GLboolean                  pointSprite;
-#else
+#endif
     __GLColorBufferEnableState colorBuffer;
     __GLPolygonEnableState     polygon;
     __GLMultisampleEnableState multisample;
     GLboolean                  scissorTest;
     GLboolean                  depthTest;
     GLboolean                  stencilTest;
-#endif
     GLboolean                  primitiveRestart;
     GLboolean                  rasterizerDiscard;
 } __GLenableState;
@@ -588,30 +548,18 @@ typedef struct __GLprogramStateRec
 */
 typedef struct __GLattributeRec {
 #ifdef OPENGL40
-    __GLcurrentState current;
     __GLRasterPosState rasterPos;
     __GLpointState point;
-    __GLlineState line;
-    __GLpolygonState polygon;
     __GLpolygonStippleState polygonStipple;
     __GLpixelState pixel;
     __GLlightState light;
     __GLfogState fog;
-    __GLdepthState depth;
     __GLdepthBoundTestState depthBoundTest;
     __GLaccumState accum;
-      __GLstencilState stencil;
-    __GLviewport viewport;
     __GLtransformState transform;
-    __GLenableState enables;
-    __GLrasterState raster;
-    __GLhintState hints;
     __GLevaluatorState evaluator;
     __GLdlistState list;
-    __GLscissor scissor;
-    __GLmultisampleState multisample;
-    __GLtextureState texture;
-#else
+#endif
     __GLcurrentState current;
     __GLlineState line;
     __GLpolygonState polygon;
@@ -624,7 +572,6 @@ typedef struct __GLattributeRec {
     __GLscissor scissor;
     __GLmultisampleState multisample;
     __GLtextureState texture;
-#endif
     __GLprogramState program;
     __GLimageState image;
     __GLprimBoundState primBound;

@@ -49,39 +49,22 @@ gceSTATUS gcQueryShaderCompilerHwCfg(
 **      gcoHAL Hal
 **          Pointer to a gcoHAL object.
 **
-**      gctSIZE_T StateBufferSize
-**          The number of bytes in the 'StateBuffer'.
-**
-**      gctPOINTER StateBuffer
-**          Pointer to the states that make up the shader program.
-**
-**      gcsHINT_PTR Hints
-**          Pointer to a gcsHINT structure that contains information required
-**          when loading the shader states.
-**
-**      gcePRIMITIVE PrimitiveType
-**          Primitive type to be rendered.
+**      gcsPROGRAM_STATE ProgramState
+**          program state.
 */
 gceSTATUS
 gcLoadShaders(
     IN gcoHAL Hal,
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
+    IN gcsPROGRAM_STATE ProgramState
     )
 {
     gceSTATUS status;
-    gcsPROGRAM_STATE programState;
 
     gcmHEADER_ARG("Hal=0x%x StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
-        Hal, StateBufferSize, StateBuffer, Hints);
-
-    programState.stateBuffer = StateBuffer;
-    programState.stateBufferSize = (gctUINT)StateBufferSize;
-    programState.hints = Hints;
+        Hal, ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
     /* Call down to the hardware object. */
-    status = gcoHARDWARE_LoadProgram(gcvNULL, Hints->stageBits, &programState);
+    status = gcoHARDWARE_LoadProgram(gcvNULL, ProgramState.hints->stageBits, &ProgramState);
 
     gcmFOOTER();
     return status;
@@ -143,74 +126,6 @@ gcInvokeThreadWalker(
 
     gcmFOOTER();
     return status;
-}
-
-gceSTATUS
-gcSHADER_SpecialHint(
-    IN  gcePATCH_ID patchId,
-    OUT gctUINT32_PTR hint
-    )
-{
-    *hint = 0;
-
-    /* Setting hint bit 0 means using "disable trilinear texture mode" */
-    /* Setting hint bit 1 means using "don't always convert RT to 32bits" */
-    switch (patchId)
-    {
-    case gcvPATCH_BM21:
-    case gcvPATCH_BM3:
-    case gcvPATCH_BMGUI:
-    case gcvPATCH_MM06:
-    case gcvPATCH_MM07:
-    case gcvPATCH_QUADRANT:
-    case gcvPATCH_ANTUTU:
-    case gcvPATCH_ANTUTU4X:
-    case gcvPATCH_ANTUTU5X:
-    case gcvPATCH_SMARTBENCH:
-    case gcvPATCH_JPCT:
-    case gcvPATCH_NEOCORE:
-    case gcvPATCH_RTESTVA:
-    case gcvPATCH_GLBM11:
-    case gcvPATCH_GLBM21:
-    case gcvPATCH_GLBM25:
-    case gcvPATCH_GLBM27:
-    case gcvPATCH_GLBMGUI:
-    case gcvPATCH_GFXBENCH:
-    case gcvPATCH_BASEMARKX:
-    case gcvPATCH_NENAMARK:
-    case gcvPATCH_NENAMARK2:
-        *hint |= (1 << 1) | (1 << 2);
-        break;
-    default:
-        break;
-    }
-
-    /* The following benchmark list can't enable "disable trilinear texture mode" */
-    switch (patchId)
-    {
-    case gcvPATCH_BM21:
-    case gcvPATCH_MM06:
-    case gcvPATCH_MM07:
-    case gcvPATCH_GLBM11:
-        *hint &= ~(1 << 1);
-        break;
-    default:
-        break;
-    }
-
-     /* The following benchmark list can't enable "don't always convert RT to 32bits" */
-    switch (patchId)
-    {
-    case gcvPATCH_NEOCORE:
-    case gcvPATCH_NENAMARK:
-    case gcvPATCH_NENAMARK2:
-        *hint &= ~(1 << 2);
-        break;
-    default:
-        break;
-    }
-
-    return gcvSTATUS_OK;
 }
 
 gceSTATUS

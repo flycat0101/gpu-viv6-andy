@@ -1815,6 +1815,17 @@ static VkResult halti5_pip_emit_rt(
  31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
  31:31) + 1))))))) << (0 ? 31:31))))
+#if !__VK_ENABLETS
+                    & (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) ((gctUINT32) (!chipGfxPipeline->destinationRead) & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
+ 17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
+ 17:17) + 1))))))) << (0 ? 17:17))))
+#endif
                     & (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
  11:8))) | (((gctUINT32) ((gctUINT32) (colorMask) & ((gctUINT32) ((((1 ?
@@ -2982,7 +2993,7 @@ static VkResult halti5_pip_tweak(
             chipPipeline->tweakHandler = (halti5_tweak_handler *)__VK_ALLOC(sizeof(halti5_tweak_handler), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
             __VK_ONERROR(chipPipeline->tweakHandler  ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
             __VK_MEMCOPY(chipPipeline->tweakHandler, handler, sizeof(halti5_tweak_handler));
-            __VK_ONERROR((*handler->tweak)(devCtx, pip, chipPipeline->tweakHandler));
+            __VK_ONERROR((*handler->tweak)(devCtx, pip, createInfo, chipPipeline->tweakHandler));
             break;
         }
     }
@@ -3693,13 +3704,19 @@ static VkResult halti5_pip_build_gfxshaders(
     halti5_vscprogram_instance *masterInstance = VK_NULL_HANDLE;
     VSC_PROG_LIB_LINK_ENTRY *vsclinkEntries = VK_NULL_HANDLE;
     uint32_t linkEntryNum = chipGfxPipeline->patchOutput.count;
-    SpvDecodeInfo decodeInfo;
+    SpvDecodeInfo *decodeInfo = VK_NULL_HANDLE;
     void *stateKey[__VK_MAX_DESCRIPTOR_SETS];
     uint32_t stateKeySizeInBytes[__VK_MAX_DESCRIPTOR_SETS];
     SHADER_HANDLE hShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
     SHADER_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
     VSC_SHADER_RESOURCE_LAYOUT vscShaderResLayout;
     struct _gcsHINT *hints = VK_NULL_HANDLE;
+    VkBool32 bTriangle = (pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST ||
+                          pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP ||
+                          pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN ||
+                          pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY ||
+                          pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY) ?
+                         VK_TRUE : VK_FALSE;
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
 
@@ -3746,6 +3763,7 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
     vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
                                 | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
@@ -3754,7 +3772,12 @@ static VkResult halti5_pip_build_gfxshaders(
                                   ? 0
                                   : VSC_COMPILER_OPT_FULL;
 
-    __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
+    decodeInfo =(SpvDecodeInfo *)__VK_ALLOC(sizeof(SpvDecodeInfo), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+
+    __VK_ONERROR((decodeInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+
+    __VK_MEMZERO(decodeInfo, sizeof(SpvDecodeInfo));
+
     for (i = 0; i < info->stageCount; i++)
     {
         uint8_t md5digest[16];
@@ -3815,17 +3838,70 @@ static VkResult halti5_pip_build_gfxshaders(
 
         if (!hShaderArray[shaderType])
         {
-            decodeInfo.binary = shaderModule->pCode;
-            decodeInfo.sizeInByte = (gctUINT)shaderModule->codeSize;
-            decodeInfo.stageInfo = (gctPOINTER)&(info->pStages[i]);
-            decodeInfo.specFlag = SPV_SPECFLAG_NONE;
-            decodeInfo.localSize[0] = decodeInfo.localSize[1] = decodeInfo.localSize[2] = 0;
-            decodeInfo.tcsInputVertices = info->pTessellationState ? info->pTessellationState->patchControlPoints : 0;
-            decodeInfo.funcCtx = shaderModule->funcTable;
-            decodeInfo.renderpassInfo = (shaderType == VSC_SHADER_STAGE_PS) ? &(pip->renderPass->attachmentCount) : gcvNULL;
-            decodeInfo.subPass = pip->subPass;
+            decodeInfo->binary = shaderModule->pCode;
+            decodeInfo->sizeInByte = (gctUINT)shaderModule->codeSize;
+            decodeInfo->stageInfo = (gctPOINTER)&(info->pStages[i]);
+            decodeInfo->specFlag = SPV_SPECFLAG_NONE;
+            decodeInfo->localSize[0] = decodeInfo->localSize[1] = decodeInfo->localSize[2] = 0;
+            decodeInfo->tcsInputVertices = info->pTessellationState ? info->pTessellationState->patchControlPoints : 0;
+            decodeInfo->funcCtx = shaderModule->funcTable;
+            decodeInfo->subPass = pip->subPass;
 
-            __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &hShaderArray[shaderType]))
+            if (shaderType == VSC_SHADER_STAGE_PS)
+            {
+                uint32_t j = 0;
+                __vkRenderPass *rdp = pip->renderPass;
+                decodeInfo->renderpassInfo = (SpvRenderPassInfo *)__VK_ALLOC(sizeof(SpvRenderPassInfo), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                __VK_ONERROR((decodeInfo->renderpassInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+                __VK_MEMZERO(decodeInfo->renderpassInfo, sizeof(SpvRenderPassInfo));
+                decodeInfo->renderpassInfo->attachmentCount = rdp->attachmentCount;
+
+                decodeInfo->renderpassInfo->attachments =
+                    (SpvAttachmentDesc *)__VK_ALLOC(sizeof(SpvAttachmentDesc) * rdp->attachmentCount, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                __VK_ONERROR((decodeInfo->renderpassInfo->attachments ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+                __VK_MEMZERO(decodeInfo->renderpassInfo->attachments, sizeof(SpvAttachmentDesc) * rdp->attachmentCount);
+
+                for (j = 0; j < rdp->attachmentCount; j++)
+                {
+                    decodeInfo->renderpassInfo->attachments[j].format = rdp->attachments[j].format;
+                    if (rdp->attachments[j].sampleCount > VK_SAMPLE_COUNT_1_BIT)
+                    {
+                        decodeInfo->renderpassInfo->attachments[j].attachmentFlag =
+                            (Spv_AttachmentFlag)(SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER | SPV_ATTACHMENTFLAG_MULTI_SAMPLE);
+                    }
+                    else
+                    {
+                        switch (rdp->attachments[j].format)
+                        {
+                        case VK_FORMAT_A2B10G10R10_UINT_PACK32:
+                        case VK_FORMAT_R8G8B8A8_SRGB:
+                        case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+                        case VK_FORMAT_B8G8R8A8_SRGB:
+                        case VK_FORMAT_D16_UNORM:
+                        case VK_FORMAT_X8_D24_UNORM_PACK32:
+                        case VK_FORMAT_D24_UNORM_S8_UINT:
+                            decodeInfo->renderpassInfo->attachments[j].attachmentFlag = SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER;
+                            break;
+                        default:
+                            decodeInfo->renderpassInfo->attachments[j].attachmentFlag = SPV_ATTACHMENTFLAG_NONE;
+                            break;
+                        }
+                    }
+                }
+                decodeInfo->renderpassInfo->subPassInfoCount = rdp->subPassInfoCount;
+                decodeInfo->renderpassInfo->subPassInfo =
+                    (SpvRenderSubPassInfo *)__VK_ALLOC(sizeof(SpvRenderSubPassInfo) * rdp->subPassInfoCount, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                __VK_ONERROR((decodeInfo->renderpassInfo->subPassInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+                __VK_MEMZERO(decodeInfo->renderpassInfo->subPassInfo, sizeof(SpvRenderSubPassInfo) * rdp->subPassInfoCount);
+
+                for (j = 0; j < rdp->subPassInfoCount; j++)
+                {
+                    __VK_MEMCOPY(&decodeInfo->renderpassInfo->subPassInfo[j].input_attachment_index, &rdp->subPassInfo[j].input_attachment_index,
+                        __VK_MAX_RENDER_TARGETS * sizeof(uint32_t));
+                }
+            }
+
+            __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(decodeInfo, &hShaderArray[shaderType]))
                                         ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
             halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, shaderType, &vscShaderResLayout);
@@ -3879,7 +3955,9 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    linkEntryNum += (pip->frontFace != VK_FRONT_FACE_CLOCKWISE) ? 1 : 0;
+    linkEntryNum += (bTriangle && pip->frontFace != VK_FRONT_FACE_CLOCKWISE) ? 1 : 0;
+    linkEntryNum += (!bTriangle) ? 1 : 0;
+
     if (linkEntryNum)
     {
         uint32_t linkEntryIdx = 0;
@@ -3922,7 +4000,7 @@ static VkResult halti5_pip_build_gfxshaders(
             }
         }
 
-        if (pip->frontFace != VK_FRONT_FACE_CLOCKWISE)
+        if (bTriangle && pip->frontFace != VK_FRONT_FACE_CLOCKWISE)
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
@@ -3932,11 +4010,23 @@ static VkResult halti5_pip_build_gfxshaders(
             linkEntryIdx++;
         }
 
+        if (!bTriangle)
+        {
+            vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT;
+            linkEntryIdx++;
+        }
+
         __VK_ASSERT(linkEntryIdx == linkEntryNum);
     }
 
     __VK_ONERROR((gcvSTATUS_OK == vscLinkProgram(&vscLinkParams, &masterInstance->pep, &masterInstance->hwStates))
                                 ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+
+    hints = &masterInstance->hwStates.hints;
 
     if (linkEntryNum)
     {
@@ -3958,8 +4048,23 @@ static VkResult halti5_pip_build_gfxshaders(
                         if ((privOutputMapping->pPrivOutputEntries[k].commonPrivm.privmFlag & VSC_LIB_LINK_TYPE_COLOR_OUTPUT)
                             && (*(gctUINT*)privOutputMapping->pPrivOutputEntries[k].commonPrivm.pPrivateData == chipGfxPipeline->patchOutput.outputs[j].locations[0]))
                         {
-                            chipGfxPipeline->patchOutput.outputs[j].locations[1] = privOutputMapping->pPrivOutputEntries[k].pOutput->ioIndex;
-                            break;
+                            uint32_t i;
+                            VkBool32 found = gcvFALSE;
+
+                            for (i = 0; i < gcdMAX_DRAW_BUFFERS; i++)
+                            {
+                                if (hints->psOutput2RtIndex[i] == (gctINT32)privOutputMapping->pPrivOutputEntries[k].pOutput->ioIndex)
+                                {
+                                    chipGfxPipeline->patchOutput.outputs[j].locations[1] = i;
+                                    found = gcvTRUE;
+                                    break;
+                                }
+                            }
+
+                            if (found)
+                            {
+                                break;
+                            }
                         }
                     }
                     patchMask &= ~(1 << j);
@@ -4024,8 +4129,6 @@ static VkResult halti5_pip_build_gfxshaders(
     chipPipeline->linkEntries = vsclinkEntries;
     chipPipeline->linkEntryCount  = linkEntryNum;
 
-    hints = &chipPipeline->curInstance->hwStates.hints;
-
     for (i = 0; i < gcvPROGRAM_STAGE_LAST; i++)
     {
         if (hints && (hints->memoryAccessFlags[i] & gceMA_FLAG_WRITE))
@@ -4033,6 +4136,22 @@ static VkResult halti5_pip_build_gfxshaders(
             chipPipeline->curInstance->memoryWrite = gcvTRUE;
             break;
         }
+    }
+
+    if (decodeInfo)
+    {
+        if (decodeInfo->renderpassInfo)
+        {
+            __VK_FREE(decodeInfo->renderpassInfo->attachments);
+            decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            __VK_FREE(decodeInfo->renderpassInfo->subPassInfo);
+            decodeInfo->renderpassInfo->subPassInfo = VK_NULL_HANDLE;
+            __VK_FREE(decodeInfo->renderpassInfo);
+            decodeInfo->renderpassInfo = VK_NULL_HANDLE;
+        }
+
+        __VK_FREE(decodeInfo);
+        decodeInfo = VK_NULL_HANDLE;
     }
 
     return VK_SUCCESS;
@@ -4092,6 +4211,22 @@ OnError:
     }
 
     halti5_helper_destroyVscShaderResLayout(pip, &vscShaderResLayout);
+
+    if (decodeInfo)
+    {
+        if (decodeInfo->renderpassInfo)
+        {
+            __VK_FREE(decodeInfo->renderpassInfo->attachments);
+            decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            __VK_FREE(decodeInfo->renderpassInfo->subPassInfo);
+            decodeInfo->renderpassInfo->subPassInfo = VK_NULL_HANDLE;
+            __VK_FREE(decodeInfo->renderpassInfo);
+            decodeInfo->renderpassInfo = VK_NULL_HANDLE;
+        }
+
+        __VK_FREE(decodeInfo);
+        decodeInfo = VK_NULL_HANDLE;
+    }
 
     return result;
 }
@@ -4220,6 +4355,7 @@ static VkResult halti5_pip_build_computeshader(
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
     vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
                                 | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
@@ -4772,10 +4908,12 @@ VkResult halti5_patch_pipeline(
             __VK_MEMCOPY(vscLinkParams.hShaderArray, hShaderArrayCopy, sizeof(hShaderArrayCopy));
             vscLinkParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
             vscLinkParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+            vscLinkParams.cfg.ctx.isPatchLib = gcvFALSE;
             vscLinkParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
             vscLinkParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS
                                      | VSC_COMPILER_FLAG_COMPILE_CODE_GEN
                                      | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
+                                     | VSC_COMPILER_FLAG_RECOMPILER
                                      | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
 
             vscLinkParams.cfg.optFlags =  (pip->flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT) ? 0 : VSC_COMPILER_OPT_FULL;

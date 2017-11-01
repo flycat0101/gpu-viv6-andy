@@ -343,12 +343,16 @@ gcoHARDWARE_SetRenderTarget(
         {
             Hardware->PEDirty->alphaDirty = gcvTRUE;
         }
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_RT, Surface->node.u.normal.node, TargetIndex);
+#endif
 
     }
     else
     {
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_RT, 0, TargetIndex);
+#endif
     }
 
     _AutoSetColorAddressing(Hardware);
@@ -419,11 +423,15 @@ gcoHARDWARE_SetDepthBuffer(
         /* Save configuration. Keep it for non-es3 driver */
         Hardware->MsaaStates->sampleInfo = Surface->sampleInfo;
 
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_DEPTH_STENCIL, Surface->node.u.normal.node, 0);
+#endif
     }
     else
     {
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_DEPTH_STENCIL, 0, 0);
+#endif
     }
 
     /* Set super-tiling. */
@@ -3132,7 +3140,8 @@ gcoHARDWARE_InitializeCL(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
-    if (Hardware->features[gcvFEATURE_TX_DESCRIPTOR])
+    if (!Hardware->features[gcvFEATURE_COMPUTE_ONLY] &&
+         Hardware->features[gcvFEATURE_TX_DESCRIPTOR])
     {
         gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
                                            0x14C40,
@@ -6265,6 +6274,11 @@ gcoHARDWARE_FlushTarget(
     gctBOOL  superTiled = pColorTarget->superTiled;
     gctUINT format = pColorTarget->format;
     gctUINT32 stride = 0;
+    gctBOOL bOQEnable = (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled);
+    gctBOOL bNeedNullRTForOQ = bOQEnable &&
+                               Hardware->features[gcvFEATURE_PE_DISABLE_COLOR_PIPE] &&
+                               !Hardware->features[gcvFEATURE_PE_DEPTH_ONLY_OQFIX] &&
+                               pColorTarget->surface == gcvNULL;
     gctBOOL colorPipeEnable = ((!Hardware->PEStates->colorStates.allColorWriteOff) && (Hardware->PEStates->colorOutCount != 0))
                               || (Hardware->PEStates->alphaStates.test != 0);
 
@@ -6330,8 +6344,34 @@ gcoHARDWARE_FlushTarget(
         Hardware->PEStates->colorStates.destinationRead = destinationRead;
     }
 
+    if (bNeedNullRTForOQ)
+    {
+        /* Set the batch count. */
+        batchCount = 1;
+        /* We need enable color pipe for the issue */
+        colorPipeEnable = gcvTRUE;
+        /* no need read RT */
+        destinationRead = 0x1;
+        /* program null RT */
+        /* Setup load flags. */
+        colorBatchLoad = gcvFALSE;
+        colorSplitLoad = gcvTRUE;
 
-    if (Hardware->PEDirty->colorTargetDirty)
+        physicalBaseAddr0 = physicalBaseAddr1 = 0;
+
+        stride = 0;
+#if gcdDUMP
+        surfaceSize = 0;
+#endif
+
+        /* When RT is NULL, we need set colorMask zero to not touch surface.
+        */
+        colorWrite = 0;
+        superTiled = gcvFALSE;
+        format = 0x06;
+        colorAddressMode = 0x0;
+    }
+    else if (Hardware->PEDirty->colorTargetDirty)
     {
         gctUINT32 cacheMode;
 
@@ -7025,32 +7065,6 @@ gcoHARDWARE_FlushTarget(
 
             /* Reset dirty flags. */
             Hardware->PEDirty->peDitherDirty = gcvFALSE;
-        }
-    }
-    else
-    {
-        /* If the draw required dither, while PE cannot support, defer until resolve time.
-        ** If the draw didn't require, do not reset the flag, unless we are sure it's the
-        ** draw can overwrite all of the surface.
-        */
-        gcoSURF rtSurf = pColorTarget->surface;
-        gctBOOL fakeFmt = rtSurf && rtSurf->formatInfo.fakedFormat;
-
-        /* Disable dither for fake formats */
-        if (Hardware->PEStates->ditherEnable && !fakeFmt)
-        {
-            gctUINT32 i;
-
-            if (rtSurf)
-            {
-                rtSurf->deferDither3D = gcvTRUE;
-            }
-
-            for (i = 1; i < Hardware->PEStates->colorOutCount; ++i)
-            {
-                gcmASSERT(Hardware->PEStates->colorStates.target[i].surface);
-                Hardware->PEStates->colorStates.target[i].surface->deferDither3D = gcvTRUE;
-            }
         }
     }
 

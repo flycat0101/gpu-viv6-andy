@@ -38,6 +38,7 @@ typedef struct __vkChipFuncTableRec
     VkResult (*DestroyImageView)(VkDevice device, VkImageView imageView);
     VkResult (*CreateBufferView)(VkDevice device, VkBufferView bufferView);
     VkResult (*DestroyBufferView)(VkDevice device, VkBufferView bufferView);
+    VkResult (*EndRenderPass)(VkCommandBuffer commandBuffer);
     VkResult (*BeginCommandBuffer)(VkCommandBuffer commandBuffer);
     VkResult (*EndCommandBuffer)(VkCommandBuffer commandBuffer);
     VkResult (*AllocDescriptorSet)(VkDevice device, VkDescriptorSet descriptorSet);
@@ -60,7 +61,8 @@ typedef struct __vkChipFuncTableRec
     VkResult (*FreeCommandBuffer)(VkDevice device, VkCommandBuffer commandBuffer);
     void (*BindPipeline)(VkCommandBuffer commandBuffer, VkPipeline oldPipeline, VkPipeline newPipeline);
     VkResult (*setMultiGpuSync)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint);
-    VkResult (*flushCache)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint);
+    VkResult (*flushCache)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint, int32_t cacheMask);
+    VkResult (*BeginSubmitCmdBuf)(VkCommandBuffer commandBuffer);
 } __vkChipFuncTable;
 
 #endif /* __gc_vk_chip_h__ */

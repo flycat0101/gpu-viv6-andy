@@ -535,6 +535,13 @@ gcoHAL_SetBltNP2Texture(
     );
 
 gceSTATUS
+gcoHAL_ExportVideoMemory(
+    IN gctUINT32 Handle,
+    IN gctUINT32 Flags,
+    OUT gctINT32 * FD
+    );
+
+gceSTATUS
 gcoHAL_NameVideoMemory(
     IN gctUINT32 Handle,
     OUT gctUINT32 * Name
@@ -1026,6 +1033,14 @@ gcoHAL_ScheduleSignal(
     IN gctSIGNAL AuxSignal,
     IN gctINT ProcessID,
     IN gceKERNEL_WHERE FromWhere
+    );
+
+gceSTATUS
+gcoHAL_GetGraphicBufferFd(
+    IN gctUINT32 Node[3],
+    IN gctSHBUF ShBuf,
+    IN gctSIGNAL Signal,
+    OUT gctINT32 * Fd
     );
 
 /******************************************************************************\
@@ -4035,7 +4050,8 @@ gckOS_DebugFlush(
 **
 **      ...         Optional arguments.
 */
-#if gcdDUMP
+
+#if gcdDUMP || gcdDUMP_2DVG
     gceSTATUS
     gcfDump(
         IN gcoOS Os,
@@ -4123,7 +4139,7 @@ gckOS_DebugFlush(
 **          Number of bytes.
 */
 
-#if gcdDUMP || gcdDUMP_COMMAND
+#if gcdDUMP || gcdDUMP_COMMAND || gcdDUMP_2DVG
 gceSTATUS
 gcfDumpBuffer(
     IN gcoOS Os,

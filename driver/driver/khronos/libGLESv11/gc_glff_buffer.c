@@ -219,8 +219,6 @@ _DuplicateBufferData(
         if (!Buffer->index)
         {
             gcmONERROR(gcoINDEX_Construct(Context->hal, &Buffer->index));
-            gcmVERIFY_OK(gcoINDEX_SetSharedLock(Buffer->index,
-                                                Context->bufferList->sharedLock));
         }
 
         /* Get memory of array buffer. */
@@ -246,8 +244,6 @@ _DuplicateBufferData(
         if (Buffer->stream == gcvNULL)
         {
             gcmONERROR(gcoSTREAM_Construct(Context->hal, &Buffer->stream));
-            gcmVERIFY_OK(gcoSTREAM_SetSharedLock(Buffer->stream,
-                                                 Context->bufferList->sharedLock));
         }
 
         /* Reserve enough memory. */
@@ -1062,9 +1058,6 @@ GL_API void GL_APIENTRY glBufferData(
                     &object->stream
                     ));
 
-                gcmVERIFY_OK(gcoSTREAM_SetSharedLock(object->stream,
-                                                     context->bufferList->sharedLock));
-
                 /* Allocate the buffer. */
                 gcmERR_BREAK(gcoSTREAM_Reserve(
                     object->stream,
@@ -1124,9 +1117,6 @@ GL_API void GL_APIENTRY glBufferData(
                     context->hal,
                     &object->index
                     ));
-
-                gcmVERIFY_OK(gcoINDEX_SetSharedLock(object->index,
-                                                    context->bufferList->sharedLock));
 
                 /* Allocate the buffer. */
                 gcmERR_BREAK(gcoINDEX_Upload(
@@ -1305,9 +1295,6 @@ GL_API void GL_APIENTRY glBufferSubData(
                 {
                     break;
                 }
-
-                gcmVERIFY_OK(gcoINDEX_SetSharedLock(object->index,
-                                                    context->bufferList->sharedLock));
 
                 gcmVERIFY_OK(gcoINDEX_Upload(
                     object->index,

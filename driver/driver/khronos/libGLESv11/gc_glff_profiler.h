@@ -178,17 +178,12 @@ extern "C" {
 #define GL1_PROFILER_FRAME_END 10
 #define GL1_PROFILER_FRAME_TYPE 11
 #define GL1_PROFILER_FRAME_COUNT 12
-#define GL1_PROFILER_SYNC_MODE 13
 #define GL1_PROFILER_FINISH_BEGIN 14
 #define GL1_PROFILER_FINISH_END 15
-#define GL1_PROFILER_BEGIN 16
-#define GL1_PROFILER_END 17
 
 #define GL1_PROFILER_PRIMITIVE_END 20
 #define GL1_PROFILER_PRIMITIVE_TYPE 21
 #define GL1_PROFILER_PRIMITIVE_COUNT 22
-
-#define GL1_TEXUPLOAD_SIZE 30
 
 #define GL1_PROFILER_DRAW_BEGIN  40
 #define GL1_PROFILER_DRAW_END      41
@@ -196,68 +191,44 @@ extern "C" {
 
 #define GL1_PROFILER_WRITE_HEADER 90
 #define GL1_PROFILER_WRITE_FRAME_BEGIN 91
-#define GL1_PROFILER_WRITE_FINISH_BEGIN 92
-#define GL1_PROFILER_WRITE_FRAME_END 93
-#define GL1_PROFILER_WRITE_FRAME_RESET 94
+#define GL1_PROFILER_WRITE_FRAME_END 92
+#define GL1_PROFILER_WRITE_FRAME_RESET 93
 
 /* Profile information. */
 typedef struct _glsPROFILER
 {
     gctBOOL         enable;
-    gctBOOL         drvEnable;
-    gctBOOL         timeEnable;
-    gctBOOL         memEnable;
-    gctBOOL         perDraw;
-    gctBOOL         perFrame;
-    gctBOOL         useFBO;
+    gctBOOL         perDrawMode;
     gctBOOL         useGlfinish;
     gctBOOL         writeDrawable;
 
     gctBOOL         need_dump;
-    gctBOOL         fromFinish;
-    gctBOOL         frameBegun;
-    gctUINT32       frameBegunPos;
-    gctBOOL         finishBegun;
+    gctUINT32       frameBegun;
+    gctUINT32       drawCount;
     gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
     gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
     gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
     gctUINT32       frameEndNumber;   /* for VIV_PROFILE = 3 */
     gctUINT32       curFrameNumber;
 
-    /* Aggregate Information */
-    gctUINT64       frameStart;
-    gctUINT64       frameEnd;
-
     /* Current frame information */
     gctUINT32       frameNumber;
     gctUINT32       finishNumber;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       finishStartTimeusec;
-    gctUINT64       finishEndTimeusec;
-
-    gctUINT64       shaderCompileTime;
-    gctUINT64       shaderStartTimeusec;
-    gctUINT64       shaderEndTimeusec;
-
-    gctUINT32       drawPointCount_11;
-    gctUINT32       drawLineCount_11;
-    gctUINT32       drawTriangleCount_11;
-    gctUINT32       drawVertexCount_11;
 
     /* Current primitive information */
     gctUINT32       primitiveNumber;
     gctUINT32       primitiveType;
     gctUINT32       primitiveCount;
 
-    gctUINT32       apiCalls[GLES1_NUM_API_CALLS];
-    gctUINT32       redundantStateChangeCalls;
+    gctUINT32       drawPointCount_11;
+    gctUINT32       drawLineCount_11;
+    gctUINT32       drawTriangleCount_11;
 
+    gctUINT32       apiCalls[GLES1_NUM_API_CALLS];
     gctUINT64       apiTimes[GLES1_NUM_API_CALLS];
     gctUINT64       totalDriverTime;
-
-    gctUINT32       textureUploadSize;
-    gctUINT32       drawCount;
 }
 glsPROFILER;
 

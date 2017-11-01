@@ -57,7 +57,7 @@ CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include/xorg -I$(ROOTFS_USR)/include/X11/dri 
 CFLAGS += -I./vivante_gal -I./vivante_ext -I./vivante_fbdev -I./vivante_util -I./vivante_exa
 CFLAGS += -I$(ROOTFS_USR)/include/drm
 
-LFLAGS += -L$(AQROOT)/build/sdk/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
+LFLAGS += -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 all: .libs/$(target)
 

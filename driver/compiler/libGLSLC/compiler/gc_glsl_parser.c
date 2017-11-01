@@ -4545,7 +4545,7 @@ yyreduce:
 
   case 329:
 
-    { slParseCompoundStatementBegin(Compiler); ;}
+    { slParseSelectStatementBegin(Compiler); ;}
     break;
 
   case 330:
@@ -4600,19 +4600,19 @@ yyreduce:
 
   case 340:
 
-    { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
-          slParseCompoundStatementBegin(Compiler); ;}
+    { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
+          slParseSelectStatementBegin(Compiler); ;}
     break;
 
   case 341:
 
-    { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
+    { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
           yyval.selectionStatementPair = slParseSelectionRestStatement(Compiler, yyvsp[-3].statement, yyvsp[0].statement); ;}
     break;
 
   case 342:
 
-    { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
+    { slParseSelectStatementEnd(Compiler, gcvNULL, gcvNULL);
           yyval.selectionStatementPair = slParseSelectionRestStatement(Compiler, yyvsp[0].statement, gcvNULL); ;}
     break;
 

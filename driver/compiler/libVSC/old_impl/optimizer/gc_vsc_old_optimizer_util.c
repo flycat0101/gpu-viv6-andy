@@ -293,7 +293,15 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     *   VC_OPTION=-OCLOCVLOCALADDRESSSPACE:0|1
     *
     */
-    gcvFALSE, /* oclOcvLocalAddressSpace; */
+    gcvTRUE, /* oclOcvLocalAddressSpace; */
+
+   /*
+    * Handle OCL in OPENCV mode
+    *
+    *   VC_OPTION=-OCLOPENCV:0|1
+    *
+    */
+    gcvTRUE, /* oclOpenCV; */
 
     /*  OCL has long:
      *
@@ -754,8 +762,9 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
         ** 1) OpenCL has no int64 in the shader.
         ** 2) This chip can support HALTI2.
         ** 3) Has int64 in the shader and VIR has support for int64
+        ** 4) VIRCG=2 is used
         */
-        if (gcHWCaps.hwFeatureFlags.hasHalti2 &&
+        if ((gcGetVIRCGKind(gcHWCaps.hwFeatureFlags.hasHalti2) == VIRCG_FULL) &&
             gcmOPT_CLUseVIRCodeGen() &&
             (!gcShaderHasInt64(Shader) ||
              gcmOPT_oclInt64InVIR()))
@@ -1105,7 +1114,7 @@ gcOpt_isRedefKillsAllPrevDef(
     while(curDep != gcvNULL )
     {
         gcOPT_CODE   firstCode;
-        gctUINT16    curDepIdx;
+        gctUINT32    curDepIdx;
         gcOPT_LIST   nextDep;
         gcOPT_LIST   dep;
         gcOPT_LIST   nextRoundStart = gcvNULL;
@@ -1141,7 +1150,7 @@ gcOpt_isRedefKillsAllPrevDef(
         {
             /* found the next dependency has the same index
                as current dependency */
-            gctUINT16    depIdx;
+            gctUINT32    depIdx;
 
             if (dep->code == gcvNULL) /* depend on input */
                 continue;
@@ -1234,7 +1243,7 @@ gcOpt_hasMultipleDependencyForSameTemp(
     for (curDep = Dependencies; curDep != gcvNULL; curDep = curDep->next )
     {
         gcOPT_CODE   depCode;
-        gctUINT16    curDepIdx;
+        gctUINT32    curDepIdx;
         gcOPT_LIST   nextDep;
         gcOPT_LIST   dep;
         gcSL_ENABLE  usedComponents;
@@ -1258,7 +1267,7 @@ gcOpt_hasMultipleDependencyForSameTemp(
         {
             /* found the next dependency has the same index
                as current dependency */
-            gctUINT16    depIdx;
+            gctUINT32    depIdx;
 
             if (dep->code == gcvNULL) /* depend on input */
                 continue;
@@ -1882,7 +1891,7 @@ gcOpt_InitializeTempArray(
     gcOPT_TEMP          temp;
     gctSOURCE_t         source;
     gctTARGET_t         target;
-    gctUINT16           index;
+    gctUINT32           index;
     gcOPT_CODE          code;
     gctUINT             tempCount = Optimizer->tempCount;
     gctUINT             i;
@@ -2367,7 +2376,7 @@ _BuildGlobalUsage(
     gcOPT_TEMP          temp;
     gcOPT_LIST          list;
     gctSOURCE_t         source;
-    gctUINT16           index;
+    gctUINT32           index;
     gcOPT_CODE          code;
     gctBOOL             updated;
     gctUINT             i;
@@ -2826,7 +2835,7 @@ gcOpt_UpdateCodeId(
                        || gcmSL_OPCODE_GET(caller->instruction.opcode, Opcode) == gcSL_JMP);
                 /* Cannot check this due to removeNOP. */
                 /*gcmASSERT(caller->instruction.tempIndex == code->id);*/
-                caller->instruction.tempIndex = (gctUINT16) i;
+                caller->instruction.tempIndex =  i;
             }
         }
 
@@ -3839,8 +3848,8 @@ gcOpt_CopyInShader(
                     gctUINT tempLabel1 = shaderFunctions[j + 1]->label;
                     shaderFunctions[j] = shaderFunctions[j + 1];
                     shaderFunctions[j + 1] = temp;
-                    shaderFunctions[j]->label = (gctUINT16) tempLabel;
-                    shaderFunctions[j + 1]->label = (gctUINT16) tempLabel1;
+                    shaderFunctions[j]->label = tempLabel;
+                    shaderFunctions[j + 1]->label = tempLabel1;
                     functionInOrder = gcvFALSE;
                 }
             }
@@ -3883,8 +3892,8 @@ gcOpt_CopyInShader(
                     gctUINT tempLabel1 = kernelFunctions[j + 1]->label;
                     kernelFunctions[j] = kernelFunctions[j + 1];
                     kernelFunctions[j + 1] = temp;
-                    kernelFunctions[j]->label = (gctUINT16) tempLabel;
-                    kernelFunctions[j + 1]->label = (gctUINT16) tempLabel1;
+                    kernelFunctions[j]->label = tempLabel;
+                    kernelFunctions[j + 1]->label = tempLabel1;
                     functionInOrder = gcvFALSE;
                 }
             }
@@ -4209,7 +4218,7 @@ gcOpt_CopyOutShader(
             kernelFunction = function->kernelFunction;
             Shader->kernelFunctions[0] = kernelFunction;
             Shader->currentKernelFunction = kernelFunction;
-            kernelFunction->label = (gctUINT16) (~0);
+            kernelFunction->label = (gctUINT32) (~0);
             kernelFunction->codeStart = function->codeHead->id;
             kernelFunction->codeCount = function->codeTail->id - function->codeHead->id + 1;
             kernelFunction->codeEnd   = function->codeTail->id + 1;
@@ -4263,7 +4272,7 @@ gcOpt_CopyOutShader(
                 }
                 else
                 {
-                    shaderFunction->label = (gctUINT16) (~0 - i);
+                    shaderFunction->label = (gctUINT32) (~0 - i);
                 }
                 if (j != j1)
                 {
@@ -4303,11 +4312,11 @@ gcOpt_CopyOutShader(
                 gcmASSERT(kernelFunction->arguments == function->arguments);
                 if (i == k)
                 {
-                    gcmASSERT(kernelFunction->label == (gctUINT16) (~0 - i));
+                    gcmASSERT(kernelFunction->label == (gctUINT32) (~0 - i));
                 }
                 else
                 {
-                    kernelFunction->label = (gctUINT16) (~0 - i);
+                    kernelFunction->label = (gctUINT32) (~0 - i);
                 }
                 if (k != k1)
                 {
@@ -4377,7 +4386,7 @@ gcOpt_CopyOutShader(
         if (kernelFunction)
         {
             Shader->kernelFunctions[k1] = kernelFunction;
-            kernelFunction->label = (gctUINT16) (~0 - i);
+            kernelFunction->label = (gctUINT32) (~0 - i);
             kernelFunction->codeStart = function->codeHead->id;
             kernelFunction->codeCount = function->codeTail->id - function->codeHead->id + 1;
             kernelFunction->codeEnd   = function->codeTail->id + 1;
@@ -4547,7 +4556,7 @@ _PackMainProgram(
                     gcmASSERT(gcmSL_OPCODE_GET(codeTarget->instruction.opcode, Opcode) == gcSL_RET);
                     gcmASSERT(jumpTarget > code->id);
                     code->instruction.opcode = gcmSL_OPCODE_SET(code->instruction.opcode, Opcode, gcSL_JMP);
-                    code->instruction.tempIndex = (gctUINT16)jumpTarget;
+                    code->instruction.tempIndex = jumpTarget;
 
                     code->callee = codeTarget;
                     gcmERR_RETURN(gcOpt_AddCodeToList(Optimizer, &codeTarget->callers, code));
@@ -5092,6 +5101,7 @@ _SetTempDefine(
 static gceSTATUS
 _AddUserRecusive(
     IN gcOPTIMIZER      Optimizer,
+    IN VSC_HASH_TABLE  *pCodeSet,
     IN gcOPT_CODE       Code,
     IN gcOPT_CODE       defCode,
     IN gcOPT_CODE       endCode
@@ -5112,14 +5122,24 @@ _AddUserRecusive(
             code = preDef->code;
             if (code != gcvNULL)
             {
-                gcmERR_BREAK(gcOpt_AddCodeToList(Optimizer, &code->users, Code));
+                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*)code, gcvNULL))
+                {
+                    break;
+                }
+                else
+                {
+                    vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
 
-                /* No need go on if we have found an exact def. Otherwise, go into further */
-                if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED &&
-                    code != endCode)
-                    gcmERR_BREAK(_AddUserRecusive(Optimizer, Code, code, endCode));
+                    gcmERR_BREAK(gcOpt_AddCodeToList(Optimizer, &code->users, Code));
+
+                    /* No need go on if we have found an exact def. Otherwise, go into further */
+                    if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED &&
+                        code != endCode)
+                    {
+                        gcmERR_BREAK(_AddUserRecusive(Optimizer, pCodeSet, Code, code, endCode));
+                    }
+                }
             }
-
             preDef = preDef->next;
         }
     }
@@ -5140,9 +5160,14 @@ _AddUser(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
+    VSC_PRIMARY_MEM_POOL mp;
+    VSC_HASH_TABLE      *pCodeSet;
 
     gcmHEADER_ARG("Optimizer=0x%x InputList=0x%x Code=0x%x",
                    Optimizer, InputList, Code);
+
+    vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
+    pCodeSet = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 256);
 
     /* Add the input list to Root. */
     for (list = InputList; list; list = list->next)
@@ -5158,7 +5183,7 @@ _AddUser(
                 code = list->code;
 
 #if _RECURSIVE_BUILD_DU_
-                gcmERR_BREAK(_AddUserRecusive(Optimizer, Code, code, code));
+                gcmERR_BREAK(_AddUserRecusive(Optimizer, pCodeSet, Code, code, code));
 #else
                 while (code != gcvNULL && code->prevDefines)
                 {
@@ -5177,6 +5202,13 @@ _AddUser(
         }
     }
 
+    if (pCodeSet)
+    {
+        vscHTBL_Destroy(pCodeSet);
+    }
+
+    vscPMP_Finalize(&mp);
+
     gcmFOOTER();
     return status;
 }
@@ -5185,6 +5217,7 @@ _AddUser(
 static gceSTATUS
 _AddTempDependencyRecusive(
     IN gcOPTIMIZER      Optimizer,
+    IN VSC_HASH_TABLE  *pCodeSet,
     IN OUT gcOPT_LIST * Root,
     IN gcOPT_CODE       code,
     IN gcOPT_CODE       endCode
@@ -5205,19 +5238,30 @@ _AddTempDependencyRecusive(
             index = preDef->index;
             if (code != gcvNULL)
             {
-                if (index < 0)
+                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*)code, gcvNULL))
                 {
-                    gcmERR_BREAK(gcOpt_AddIndexToList(Optimizer, Root, index));
+                    break;
                 }
                 else
                 {
-                    gcmERR_BREAK(gcOpt_AddCodeToList(Optimizer, Root, code));
-                }
+                    vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
 
-                /* No need go on if we have found an exact def. Otherwise, go into further */
-                if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED &&
-                    code != endCode)
-                    gcmERR_BREAK(_AddTempDependencyRecusive(Optimizer, Root, code, endCode));
+                    if (index < 0)
+                    {
+                        gcmERR_BREAK(gcOpt_AddIndexToList(Optimizer, Root, index));
+                    }
+                    else
+                    {
+                        gcmERR_BREAK(gcOpt_AddCodeToList(Optimizer, Root, code));
+                    }
+
+                    /* No need go on if we have found an exact def. Otherwise, go into further */
+                    if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED &&
+                        code != endCode)
+                    {
+                        gcmERR_BREAK(_AddTempDependencyRecusive(Optimizer, pCodeSet, Root, code, endCode));
+                    }
+                }
             }
 
             preDef = preDef->next;
@@ -5240,8 +5284,13 @@ _AddTempDependency(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
+    VSC_PRIMARY_MEM_POOL mp;
+    VSC_HASH_TABLE      *pCodeSet;
 
     gcmHEADER_ARG("Optimizer=%p SrcList=%p Root=%p", Optimizer, SrcList, Root);
+
+    vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
+    pCodeSet = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 256);
 
     for (list = SrcList; list; list = list->next)
     {
@@ -5261,7 +5310,7 @@ _AddTempDependency(
             code = list->code;
 
 #if _RECURSIVE_BUILD_DU_
-            gcmERR_BREAK(_AddTempDependencyRecusive(Optimizer, Root, code, code));
+            gcmERR_BREAK(_AddTempDependencyRecusive(Optimizer, pCodeSet, Root, code, code));
 #else
             while (code != gcvNULL && code->prevDefines)
             {
@@ -5283,6 +5332,13 @@ _AddTempDependency(
 #endif
         }
     }
+
+    if (pCodeSet)
+    {
+        vscHTBL_Destroy(pCodeSet);
+    }
+
+    vscPMP_Finalize(&mp);
 
     /* Success. */
     gcmFOOTER_ARG("*Root=%p status=%d", *Root, status);
@@ -5750,7 +5806,7 @@ _InsertInitializerInstForOutput(
                                                          | gcmSL_TARGET_SET(0, Format, gcGetFormatFromType(output->type))
                                                          | gcmSL_TARGET_SET(0, Precision, output->precision)
                                                          | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS);
-                insertCode->instruction.tempIndex = (gctUINT16)(j + output->tempIndex);
+                insertCode->instruction.tempIndex = (j + output->tempIndex);
                 insertCode->instruction.source0 = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                                                             | gcmSL_SOURCE_SET(0, Format, gcGetFormatFromType(output->type))
                                                             | gcmSL_SOURCE_SET(0, Precision, output->precision)
@@ -5786,7 +5842,7 @@ _BuildDataFlowForCode(
     gcOPT_TEMP              tempArray = Optimizer->tempArray;
     gctTARGET_t               target;
     gctSOURCE_t             source;
-    gctUINT16               index;
+    gctUINT32               index;
     gctUINT8                format;
     gctBOOL                 targetIsTemp = gcvFALSE;
 
@@ -6335,9 +6391,8 @@ _BuildFunctionFlowGraph(
     gcmVERIFY_OK(_AddUndefined(Optimizer, tempDefineArray));
 
     /* Build data flow. */
-    for (code = Function->codeHead;
-         code && (code != Function->codeTail->next);
-         code = code->next)
+    code = Function->codeHead;
+    while (code && code != Function->codeTail->next)
     {
         if(lastBackwardCallee && code->id == lastBackwardCallee->id)
         {
@@ -6400,7 +6455,7 @@ _BuildFunctionFlowGraph(
             {
                 code->handled = gcvTRUE;
                 for (code = code->prev;
-                     code != gcvNULL && code != codeDest->prev;
+                     code != gcvNULL && code != codeDest;
                      code = code->prev)
                 {
                     /* Reset handled flag for the codes in between. */
@@ -6424,6 +6479,7 @@ _BuildFunctionFlowGraph(
                 gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, tempDefineArray));
             }
         }
+        code = code->next;
     }
 
     /* Output dependancies are already added by RET instruction (main program has extra RET instruction). */
@@ -7489,6 +7545,42 @@ gcOpt_UpdateIndex(
     IN gcOPT_FUNCTION Function,
     IN gctINT*        TempIndexMappingArray,
     IN gctINT*        CurrentTempIndex,
+    OUT gctUINT32 *   IndexPtr
+    )
+{
+    gctINT oldTempIndex = (gctINT)(*IndexPtr);
+
+    if (_isTempRegLocal(Optimizer, Function, oldTempIndex))
+    {
+        gcmASSERT(oldTempIndex >= (gctINT)Function->tempIndexStart);
+
+        /* If we haven't remapped this temp, map one. */
+        if (TempIndexMappingArray[oldTempIndex - Function->tempIndexStart] == -1)
+        {
+            TempIndexMappingArray[oldTempIndex - Function->tempIndexStart] = *CurrentTempIndex;
+            *CurrentTempIndex = *CurrentTempIndex +1;
+
+#if _SUPPORT_LONG_ULONG_DATA_TYPE
+            if (isFormat64bit(Optimizer->tempArray[oldTempIndex].format))
+            {
+                TempIndexMappingArray[oldTempIndex - Function->tempIndexStart + 1] = *CurrentTempIndex;
+                *CurrentTempIndex = *CurrentTempIndex +1;
+            }
+#endif
+        }
+
+        *IndexPtr = (gctUINT32)TempIndexMappingArray[oldTempIndex - Function->tempIndexStart];
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+gctBOOL
+gcOpt_UpdateIndexed(
+    IN gcOPTIMIZER    Optimizer,
+    IN gcOPT_FUNCTION Function,
+    IN gctINT*        TempIndexMappingArray,
+    IN gctINT*        CurrentTempIndex,
     OUT gctUINT16 *   IndexPtr
     )
 {
@@ -7518,7 +7610,6 @@ gcOpt_UpdateIndex(
     }
     return gcvFALSE;
 }
-
 /*******************************************************************************
 **                            gcOpt_RemapTempIndexForCode
 ********************************************************************************
@@ -7580,7 +7671,7 @@ gcOpt_RemapTempIndexForCode(
             if (gcmSL_TARGET_GET(inst->temp, Indexed) != gcSL_NOT_INDEXED)
             {
                 /* fix indexed register */
-                if (gcOpt_UpdateIndex(Optimizer,
+                if (gcOpt_UpdateIndexed(Optimizer,
                                       Function,
                                       TempIndexMappingArray,
                                       CurrentTempIndex,
@@ -7595,7 +7686,7 @@ gcOpt_RemapTempIndexForCode(
         for (i = 0; i < 2; i++)
         {
             gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
-            gctUINT16 * index  = (i==0) ? &inst->source0Index
+            gctUINT32 * index  = (i==0) ? &inst->source0Index
                                         : &inst->source1Index;
 
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
@@ -7616,7 +7707,7 @@ gcOpt_RemapTempIndexForCode(
                                                 : &inst->source1Indexed;
 
                 /* fix indexed register */
-                if (gcOpt_UpdateIndex(Optimizer,
+                if (gcOpt_UpdateIndexed(Optimizer,
                                       Function,
                                       TempIndexMappingArray,
                                       CurrentTempIndex,

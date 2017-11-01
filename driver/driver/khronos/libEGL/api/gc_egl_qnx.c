@@ -2665,7 +2665,7 @@ _SyncToPixmap(
 
 static struct eglPlatform qnxPlatform =
 {
-    0,
+    EGL_PLATFORM_QNX_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,

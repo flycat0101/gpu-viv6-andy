@@ -456,8 +456,8 @@ VX_INTERNAL_API void vxoReference_IncrementReadCount(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryReference(vx_reference ref, vx_enum attribute, void *ptr, vx_size size)
 {
-    if (!vxoContext_IsValid((vx_context_s *)ref)
-        && !vxoReference_IsValidAndNoncontext(ref))
+    if (!vxoReference_IsValidAndNoncontext(ref)
+        && !vxoContext_IsValid((vx_context_s *)ref))
     {
         return VX_ERROR_INVALID_REFERENCE;
     }

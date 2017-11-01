@@ -20,6 +20,8 @@ VX_INTERNAL_API vx_bool vxImageFormat_IsSupported(vx_df_image imageFormat);
 
 VX_INTERNAL_API vx_size vxImageFormat_GetChannelSize(vx_df_image color);
 
+VX_INTERNAL_API vx_uint32 vxComputePlaneOffset(vx_image image, vx_uint32 x, vx_uint32 y, vx_uint32 planeIndex);
+
 VX_INTERNAL_API vx_image vxoImage_LocateROI(vx_image image, OUT vx_rectangle_t *rect);
 
 VX_INTERNAL_API vx_bool vxoImage_IsValid(vx_image image);

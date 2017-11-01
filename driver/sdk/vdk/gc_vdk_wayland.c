@@ -41,6 +41,7 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 #include <wayland-cursor.h>
+#include "ivi-application-client-protocol.h"
 
 #include <linux/input.h>
 
@@ -53,6 +54,8 @@ const char * _VDK_PLATFORM = "\n\0$PLATFORM$WAYLAND\n";
 
 
 #define EVENT_QUEUE_SIZE 128
+
+#define IVI_SURFACE_ID 9000
 
 struct vdk_display;
 
@@ -68,6 +71,8 @@ struct vdk_window
     int height;
 
     struct wl_shell_surface *shell_surface;
+
+    struct ivi_surface *ivi_surface;
 
     /* Event queue. */
     vdkEvent event_queue[EVENT_QUEUE_SIZE];
@@ -119,6 +124,8 @@ struct vdk_display
     struct wl_output *output;
 
     struct wl_shell *shell;
+
+    struct ivi_application *ivi_application;
 
     /* compositor information. */
     int width;
@@ -226,6 +233,57 @@ create_shell_surface(struct vdk_window *win, struct vdk_display *dpy)
     wl_shell_surface_set_toplevel(win->shell_surface);
 }
 
+static void set_viewport_handle(int x, int y, int width, int height)
+{
+    typedef void (*GLESViewport)(int x, int y, int width, int height);
+    static GLESViewport glesViewport = (GLESViewport)NULL;
+
+    if (glesViewport == (GLESViewport)NULL)
+        glesViewport = (GLESViewport)eglGetProcAddress("glViewport");
+
+    if (glesViewport)
+        glesViewport(x, y, width, height);
+}
+
+static void
+handle_ivi_surface_configure(void *data, struct ivi_surface *ivi_surface,
+                             int32_t width, int32_t height)
+{
+
+    struct vdk_window *window = data;
+
+    wl_egl_window_resize(window->wl_win, width, height, 0, 0);
+
+    window->width = width;
+    window->height = height;
+
+    set_viewport_handle(0, 0, (int)width, (int)height);
+}
+
+static const struct ivi_surface_listener ivi_surface_listener = {
+    handle_ivi_surface_configure,
+};
+
+static void
+create_ivi_surface(struct vdk_window *window, void *data)
+{
+    struct vdk_display *dpy = (struct vdk_display *)data;
+    uint32_t id_ivisurf = IVI_SURFACE_ID + (uint32_t)getpid();
+    window->ivi_surface =
+        ivi_application_surface_create(dpy->ivi_application,
+            id_ivisurf, window->surface);
+
+    if (window->ivi_surface == NULL) {
+        fprintf(stderr, "Failed to create ivi_client_surface\n");
+        abort();
+    }
+
+    ivi_surface_add_listener(window->ivi_surface,
+        &ivi_surface_listener, window);
+}
+
+
+
 static struct vdk_window * vdk_create_window(vdkPrivate priv,
         struct vdk_display *dpy, int x, int y, int width, int height)
 {
@@ -271,8 +329,16 @@ static struct vdk_window * vdk_create_window(vdkPrivate priv,
     win->event_rpos = 0;
     pthread_mutex_init(&win->event_mutex, NULL);
 
-    create_shell_surface(win, dpy);
+    if (dpy->shell)
+    {
+        create_shell_surface(win, dpy);
+    } else if (dpy->ivi_application ) {
+        create_ivi_surface(win, dpy);
+    }
+
     wl_display_roundtrip(dpy->wl_dpy);
+
+
 
     return win;
 
@@ -293,7 +359,13 @@ static void vdk_destroy_window(vdkPrivate priv, struct vdk_window *win)
     /* Do destroy window. */
     wl_egl_window_destroy(win->wl_win);
 
-    wl_shell_surface_destroy(win->shell_surface);
+    if (win->shell_surface)
+        wl_shell_surface_destroy(win->shell_surface);
+
+    if (win->ivi_surface)
+    {
+        ivi_surface_destroy(win->ivi_surface);
+    }
 
     wl_surface_destroy(win->surface);
 
@@ -854,6 +926,9 @@ registry_handle_global(void *data, struct wl_registry *registry,
         d->output = wl_registry_bind(registry, name,
                        &wl_output_interface, 1);
         wl_output_add_listener(d->output, &output_listener, d);
+    } else if (strcmp(interface, "ivi_application") == 0) {
+        d->ivi_application = wl_registry_bind(registry, name,
+                       &ivi_application_interface, 1);
     }
 }
 
@@ -942,6 +1017,9 @@ static void vdk_destroy_display(vdkPrivate priv, struct vdk_display *dpy)
     if (dpy->shm) {
         wl_shm_destroy(dpy->shm);
     }
+
+    if (dpy->ivi_application)
+        ivi_application_destroy(dpy->ivi_application);
 
     if (dpy->compositor)
         wl_compositor_destroy(dpy->compositor);

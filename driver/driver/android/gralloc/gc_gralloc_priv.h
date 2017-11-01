@@ -18,16 +18,16 @@
 
 #include "gralloc_priv.h"
 
-#define GRALLOC_REORG                   1
-
 /*
  * Private gralloc usage(s) for render target allocation.
- * TODO (Soc-vendor): Make sure these do not conflict with other private usage bits.
+ *
+ * TODO (Soc-vendor): Soc-vendor please determine the values. Make sure the
+ * bits are not conflicted with other usage bits.
  */
-#define GRALLOC_USAGE_PRIVATE_0_VIV         0x100000
-#define GRALLOC_USAGE_PRIVATE_1_VIV         0x200000
-#define GRALLOC_USAGE_PRIVATE_2_VIV         0x400000
-#define GRALLOC_USAGE_PRIVATE_3_VIV         0x800000
+#define GRALLOC_USAGE_PRIVATE_0_VIV         0x01000000
+#define GRALLOC_USAGE_PRIVATE_1_VIV         0x02000000
+#define GRALLOC_USAGE_PRIVATE_2_VIV         0x04000000
+#define GRALLOC_USAGE_PRIVATE_3_VIV         0x08000000
 
 
 /* Buffer types combined from private gralloc usage bits. */

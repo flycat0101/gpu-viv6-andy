@@ -662,8 +662,11 @@ _VSC_UF_AUBO_GetCapability(
         return HwCfg->maxGSConstRegCount;
 
     case VIR_SHADER_FRAGMENT:
-    case VIR_SHADER_COMPUTE:
         return HwCfg->maxPSConstRegCount;
+
+    case VIR_SHADER_COMPUTE:
+        return (HwCfg->hwFeatureFlags.hasThreadWalkerInPS ?
+                HwCfg->maxVSConstRegCount : HwCfg->maxPSConstRegCount);
 
     default:
         gcmASSERT(0);
@@ -3705,7 +3708,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
                         VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
-                        VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+                        VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                         VIR_Operand_SetTempRegister(loadSrc0, func, lastSymId, VIR_TYPE_UINT32);
                         VIR_Operand_SetImmediateUint(loadSrc1, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin) + VIR_Uniform_GetOffset(uniform));

@@ -13,7 +13,6 @@
 
 #include "gc_es_context.h"
 #include "gc_gl_api_inline.c"
-#include "gc_gl_debug.h"
 
 
 #if defined(_WIN32)
@@ -22,7 +21,6 @@
 __GL_INLINE GLvoid __glNormal3fv(__GLcontext *gc, GLfloat *v)
 {
     GLfloat *current;
-//    __GL_SETUP();
 
     if (gc->input.preVertexFormat & __GL_N3F_BIT)
     {
@@ -115,11 +113,6 @@ GLvoid APIENTRY __glim_Normal3d(__GLcontext *gc, GLdouble x, GLdouble y, GLdoubl
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3d", DT_GLdouble, x, DT_GLdouble, y, DT_GLdouble, z, DT_GLnull);
-#endif
-
     fv[0] = x;
     fv[1] = y;
     fv[2] = z;
@@ -129,11 +122,6 @@ GLvoid APIENTRY __glim_Normal3d(__GLcontext *gc, GLdouble x, GLdouble y, GLdoubl
 GLvoid APIENTRY __glim_Normal3dv(__GLcontext *gc, const GLdouble *v)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3dv", DT_GLdouble_ptr, v, DT_GLnull);
-#endif
 
     fv[0] = v[0];
     fv[1] = v[1];
@@ -145,11 +133,6 @@ GLvoid APIENTRY __glim_Normal3f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3f", DT_GLfloat, x, DT_GLfloat, y, DT_GLfloat, z, DT_GLnull);
-#endif
-
     fv[0] = x;
     fv[1] = y;
     fv[2] = z;
@@ -158,22 +141,12 @@ GLvoid APIENTRY __glim_Normal3f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 
 GLvoid APIENTRY __glim_Normal3fv(__GLcontext *gc, const GLfloat *v)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3fv", DT_GLfloat_ptr, v, DT_GLnull);
-#endif
-
     __glNormal3fv( gc, (GLfloat *)v );
 }
 
 GLvoid APIENTRY __glim_Normal3b(__GLcontext *gc, GLbyte x, GLbyte y, GLbyte z)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3b", DT_GLbyte, x, DT_GLbyte, y, DT_GLbyte, z, DT_GLnull);
-#endif
 
     fv[0] = __GL_B_TO_FLOAT(x);
     fv[1] = __GL_B_TO_FLOAT(y);
@@ -185,11 +158,6 @@ GLvoid APIENTRY __glim_Normal3bv(__GLcontext *gc, const GLbyte *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3bv", DT_GLbyte_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_B_TO_FLOAT(v[0]);
     fv[1] = __GL_B_TO_FLOAT(v[1]);
     fv[2] = __GL_B_TO_FLOAT(v[2]);
@@ -199,11 +167,6 @@ GLvoid APIENTRY __glim_Normal3bv(__GLcontext *gc, const GLbyte *v)
 GLvoid APIENTRY __glim_Normal3s(__GLcontext *gc, GLshort x, GLshort y, GLshort z)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3s", DT_GLshort, x, DT_GLshort, y, DT_GLshort, z, DT_GLnull);
-#endif
 
     fv[0] = __GL_S_TO_FLOAT(x);
     fv[1] = __GL_S_TO_FLOAT(y);
@@ -215,11 +178,6 @@ GLvoid APIENTRY __glim_Normal3sv(__GLcontext *gc, const GLshort *v)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3sv", DT_GLshort_ptr, v, DT_GLnull);
-#endif
-
     fv[0] = __GL_S_TO_FLOAT(v[0]);
     fv[1] = __GL_S_TO_FLOAT(v[1]);
     fv[2] = __GL_S_TO_FLOAT(v[2]);
@@ -230,11 +188,6 @@ GLvoid APIENTRY __glim_Normal3i(__GLcontext *gc, GLint x, GLint y, GLint z)
 {
     GLfloat fv[3];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3i", DT_GLint, x, DT_GLint, y, DT_GLint, z, DT_GLnull);
-#endif
-
     fv[0] = __GL_I_TO_FLOAT(x);
     fv[1] = __GL_I_TO_FLOAT(y);
     fv[2] = __GL_I_TO_FLOAT(z);
@@ -244,11 +197,6 @@ GLvoid APIENTRY __glim_Normal3i(__GLcontext *gc, GLint x, GLint y, GLint z)
 GLvoid APIENTRY __glim_Normal3iv(__GLcontext *gc, const GLint *v)
 {
     GLfloat fv[3];
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_Normal3iv", DT_GLint_ptr, v, DT_GLnull);
-#endif
 
     fv[0] = __GL_I_TO_FLOAT(v[0]);
     fv[1] = __GL_I_TO_FLOAT(v[1]);

@@ -378,7 +378,7 @@ static gceSTATUS set_uAccum(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
 
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &chipCtx->accumValue);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &chipCtx->accumValue);
 
     gcmFOOTER();
 
@@ -400,7 +400,7 @@ static gceSTATUS set_uYmajor(
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
 
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &chipCtx->yMajor);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &chipCtx->yMajor);
 
     gcmFOOTER();
 
@@ -422,7 +422,7 @@ static gceSTATUS set_uColor(
     {
         chipCtx->attributeInfo[__GL_INPUT_DIFFUSE_INDEX].dirty = GL_TRUE;
 
-        status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &gc->state.raster.clearColor.clear.r);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &gc->state.raster.clearColor.clear.r);
         gcmFOOTER();
         return status;
     }
@@ -436,7 +436,7 @@ static gceSTATUS set_uColor(
 
         chipCtx->attributeInfo[__GL_INPUT_DIFFUSE_INDEX].dirty = GL_FALSE;
 
-        status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &gc->state.current.color.r);
+        status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &gc->state.current.color.r);
 
         gcmFOOTER();
         return status;
@@ -511,7 +511,7 @@ static gceSTATUS set_uFogFactors(
         valueArray[0] = glmFLOATMULTIPLY(density,_exp2FogDensityAdjustment);
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -527,7 +527,7 @@ static gceSTATUS set_uFogColor(
     gceSTATUS status;
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &gc->state.fog.color.r);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &gc->state.fog.color.r);
     gcmFOOTER();
     return status;
 }
@@ -556,7 +556,7 @@ static gceSTATUS set_uTexColor(
         *value++ = color->a;
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -587,7 +587,7 @@ static gceSTATUS set_uTexCombScale(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -609,7 +609,7 @@ static gceSTATUS set_uPixelTransferScale(
     valueArray[2] = gc->state.pixel.transferMode.b_scale;
     valueArray[3] = gc->state.pixel.transferMode.a_scale;
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -631,7 +631,7 @@ static gceSTATUS set_uPixelTransferBias(
     valueArray[2] = gc->state.pixel.transferMode.b_bias;
     valueArray[3] = gc->state.pixel.transferMode.a_bias;
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -666,7 +666,7 @@ static gceSTATUS set_uTextureBorderColor(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->hints, valueArray);
+    status = gcUNIFORM_SetValueF_Ex(Uniform, numOfTex, chipCtx->currProgram->programState.hints, valueArray);
 
     gcmFOOTER();
 
@@ -1014,7 +1014,7 @@ static gceSTATUS using_vEyePosition(
     gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
     status = glfUsingVarying(
         ShaderControl->i,
-        "#FogFragCoord",
+        "FogFragCoordX",
         gcSHADER_FLOAT_X1,
         1,
         gcvFALSE,

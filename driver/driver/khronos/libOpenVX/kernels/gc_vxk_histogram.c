@@ -14,6 +14,8 @@
 #include <gc_vxk_common.h>
 #include <stdio.h>
 
+#define  USE_FP32_PRECISION 1
+
 extern vx_int16 Fp32toFp16(vx_float32 val);
 
 vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_reference* staging)
@@ -71,9 +73,19 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
 
         kernelContext->uniform_num = 0;
         {
+#if USE_FP32_PRECISION
+            vx_float32 bin[4];
+
+            bin[0] = (vx_float32)offset;
+            bin[1] = (vx_float32)(offset + rang);
+            bin[2] = 1.0f * numBins / rang;
+            bin[3] = 0;
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
+#else
             gcoVX_Kernel_Context_Reg bin;
-            vx_float32 offset_obj = (0.125f - offset)/window_size;
-            vx_float32 inv_win = 1.0f/window_size;
+            vx_float32 offset_obj = (0.125f - offset) * numBins / rang;
+            vx_float32 inv_win = 1.0f * numBins / rang;
 
             gcoOS_ZeroMemory(&bin, sizeof(gcoVX_Kernel_Context_Reg));
             bin.bin16[0] = Fp32toFp16(1.0f);
@@ -82,6 +94,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
             bin.bin16[3] = Fp32toFp16(offset_obj);
 
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, &bin, sizeof(gcoVX_Kernel_Context_Reg));
+#endif
             kernelContext->uniforms[kernelContext->uniform_num].num = 4 * 4;
             kernelContext->uniforms[kernelContext->uniform_num++].index = 2;
         }
@@ -99,7 +112,12 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
             bin[0] =
             bin[1] =
             bin[2] =
-            bin[3] = FV2(offset);
+            bin[3] =
+#if USE_FP32_PRECISION
+            FV(offset);
+#else
+            FV2(offset);
+#endif
 
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
             kernelContext->uniforms[kernelContext->uniform_num].num = 4 * 4;
@@ -126,7 +144,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         kernelContext->params.ystep         = height;
         kernelContext->params.volume        = count;
         kernelContext->params.col           = height;
-        kernelContext->params.scale         = 1.0f/window_size;
+        kernelContext->params.scale         = 1.0f * numBins / rang;
 
         kernelContext->params.evisNoInst = node->base.context->evisNoInst;
     }
@@ -143,7 +161,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
 
             bin[0] = (vx_float32)offset;
             bin[1] = (vx_float32)(offset + rang);
-            bin[2] = 1.0f/window_size;
+            bin[2] = 1.0f * numBins / rang;
             bin[3] = 0;
 
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
@@ -182,9 +200,10 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
     {
         gcoVX_Kernel_Context_Reg bin0[4] = {{{0}}}, bin1[4] = {{{0}}};
         gctUINT32 bytes = sizeof(bin0), i = 0, j = 0;
-        vx_uint32 height = 0;
+        vx_uint32 width = 0, height = 0;
 
         vx_uint32 index = 0, position = 0;
+        vxQueryImage(src, VX_IMAGE_WIDTH, &width, sizeof(width));
 
         vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
@@ -251,20 +270,23 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
                     }
                 }
 
-                if ((position > 0) && (position < 8) && (index >= numBins))
+                if (index >= numBins)
                 {
-                    vx_uint32 c = 0;
-                    vx_uint16 max = (vx_uint16)(offset + rang);
-                    for(c = position; c < 8; c++)
+                    if ((position > 0) && (position < 8))
                     {
-                        if(bin[1].bin16[position -1] > max)
+                        vx_uint32 c = 0;
+                        vx_uint16 max = (vx_uint16)(offset + rang);
+                        for(c = position; c < 8; c++)
                         {
-                            bin[1].bin16[position -1] =
-                            bin[1].bin16[c] = max;
-                        }
+                            if(bin[1].bin16[position -1] > max)
+                            {
+                                bin[1].bin16[position -1] =
+                                bin[1].bin16[c] = max;
+                            }
 
-                        else
-                            bin[1].bin16[c] = bin[1].bin16[position -1];
+                            else
+                                bin[1].bin16[c] = bin[1].bin16[position -1];
+                        }
                     }
                     break;
                 }
@@ -317,6 +339,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         kernelContext->params.xstep         = 16;
         kernelContext->params.ystep         = height;
         kernelContext->params.volume        = count;
+        kernelContext->params.clamp         = width * height;/*save the size of image*/
 
         kernelContext->params.evisNoInst = node->base.context->evisNoInst;
     }

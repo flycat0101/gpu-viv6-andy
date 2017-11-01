@@ -324,9 +324,8 @@ gcChipUtilsHashFindObjectByKey(
     return retObj;
 }
 
-
 gceSTATUS
-gcChipUtilsDumpSurface(
+gcChipUtilsDumpSurfaceTGA(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     gctCONST_STRING fileName,
@@ -335,7 +334,7 @@ gcChipUtilsDumpSurface(
 {
     gctPOINTER frameMemory = gcvNULL;
     gctFILE file = gcvNULL;
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gcsSURF_VIEW tgtView = {gcvNULL, 0, 1};
     gcsSURF_VIEW resolveRTView = {gcvNULL, 0, 1};
     gctPOINTER logical[3]  = {0};
@@ -343,9 +342,365 @@ gcChipUtilsDumpSurface(
     char level[6] = "+.tga";
     GLchar fName[__GLES_MAX_FILENAME_LEN]= {0};
     gctUINT8 tgaHeader[18];
-    gcsSURF_FORMAT_INFO_PTR srcFmtInfo;
+    const GLchar *formatName = "";
 
-    gcmHEADER_ARG("gc=0x%x, surf=0x%x, fileName=%s, yInverted", gc, surfView, fileName, yInverted);
+    gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d,", gc, surfView, fileName, yInverted);
+
+    do
+    {
+        gctINT32 resolveStride;
+        gctUINT8_PTR frameBGR;
+        gctUINT8_PTR frameARGB;
+        gctINT32 x, y;
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+        gctBOOL visualizeDepth = gcvFALSE;
+        gcsSURF_FORMAT_INFO_PTR srcFmtInfo;
+
+        gcmERR_BREAK(gcoSURF_GetSize(surfView->surf, &width, &height, &depth));
+
+        /* Construct temp linear surface. */
+        gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
+                                       gcvSURF_A8R8G8B8,
+                                       gcvPOOL_DEFAULT,
+                                       &tgtView.surf));
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted  = !yInverted;
+        rlvArgs.uArgs.v2.rectSize.x = width;
+        rlvArgs.uArgs.v2.rectSize.y = height;
+        rlvArgs.uArgs.v2.numSlices  = 1;
+
+        gcmERR_BREAK(gcoSURF_GetFormatInfo(surfView->surf, &srcFmtInfo));
+        formatName = srcFmtInfo->formatName;
+
+        if (srcFmtInfo->fmtClass == gcvFORMAT_CLASS_DEPTH)
+        {
+            rlvArgs.uArgs.v2.visualizeDepth = gcvTRUE;
+            visualizeDepth = gcvTRUE;
+        }
+
+        /* Resolve render target to linear surface. */
+        if (gcmIS_ERROR(gcoSURF_ResolveRect(surfView, &tgtView, &rlvArgs)))
+        {
+            gcsSURF_BLIT_ARGS cpuBltArgs;
+
+            gcmASSERT(surfView->surf);
+            gcoOS_ZeroMemory(&cpuBltArgs, sizeof(cpuBltArgs));
+            cpuBltArgs.srcSurface  = surfView->surf;
+            cpuBltArgs.srcX        = 0;
+            cpuBltArgs.srcY        = 0;
+            cpuBltArgs.srcZ        = surfView->firstSlice;
+            cpuBltArgs.srcWidth    = width;
+            cpuBltArgs.srcHeight   = height;
+            cpuBltArgs.srcDepth    = 1;
+            cpuBltArgs.srcNumSlice = surfView->numSlices;
+
+            cpuBltArgs.dstSurface  = tgtView.surf;
+            cpuBltArgs.dstX        = 0;
+            cpuBltArgs.dstY        = 0;
+            cpuBltArgs.dstZ        = tgtView.firstSlice;
+            cpuBltArgs.dstWidth    = width;
+            cpuBltArgs.dstHeight   = height;
+            cpuBltArgs.dstDepth    = 1;
+            cpuBltArgs.yReverse    = !yInverted;
+            cpuBltArgs.dstNumSlice = tgtView.numSlices;
+
+            if (gcmIS_ERROR(gcoSURF_BlitCPU(&cpuBltArgs)))
+            {
+                gscSURF_BLITDRAW_BLIT blitArgs;
+                /* Construct temp linear surface. */
+                gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_RENDER_TARGET,
+                                               gcvSURF_A8R8G8B8,
+                                               gcvPOOL_DEFAULT,
+                                               &resolveRTView.surf));
+
+
+                gcoOS_ZeroMemory(&blitArgs, sizeof(blitArgs));
+                blitArgs.srcRect.right  = width;
+                blitArgs.srcRect.bottom = height;
+                blitArgs.dstRect.right  = width;
+                blitArgs.dstRect.bottom = height;
+                blitArgs.filterMode     = gcvTEXTURE_POINT;
+                gcmERR_BREAK(gcoSURF_DrawBlit(surfView, &resolveRTView, &blitArgs));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&resolveRTView, &tgtView, &rlvArgs));
+            }
+
+            gcmERR_BREAK(status);
+        }
+
+        /* Commit resolve command and stall hardware. */
+        gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+
+        /* Lock for linear surface memory. */
+        gcmERR_BREAK(gcoSURF_Lock(tgtView.surf, gcvNULL, logical));
+
+        /* Query linear surface stride. */
+        gcmERR_BREAK(gcoSURF_GetAlignedSize(tgtView.surf, gcvNULL, gcvNULL, &resolveStride));
+
+        /* Allocate frame memory. */
+        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, width * height * 3, &frameMemory));
+
+        /* Color format conversion: ARGB to RGB. */
+        frameBGR = (gctUINT8_PTR)frameMemory;
+
+        level[0] = '-';
+
+        for (y = 0; y < (gctINT32)height; ++y)
+        {
+            frameARGB = (gctUINT8_PTR) logical[0] + y * resolveStride;
+
+            for (x = 0; x < (gctINT32)width; ++x)
+            {
+                if (visualizeDepth)
+                {
+                    frameBGR[0] = frameARGB[1];
+                    frameBGR[1] = frameARGB[2];
+                    frameBGR[2] = frameARGB[3];
+                }
+                else
+                {
+                    frameBGR[0] = frameARGB[0];
+                    frameBGR[1] = frameARGB[1];
+                    frameBGR[2] = frameARGB[2];
+                }
+                frameARGB += 4;
+                frameBGR  += 3;
+            }
+        }
+    } while(gcvFALSE);
+
+    if (gcvNULL != logical[0])
+    {
+        /* Unlock and destroy linear surface. */
+        gcmVERIFY_OK(gcoSURF_Unlock(tgtView.surf, logical[0]));
+        logical[0] = gcvNULL;
+    }
+
+    if (tgtView.surf)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(tgtView.surf));
+        tgtView.surf = gcvNULL;
+    }
+
+    if (resolveRTView.surf)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(resolveRTView.surf));
+        resolveRTView.surf = gcvNULL;
+    }
+
+    /* Prepare tga file header. */
+    tgaHeader[ 0] = 0;
+    tgaHeader[ 1] = 0;
+    tgaHeader[ 2] = 2;
+    tgaHeader[ 3] = 0;
+    tgaHeader[ 4] = 0;
+    tgaHeader[ 5] = 0;
+    tgaHeader[ 6] = 0;
+    tgaHeader[ 7] = 0;
+    tgaHeader[ 8] = 0;
+    tgaHeader[ 9] = 0;
+    tgaHeader[10] = 0;
+    tgaHeader[11] = 0;
+    tgaHeader[12] = (width & 0x00ff);
+    tgaHeader[13] = (width & 0xff00) >> 8;
+    tgaHeader[14] = (height & 0x00ff);
+    tgaHeader[15] = (height & 0xff00) >> 8;
+    tgaHeader[16] = 24;
+    tgaHeader[17] = (0x01 << 5);
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, formatName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
+
+    /* Open tga file for write. */
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
+
+    /* Write tga file header. */
+    gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, 18, tgaHeader));
+
+    if (frameMemory)
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, width * height * 3, frameMemory));
+        gcmOS_SAFE_FREE(gcvNULL, frameMemory);
+    }
+
+    if (gcvNULL != file)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, file));
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcChipUtilsDumpSurfaceRAW(
+    __GLcontext *gc,
+    gcsSURF_VIEW *surfView,
+    gctCONST_STRING fileName,
+    GLboolean yInverted
+    )
+{
+    gctFILE file = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_VIEW tgtView = {gcvNULL, 0, 1};
+    gcsSURF_VIEW resolveRTView = {gcvNULL, 0, 1};
+    gctPOINTER logical[3]  = {0};
+    gctUINT width = 0, height = 0, depth = 0;
+    gctINT stride = 0, layerSize = 0;
+    char level[6] = "+.raw";
+    GLchar fName[__GLES_MAX_FILENAME_LEN]= {0};
+    __GLsurfRawHead rawHead;
+    const GLchar *formatName = "";
+
+    gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d", gc, surfView, fileName, yInverted);
+
+    do
+    {
+        gcsSURF_FORMAT_INFO_PTR srcFmtInfo;
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        gcmERR_BREAK(gcoSURF_GetSize(surfView->surf, &width, &height, &depth));
+        gcmERR_BREAK(gcoSURF_GetFormatInfo(surfView->surf, &srcFmtInfo));
+        formatName = srcFmtInfo->formatName;
+
+        /* Construct temp linear surface. */
+        gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
+                                       srcFmtInfo->format,
+                                       gcvPOOL_DEFAULT,
+                                       &tgtView.surf));
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted  = !yInverted;
+        rlvArgs.uArgs.v2.rectSize.x = width;
+        rlvArgs.uArgs.v2.rectSize.y = height;
+        rlvArgs.uArgs.v2.numSlices  = 1;
+
+        /* Resolve render target to linear surface. */
+        if (gcmIS_ERROR(gcoSURF_ResolveRect(surfView, &tgtView, &rlvArgs)))
+        {
+            gcsSURF_BLIT_ARGS cpuBltArgs;
+
+            gcmASSERT(surfView->surf);
+            gcoOS_ZeroMemory(&cpuBltArgs, sizeof(cpuBltArgs));
+            cpuBltArgs.srcSurface  = surfView->surf;
+            cpuBltArgs.srcX        = 0;
+            cpuBltArgs.srcY        = 0;
+            cpuBltArgs.srcZ        = surfView->firstSlice;
+            cpuBltArgs.srcWidth    = width;
+            cpuBltArgs.srcHeight   = height;
+            cpuBltArgs.srcDepth    = 1;
+            cpuBltArgs.srcNumSlice = surfView->numSlices;
+
+            cpuBltArgs.dstSurface  = tgtView.surf;
+            cpuBltArgs.dstX        = 0;
+            cpuBltArgs.dstY        = 0;
+            cpuBltArgs.dstZ        = tgtView.firstSlice;
+            cpuBltArgs.dstWidth    = width;
+            cpuBltArgs.dstHeight   = height;
+            cpuBltArgs.dstDepth    = 1;
+            cpuBltArgs.yReverse    = !yInverted;
+            cpuBltArgs.dstNumSlice = tgtView.numSlices;
+
+            if (gcmIS_ERROR(gcoSURF_BlitCPU(&cpuBltArgs)))
+            {
+                gscSURF_BLITDRAW_BLIT blitArgs;
+                /* Construct temp linear surface. */
+                gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_RENDER_TARGET,
+                                               srcFmtInfo->format,
+                                               gcvPOOL_DEFAULT,
+                                               &resolveRTView.surf));
+
+
+                gcoOS_ZeroMemory(&blitArgs, sizeof(blitArgs));
+                blitArgs.srcRect.right  = width;
+                blitArgs.srcRect.bottom = height;
+                blitArgs.dstRect.right  = width;
+                blitArgs.dstRect.bottom = height;
+                blitArgs.filterMode     = gcvTEXTURE_POINT;
+                gcmERR_BREAK(gcoSURF_DrawBlit(surfView, &resolveRTView, &blitArgs));
+
+                gcmERR_BREAK(gcoSURF_ResolveRect(&resolveRTView, &tgtView, &rlvArgs));
+            }
+
+            gcmERR_BREAK(status);
+        }
+
+        /* Commit resolve command and stall hardware. */
+        gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+        gcmERR_BREAK(gcoSURF_Lock(tgtView.surf, gcvNULL, logical));
+        gcmERR_BREAK(gcoSURF_GetAlignedSize(tgtView.surf, gcvNULL, gcvNULL, &stride));
+        gcmERR_BREAK(gcoSURF_GetInfo(tgtView.surf, gcvSURF_INFO_LAYERSIZE, &layerSize));
+
+        level[0] = '-';
+    } while (GL_FALSE);
+
+    if (resolveRTView.surf)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(resolveRTView.surf));
+        resolveRTView.surf = gcvNULL;
+    }
+
+    /* Prepare file header */
+    __GL_MEMZERO(&rawHead, sizeof(rawHead));
+    rawHead.width = width;
+    rawHead.height = height;
+    rawHead.stride = (GLuint)stride;
+    rawHead.layerSize = (GLuint)layerSize;
+    gcmVERIFY_OK(gcoOS_StrCopySafe(rawHead.formatName, 64, formatName));
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, formatName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
+
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
+
+    /* Write raw file header. */
+    gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, sizeof(rawHead), &rawHead));
+
+    if (logical[0])
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, stride * height, logical[0]));
+
+        /* Unlock linear surface. */
+        gcmVERIFY_OK(gcoSURF_Unlock(tgtView.surf, logical[0]));
+        logical[0] = gcvNULL;
+    }
+
+    if (gcvNULL != file)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, file));
+    }
+
+    if (tgtView.surf)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(tgtView.surf));
+        tgtView.surf = gcvNULL;
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcChipUtilsDumpSurface(
+    __GLcontext *gc,
+    gcsSURF_VIEW *surfView,
+    gctCONST_STRING fileName,
+    GLboolean yInverted,
+    GLbitfield saveMask
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d, saveMask=0x%x",
+                  gc, surfView, fileName, yInverted, saveMask);
 
 #if defined(ANDROID)
     {
@@ -374,193 +729,21 @@ gcChipUtilsDumpSurface(
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
         }
-
-        gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
     }
 #endif
 
-    do
+    if (saveMask & __GL_SAVE_SURF_AS_TGA)
     {
-        gctINT32   resolveStride;
-        gctUINT8_PTR frameBGR;
-        gctUINT8_PTR frameARGB;
-        gctINT32 x, y;
-        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-
-        gcmERR_BREAK(gcoSURF_GetSize(surfView->surf, &width, &height, &depth));
-
-        /* Construct temp linear surface. */
-        gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
-                                       gcvSURF_A8R8G8B8,
-                                       gcvPOOL_DEFAULT,
-                                       &tgtView.surf));
-
-        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-        rlvArgs.uArgs.v2.yInverted  = !yInverted;
-        rlvArgs.uArgs.v2.rectSize.x = width;
-        rlvArgs.uArgs.v2.rectSize.y = height;
-        rlvArgs.uArgs.v2.numSlices  = 1;
-
-        gcmERR_BREAK(gcoSURF_GetFormatInfo(surfView->surf, &srcFmtInfo));
-
-        if (srcFmtInfo->fmtClass == gcvFORMAT_CLASS_DEPTH)
-        {
-            rlvArgs.uArgs.v2.visualizeDepth = gcvTRUE;
-        }
-
-        /* Resolve render target to linear surface. */
-        if (gcmIS_ERROR(gcoSURF_ResolveRect(surfView, &tgtView, &rlvArgs)))
-        {
-            gcsSURF_BLIT_ARGS cpuBltArgs;
-
-            gcmASSERT(surfView->surf);
-            gcoOS_ZeroMemory(&cpuBltArgs, sizeof(cpuBltArgs));
-            cpuBltArgs.srcSurface = surfView->surf;
-            cpuBltArgs.srcX       = 0;
-            cpuBltArgs.srcY       = 0;
-            cpuBltArgs.srcZ       = surfView->firstSlice;
-            cpuBltArgs.srcWidth   = width;
-            cpuBltArgs.srcHeight  = height;
-            cpuBltArgs.srcDepth   = 1;
-
-            cpuBltArgs.dstSurface = tgtView.surf;
-            cpuBltArgs.dstX       = 0;
-            cpuBltArgs.dstY       = 0;
-            cpuBltArgs.dstZ       = tgtView.firstSlice;
-            cpuBltArgs.dstWidth   = width;
-            cpuBltArgs.dstHeight  = height;
-            cpuBltArgs.dstDepth   = 1;
-            cpuBltArgs.yReverse   = !yInverted;
-
-            if (gcmIS_ERROR(gcoSURF_BlitCPU(&cpuBltArgs)))
-            {
-                gscSURF_BLITDRAW_BLIT blitArgs;
-                /* Construct temp linear surface. */
-                gcmERR_BREAK(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_RENDER_TARGET,
-                                               gcvSURF_A8R8G8B8,
-                                               gcvPOOL_DEFAULT,
-                                               &resolveRTView.surf));
-
-
-                gcoOS_ZeroMemory(&blitArgs, sizeof(blitArgs));
-                blitArgs.srcRect.right  = width;
-                blitArgs.srcRect.bottom = height;
-                blitArgs.dstRect.right  = width;
-                blitArgs.dstRect.bottom = height;
-                blitArgs.filterMode     = gcvTEXTURE_POINT;
-                gcmERR_BREAK(gcoSURF_DrawBlit(surfView, &resolveRTView, &blitArgs));
-
-                gcmERR_BREAK(gcoSURF_ResolveRect(&resolveRTView, &tgtView, &rlvArgs));
-            }
-
-            gcmERR_BREAK(status);
-        }
-
-        /* Commit resolve command and stall hardware. */
-        gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-
-        /* Lock for linear surface memory. */
-        gcmERR_BREAK(gcoSURF_Lock(tgtView.surf, gcvNULL, logical));
-
-        /* Query linear surface stride. */
-        gcmERR_BREAK(gcoSURF_GetAlignedSize(tgtView.surf, gcvNULL, gcvNULL, &resolveStride));
-
-        /* Allocate frame memory. */
-        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, width * height * 3, &frameMemory));
-
-        /* Color format conversion: ARGB to RGB. */
-        frameBGR = (gctUINT8_PTR) frameMemory;
-
-        level[0] = '-';
-
-        for (y = 0; y < (gctINT32)height; ++y)
-        {
-            frameARGB = (gctUINT8_PTR) logical[0] + y * resolveStride;
-
-            for (x = 0; x < (gctINT32)width; ++x)
-            {
-                frameBGR[0] = frameARGB[0];
-                frameBGR[1] = frameARGB[1];
-                frameBGR[2] = frameARGB[2];
-                frameARGB += 4;
-                frameBGR  += 3;
-            }
-        }
-
-        /* Unlock and destroy linear surface. */
-        gcmERR_BREAK(gcoSURF_Unlock(tgtView.surf, logical[0]));
-        logical[0] = gcvNULL;
-        gcmERR_BREAK(gcoSURF_Destroy(tgtView.surf));
-        tgtView.surf = gcvNULL;
-
-    }
-    while(gcvFALSE);
-
-    /* Prepare tga file header. */
-    tgaHeader[ 0] = 0;
-    tgaHeader[ 1] = 0;
-    tgaHeader[ 2] = 2;
-    tgaHeader[ 3] = 0;
-    tgaHeader[ 4] = 0;
-    tgaHeader[ 5] = 0;
-    tgaHeader[ 6] = 0;
-    tgaHeader[ 7] = 0;
-    tgaHeader[ 8] = 0;
-    tgaHeader[ 9] = 0;
-    tgaHeader[10] = 0;
-    tgaHeader[11] = 0;
-    tgaHeader[12] = (width & 0x00ff);
-    tgaHeader[13] = (width & 0xff00) >> 8;
-    tgaHeader[14] = (height & 0x00ff);
-    tgaHeader[15] = (height & 0xff00) >> 8;
-    tgaHeader[16] = 24;
-    tgaHeader[17] = (0x01 << 5);
-
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
-
-    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
-
-    /* Open tga file for write. */
-    gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
-
-    /* Write tga file header. */
-    gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, 18, tgaHeader));
-
-    if (frameMemory)
-    {
-        /* Write pixel data. */
-        gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, width * height * 3, frameMemory));
-
-        gcmOS_SAFE_FREE(gcvNULL, frameMemory);
+        gcChipUtilsDumpSurfaceTGA(gc, surfView, fileName, yInverted);
     }
 
-    if (gcvNULL != file)
+    if (saveMask & __GL_SAVE_SURF_AS_RAW)
     {
-        /* Close tga file. */
-        gcmVERIFY_OK(gcoOS_Close(gcvNULL, file));
-    }
-
-    if (gcvNULL != logical[0])
-    {
-        /* Unlock and destroy linear surface. */
-        gcmVERIFY_OK(gcoSURF_Unlock(tgtView.surf, logical[0]));
-        logical[0] = gcvNULL;
-    }
-
-    if (tgtView.surf)
-    {
-        gcmVERIFY_OK(gcoSURF_Destroy(tgtView.surf));
-        tgtView.surf = gcvNULL;
-    }
-
-    if (resolveRTView.surf)
-    {
-        gcmVERIFY_OK(gcoSURF_Destroy(resolveRTView.surf));
-        resolveRTView.surf = gcvNULL;
+        gcChipUtilsDumpSurfaceRAW(gc, surfView, fileName, yInverted);
     }
 
     gcmFOOTER();
-    return gcvSTATUS_OK;
+    return status;
 }
 
 gceSTATUS
@@ -592,7 +775,7 @@ gcChipUtilsVerifyRT(
             gcmONERROR(gcoSURF_Unlock(rtView->surf, logical[0]));
             gcmONERROR(gcoSURF_GetInfo(rtView->surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-            gcmDUMP(gcvNULL, "#verify rt%d", index);
+            gcmDUMP(gcvNULL, "#[info: verify rt%d", index);
             gcmDUMP_BUFFER(gcvNULL,
                            "verify",
                            physical[0] + gcChipGetSurfOffset(rtView),
@@ -611,7 +794,7 @@ gcChipUtilsVerifyRT(
         gcmONERROR(gcoSURF_Unlock(chipCtx->drawDepthView.surf, logical[0]));
         gcmONERROR(gcoSURF_GetInfo(chipCtx->drawDepthView.surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-        gcmDUMP(gcvNULL, "#verify depth");
+        gcmDUMP(gcvNULL, "#[info: verify depth");
         gcmDUMP_BUFFER(gcvNULL,
                        "verify",
                        physical[0] + gcChipGetSurfOffset(&chipCtx->drawDepthView),
@@ -669,13 +852,19 @@ gcChipUtilsVerifyImagesCB(
                 __GLtextureObject *texObj = imageUnit->texObj;
                 gctUINT8 i;
                 GLuint sliceNumbers = 1;
+                GLboolean layered = ((imageUnit->type != __GL_IMAGE_2D) && !imageUnit->singleLayered);
 
-                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
+                texView = gcChipGetTextureSurface(chipCtx, texObj, layered, imageUnit->level, imageUnit->actualLayer);
 
                 if ((imageUnit->type != __GL_IMAGE_2D) && !imageUnit->singleLayered)
                 {
                     texView.firstSlice = 0;
                     sliceNumbers = texView.surf->requestD;
+                }
+
+                if (imageUnit->singleLayered)
+                {
+                    texView.numSlices = 1;
                 }
 
                 gcmONERROR(gcoSURF_Lock(texView.surf, physical, logical));
@@ -688,11 +877,11 @@ gcChipUtilsVerifyImagesCB(
                 for (i = 0; i < formatInfo->layers; i++)
                 {
                     GLuint j;
-                    gcmDUMP(gcvNULL, "#verify image multi-layer%d", i);
+                    gcmDUMP(gcvNULL, "#[info: verify image multi-layer%d", i);
 
                     for (j = 0; j < sliceNumbers; j++)
                     {
-                        gcmDUMP(gcvNULL, "#verify image slice[%d]", j);
+                        gcmDUMP(gcvNULL, "#[info: verify image slice[%d]", j);
                         gcmDUMP_BUFFER(gcvNULL,
                                        "verify",
                                        physical[0] + offset +  layerSize * i,
@@ -728,7 +917,7 @@ OnError:
 }
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgDumpImagePerDraw;
+extern GLbitfield g_dbgDumpImagePerDraw;
 
 gceSTATUS
 gcChipUtilsDumpTexture(
@@ -774,36 +963,33 @@ gcChipUtilsDumpTexture(
         do
         {
             gctUINT fileNameOffset = 0;
-            gcsSURF_FORMAT_INFO_PTR formatInfo;
 
-            surfView = gcChipGetTextureSurface(chipCtx, tex, level, slice);
+            surfView = gcChipGetTextureSurface(chipCtx, tex, gcvFALSE, level, slice);
             if (!surfView.surf)
             {
                 break;
             }
 
-            gcmVERIFY_OK(gcoSURF_GetFormatInfo(surfView.surf, &formatInfo));
-
             gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                             __GLES_MAX_FILENAME_LEN,
                                             &fileNameOffset,
-                                            "fID%04d_dID%04d(%s)_texID%04d[%s]_%s_level%02d_slice%02d",
+                                            "fID%04d_dID%04d(%s)_texID%04d[%s]_level%02d_slice%02d",
                                             frameCount,
                                             drawCount,
                                             (gc->shaderProgram.mode == __GLSL_MODE_COMPUTE ? "compute" : "draw"),
                                             tex->name,
                                             txTypeStr[tex->targetIndex],
-                                            formatInfo->formatName,
                                             level,
                                             slice
                                             ));
-            gcmERR_BREAK(gcChipUtilsDumpSurface(gc, &surfView, fileName, gcvFALSE));
+
+            gcmERR_BREAK(gcChipUtilsDumpSurface(gc, &surfView, fileName, gcvFALSE, (g_dbgDumpImagePerDraw >> 16)));
 
             ++slice;
         } while (gcvTRUE);
 
         slice = 0;
-        surfView = gcChipGetTextureSurface(chipCtx, tex, ++level, slice);
+        surfView = gcChipGetTextureSurface(chipCtx, tex, gcvFALSE, ++level, slice);
         if (!surfView.surf)
         {
             break;
@@ -830,14 +1016,17 @@ gcChipUtilsDumpRT(
     gctUINT fileNameOffset = 0;
     GLuint index;
     gctUINT32 frameCount, drawCount;
-    static char *txTypeStr[] = { "2D",
-                         "3D",
-                         "CUBE",
-                         "2D_A",
-                         "EXT",
-                         "2DMS",
-                         "2DMS_A",
-                         "CUBE_A"};
+    GLuint pID, ppID;
+    static char *txTypeStr[] = {
+        "2D",
+        "3D",
+        "CUBE",
+        "2D_A",
+        "EXT",
+        "2DMS",
+        "2DMS_A",
+        "CUBE_A"
+        };
     gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
 
     /* Allocate memory for output file name string. */
@@ -854,15 +1043,59 @@ gcChipUtilsDumpRT(
                             &drawCount);
     /* increased in begin */
     drawCount--;
+    pID = gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
+    ppID = gc->shaderProgram.currentProgram ? 0 : (gc->shaderProgram.boundPPO ? gc->shaderProgram.boundPPO->name : 0);
+
+    switch (flag)
+    {
+    case (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(clear)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+        break;
+    case (__GL_PERDRAW_DUMP_DRAW_RT | __GL_PERDRAW_DUMP_DRAW_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+    break;
+
+    case (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(blit)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+        break;
+
+    default:
+        GL_ASSERT(0);
+    }
 
     for (index = 0; index < gc->constants.shaderCaps.maxDrawBuffers; ++index)
     {
         gcsSURF_VIEW *rtView = &chipCtx->drawRtViews[index];
         if (rtView->surf)
         {
-            gcsSURF_FORMAT_INFO_PTR formatInfo;
-            fileNameOffset = 0;
-            gcmVERIFY_OK(gcoSURF_GetFormatInfo(rtView->surf, &formatInfo));
+            gctUINT fileNameOffset2 = fileNameOffset;
 
             if (gc->frameBuffer.drawFramebufObj->name)
             {
@@ -873,87 +1106,43 @@ gcChipUtilsDumpRT(
 
                 if (attachPoint->objType == GL_TEXTURE)
                 {
-                    texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
+                    texObj = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
                 }
 
                 /* clear */
-                if (1 == flag)
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
-                                                    frameCount,
-                                                    gc->frameBuffer.drawFramebufObj->name,
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                    attachPoint->objName,
-                                                    formatInfo->formatName,
-                                                    attachPoint->level,
-                                                    attachPoint->face,
-                                                    attachPoint->layer,
-                                                    index));
-                }
-                /* draw */
-                else
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
-                                                    frameCount,
-                                                    drawCount,
-                                                    gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                    gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                    gc->frameBuffer.drawFramebufObj->name,
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                    attachPoint->objName,
-                                                    formatInfo->formatName,
-                                                    attachPoint->level,
-                                                    attachPoint->face,
-                                                    attachPoint->layer,
-                                                    index));
-                }
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                                __GLES_MAX_FILENAME_LEN,
+                                                &fileNameOffset2,
+                                                "fbo%04d(%s[%s]ID%04d_level%02d_face%d_layer%02d)_RT%d",
+                                                gc->frameBuffer.drawFramebufObj->name,
+                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
+                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
+                                                attachPoint->objName,
+                                                attachPoint->level,
+                                                attachPoint->face,
+                                                attachPoint->layer,
+                                                index));
             }
             else
             {
                 GL_ASSERT(index == 0);
-                /* clear */
-                if (1 == flag)
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_clear_window_%s_RT",
-                                                    frameCount,
-                                                    formatInfo->formatName));
-                }
-                /* draw */
-                else
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_RT",
-                                                    frameCount,
-                                                    drawCount,
-                                                    gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                    gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                    formatInfo->formatName));
-
-                }
-
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                                __GLES_MAX_FILENAME_LEN,
+                                                &fileNameOffset2,
+                                                "window_RT"));
             }
-            gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, rtView, fileName, chipCtx->drawYInverted));
+
+            gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, rtView, fileName, chipCtx->drawYInverted, (g_dbgDumpImagePerDraw >> 16)));
         }
     }
-    if ((dsView->surf) &&
-        ((g_dbgDumpImagePerDraw == 2) || (chipCtx->drawRTnum == 0)))
+
+    if ((dsView->surf)
+     && (((g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_CLEAR_DS
+                                  | __GL_PERDRAW_DUMP_DRAW_DS
+                                  | __GL_PERDRAW_DUMP_BLITFBO_DS))
+       || (chipCtx->drawRTnum == 0))))
     {
-        gcsSURF_FORMAT_INFO_PTR formatInfo;
-        fileNameOffset = 0;
-        gcmVERIFY_OK(gcoSURF_GetFormatInfo(dsView->surf, &formatInfo));
+        gctUINT fileNameOffset2 = fileNameOffset;
 
         if (gc->frameBuffer.drawFramebufObj->name)
         {
@@ -964,79 +1153,30 @@ gcChipUtilsDumpRT(
 
             if (attachPoint->objType == GL_TEXTURE)
             {
-                texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
+                texObj = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
             }
 
-            /* clear */
-            if (1 == flag)
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
-                                                frameCount,
-                                                gc->frameBuffer.drawFramebufObj->name,
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                attachPoint->objName,
-                                                formatInfo->formatName,
-                                                attachPoint->level,
-                                                attachPoint->face,
-                                                attachPoint->layer));
-
-            }
-            /* draw */
-            else
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
-                                                frameCount,
-                                                drawCount,
-                                                gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                gc->frameBuffer.drawFramebufObj->name,
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                attachPoint->objName,
-                                                formatInfo->formatName,
-                                                attachPoint->level,
-                                                attachPoint->face,
-                                                attachPoint->layer));
-            }
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset2,
+                                            "fbo%04d(%s[%s]ID%04d_level%02d_face%d_layer%02d)_depth",
+                                            gc->frameBuffer.drawFramebufObj->name,
+                                            (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
+                                            (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
+                                            attachPoint->objName,
+                                            attachPoint->level,
+                                            attachPoint->face,
+                                            attachPoint->layer));
         }
         else
         {
-            /* clear */
-            if (1 == flag)
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_clear_window_%s_depth",
-                                                frameCount,
-                                                formatInfo->formatName
-                                                ));
-            }
-            /* draw */
-            else
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_depth",
-                                                frameCount,
-                                                drawCount,
-                                                gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                formatInfo->formatName
-                                                ));
-
-            }
-
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset2,
+                                            "window_depth"
+                                            ));
         }
-        gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, dsView, fileName, chipCtx->drawYInverted));
+        gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, dsView, fileName, chipCtx->drawYInverted, (g_dbgDumpImagePerDraw >> 16)));
     }
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, fileName));
 
@@ -1044,4 +1184,5 @@ gcChipUtilsDumpRT(
 }
 
 #endif
+
 

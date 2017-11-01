@@ -6045,6 +6045,20 @@ gctSTRING gcLibImageLoad_2D_float_rgba8_snorm =
 "   return vec4(clamp(raw, -127, 127)) / 127.0;\n"
 "}\n";
 
+gctSTRING gcLibImageLoad_2D_float_rg8 =
+"highp vec4 _viv_image_load_image_2d_rg8(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 raw = _viv_image_load_uimage_2d_rg8ui(img_desc, p);\n"
+"   return vec4(min(raw, 255u)) / 255.0;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_r8 =
+"highp vec4 _viv_image_load_image_2d_r8(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 raw = _viv_image_load_uimage_2d_r8ui(img_desc, p);\n"
+"   return vec4(min(raw, 255u)) / 255.0;\n"
+"}\n";
+
 gctSTRING gcLibImageLoad_2D_float_rgba32f =
 "highp vec4 _viv_image_load_image_2d_rgba32f(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec2 p)\n"
 "{\n"
@@ -6066,6 +6080,66 @@ gctSTRING gcLibImageLoad_2D_float_rgba32f =
 "   return result;\n"
 "}\n";
 
+/* don't use raw.zw = vec2(0.0, 1.0),
+   recompilation has issue with const vector*/
+gctSTRING gcLibImageLoad_2D_float_rg16f =
+"highp vec4 _viv_image_load_image_2d_rg16f(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1.0; } \n"
+"   else {\n"
+"       highp vec4 raw;\n"
+"       highp vec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:FLOAT16>, address, 0);\n"
+"       raw.xy = temp;\n"
+"       raw.z = 0.0;\n"
+"       raw.w = 1.0;\n"
+"       result = _viv_image_swizzle(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_r16f =
+"highp vec4 _viv_image_load_image_2d_r16f(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1.0; } \n"
+"   else {\n"
+"       highp vec4 raw;\n"
+"       highp float temp;\n"
+"       _viv_asm(LOAD, temp!<f:FLOAT16>, address, 0);\n"
+"       raw.x = temp;\n"
+"       raw.y = 0.0;\n"
+"       raw.z = 0.0;\n"
+"       raw.w = 1.0;\n"
+"       result = _viv_image_swizzle(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_rg32f =
+"highp vec4 _viv_image_load_image_2d_rg32f(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1.0; } \n"
+"   else {\n"
+"       highp vec4 raw;\n"
+"       highp vec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:FLOAT>, address, 0);\n"
+"       raw.xy = temp;\n"
+"       raw.z = 0.0;\n"
+"       raw.w = 1.0;\n"
+"       result = _viv_image_swizzle(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
 /* don't use raw = vec4(0.0, 0.0, 0.0, 1.0),
    recompilation has issue with const vector*/
 gctSTRING gcLibImageLoad_2D_float_r32f =
@@ -6082,8 +6156,108 @@ gctSTRING gcLibImageLoad_2D_float_r32f =
 "       raw.x = temp;\n"
 "       raw.y = 0.0;\n"
 "       raw.z = 0.0;\n"
-"       raw.q = 1.0;\n"
+"       raw.w = 1.0;\n"
 "       result = _viv_image_swizzle(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_r5g6b5_unorm_pack16 =
+"highp vec4 _viv_image_load_image_2d_r5g6b5_unorm_pack16(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1.0 : 0.0; } \n"
+"   else {\n"
+"       highp uvec4 raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT16>, address, 0);\n"
+"       result.x = float((raw.x >> 11) & uint(0x1F)) / 31.0;\n"
+"       result.y = float((raw.x >> 5)  & uint(0x3F)) / 63.0;\n"
+"       result.z = float((raw.x) & uint(0x1F)) / 31.0;\n"
+"       result.w = 1.0;\n"
+"       result = _viv_image_swizzle(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_abgr8_unorm_pack32 =
+"highp vec4 _viv_image_load_image_2d_abgr8_unorm_pack32(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1.0 : 0.0; } \n"
+"   else {\n"
+"       highp uint raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT32>, address, 0);\n"
+"       result.x = float((raw) & uint(0xFF)) / 255.0;\n"
+"       result.y = float((raw >> 8) & uint(0xFF)) / 255.0;\n"
+"       result.z = float((raw >> 16) & uint(0xFF)) / 255.0;\n"
+"       result.w = float((raw >> 24) & uint(0xFF)) / 255.0;\n"
+"       result = _viv_image_swizzle(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_a2r10g10b10_unorm_pack32 =
+"highp vec4 _viv_image_load_image_2d_a2r10g10b10_unorm_pack32(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   vec4 result = vec4(0.0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1.0 : 0.0; } \n"
+"   else {\n"
+"       highp uint raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT32>, address, 0);\n"
+"       result.x = float((raw) & uint(0x3FF)) / 1023.0;\n"
+"       result.y = float((raw >> 10) & uint(0x3FF)) / 1023.0;\n"
+"       result.z = float((raw >> 20) & uint(0x3FF)) / 1023.0;\n"
+"       result.w = float((raw >> 30) & uint(0x3)) / 3.0;\n"
+"       result = _viv_image_swizzle(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_uint_abgr8ui_pack32 =
+"highp uvec4 _viv_image_load_uimage_2d_abgr8ui_pack32(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1u : 0u; } \n"
+"   else {\n"
+"       highp uint raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT32>, address, 0);\n"
+"       result.x = (raw) & uint(0xFF);\n"
+"       result.y = (raw >> 8) & uint(0xFF);\n"
+"       result.z = (raw >> 16) & uint(0xFF);\n"
+"       result.w = (raw >> 24) & uint(0xFF);\n"
+"       result = _viv_image_swizzle_uint(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_int_abgr8i_pack32 =
+"highp ivec4 _viv_image_load_iimage_2d_abgr8i_pack32(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1 : 0; } \n"
+"   else {\n"
+"       highp int raw;\n"
+"       _viv_asm(LOAD, raw!<f:INT32>, address, 0);\n"
+"       result.x = (raw) & (0xFF);\n"
+"       result.y = (raw >> 8) & (0xFF);\n"
+"       result.z = (raw >> 16) & (0xFF);\n"
+"       result.w = (raw >> 24) & (0xFF);\n"
+"       result = _viv_image_swizzle_int(img_desc, result);\n"
 "   }\n"
 "   return result;\n"
 "}\n";
@@ -6120,6 +6294,45 @@ gctSTRING gcLibImageLoad_2D_int_rgba8i =
 "   return result;\n"
 "}\n";
 
+gctSTRING gcLibImageLoad_2D_int_rg8i =
+"highp ivec4 _viv_image_load_iimage_2d_rg8i(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1 : 0; } \n"
+"   else {\n"
+"       highp ivec2 raw;\n"
+"       _viv_asm(LOAD, raw!<f:INT8>, address, 0);\n"
+"       result.xy = raw;\n"
+"       result.z = 0;\n"
+"       result.w = 1;\n"
+"       result = _viv_image_swizzle_int(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_int_r8i =
+"highp ivec4 _viv_image_load_iimage_2d_r8i(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1 : 0; } \n"
+"   else {\n"
+"       highp int raw;\n"
+"       _viv_asm(LOAD, raw!<f:INT8>, address, 0);\n"
+"       result.x = raw;\n"
+"       result.y = 0;\n"
+"       result.z = 0;\n"
+"       result.w = 1;\n"
+"       result = _viv_image_swizzle_int(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
 gctSTRING gcLibImageLoad_2D_int_rgba32i =
 "highp ivec4 _viv_image_load_iimage_2d_rgba32i(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec2 p)\n"
 "{\n"
@@ -6141,6 +6354,25 @@ gctSTRING gcLibImageLoad_2D_int_rgba32i =
 "   return result;\n"
 "}\n";
 
+gctSTRING gcLibImageLoad_2D_int_rg32i =
+"highp ivec4 _viv_image_load_iimage_2d_rg32i(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1; } \n"
+"   else {\n"
+"       highp ivec4 raw;\n"
+"       highp ivec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:INT32>, address, 0);\n"
+"       raw.xy = temp.xy;\n"
+"       raw.z = 0;\n"
+"       raw.w = 1;\n"
+"       result = _viv_image_swizzle_int(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
 gctSTRING gcLibImageLoad_2D_int_r32i =
 "highp ivec4 _viv_image_load_iimage_2d_r32i(highp uvec4 img_desc, ivec2 p)\n"
 "{\n"
@@ -6152,6 +6384,45 @@ gctSTRING gcLibImageLoad_2D_int_r32i =
 "       highp ivec4 raw;\n"
 "       highp int temp;\n"
 "       _viv_asm(LOAD, temp!<f:INT32>, address, 0);\n"
+"       raw.x = temp;\n"
+"       raw.y = 0;\n"
+"       raw.z = 0;\n"
+"       raw.w = 1;\n"
+"       result = _viv_image_swizzle_int(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_int_rg16i =
+"highp ivec4 _viv_image_load_iimage_2d_rg16i(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1; } \n"
+"   else {\n"
+"       highp ivec4 raw;\n"
+"       highp ivec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:INT16>, address, 0);\n"
+"       raw.xy = temp.xy;\n"
+"       raw.z = 0;\n"
+"       raw.w = 1;\n"
+"       result = _viv_image_swizzle_int(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_int_r16i =
+"highp ivec4 _viv_image_load_iimage_2d_r16i(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 result = ivec4(0);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1; } \n"
+"   else {\n"
+"       highp ivec4 raw;\n"
+"       highp int temp;\n"
+"       _viv_asm(LOAD, temp!<f:INT16>, address, 0);\n"
 "       raw.x = temp;\n"
 "       raw.y = 0;\n"
 "       raw.z = 0;\n"
@@ -6193,6 +6464,45 @@ gctSTRING gcLibImageLoad_2D_uint_rgba8ui =
 "   return result;\n"
 "}\n";
 
+gctSTRING gcLibImageLoad_2D_uint_rg8ui =
+"highp uvec4 _viv_image_load_uimage_2d_rg8ui(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1u : 0u; } \n"
+"   else {\n"
+"       highp uvec2 raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT8>, address, 0);\n"
+"       result.xy = raw;\n"
+"       result.z = 0u;\n"
+"       result.w = 1u;\n"
+"       result = _viv_image_swizzle_uint(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_uint_r8ui =
+"highp uvec4 _viv_image_load_uimage_2d_r8ui(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint inBorder = addrRet.x;\n"
+"   uint address = addrRet.y;\n"
+"   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1u : 0u; } \n"
+"   else {\n"
+"       highp uint raw;\n"
+"       _viv_asm(LOAD, raw!<f:UINT8>, address, 0);\n"
+"       result.x = raw;\n"
+"       result.y = 0u;\n"
+"       result.z = 0u;\n"
+"       result.w = 1u;\n"
+"       result = _viv_image_swizzle_uint(img_desc, result);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
 gctSTRING gcLibImageLoad_2D_uint_rgba32ui =
 "highp uvec4 _viv_image_load_uimage_2d_rgba32ui(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec2 p)\n"
 "{\n"
@@ -6225,6 +6535,64 @@ gctSTRING gcLibImageLoad_2D_uint_r32ui =
 "       highp uvec4 raw;\n"
 "       highp uint temp;\n"
 "       _viv_asm(LOAD, temp!<f:UINT32>, address, 0);\n"
+"       raw.x = temp;\n"
+"       raw.y = 0u;\n"
+"       raw.z = 0u;\n"
+"       raw.w = 1u;\n"
+"       result = _viv_image_swizzle_uint(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_uint_rg32ui =
+"highp uvec4 _viv_image_load_uimage_2d_rg32ui(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1u; } \n"
+"   else {\n"
+"       highp uvec4 raw;\n"
+"       highp uvec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:UINT32>, address, 0);\n"
+"       raw.xy = temp;\n"
+"       raw.z = 0u;\n"
+"       raw.w = 1u;\n"
+"       result = _viv_image_swizzle_uint(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_uint_rg16ui =
+"highp uvec4 _viv_image_load_uimage_2d_rg16ui(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1u; } \n"
+"   else {\n"
+"       highp uvec4 raw;\n"
+"       highp uvec2 temp;\n"
+"       _viv_asm(LOAD, temp!<f:UINT16>, address, 0);\n"
+"       raw.xy = temp.xy;\n"
+"       raw.z = 0u;\n"
+"       raw.w = 1u;\n"
+"       result = _viv_image_swizzle_uint(img_desc, raw);\n"
+"   }\n"
+"   return result;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_uint_r16ui =
+"highp uvec4 _viv_image_load_uimage_2d_r16ui(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uvec4 result = uvec4(0u);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x > 0u) { result.w = 1u; } \n"
+"   else {\n"
+"       highp uvec4 raw;\n"
+"       highp uint temp;\n"
+"       _viv_asm(LOAD, temp!<f:UINT16>, address, 0);\n"
 "       raw.x = temp;\n"
 "       raw.y = 0u;\n"
 "       raw.z = 0u;\n"
@@ -8369,7 +8737,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer =
 "    highp uvec4 result;\n"
 "    ivec4 size;\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
-"    ivec2 newCoord = ivec2(p%size.x, p/size.y);\n"
+"    ivec2 newCoord = ivec2(p%size.x, p/size.x);\n"
 "    vec2 fCoord = vec2(float(newCoord.x)/float(size.x), float(newCoord.y)/float(size.y));\n"
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
@@ -8403,43 +8771,47 @@ gctSTRING gcLibTexelFetch_SamplerBuffer_halti4 =
 
 /* getLod. */
 gctSTRING gcLibGetLod =
-"highp vec2 _viv_calculate_lod(ivec4 size, vec2 coord)\n"
+"highp vec2 _viv_calculate_lod(ivec4 size, ivec3 lmm, vec3 coord)\n"
 "{\n"
-"    float fLod;\n"
-"    vec2 temp1 = dFdx(coord);\n"
-"    vec2 temp2 = dFdy(coord);\n"
-"    vec2 temp3 = vec2(size.xy);\n"
+"    float lambda_prime, clampResult;\n"
+"    vec3 temp1, temp2, temp3;\n"
+"    temp1 = dFdx(coord);\n"
+"    temp2 = dFdy(coord);\n"
+"    temp3 = vec3(size.xyz);\n"
 "    temp1 = temp1 * temp3;\n"
 "    temp2 = temp2 * temp3;\n"
 "    temp1.x = length(temp1);\n"
 "    temp2.x = length(temp2);\n"
-"    fLod = max(log2(temp1.x), log2(temp2.x));\n"
-"    return vec2(float(int(floor(fLod + 0.5))), fLod);\n"
+"    lambda_prime = max(log2(temp1.x), log2(temp2.x));\n"
+"    {\n"
+"       clampResult = max(lambda_prime, float(lmm.x));\n"
+"       clampResult = min(clampResult, float(lmm.y));\n"
+"       clampResult = max(clampResult, 0.0);\n"
+"       clampResult = ceil(clampResult + 0.5) - 1.0;\n"
+"    }\n"
+"    return vec2(clampResult, lambda_prime);\n"
 "}\n"
 "highp vec2 _viv_image_query_lod_2d(sampler2D sampler, vec2 coord)\n"
 "{\n"
 "    ivec4 size;\n"
+"    ivec3 lmm;\n"
+"    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
-"    return _viv_calculate_lod(size, coord);\n"
+"    return _viv_calculate_lod(size, lmm, vec3(coord, 0.0));\n"
 "}\n"
 "highp vec2 _viv_image_query_lod_3d(sampler3D sampler, vec3 coord)\n"
 "{\n"
 "    ivec4 size;\n"
-"    float fLod;\n"
+"    ivec3 lmm;\n"
+"    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
-"    vec3 temp1 = dFdx(coord);\n"
-"    vec3 temp2 = dFdy(coord);\n"
-"    vec3 temp3 = vec3(size.xyz);\n"
-"    temp1 = temp1 * temp3;\n"
-"    temp2 = temp2 * temp3;\n"
-"    temp1.x = length(temp1);\n"
-"    temp2.x = length(temp2);\n"
-"    fLod = max(log2(temp1.x), log2(temp2.x));\n"
-"    return vec2(float(int(floor(fLod + 0.5))), fLod);\n"
+"    return _viv_calculate_lod(size, lmm, coord);\n"
 "}\n"
 "highp vec2 _viv_image_query_lod_cube(sampler2D sampler, vec3 coord)\n"
 "{\n"
 "    ivec4 size;\n"
+"    ivec3 lmm;\n"
+"    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
 "    float maxCoord;\n"
 "    int face;\n"
@@ -8485,7 +8857,7 @@ gctSTRING gcLibGetLod =
 "            orgST = vec2(coord.xy);\n"
 "    }\n"
 "    orgUV = _viv_evaluate_UV(face, maxCoord, orgST, 1.0);\n"
-"    return _viv_calculate_lod(size, orgUV);\n"
+"    return _viv_calculate_lod(size, lmm, vec3(orgUV, 0.0));\n"
 "}\n";
 
 /* imageStore gc3000/5000 implementation where HW does not support image_wr */
@@ -8506,6 +8878,23 @@ gctSTRING gcLibImageStore_2D_float_rgba32f =
 "   }\n"
 "}\n";
 
+/* format rg16f */
+gctSTRING gcLibImageStore_2D_float_rg16f =
+"void _viv_image_store_image_2d_rg16f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:FLOAT16>, address, data.xy);\n"
+"       data.z = 0.0;\n"
+"       data.w = 1.0;\n"
+"   }\n"
+"}\n";
+
 /* format rgba16f */
 gctSTRING gcLibImageStore_2D_float =
 "void _viv_image_store_image_2d(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
@@ -8515,6 +8904,38 @@ gctSTRING gcLibImageStore_2D_float =
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
 "       _viv_asm(STORE1, result!<f:FLOAT16>, address, data);\n"
+"   }\n"
+"}\n";
+
+/* format rg32f */
+gctSTRING gcLibImageStore_2D_float_rg32f =
+"void _viv_image_store_image_2d_rg32f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:FLOAT>, address, data.xy);\n"
+"       data.z = 0.0;\n"
+"       data.w = 1.0;\n"
+"   }\n"
+"}\n";
+
+/* format r16f */
+gctSTRING gcLibImageStore_2D_float_r16f =
+"void _viv_image_store_image_2d_r16f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:FLOAT16>, address, data.x);\n"
 "   }\n"
 "}\n";
 
@@ -8530,6 +8951,102 @@ gctSTRING gcLibImageStore_2D_float_r32f =
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
 "       _viv_asm(STORE1, result!<f:FLOAT>, address, data.x);\n"
+"   }\n"
+"}\n";
+
+/* format r5g6b5 */
+gctSTRING gcLibImageStore_2D_float_r5g6b5_unorm_pack16 =
+"void _viv_image_store_image_2d_r5g6b5_unorm_pack16(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   float result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 temp = uvec4(0u);\n"
+"       temp.x = uint(data.x * 31.0);\n"
+"       temp.y = uint(data.y * 63.0);\n"
+"       temp.z = uint(data.z * 31.0);\n"
+"       temp.w = (temp.x << 11) | (temp.y << 5) | temp.z;\n"
+"       _viv_asm(STORE1, result!<f:UINT16>, address, temp.w);\n"
+"   }\n"
+"}\n";
+
+/* format abgr8 */
+gctSTRING gcLibImageStore_2D_float_abgr8_unorm_pack32 =
+"void _viv_image_store_image_2d_abgr8_unorm_pack32(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   float result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 temp = uvec4(0u);\n"
+"       temp.x = uint(data.x * 255.0);\n"
+"       temp.y = uint(data.y * 255.0);\n"
+"       temp.z = uint(data.z * 255.0);\n"
+"       temp.w = uint(data.w * 255.0);\n"
+"       temp.x = (temp.x) | (temp.y << 8) | (temp.z << 16) | (temp.w << 24);\n"
+"       _viv_asm(STORE1, result!<f:UINT32>, address, temp.x);\n"
+"   }\n"
+"}\n";
+
+/* format abgr8 */
+gctSTRING gcLibImageStore_2D_float_a2r10g10b10_unorm_pack32 =
+"void _viv_image_store_image_2d_a2r10g10b10_unorm_pack32(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   float result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 temp = uvec4(0u);\n"
+"       temp.x = uint(data.x * 1023.0);\n"
+"       temp.y = uint(data.y * 1023.0);\n"
+"       temp.z = uint(data.z * 1023.0);\n"
+"       temp.w = uint(data.w * 3.0);\n"
+"       temp.x = (temp.x) | (temp.y << 10) | (temp.z << 20) | (temp.w << 30);\n"
+"       _viv_asm(STORE1, result!<f:UINT32>, address, temp.x);\n"
+"   }\n"
+"}\n";
+
+/* format abgr8_ui */
+gctSTRING gcLibImageStore_2D_uint_abgr8ui_pack32 =
+"void _viv_image_store_uimage_2d_abgr8ui_pack32(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uint result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uint temp = 0u;\n"
+"       temp = (data.x) | (data.y << 8) | (data.z << 16) | (data.w << 24);\n"
+"       _viv_asm(STORE1, result!<f:UINT32>, address, temp);\n"
+"   }\n"
+"}\n";
+
+/* format abgr8_i */
+gctSTRING gcLibImageStore_2D_int_abgr8i_pack32 =
+"void _viv_image_store_iimage_2d_abgr8i_pack32(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
+"{\n"
+"   int result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       int temp = 0;\n"
+"       temp = (data.x) | (data.y << 8) | (data.z << 16) | (data.w << 24);\n"
+"       _viv_asm(STORE1, result!<f:INT32>, address, temp);\n"
 "   }\n"
 "}\n";
 
@@ -8568,6 +9085,41 @@ gctSTRING gcLibImageStore_2D_float_rgba8_snorm =
 "   }\n"
 "}\n";
 
+/* format rg8i */
+gctSTRING gcLibImageStore_2D_float_rg8 =
+"void _viv_image_store_image_2d_rg8(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec4 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.xy);\n"
+"   }\n"
+"}\n";
+
+/* format r8 */
+gctSTRING gcLibImageStore_2D_float_r8 =
+"void _viv_image_store_image_2d_r8(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec4 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.x);\n"
+"   }\n"
+"}\n";
+
+
 /* format rgba32i */
 gctSTRING gcLibImageStore_2D_int_rgba32i =
 "void _viv_image_store_iimage_2d_rgba32i(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec2 p, ivec4 data)\n"
@@ -8582,6 +9134,36 @@ gctSTRING gcLibImageStore_2D_int_rgba32i =
 "   address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
 "       _viv_asm(STORE1, result!<f:INT32>, address, data.zw);\n"
+"   }\n"
+"}\n";
+
+/* format rg16i */
+gctSTRING gcLibImageStore_2D_int_rg16i =
+"void _viv_image_store_iimage_2d_rg16i(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   ivec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:INT16>, address, data.xy);\n"
+"   }\n"
+"}\n";
+
+/* format r16i */
+gctSTRING gcLibImageStore_2D_int_r16i =
+"void _viv_image_store_iimage_2d_r16i(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   int result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:INT16>, address, data.x);\n"
 "   }\n"
 "}\n";
 
@@ -8611,6 +9193,34 @@ gctSTRING gcLibImageStore_2D_int_rgba8i =
 "   }\n"
 "}\n";
 
+/* format rg8i */
+gctSTRING gcLibImageStore_2D_int_rg8i =
+"void _viv_image_store_iimage_2d_rg8i(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
+"{\n"
+"   ivec4 result;\n"
+"   uvec4 img_desc_u = img_desc;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       ivec4 val = _viv_image_store_swizzle_int(img_desc_u, data);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, val.xy);\n"
+"   }\n"
+"}\n";
+
+/* format r8i */
+gctSTRING gcLibImageStore_2D_int_r8i =
+"void _viv_image_store_iimage_2d_r8i(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
+"{\n"
+"   ivec4 result;\n"
+"   uvec4 img_desc_u = img_desc;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       ivec4 val = _viv_image_store_swizzle_int(img_desc_u, data);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, val.x);\n"
+"   }\n"
+"}\n";
+
 /* format r32i */
 gctSTRING gcLibImageStore_2D_int_r32i =
 "void _viv_image_store_iimage_2d_r32i(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
@@ -8620,6 +9230,18 @@ gctSTRING gcLibImageStore_2D_int_r32i =
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
 "       _viv_asm(STORE1, result!<f:INT32>, address, data.x);\n"
+"   }\n"
+"}\n";
+
+/* format rg32i */
+gctSTRING gcLibImageStore_2D_int_rg32i =
+"void _viv_image_store_iimage_2d_rg32i(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
+"{\n"
+"   int result;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:INT32>, address, data.xy);\n"
 "   }\n"
 "}\n";
 
@@ -8662,6 +9284,74 @@ gctSTRING gcLibImageStore_2D_uint_rgba8ui =
 "   if (addrRet.x == 0u) {\n"
 "       uvec4 val = _viv_image_store_swizzle_uint(img_desc, data);\n"
 "       _viv_asm(STORE1, result!<f:UINT8>, address, val);\n"
+"   }\n"
+"}\n";
+
+/* format rg8ui */
+gctSTRING gcLibImageStore_2D_uint_rg8ui =
+"void _viv_image_store_uimage_2d_rg8ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uvec4 result;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 val = _viv_image_store_swizzle_uint(img_desc, data);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, val.xy);\n"
+"   }\n"
+"}\n";
+
+/* format r8ui */
+gctSTRING gcLibImageStore_2D_uint_r8ui =
+"void _viv_image_store_uimage_2d_r8ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uvec4 result;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       uvec4 val = _viv_image_store_swizzle_uint(img_desc, data);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, val.x);\n"
+"   }\n"
+"}\n";
+
+/* format rg16ui */
+gctSTRING gcLibImageStore_2D_uint_rg16ui =
+"void _viv_image_store_uimage_2d_rg16ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uvec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:UINT16>, address, data.xy);\n"
+"   }\n"
+"}\n";
+
+/* format r16ui */
+gctSTRING gcLibImageStore_2D_uint_r16ui =
+"void _viv_image_store_uimage_2d_r16ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uint result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:UINT16>, address, data.x);\n"
+"   }\n"
+"}\n";
+
+/* format rg32ui */
+gctSTRING gcLibImageStore_2D_uint_rg32ui =
+"void _viv_image_store_uimage_2d_rg32ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
+"{\n"
+"   uvec2 result;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:UINT32>, address, data.xy);\n"
 "   }\n"
 "}\n";
 
@@ -12163,11 +12853,20 @@ gctSTRING gcLibImageQuery_halti4 =
 "    _viv_asm(GET_SAMPLER_LBS, size, img_desc);\n"
 "    return size;\n"
 "}\n"
+"int _viv_image_query_size_samplerBuffer(highp uvec4 img_desc)\n"
+"{\n"
+"    ivec4 size;\n"
+"    _viv_asm(GET_SAMPLER_LBS, size, img_desc);\n"
+"    return size.z;\n"
+"}\n"
 /* Size for mipmap level for LOD */
 "ivec4 _viv_image_query_size_lod(highp uvec4 img_desc, float lod)\n"
 "{\n"
 "    ivec4 size;\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, img_desc);\n"
+"    size.xyz = size.xyz >> int(lod);\n"
+"    size.xyz = max(size.xyz, 1);\n"
+"    return size;\n"
 "}\n"
 "int _viv_image_query_size_lod_1d(highp uvec4 img_desc, int lod)\n"
 "{\n"

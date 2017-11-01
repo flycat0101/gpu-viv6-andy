@@ -161,7 +161,7 @@ static gctBOOL SetupDriver
                 &pDrvHandle->g_Contiguous
                 );
 
-        TRACE_INFO("Physcal : %d LOGICAL ADDR = %p  SIZE = %d\n", pDrvHandle->g_ContiguousPhysical, pDrvHandle->g_Contiguous, pDrvHandle->g_ContiguousSize);
+        TRACE_INFO("Physcal : %p LOGICAL ADDR = %p  SIZE = 0x%lx\n", pDrvHandle->g_ContiguousPhysical, pDrvHandle->g_Contiguous, pDrvHandle->g_ContiguousSize);
         if (status < 0) {
             TRACE_ERROR("gcoHAL_MapMemory failed, status = %d\n", status);
             goto FREESOURCE;
@@ -394,11 +394,12 @@ Bool VIV2DGPUCtxInit(GALINFOPTR galInfo) {
         TRACE_ERROR("UNDEFINED GPU CTX\n");
         TRACE_EXIT(FALSE);
     }
-    status = gcoOS_Allocate(gcvNULL, sizeof (VIVGPU), &mHandle);
+    status = gcoOS_Allocate(gcvNULL, sizeof(VIVGPU), &mHandle);
     if (status < 0) {
         TRACE_ERROR("Unable to allocate driver, status = %d\n", status);
         TRACE_EXIT(FALSE);
     }
+    memset(mHandle, 0, sizeof(VIVGPU));
     gpuctx = (VIVGPUPtr) (mHandle);
     ret = SetupDriver(&gpuctx->mDriver);
     if (ret != gcvTRUE) {
@@ -492,7 +493,7 @@ Bool VIV2DCacheOperation(GALINFOPTR galInfo, Viv2DPixmapPtr ppix, VIVFLUSHTYPE f
         TRACE_EXIT(TRUE);
     }
 
-    TRACE_INFO("FLUSH INFO => LOGICAL = %d PHYSICAL = %d STRIDE = %d  ALIGNED HEIGHT = %d\n", surf->mVideoNode.mLogicalAddr, surf->mVideoNode.mPhysicalAddr, surf->mStride, surf->mAlignedHeight);
+    TRACE_INFO("FLUSH INFO => LOGICAL = %p PHYSICAL = 0x%x STRIDE = 0x%x  ALIGNED HEIGHT = 0x%x\n", surf->mVideoNode.mLogicalAddr, surf->mVideoNode.mPhysicalAddr, surf->mStride, surf->mAlignedHeight);
 
     switch (flush_type) {
         case INVALIDATE:

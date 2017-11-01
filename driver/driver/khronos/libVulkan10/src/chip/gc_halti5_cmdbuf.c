@@ -24,8 +24,7 @@ static VkBool32 g_dbgSkipDraw = VK_FALSE;
 ** Handle pipeline switch between compute and graphics
 */
 static void halti5_pipeline_switch(
-    __vkCommandBuffer *cmdBuf,
-    int32_t *stallDestination
+    __vkCommandBuffer *cmdBuf
     )
 {
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
@@ -75,15 +74,14 @@ static void halti5_pipeline_switch(
 ** Handle switch between graphics pipelines.
 */
 static void halti5_gfxpipeline_switch(
-    __vkCommandBuffer *cmdBuf,
-    int32_t *stallDestination
+    __vkCommandBuffer *cmdBuf
     )
 {
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     VkBool32 flushColorcache = VK_FALSE, flushZcache = VK_FALSE;
-    VkBool32 stallRA = VK_FALSE;
+    VkBool32 stallRAatDraw = VK_FALSE;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkBool32 switchCacheMode = VK_FALSE;
     VkBool32 feStallState = VK_FALSE, raStallState = VK_FALSE;
@@ -100,12 +98,12 @@ static void halti5_gfxpipeline_switch(
             && chipGfxPipeline->earlyZ)
     {
         flushZcache = VK_TRUE;
-        stallRA = VK_TRUE;
+        stallRAatDraw = VK_TRUE;
     }
     else if (chipCommand->gfxPipelineSwitchDirtyMask & HALTI5_GFXPIPELINE_SWITCH_PE_DEPTH_DIRTY)
     {
         flushZcache = VK_TRUE;
-        stallRA = VK_TRUE;
+        stallRAatDraw = VK_TRUE;
     }
     else if (chipCommand->gfxPipelineSwitchDirtyMask & HALTI5_GFXPIPELINE_SWITCH_STENCIL_MODE_DIRTY)
     {
@@ -127,7 +125,7 @@ static void halti5_gfxpipeline_switch(
         feStallState = VK_TRUE;
     }
 
-    if (flushColorcache || flushZcache || stallRA || feStallState || raStallState)
+    if (flushColorcache || flushZcache || stallRAatDraw || feStallState || raStallState)
     {
         pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
@@ -168,7 +166,7 @@ static void halti5_gfxpipeline_switch(
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))));;
 
         }
-        else if (raStallState)
+        else if (raStallState || stallRAatDraw)
         {
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE,
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -187,20 +185,6 @@ static void halti5_gfxpipeline_switch(
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))));
-        }
-        else if (stallRA)
-        {
-            __VK_ASSERT(stallDestination);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))));
-            *stallDestination |= SEMAPHORE_STALL_PAIR_RA_PE_BIT;
         }
 
         if (switchCacheMode)
@@ -241,96 +225,50 @@ static void halti5_gfxpipeline_switch(
     return;
 }
 
-static void halti5_send_stall(
-    __vkCommandBuffer *cmdBuf,
-    int32_t stallDestination
+static VkResult halti5_flushRsViewFirstUse(
+    __vkCommandBuffer *cmdBuf
     )
 {
-    uint32_t i = 0;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer*)cmdBuf->chipPriv;
+    HwResourceViewUsage newRsViewMask = chipCommandBuffer->newResourceViewUsageMask;
+    uint32_t index = 0;
+    HwCacheMask cacheMask = HW_CACHE_NONE;
+    static const HwCacheMask s_rsViewUsageToCacheMask[] =
+        {
+            HW_CACHE_TEXTURE_DATA | HW_CACHE_VST_DATA, /* HW_RESOURCEVIEW_USAGE_TX */
+            HW_CACHE_SH_L1, /* HW_RESOURCEVIEW_USAGE_SH */
+            HW_CACHE_DEPTH, /* HW_RESOURCEVIEW_USAGE_DEPTH */
+            HW_CACHE_COLOR                             /* HW_RESOURCEVIEW_USAGE_COLOR */
+        };
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    static const uint32_t s_semaStallStates[SEMAPHORE_STALL_PAIR_MAX] =
-    {
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:0) - (0 ?
- 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x10 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))),
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:0) - (0 ?
- 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))),
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:0) - (0 ?
- 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))),
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:0) - (0 ?
- 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x10 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:28) - (0 ? 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ?
- 29:28) + 1))))))) << (0 ? 29:28))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 29:28) - (0 ? 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ?
- 29:28) + 1))))))) << (0 ? 29:28))),
-    };
+    VkResult result = VK_SUCCESS;
 
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
-    while (stallDestination)
-    {
-        if (stallDestination & (1 << i))
-        {
-            VkBool32 needLockBLT = (i == SEMAPHORE_STALL_PAIR_FE_BLT) || (i == SEMPAHORE_STALL_PAIR_FE_PREFETCH_BLT);
-            VkBool32 stallRA = (i == SEMAPHORE_STALL_PAIR_RA_PE);
-            __VK_ASSERT(i < SEMAPHORE_STALL_PAIR_MAX);
-            if (needLockBLT)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-                    );
-            }
-            if (stallRA)
-            {
-                __VK_STALL_RA(&pCmdBuffer, s_semaStallStates[i]);
-            }
-            else
-            {
-                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (s_semaStallStates[i]);
-;
 
-            }
-            if (needLockBLT)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-                    );
-            }
-            stallDestination &= ~(1 << i);
+    __VK_ASSERT(newRsViewMask);
+
+    while (newRsViewMask)
+    {
+        if (newRsViewMask & (1 << index))
+        {
+            newRsViewMask &= ~(1 << index);
+            cacheMask |= s_rsViewUsageToCacheMask[index];
         }
-        i++;
+        index++;
     }
+
+    __VK_ASSERT(cacheMask);
+
+    result = halti5_flushCache((VkDevice)cmdBuf->devCtx, &pCmdBuffer, VK_NULL_HANDLE, cacheMask);
+
     cmdBuf->curScrachBufIndex += (uint32_t)(uintptr_t)(pCmdBuffer - pCmdBufferBegin);
-    return;
+
+    chipCommandBuffer->newResourceViewUsageMask = 0;
+
+    return result;
+
 }
+
 static VkResult halti5_draw_validate(
     __vkCommandBuffer *cmdBuf,
     __vkDrawComputeCmdParams *cmdParams
@@ -361,7 +299,6 @@ static VkResult halti5_draw_validate(
         VkBool32 vscprogramInstanceSwitched = VK_FALSE;
         halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
         halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
-        int32_t stallDestination = 0;
         uint32_t dynamicStateDirty = (bindInfo->dynamicStates.dirtyMask & pip->dynamicStates);
         __vkDevContext *devCtx = cmdBuf->devCtx;
 
@@ -378,13 +315,13 @@ static VkResult halti5_draw_validate(
 
         if (cmdBuf->bindInfo.pipeline.activePipeline != VK_PIPELINE_BIND_POINT_GRAPHICS)
         {
-            halti5_pipeline_switch(cmdBuf, &stallDestination);
+            halti5_pipeline_switch(cmdBuf);
             cmdBuf->bindInfo.pipeline.activePipeline = VK_PIPELINE_BIND_POINT_GRAPHICS;
         }
 
         if (chipCommandBuffer->gfxPipelineSwitchDirtyMask)
         {
-            halti5_gfxpipeline_switch(cmdBuf, &stallDestination);
+            halti5_gfxpipeline_switch(cmdBuf);
         }
 
         if (gfxPipelineDirty || bindInfo->renderPass.dirty)
@@ -473,7 +410,9 @@ static VkResult halti5_draw_validate(
         if (descSetInfo->dirtyMask)
         {
             __VK_ERR_BREAK(halti5_setDesriptorSets(cmdBuf, pip, descSetInfo));
+#if __VK_ENABLETS
             __VK_ERR_BREAK(halti5_setTxTileStatus(cmdBuf, descSetInfo));
+#endif
             descSetInfo->dirtyMask = 0;
         }
 
@@ -493,9 +432,9 @@ static VkResult halti5_draw_validate(
             __VK_ERR_BREAK(halti5_setDrawID(cmdBuf, pip));
         }
 
-        if (stallDestination)
+        if (chipCommandBuffer->newResourceViewUsageMask)
         {
-            halti5_send_stall(cmdBuf, stallDestination);
+            __VK_ERR_BREAK(halti5_flushRsViewFirstUse(cmdBuf));
         }
 
     } while(VK_FALSE);
@@ -1556,9 +1495,9 @@ static VkResult halti5_compute_validate(
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
     struct _gcsHINT *hints = &chipPipeline->masterInstance->hwStates.hints;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
     VkBool32 computePipelineDirty = (bindInfo->pipeline.dirty & __VK_CMDBUF_BINDINGINFO_PIPELINE_COMPUTE_DIRTY);
     VkBool32 vscprogramInstanceSwitched = VK_FALSE;
-    int32_t stallDestination = 0;
     VkResult result = VK_SUCCESS;
 #if __VK_RESOURCE_INFO
     static int32_t tgtCmdBufferID = 0;
@@ -1588,7 +1527,7 @@ static VkResult halti5_compute_validate(
 
         if (bindInfo->pipeline.activePipeline != VK_PIPELINE_BIND_POINT_COMPUTE)
         {
-            halti5_pipeline_switch(cmdBuf, &stallDestination);
+            halti5_pipeline_switch(cmdBuf);
             bindInfo->pipeline.activePipeline = VK_PIPELINE_BIND_POINT_COMPUTE;
         }
 
@@ -1720,9 +1659,9 @@ static VkResult halti5_compute_validate(
             __VK_ERR_BREAK(halti5_setDrawID(cmdBuf, pip));
         }
 
-        if (stallDestination)
+        if (chipCommandBuffer->newResourceViewUsageMask)
         {
-            halti5_send_stall(cmdBuf, stallDestination);
+            __VK_ERR_BREAK(halti5_flushRsViewFirstUse(cmdBuf));
         }
 
     } while (VK_FALSE);
@@ -1912,7 +1851,7 @@ OnError:
     cmdBuf->curScrachBufIndex = 0;
     return result;
 }
-
+#if __VK_ENABLETS
 uint32_t halti5_computeTileStatusAddr(
     __vkDevContext *devCtx,
     __vkImage *img,
@@ -2970,7 +2909,7 @@ VkResult halti5_decompressTileStatus(
     }
 
     /* Flush the pipe. */
-    __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, commandBuffer, VK_NULL_HANDLE));
+    __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, commandBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
 
     __VK_CanTSEnable(tsResource, pRanges, &canFillFullSlice);
 
@@ -3059,7 +2998,7 @@ VkResult halti5_decompressTileStatus(
 OnError:
     return result;
 }
-
+#endif
 VkResult halti5_setIndexBuffer(
     __vkCommandBuffer *cmdBuf
     )
@@ -3373,12 +3312,15 @@ VkResult halti5_setRenderTargets(
     __vkImageLevel *pLevel;
     uint32_t baseAddresses[2];
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
+#if __VK_ENABLETS
     VkImageSubresourceRange* pRanges;
+#endif
     const gcsFEATURE_DATABASE *database = devCtx->database;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     uint32_t tileMode = 0;
+#if __VK_ENABLETS
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
-
+#endif
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
     for (i = 0; i < subPass->colorCount; i++)
@@ -3393,7 +3335,9 @@ VkResult halti5_setRenderTargets(
         chipImgv = (halti5_imageView *)rtImageView->chipPriv;
         rtImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, rtImageView->createInfo.image);
         pLevel = &rtImage->pImgLevels[rtImageView->createInfo.subresourceRange.baseMipLevel];
+#if __VK_ENABLETS
         pRanges = &rtImageView->createInfo.subresourceRange;
+#endif
 
         if (gcvINVALIDTILED == tiling)
         {
@@ -3427,16 +3371,17 @@ VkResult halti5_setRenderTargets(
                 + rtImageView->createInfo.subresourceRange.baseArrayLayer * pLevel->sliceSize);
 
             baseAddresses[0] = baseAddresses[1] = rtBaseAddr;
-
+#if __VK_ENABLETS
             /* Enable rt tile status.*/
             halti5_setRtTileStatus(cmdBuf, &pCmdBuffer, rtImage, pRanges, hwRtIndex);
-
+#endif
             if (hwRtIndex == 0)
             {
+#if __VK_ENABLETS
                 VkBool32 destinationRead = VK_FALSE;
 
                 destinationRead = chipGfxPipeline->destinationRead || (rtImage->memory->ts && !chipCommand->rt0TSEnable && rtImage->memory->ts->compressed);
-
+#endif
                 __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050B, VK_FALSE,
                     (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
@@ -3456,6 +3401,7 @@ VkResult halti5_setRenderTargets(
  15:15) + 1))))))) << (0 ? 15:15))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
  15:15) + 1))))))) << (0 ? 15:15))))
+#if __VK_ENABLETS
                     & (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
  16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) ((gctUINT32) (!destinationRead) & ((gctUINT32) ((((1 ?
@@ -3464,7 +3410,9 @@ VkResult halti5_setRenderTargets(
  17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
  17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17)))));
+ 17:17) + 1))))))) << (0 ? 17:17))))
+#endif
+                    );
 
                 __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0518, VK_FALSE, 2, baseAddresses);
                 __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050D, VK_FALSE, (uint32_t)pLevel->stride);
@@ -3544,8 +3492,9 @@ VkResult halti5_setRenderTargets(
             & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT));
         dsImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, dsImageView->createInfo.image);
         pLevel = &dsImage->pImgLevels[dsImageView->createInfo.subresourceRange.baseMipLevel];
+#if __VK_ENABLETS
         pRanges = &dsImageView->createInfo.subresourceRange;
-
+#endif
         if (gcvINVALIDTILED == tiling)
         {
             tiling = dsImage->halTiling;
@@ -3554,10 +3503,10 @@ VkResult halti5_setRenderTargets(
         {
             __VK_ASSERT(tiling == dsImage->halTiling);
         }
-
+#if __VK_ENABLETS
         /* Enable ds tile status. */
         halti5_setRtTileStatus(cmdBuf, &pCmdBuffer, dsImage, pRanges, 0);
-
+#endif
         rtBaseAddr = dsImage->memory->devAddr;
         rtBaseAddr += (uint32_t)(dsImage->memOffset + pLevel->offset +
                                  dsImageView->createInfo.subresourceRange.baseArrayLayer * pLevel->sliceSize);
@@ -3604,6 +3553,20 @@ VkResult halti5_setRenderTargets(
     return VK_SUCCESS;
 }
 
+static HwResourceViewUsage halti5_check_resView_firstUse(
+    HwResourceViewUsage *usedUsageMask,
+    HwResourceViewUsage  usage
+    )
+{
+    if (!(*usedUsageMask & usage))
+    {
+        *usedUsageMask |= usage;
+        return usage;
+    }
+
+    return (HwResourceViewUsage)0;
+}
+
 void halti5_helper_setSamplerStates(
     __vkCommandBuffer *cmdBuf,
     uint32_t **commandBuffer,
@@ -3644,9 +3607,11 @@ void halti5_helper_setSamplerStates(
 
     __vkDeviceMemory *txDescriptorNode;
     uint32_t physical;
+#if __VK_ENABLETS
     int32_t tsSlotIndex = -1;
     __vkDevContext *devCtx = cmdBuf->devCtx;
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
+#endif
     uint32_t hwSamplerCtrl0 = samplerDesc->halti5.hwSamplerCtrl0;
 
     txDescriptorNode = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, txDesc->descriptor);
@@ -3698,13 +3663,15 @@ void halti5_helper_setSamplerStates(
         s_TxHwRegisters[txHwRegisterIdx].texDescAddrReg + hwSamplerNo, VK_FALSE,
         physical);
 
+    /* Only need to enable TX256_BYTE_REQUEST when msaa and ts both exist.
+       For vulkan, ts is not ready, this bit should always be disable.
+    */
     __vkCmdLoadSingleHWState(commandBuffer,
         s_TxHwRegisters[txHwRegisterIdx].textureControlAddrReg + hwSamplerNo, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
  0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) (txDesc->msaaImage) & ((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)))
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:1) - (0 ?
  1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
  1:1))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 1:1) - (0 ?
@@ -3725,7 +3692,7 @@ void halti5_helper_setSamplerStates(
  6:6))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 6:6) - (0 ?
  6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
  6:6))));
-
+#if __VK_ENABLETS
     if (imgv)
     {
         __vkImage * img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
@@ -3733,6 +3700,18 @@ void halti5_helper_setSamplerStates(
         VkImageSubresourceRange *pRange = &imgv->createInfo.subresourceRange;
         VkBool32 anyTsEnableForMultiSlice = VK_FALSE;
         VkBool32 canTsEnable = VK_TRUE;
+
+        uint32_t levelCount = pRange->levelCount;
+        uint32_t layerCount = pRange->layerCount;
+        if (pRange->layerCount == VK_REMAINING_MIP_LEVELS)
+        {
+            levelCount = img->createInfo.mipLevels - pRange->baseMipLevel;
+        }
+
+        if (pRange->layerCount == VK_REMAINING_ARRAY_LAYERS)
+        {
+            layerCount = img->createInfo.arrayLayers - pRange->baseArrayLayer;
+        }
 
         __VK_AnyTSEnable(tsResource, pRange, &anyTsEnableForMultiSlice);
         __VK_CanTSEnable(tsResource, pRange, &canTsEnable);
@@ -3802,6 +3781,7 @@ void halti5_helper_setSamplerStates(
         }
     }
 
+
     tsSlotIndex = chipCommand->texTileStatusSlotIndex[hwSamplerNo];
     chipCommand->texHasTileStatus[hwSamplerNo] = txDesc->hasTileStatus;
     chipCommand->imgvWithTS[hwSamplerNo] = imgv;
@@ -3829,7 +3809,7 @@ void halti5_helper_setSamplerStates(
             chipCommand->texTileStatusSlotDirty |= 1 << tsSlotIndex;
         }
     }
-
+#endif
     return;
 
 }
@@ -3851,6 +3831,7 @@ static VkResult halti5_helper_setDescSetSeperateImage(
     PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->curInstance->pep;
     struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     VkBool32 *separateBindingProgramed = chipPipeline->separateBindingProgramed;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
 
     uint32_t entryIdx, j;
     uint32_t stageIdx = 0, activeStageMask;
@@ -3930,6 +3911,10 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                             resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curTexRegion.resource);
                             imgv = resInfo->u.imageInfo.imageView;
                             chipImgv = (halti5_imageView *)imgv->chipPriv;
+
+                            chipCommandBuffer->newResourceViewUsageMask |=
+                                halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+
                             /* if board color will be used, must be valid combination */
                             __VK_ASSERT(((sampler->createInfo.addressModeU != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER) &&
                                 (sampler->createInfo.addressModeV != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER) &&
@@ -4137,6 +4122,7 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
     uint32_t entryIdx, arrayIdx;
     uint32_t stageIdx = 0, activeStageMask;
     PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY *samplerEntry = VK_NULL_HANDLE;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
 
     for (entryIdx = 0; entryIdx < progResourceSet->combinedSampTexTable.countOfEntries; entryIdx++)
     {
@@ -4184,6 +4170,9 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                     (sampler->createInfo.addressModeV != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER) &&
                     (sampler->createInfo.addressModeW != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER)) ||
                     ((chipImgv->txDesc[0].invalidBorderColorMask & (1 << sampler->createInfo.borderColor)) == 0));
+
+                chipCommandBuffer->newResourceViewUsageMask |=
+                    halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
 
                 (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
                                                                   commandBuffer,
@@ -4300,6 +4289,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
     uint32_t entryIdx, arrayIdx;
     uint32_t stageIdx = 0, activeStageMask;
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY *samplerBufEntry = VK_NULL_HANDLE;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
 
     for (entryIdx = 0; entryIdx < progResourceSet->uniformTexBufTable.countOfEntries; entryIdx++)
     {
@@ -4345,6 +4335,8 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                                                                   0,
                                                                   (hwSamplerNo + arrayIdx),
                                                                   hints->shaderConfigData);
+                chipCommandBuffer->newResourceViewUsageMask |=
+                    halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
 
                 if (samplerBufEntry->pTextureSize[stageIdx])
                 {
@@ -4376,6 +4368,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 }
 
 static VkResult halti5_helper_setDescSetInputAttach(
+    __vkCommandBuffer *cmdBuf,
     __vkDevContext *devCtx,
     uint32_t **commandBuffer,
     __vkPipeline *pip,
@@ -4391,6 +4384,8 @@ static VkResult halti5_helper_setDescSetInputAttach(
     uint32_t stageIdx = 0, activeStageMask;
 
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY *inputAttachEntry = VK_NULL_HANDLE;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
 
     for (entryIdx = 0; entryIdx < progResourceSet->inputAttachmentTable.countOfEntries; entryIdx++)
     {
@@ -4412,43 +4407,119 @@ static VkResult halti5_helper_setDescSetInputAttach(
         if (activeStageMask & (1 << stageIdx))
         {
             SHADER_UAV_SLOT_MAPPING *hwMapping = &inputAttachEntry->hwMappings[stageIdx].uavMapping;
-            uint32_t hwConstRegNo;
             uint32_t hwConstRegAddrBase = hints->hwConstRegBases[stageIdx];
-            uint32_t hwConstRegAddr;
+            uint32_t TxHwRegisterIdx = (stageIdx < VSC_SHADER_STAGE_PS) ? 0 : 1;
 
             __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
             __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
-
-            hwConstRegNo = hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo;
-            hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo * 4)
-                + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
 
             for (arrayIdx = 0; arrayIdx < descriptorBinding->std.descriptorCount; arrayIdx++)
             {
                 __vkDescriptorResourceRegion curRegion;
                 __vkDescriptorResourceInfo *resInfo;
+                __vkImageView *imgv;
+                halti5_imageView *chipImgv;
+                __vkImage *img;
 
                 __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
+                imgv = resInfo->u.imageInfo.imageView;
+                img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                chipImgv = (halti5_imageView *)imgv->chipPriv;
 
-                switch (descriptorBinding->std.descriptorType)
+                if (img->createInfo.samples > VK_SAMPLE_COUNT_1_BIT)
                 {
-                case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                    uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
+
+                    (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
+                                                                      commandBuffer,
+                                                                      VK_NULL_HANDLE,
+                                                                      TxHwRegisterIdx,
+                                                                      chipImgv->txDesc,
+                                                                      &chipImgv->samplerDesc,
+                                                                      0,
+                                                                      (hwSamplerNo + arrayIdx),
+                                                                      hints->shaderConfigData);
+                    chipCommandBuffer->newResourceViewUsageMask |=
+                        halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+                }
+                else
+                {
+                    switch (img->createInfo.format)
                     {
-                        __vkImageView *imgv;
-                        halti5_imageView *chipImgv;
-                        imgv = resInfo->u.imageInfo.imageView;
-                        chipImgv = (halti5_imageView *)imgv->chipPriv;
+                    case VK_FORMAT_A2B10G10R10_UINT_PACK32:
+                    case VK_FORMAT_R8G8B8A8_SRGB:
+                    case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+                    case VK_FORMAT_B8G8R8A8_SRGB:
+                    case VK_FORMAT_D16_UNORM:
+                    case VK_FORMAT_X8_D24_UNORM_PACK32:
+                    case VK_FORMAT_D24_UNORM_S8_UINT:
+                        {
+                            uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
 
-                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
-                            chipImgv->imgDesc[0].imageInfo);
+                            (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
+                                                                              commandBuffer,
+                                                                              VK_NULL_HANDLE,
+                                                                              TxHwRegisterIdx,
+                                                                              chipImgv->txDesc,
+                                                                              &chipImgv->samplerDesc,
+                                                                              0,
+                                                                              (hwSamplerNo + arrayIdx),
+                                                                              hints->shaderConfigData);
+                            chipCommandBuffer->newResourceViewUsageMask |=
+                                halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+                        }
+                        break;
+                    default:
+                        {
+                            uint32_t hwConstRegNo;
+                            uint32_t hwConstRegAddr;
+
+                            hwConstRegNo = hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo;
+                            hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo * 4)
+                                + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+
+                            chipCommandBuffer->newResourceViewUsageMask |=
+                                halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_SH);
+
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
+                                chipImgv->imgDesc[0].imageInfo);
+
+                            if (inputAttachEntry->pImageSize[stageIdx])
+                            {
+                                SHADER_PRIV_CONSTANT_ENTRY *privEntry = inputAttachEntry->pImageSize[stageIdx];
+
+                                if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                                {
+                                    __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                                    __vkImageLevel *pLevel = &img->pImgLevels[imgv->createInfo.subresourceRange.baseMipLevel];
+                                    uint32_t data[4];
+                                    uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                                    uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                                    __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_IMAGE_SIZE);
+                                    data[0] = pLevel->requestW;
+                                    data[1] = pLevel->requestH;
+                                    data[2] = pLevel->requestD;
+                                    data[3] = (uint32_t)pLevel->sliceSize;
+                                    __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4,
+                                        data);
+                                }
+                            }
+
+                            if (inputAttachEntry->pExtraLayer[stageIdx])
+                            {
+                                SHADER_PRIV_UAV_ENTRY* privEntry = inputAttachEntry->pExtraLayer[stageIdx];
+                                uint32_t hwConstRegNoForExtraLayer = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo;
+                                uint32_t hwConstRegAddrForExtraLayer = (hwConstRegAddrBase >> 2) + (hwConstRegNoForExtraLayer * 4)
+                                    + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+                                __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER);
+                                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForExtraLayer + (arrayIdx * 4), VK_FALSE, 4,
+                                    chipImgv->imgDesc[1].imageInfo);
+                            }
+                        }
+                        break;
                     }
-                    break;
-
-                default:
-                    __VK_ASSERT(!"Wrong descriptor type, which should not fall in storage set function");
-                    break;
-
                 }
             }
             activeStageMask &= ~(1 << stageIdx);
@@ -4462,6 +4533,7 @@ static VkResult halti5_helper_setDescSetInputAttach(
 
 
 static VkResult halti5_helper_setDescSetStorage(
+    __vkCommandBuffer *cmdBuf,
     __vkDevContext *devCtx,
     uint32_t **commandBuffer,
     __vkPipeline *pip,
@@ -4479,6 +4551,7 @@ static VkResult halti5_helper_setDescSetStorage(
     uint32_t stageIdx = 0, activeStageMask;
 
     PROG_VK_STORAGE_TABLE_ENTRY *storageEntry = VK_NULL_HANDLE;
+    halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
 
     for (entryIdx = 0; entryIdx < progResourceSet->storageTable.countOfEntries; entryIdx++)
     {
@@ -4527,6 +4600,8 @@ static VkResult halti5_helper_setDescSetStorage(
                         imgv = resInfo->u.imageInfo.imageView;
                         chipImgv = (halti5_imageView *)imgv->chipPriv;
 
+                        chipCommandBuffer->newResourceViewUsageMask |=
+                            halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_SH);
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                             chipImgv->imgDesc[0].imageInfo);
 
@@ -4570,6 +4645,9 @@ static VkResult halti5_helper_setDescSetStorage(
                         halti5_bufferView *chipBufv;
                         bufv = resInfo->u.bufferView;
                         chipBufv = (halti5_bufferView *)bufv->chipPriv;
+
+                        chipCommandBuffer->newResourceViewUsageMask |=
+                            halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_SH);
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                             chipBufv->imgDesc[0].imageInfo);
 
@@ -4751,6 +4829,7 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
     return VK_SUCCESS;
 }
 
+#if __VK_ENABLETS
 VkResult halti5_setTxTileStatus(
     __vkCommandBuffer *cmdBuf,
     __vkCmdBindDescSetInfo *descSetInfo
@@ -5011,6 +5090,7 @@ VkResult halti5_setTxTileStatus(
 OnError:
     return result;
 }
+#endif
 
 VkResult halti5_setDesriptorSets(
     __vkCommandBuffer *cmdBuf,
@@ -5126,6 +5206,7 @@ VkResult halti5_setDesriptorSets(
                     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
                         __VK_VERIFY_OK(halti5_helper_setDescSetStorage(
+                            cmdBuf,
                             devCtx,
                             &pCmdBuffer,
                             pip,
@@ -5139,6 +5220,7 @@ VkResult halti5_setDesriptorSets(
 
                     case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                         __VK_VERIFY_OK(halti5_helper_setDescSetInputAttach(
+                            cmdBuf,
                             devCtx,
                             &pCmdBuffer,
                             pip,
@@ -5161,6 +5243,34 @@ VkResult halti5_setDesriptorSets(
 
 }
 
+VkResult halti5_endRenderPass(
+    VkCommandBuffer commandBuffer
+    )
+{
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
+
+    if (chipPipeline && chipPipeline->tweakHandler &&
+        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
+    {
+        /* init tweakinfo */
+        if (chipInstance == VK_NULL_HANDLE)
+        {
+            halti5_initChipInstance(cmdBuf, chipPipeline->tweakHandler->tweakType);
+            chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
+        }
+
+        if (chipInstance->tweakInfo->end_render_pass)
+        {
+            (*chipInstance->tweakInfo->end_render_pass)(chipInstance->tweakInfo, cmdBuf);
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
 VkResult halti5_beginCommandBuffer(
     VkCommandBuffer commandBuffer
     )
@@ -5172,9 +5282,10 @@ VkResult halti5_beginCommandBuffer(
     uint32_t hwFlushState = 0;
     uint32_t hwFlushVST = 0;
     uint32_t requestSize = 0;
+#if __VK_ENABLETS
     uint32_t i;
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
-
+#endif
     hwFlushState |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
  1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
@@ -5252,7 +5363,7 @@ VkResult halti5_beginCommandBuffer(
     __vkCmdLoadSingleHWState(&states, 0x0E03, VK_FALSE, hwFlushVST);
 
     __vk_CmdReleaseBuffer(commandBuffer, requestSize);
-
+#if __VK_ENABLETS
     /* Initialize some TS information. */
     for (i = 0; i < gcdTXDESCRIPTORS; i++)
     {
@@ -5266,7 +5377,7 @@ VkResult halti5_beginCommandBuffer(
     {
         chipCommand->texTileStatusSlotUser[i] = -1;
     }
-
+#endif
 
     return VK_SUCCESS;
 }
@@ -5275,6 +5386,11 @@ VkResult halti5_endCommandBuffer(
     VkCommandBuffer commandBuffer
     )
 {
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
+
 #if __VK_RESOURCE_SAVE_TGA || gcdDUMP
     uint32_t *states;
 
@@ -5305,6 +5421,36 @@ VkResult halti5_endCommandBuffer(
 
     __vk_CmdReleaseBuffer(commandBuffer, 2);
 #endif
+
+    if (chipPipeline && chipPipeline->tweakHandler &&
+        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
+    {
+        if (chipInstance->tweakInfo && chipInstance->tweakInfo->end_cmd_buf)
+        {
+            (*chipInstance->tweakInfo->end_cmd_buf)(chipInstance->tweakInfo, cmdBuf);
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+VkResult halti5_beginSubmitCmdBuf(
+    VkCommandBuffer commandBuffer
+    )
+{
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
+
+    if (chipPipeline && chipPipeline->tweakHandler &&
+        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
+    {
+        if (chipInstance->tweakInfo && chipInstance->tweakInfo->begin_submit_cmd_buf)
+        {
+            (*chipInstance->tweakInfo->begin_submit_cmd_buf)(chipInstance->tweakInfo, cmdBuf);
+        }
+    }
 
     return VK_SUCCESS;
 }
@@ -5410,7 +5556,7 @@ VkResult halti5_setMultiGPURenderingMode(
     }
 
     /* Flush pipe.*/
-    result = halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+    result = halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL);
 
     switch (mode)
     {
@@ -5995,7 +6141,8 @@ VkResult halti5_bindDescriptors(
                        | VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT
                        | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
                        | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-                       | VK_PIPELINE_STAGE_TRANSFER_BIT))
+                       | VK_PIPELINE_STAGE_TRANSFER_BIT
+                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT))
      {
          if (srcAccessMask & (VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT))
          {
@@ -7026,17 +7173,21 @@ VkResult halti5_setMultiGpuSync(
 ** to make it broadcasted.
 ** 2) For new submission path, Vulkan directly unlock and free memory w/o through
 ** Event mechanmis, which mean GPU cache is not get flush out for these freed memory.
-** we need flush cache at end of every commit.
+** we need flush cache at the end of every commit.
 */
 VkResult halti5_flushCache(
     VkDevice device,
     uint32_t **commandBuffer,
-    uint32_t *sizeInUint
+    uint32_t *sizeInUint,
+    int32_t  cacheMask
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     static uint32_t scratchBuffer[__VK_SCRATCH_BUFFER_SIZE];
+    HwCacheMask hwCacheMask = (HwCacheMask)cacheMask;
+    VkBool32 needSemaphoreStall = VK_FALSE;
+    uint32_t aqFlushState = 0;
 
     if (commandBuffer)
     {
@@ -7047,140 +7198,160 @@ VkResult halti5_flushCache(
         pCmdBuffer = scratchBuffer;
     }
 
+    __VK_ASSERT(hwCacheMask);
+
     pCmdBufferBegin = pCmdBuffer;
 
-    /* Semaphore. */
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (hwCacheMask & (HW_CACHE_TEXTURE_ALL | HW_CACHE_VST_ALL | HW_CACHE_INSTRUCTION))
+    {
+        needSemaphoreStall = VK_TRUE;
+    }
+
+    if (needSemaphoreStall)
+    {
+        /* Semaphore. */
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
 
-    /* Stall. */
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        /* Stall. */
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)));
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+    }
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16)));
-
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    aqFlushState |= (hwCacheMask & HW_CACHE_DEPTH) ? ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
- 2:2))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
- 6:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) : 0;
+    aqFlushState |= (hwCacheMask & HW_CACHE_COLOR) ? ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))) : 0;
+    aqFlushState |= (hwCacheMask & HW_CACHE_SH_L1) ?
+        (((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:5) - (0 ?
+ 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
  5:5))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:5) - (0 ? 5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 10:10) - (0 ? 10:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:10) - (0 ?
- 10:10) + 1))))))) << (0 ? 10:10))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 10:10) - (0 ? 10:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:10) - (0 ?
- 10:10) + 1))))))) << (0 ? 10:10)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
- 11:11) + 1))))))) << (0 ? 11:11))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
- 11:11) + 1))))))) << (0 ? 11:11)));
+       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:10) - (0 ?
+ 10:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:10) - (0 ? 10:10) + 1))))))) << (0 ?
+ 10:10))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 10:10) - (0 ? 10:10) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:10) - (0 ? 10:10) + 1))))))) << (0 ? 10:10)))
+       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 11:11) - (0 ?
+ 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ?
+ 11:11))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 11:11) - (0 ? 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)))) : 0;
+    aqFlushState |= (hwCacheMask & HW_CACHE_L2) ? ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6))) : 0;
+    aqFlushState |= (hwCacheMask & HW_CACHE_TEXTURE_DATA) ? ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2))) : 0;
 
-    /* Append LOAD_STATE to AQFlush. */
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (aqFlushState)
+    {
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16)));
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+
+        *pCmdBuffer++ = aqFlushState;
+    }
+
+    if (hwCacheMask & HW_CACHE_VST_DATA)
+    {
+         /* Append LOAD_STATE to AQFlush. */
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)));
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
  4:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 4:4) - (0 ? 4:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4)));
-
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    }
+#if __VK_ENABLETS
+    if (hwCacheMask & HW_CACHE_TS)
+    {
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0594) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16)));
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
-
-    if (devCtx->database->REG_Halti5)
+    }
+#endif
+    if ((devCtx->database->REG_Halti5) && (hwCacheMask & HW_CACHE_INSTRUCTION))
     {
         *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -7225,7 +7396,7 @@ VkResult halti5_flushCache(
  4:4)));
     }
 
-    if (devCtx->database->REG_Halti5)
+    if ((devCtx->database->REG_Halti5) && (hwCacheMask & HW_CACHE_TX_DESC))
     {
         *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -7251,7 +7422,7 @@ VkResult halti5_flushCache(
 
     }
 
-    if (devCtx->database->HWTFB)
+    if ((devCtx->database->HWTFB) && (hwCacheMask & HW_CACHE_TFB))
     {
         *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -7272,48 +7443,50 @@ VkResult halti5_flushCache(
 
     }
 
-    /* Semaphore. */
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (needSemaphoreStall)
+    {
+        /* Semaphore. */
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
 
-    /* Stall. */
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        /* Stall. */
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)));
 
-    *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
-
+    }
 
     if (commandBuffer)
     {

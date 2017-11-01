@@ -107,7 +107,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libsync
 
 LOCAL_SHARED_LIBRARIES += \
-	libSPIRV \
+	libSPIRV_viv \
 	libVSC \
 	libGAL \
 	libGLSLC

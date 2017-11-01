@@ -149,6 +149,7 @@ typedef struct __vkPhysicalDeviceConfigRec
     uint32_t customerID;
     uint32_t chipFlags;
     const gcsFEATURE_DATABASE *database;
+    gcsHAL_QUERY_CHIP_OPTIONS options;
 }__vkPhysicalDeviceConfig;
 
 struct __vkPhysicalDeviceRec
@@ -216,6 +217,8 @@ struct __vkInstanceRec
 
     __vkDrvCtrlOption  drvOption;
     __vkChipInfo       chipInfo;
+
+    void *chipPriv;
 
     struct __vkInstanceRec *pNext;
 };

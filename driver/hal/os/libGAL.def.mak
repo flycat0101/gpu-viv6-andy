@@ -395,7 +395,6 @@ EXPORTS
     gcoSURF_SetResolvability
     gcoSURF_Swap
     gcoSURF_ResetSurWH
-    gcoSURF_SetSharedLock
     gcoSURF_GetFence
     gcoSURF_WaitFence
     gcoSURF_AlignResolveRect
@@ -416,7 +415,6 @@ EXPORTS
     ; gcoINDEX
     gcoINDEX_Bind
     gcoINDEX_BindOffset
-    gcoINDEX_SetSharedLock
     gcoINDEX_Construct
     gcoINDEX_Destroy
     gcoINDEX_Free
@@ -682,6 +680,7 @@ EXPORTS
     gcoTEXTURE_GetMipMapSlice
     gcoTEXTURE_InitParams
     gcoTEXTURE_IsComplete
+    gcoTEXTURE_CheckTexLevel0Attrib
     gcoTEXTURE_IsRenderable
     gcoTEXTURE_QueryCaps
     gcoTEXTURE_RenderIntoMipMap
@@ -734,7 +733,6 @@ EXPORTS
     gcLoadShaders
     gcLoadKernel
     gcInvokeThreadWalker
-    gcSHADER_SpecialHint
     gcoSHADER_ProgramUniform
     gcoSHADER_ProgramUniformEx
     gcoSHADER_BindBufferBlock
@@ -742,17 +740,14 @@ EXPORTS
     gcoSHADER_FreeVidMem
 
     ; gcoSTREAM
-    gcoSTREAM_SetSharedLock
     gcoSTREAM_Construct
     gcoSTREAM_Destroy
     gcoSTREAM_Flush
     gcoSTREAM_Lock
     gcoSTREAM_Reserve
-    gcoSTREAM_SetDynamic
     gcoSTREAM_SetStride
     gcoSTREAM_Unlock
     gcoSTREAM_Upload
-    gcoSTREAM_UploadDynamic
     gcoSTREAM_CPUCacheOperation
     gcoSTREAM_CPUCacheOperation_Range
     gcoSTREAM_GetFence
@@ -826,28 +821,14 @@ EXPORTS
     gcoCL_ChooseBltEngine
 
     ; gcoPROFILER
-    gcoPROFILER_Initialize
+    gcoPROFILER_Construct
     gcoPROFILER_Destroy
-    gcoPROFILER_Write
-    gcoPROFILER_Flush
-    gcoPROFILER_EndFrame
+    gcoPROFILER_Enable
+    gcoPROFILER_Disable
     gcoPROFILER_Begin
     gcoPROFILER_End
-    gcoPROFILER_ShaderFS
-    gcoPROFILER_ShaderVS
-    gcoPROFILER_NEW_Construct
-    gcoPROFILER_NEW_Destroy
-    gcoPROFILER_NEW_Enable
-	gcoPROFILER_NEW_Disable
-    gcoPROFILER_NEW_Begin
-    gcoPROFILER_NEW_End
-    gcoPROFILER_NEW_EndFrame
-    gcoPROFILER_NEW_RecordCounters
-    gcoPROFILER_NEW_WriteCounters
-    gcoPROFILER_NEW_Write
-    gcoPROFILER_NEW_GetPos
-    gcoPROFILER_NEW_Seek
-    gcoPROFILER_NEW_Flush
+    gcoPROFILER_Write
+    gcoPROFILER_Flush
 
     ; gcoMATH
     gcoMATH_Log2in5dot5

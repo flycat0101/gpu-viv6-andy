@@ -271,6 +271,101 @@ static vx_int16 ops7_y[7][7] = {
         {-1, -6,-15, -20,-15, -6,-1},
 };
 
+vx_status vxSobelMxN_F16(vx_node node, vx_image input, vx_scalar win, vx_scalar shift, vx_image grad_x,
+                     vx_image grad_y, vx_border_t *bordermode)
+{
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_status status = VX_SUCCESS;
+    vx_int16 * ops[] = {
+                        (vx_int16 *)ops3_x, (vx_int16 *)ops3_y,
+                        (vx_int16 *)ops5_x, (vx_int16 *)ops5_y,
+                        (vx_int16 *)ops7_x, (vx_int16 *)ops7_y
+                    };
+    vx_int32    wins = 0;
+    vx_uint32 height = 0;
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
+    }
+
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
+
+    status = vxReadScalarValue(win, &wins);
+
+    /*index = 0*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+
+    /*index = 1*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
+
+    /*index = 2*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
+
+    kernelContext->params.kernel = gcvVX_KERNEL_SOBEL_MxN;
+
+    kernelContext->params.xstep = 2;
+    kernelContext->params.policy = VX_DF_IMAGE('F','0','1','6');/*temp for type*/
+
+    kernelContext->params.ystep = height;
+
+    kernelContext->params.clamp = vx_false_e;
+    kernelContext->params.col = wins;
+    kernelContext->params.row = wins;
+    kernelContext->params.matrix = ops[wins - 3];
+    kernelContext->params.matrix1 = ops[wins - 2];
+    kernelContext->params.borders = bordermode->mode;
+    kernelContext->params.volume = height;
+
+    if (shift != VX_NULL)
+        kernelContext->params.scale = shift->value->f32;
+    else
+        kernelContext->params.scale = gcoMATH_Log2(0);
+
+    if (bordermode->mode == VX_BORDER_CONSTANT || bordermode->mode == VX_BORDER_UNDEFINED)
+    {
+        vx_uint32 bin[4];
+
+        bin[0] =
+        bin[1] =
+        bin[2] =
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_UNDEFINED)?0:bordermode->constant_value.U32);
+
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[0].num = 4 * 4;
+        kernelContext->uniforms[0].index = 3;
+        kernelContext->uniform_num = 1;
+    }
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    kernelContext->node = node;
+
+    status = gcfVX_Kernel(kernelContext);
+
+    status = vxWriteScalarValue(win, &wins);
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
+    return status;
+}
+
 vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_x,
                      vx_image grad_y, vx_border_t *bordermode)
 {

@@ -60,8 +60,8 @@ typedef struct __DRIdrawableRec __DRIdrawablePriv;
 typedef struct __DRIDisplayRec  __DRIDisplay;
 
 
-void _VivGetLock(__DRIdrawablePriv * drawable);
-void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
+static void _VivGetLock(__DRIdrawablePriv * drawable);
+static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
 
 static pthread_mutex_t drmMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -253,6 +253,12 @@ struct __DRIdrawableRec {
     RSFUNC rsFunc;
 #endif
 
+    gctINT oldx;
+    gctINT oldy;
+    gctUINT oldw;
+    gctUINT oldh;
+    PlatformWindowType olddrawable;
+    gctBOOL vgapi;
 };
 
 
@@ -481,6 +487,10 @@ static Bool VIVEXTDrawableInfo(Display* dpy, int screen, Drawable drawable,
     xVIVEXTDrawableInfoReply rep;
     xVIVEXTDrawableInfoReq *req;
     int extranums = 0;
+#ifdef DRI_PIXMAPRENDER_ASYNC
+    #define DRM_CLIPRECTS_CACHE_NUM 32
+    static drm_clip_rect_t xcliprects[DRM_CLIPRECTS_CACHE_NUM];
+#endif
 
     VIVEXTCheckExtension (dpy, info, False);
 
@@ -514,6 +524,25 @@ static Bool VIVEXTDrawableInfo(Display* dpy, int screen, Drawable drawable,
     *relX = rep.relX;
     *relY = rep.relY;
 
+#ifdef DRI_PIXMAPRENDER_ASYNC
+
+    *pClipRects = NULL;
+     if (*numClipRects) {
+        if (*numClipRects < DRM_CLIPRECTS_CACHE_NUM)
+        {
+           int len = sizeof(drm_clip_rect_t) * (*numClipRects);
+           _XRead(dpy, (char*)xcliprects, len);
+        } else {
+           int len = sizeof(drm_clip_rect_t) * (*numClipRects);
+
+           *pClipRects = (drm_clip_rect_t *)Xcalloc(len, 1);
+           if (*pClipRects)
+               _XRead(dpy, (char*)*pClipRects, len);
+        }
+     }
+
+#else
+
     if (*numClipRects) {
        int len = sizeof(drm_clip_rect_t) * (*numClipRects);
 
@@ -523,6 +552,8 @@ static Bool VIVEXTDrawableInfo(Display* dpy, int screen, Drawable drawable,
     } else {
         *pClipRects = NULL;
     }
+
+#endif
 
     UnlockDisplay(dpy);
     SyncHandle();
@@ -1411,7 +1442,7 @@ gceSTATUS _getPixmapDrawableInfo(Display *dpy, Drawable pixmap, gctUINT* videoNo
     return gcvSTATUS_OK;
 }
 
-void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
+static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
 {
 
     __DRIdrawablePriv *pdp=drawable;
@@ -1456,12 +1487,23 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
     else
        pdp->pStamp = &(display->pSAREA->drawableTable[pdp->index].stamp);
 
-
     if ( numClipRects >0 && pClipRects )
         Xfree((void *)pClipRects);
 
+    if (!drawable->vgapi) {
+        if (pdp->oldx == (gctINT)x && pdp->oldy == (gctINT)y
+              && pdp->oldw == (gctUINT)w && pdp->oldh == (gctUINT)h
+              && pdp->olddrawable == pdp->drawable )
+        goto ENDFLAG;
 
-    if ( pdp->numClipRects >0 && pdp->pClipRects )
+        pdp->oldx = (gctINT)x;
+        pdp->oldy = (gctINT)y;
+        pdp->oldw = (gctUINT)w;
+        pdp->oldh = (gctUINT)h;
+        pdp->olddrawable = pdp->drawable;
+    }
+
+    if (pdp->numClipRects >0 && pdp->pClipRects)
         Xfree((void *)pdp->pClipRects);
     pdp->numClipRects = 0;
 
@@ -1476,10 +1518,10 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
                     &nodeName,
                     (unsigned int *)&pdp->backBufferPhysAddr);
 
-    if ( nodeName )
+    if (nodeName)
     {
 
-        if ( pdp->backNode )
+        if (pdp->backNode)
             _FreeVideoNode(0, pdp->backNode);
 
         pdp->backNode = 0;
@@ -1495,7 +1537,7 @@ ENDFLAG:
 ;
 }
 
-void _FullScreenCovered(__DRIdrawablePriv * drawable)
+static void _FullScreenCovered(__DRIdrawablePriv * drawable)
 {
     Bool ret;
     __DRIDisplay * display;
@@ -1510,7 +1552,7 @@ void _FullScreenCovered(__DRIdrawablePriv * drawable)
  * LOCK_FRAMEBUFFER( gc ) and UNLOCK_FRAMEBUFFER( gc ) should be called whenever
  * OpenGL driver needs to access framebuffer hardware.
  */
-void _VivGetLock(__DRIdrawablePriv * drawable)
+static void _VivGetLock(__DRIdrawablePriv * drawable)
 {
     if (drawable)
     {
@@ -1628,7 +1670,7 @@ _GetDisplayInfo(
     }
 }
 
-__DRIcontextPriv * _FindContext(__DRIDisplay* display,
+static __DRIcontextPriv * _FindContext(__DRIDisplay* display,
     IN gctPOINTER Context)
 {
     gctBOOL found = gcvFALSE;
@@ -1646,7 +1688,7 @@ __DRIcontextPriv * _FindContext(__DRIDisplay* display,
     return found ? cur : NULL;
 }
 
-__DRIdrawablePriv * _FindDrawable(__DRIDisplay* display,
+static __DRIdrawablePriv * _FindDrawable(__DRIDisplay* display,
     IN PlatformWindowType Drawable)
 {
     gctBOOL found = gcvFALSE;
@@ -1668,7 +1710,7 @@ __DRIdrawablePriv * _FindDrawable(__DRIDisplay* display,
 ** Display.
 */
 
-void
+static void
 _GetColorBitsInfoFromMask(
     gctSIZE_T Mask,
     gctUINT *Length,
@@ -1725,7 +1767,7 @@ _GetColorBitsInfoFromMask(
     }
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplay(
     OUT PlatformDisplayType * Display,
     IN gctPOINTER Context
@@ -1767,77 +1809,6 @@ dri_GetDisplay(
     }
 
     gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-dri_GetDisplayByIndex(
-    IN gctINT DisplayIndex,
-    OUT PlatformDisplayType * Display,
-    IN gctPOINTER Context
-    )
-{
-    return dri_GetDisplay(Display, Context);
-}
-
-gceSTATUS
-dri_GetDisplayInfo(
-    IN PlatformDisplayType Display,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctSIZE_T * Physical,
-    OUT gctINT * Stride,
-    OUT gctINT * BitsPerPixel
-    )
-{
-    Screen * screen;
-    XImage *image;
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Display=0x%x", Display);
-    if (Display == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-
-    screen = XScreenOfDisplay(Display, DefaultScreen(Display));
-
-    if (Width != gcvNULL)
-    {
-        *Width = XWidthOfScreen(screen);
-    }
-
-    if (Height != gcvNULL)
-    {
-        *Height = XHeightOfScreen(screen);
-    }
-
-    if (Physical != gcvNULL)
-    {
-        *Physical = ~0;
-    }
-
-    if (Stride != gcvNULL)
-    {
-        *Stride = 0;
-    }
-
-    if (BitsPerPixel != gcvNULL)
-    {
-        image = XGetImage(Display,
-            DefaultRootWindow(Display),
-            0, 0, 1, 1, AllPlanes, ZPixmap);
-
-        if (image != gcvNULL)
-        {
-            *BitsPerPixel = image->bits_per_pixel;
-            XDestroyImage(image);
-        }
-
-    }
-
-    gcmFOOTER_NO();
     return status;
 }
 
@@ -1890,7 +1861,7 @@ typedef struct _driDISPLAY_INFO
 driDISPLAY_INFO;
 
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplayInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1962,7 +1933,7 @@ dri_GetDisplayInfoEx(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplayVirtual(
     IN PlatformDisplayType Display,
     OUT gctINT * Width,
@@ -1972,7 +1943,7 @@ dri_GetDisplayVirtual(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplayBackbuffer(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1986,7 +1957,7 @@ dri_GetDisplayBackbuffer(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_SetDisplayVirtual(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1998,7 +1969,7 @@ dri_SetDisplayVirtual(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_SetDisplayVirtualEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -2012,7 +1983,7 @@ dri_SetDisplayVirtualEx(
     return dri_SetDisplayVirtual(Display, Window, Offset, X, Y);
 }
 
-gceSTATUS
+static gceSTATUS
 dri_CancelDisplayBackbuffer(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -2026,7 +1997,7 @@ dri_CancelDisplayBackbuffer(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_SetSwapInterval(
     IN PlatformDisplayType Display,
     IN gctINT Interval
@@ -2035,16 +2006,7 @@ dri_SetSwapInterval(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
-dri_SetSwapIntervalEx(
-    IN PlatformDisplayType Display,
-    IN gctINT Interval,
-    IN gctPOINTER localDisplay)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
+static gceSTATUS
 dri_GetSwapInterval(
     IN PlatformDisplayType Display,
     IN gctINT_PTR Min,
@@ -2054,7 +2016,7 @@ dri_GetSwapInterval(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DestroyDisplay(
     IN PlatformDisplayType Display
     )
@@ -2066,21 +2028,12 @@ dri_DestroyDisplay(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-dri_DisplayBufferRegions(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctINT NumRects,
-    IN gctINT_PTR Rects
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
+
 
 /*******************************************************************************
 ** Context
 */
-gceSTATUS
+static gceSTATUS
 dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
 {
     __DRIcontextPriv *context;
@@ -2131,7 +2084,7 @@ OnError:
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DestroyContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
 {
     __DRIDisplay* display;
@@ -2174,7 +2127,7 @@ OnError:
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_MakeCurrent(IN gctPOINTER localDisplay,
     IN PlatformWindowType DrawDrawable,
     IN PlatformWindowType ReadDrawable,
@@ -2185,6 +2138,7 @@ dri_MakeCurrent(IN gctPOINTER localDisplay,
     gceSTATUS status = gcvSTATUS_OK;
     __DRIdrawablePriv *drawable;
     gceSURF_FORMAT format;
+    VEGLThreadData  thread;
 
     gcmHEADER_ARG("localDisplay=0x%x, Drawable = 0x%x, Readable = 0x%x Context=0x%x\n", localDisplay, DrawDrawable, ReadDrawable, Context);
 
@@ -2192,6 +2146,8 @@ dri_MakeCurrent(IN gctPOINTER localDisplay,
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    thread = veglGetThreadData();
 
     display = (__DRIDisplay*)localDisplay;
 
@@ -2204,6 +2160,8 @@ dri_MakeCurrent(IN gctPOINTER localDisplay,
     } else {
         gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
     }
+
+    drawable->vgapi = (thread->api == EGL_OPENVG_API);
 
     if (!drawable->pStamp) {
 
@@ -2238,7 +2196,7 @@ OnError:
 /*******************************************************************************
 ** Drawable
 */
-gceSTATUS
+static gceSTATUS
 dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 {
     __DRIdrawablePriv *drawable;
@@ -2305,6 +2263,11 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
     drawable->exitSIG = gcvNULL;
 #endif
 
+    drawable->oldx = -1;
+    drawable->oldy = -1;
+    drawable->oldw = 0;
+    drawable->oldh = 0;
+    drawable->olddrawable = (PlatformWindowType)0;
 
 OnError:
     /* Success. */
@@ -2312,7 +2275,7 @@ OnError:
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DestroyDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 {
     __DRIdrawablePriv *cur;
@@ -2382,7 +2345,7 @@ OnError:
 ** Windows
 */
 
-gceSTATUS
+static gceSTATUS
 dri_GetWindowInfo(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -3355,7 +3318,7 @@ static gctBOOL _legacyPath(
 }
 
 
-gceSTATUS
+static gceSTATUS
 dri_RSForSwap(
     IN gctPOINTER localDisplay,
     IN PlatformWindowType Drawable,
@@ -3382,7 +3345,7 @@ dri_RSForSwap(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_SwapBuffers(
     IN gctPOINTER localDisplay,
     IN PlatformWindowType Drawable,
@@ -3481,7 +3444,7 @@ dri_SwapBuffers(
     }
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DrawImage(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -3517,116 +3480,10 @@ dri_DrawImage(
     return status;
 }
 
-gceSTATUS
-dri_GetImage(
-    IN PlatformWindowType Window,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
-    OUT gctINT * BitsPerPixel,
-    OUT gctPOINTER * Bits
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
 /*******************************************************************************
 ** Pixmaps. ********************************************************************
 */
-
-gceSTATUS
-dri_CreatePixmap(
-    IN PlatformDisplayType Display,
-    IN gctINT Width,
-    IN gctINT Height,
-    IN gctINT BitsPerPixel,
-    OUT PlatformPixmapType * Pixmap
-    )
-{
-    /* Get default root window. */
-    XImage *image;
-    Window rootWindow;
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Display=0x%x Width=%d Height=%d BitsPerPixel=%d", Display, Width, Height, BitsPerPixel);
-    /* Test if we have a valid display data structure pointer. */
-    if (Display == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-    if ((Width <= 0) || (Height <= 0))
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-    rootWindow = DefaultRootWindow(Display);
-
-    /* Check BitsPerPixel, only support 16bit and 32bit now. */
-    switch (BitsPerPixel)
-    {
-    case 0:
-        image = XGetImage(Display,
-            rootWindow,
-            0, 0, 1, 1, AllPlanes, ZPixmap);
-
-        if (image == gcvNULL)
-        {
-            /* Error. */
-            status = gcvSTATUS_INVALID_ARGUMENT;
-            gcmFOOTER();
-            return status;
-        }
-        BitsPerPixel = image->bits_per_pixel;
-        break;
-
-    case 16:
-    case 32:
-        break;
-
-    default:
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-
-    do
-    {
-        /* Create native pixmap, ie X11 Pixmap. */
-        *Pixmap = XCreatePixmap(Display,
-            rootWindow,
-            Width,
-            Height,
-            BitsPerPixel);
-
-        if (*Pixmap == 0)
-        {
-            break;
-        }
-
-        /* Flush command buffer. */
-        XFlush(Display);
-
-        gcmFOOTER_ARG("*Pixmap=0x%x", *Pixmap);
-        return status;
-    }
-    while (0);
-
-    /* Roll back. */
-    if (*Pixmap != 0)
-    {
-        XFreePixmap(Display, *Pixmap);
-        XFlush(Display);
-    }
-
-    status = gcvSTATUS_OUT_OF_RESOURCES;
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
+static gceSTATUS
 dri_GetPixmapInfo(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -3747,21 +3604,7 @@ dri_GetPixmapInfo(
     return status;
 }
 
-gceSTATUS
-dri_DestroyPixmap(
-    IN PlatformDisplayType Display,
-    IN PlatformPixmapType Pixmap
-    )
-{
-    if (Pixmap != 0)
-    {
-        XFreePixmap(Display, Pixmap);
-        XFlush(Display);
-    }
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
+static gceSTATUS
 dri_DrawPixmap(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -3857,7 +3700,7 @@ dri_DrawPixmap(
     return eStatus;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_InitLocalDisplayInfo(
     IN PlatformDisplayType Display,
     IN OUT gctPOINTER * localDisplay
@@ -3897,7 +3740,7 @@ dri_InitLocalDisplayInfo(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DeinitLocalDisplayInfo(
     IN PlatformDisplayType Display,
     IN OUT gctPOINTER * localDisplay
@@ -3917,7 +3760,7 @@ dri_DeinitLocalDisplayInfo(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplayInfoEx2(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -3940,7 +3783,7 @@ dri_GetDisplayInfoEx2(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetDisplayBackbufferEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -3955,7 +3798,7 @@ dri_GetDisplayBackbufferEx(
     return dri_GetDisplayBackbuffer(Display, Window, context, surface, Offset, X, Y);
 }
 
-gceSTATUS
+static gceSTATUS
 dri_IsValidDisplay(
     IN PlatformDisplayType Display
     )
@@ -3965,7 +3808,7 @@ dri_IsValidDisplay(
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 
-gctBOOL
+static gctBOOL
 dri_SynchronousFlip(
     IN PlatformDisplayType Display
     )
@@ -3973,7 +3816,7 @@ dri_SynchronousFlip(
     return gcvFALSE;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetNativeVisualId(
     IN PlatformDisplayType Display,
     OUT gctINT* nativeVisualId
@@ -3984,7 +3827,7 @@ dri_GetNativeVisualId(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetWindowInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -4076,7 +3919,7 @@ dri_GetWindowInfoEx(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_DrawImageEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -4103,7 +3946,7 @@ dri_DrawImageEx(
                            Bits);
 }
 
-gceSTATUS
+static gceSTATUS
 dri_SetWindowFormat(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -4121,7 +3964,7 @@ dri_SetWindowFormat(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_GetPixmapInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -4190,7 +4033,7 @@ dri_GetPixmapInfoEx(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dri_CopyPixmapBits(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -4264,17 +4107,6 @@ dri_CopyPixmapBits(
     if (img) XDestroyImage(img);
 
     return status;
-}
-
-gceSTATUS
-dri_ResizeWindow(
-    IN gctPOINTER localDisplay,
-    IN PlatformWindowType Drawable,
-    IN gctUINT Width,
-    IN gctUINT Height
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
 }
 
 #include <gc_egl_precomp.h>
@@ -6439,7 +6271,7 @@ _RSForSwap(
 
 static struct eglPlatform driPlatform =
 {
-    EGL_PLATFORM_X11_KHR,
+    EGL_PLATFORM_DRI_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
@@ -6476,6 +6308,20 @@ static struct eglPlatform driPlatform =
     _RSForSwap,
 };
 
+
+
+#ifdef X11_DRI3
+/* For DRI3 auto check if backend supports DRI3, otherwise DRI1 */
+VEGLPlatform
+_veglGetDRIPlatform(
+    void * NativeDisplay
+    )
+{
+    return &driPlatform;
+}
+
+#else
+
 VEGLPlatform
 veglGetX11Platform(
     void * NativeDisplay
@@ -6484,3 +6330,4 @@ veglGetX11Platform(
     return &driPlatform;
 }
 
+#endif

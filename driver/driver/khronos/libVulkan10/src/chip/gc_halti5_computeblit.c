@@ -1357,6 +1357,7 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
         vscLinkParams.pGlApiCfg = &devCtx->pPhyDevice->shaderCaps;
         vscLinkParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
         vscLinkParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+        vscLinkParams.cfg.ctx.isPatchLib = gcvFALSE;
         vscLinkParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS
                                  | VSC_COMPILER_FLAG_COMPILE_CODE_GEN
                                  | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO

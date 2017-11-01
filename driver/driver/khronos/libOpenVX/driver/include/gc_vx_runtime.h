@@ -46,10 +46,6 @@ VX_INTERNAL_API void vxEnableTraceTarget(vx_trace_target_e target, vx_bool enabl
 
 VX_INTERNAL_API void vxTrace(vx_trace_target_e target, char *message, ...);
 
-VX_INTERNAL_API void vxWarning(char *message, ...);
-
-VX_INTERNAL_API void vxError(char *message, ...);
-
 /* Heap & Memory APIs */
 VX_INTERNAL_API vx_ptr vxAllocate(vx_size size);
 

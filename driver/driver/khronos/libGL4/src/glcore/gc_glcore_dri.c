@@ -333,6 +333,9 @@ VEGLEXimports imports = {
         gcvFALSE,                /* robustAccess */
         0,                       /* resetNotification */
         gcvFALSE,                /* debuggable */
+        0,
+        gcvFALSE,
+        0x14,
         &__glDevicePipeEntry[0],/*device*/
         0,/*deviceIndex*/
         gcvNULL,/*other*/
@@ -366,10 +369,13 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
     GLint x, y, w, h, i;
     vvtDeviceInfo *pDeviceInfo = sPriv->pDevPriv;
 
-    drmGetLock( pDriMirror->fd, pDriMirror->hwContext, flags );
+    if (sPriv->dri3 == GL_FALSE)
+    {
+        drmGetLock( pDriMirror->fd, pDriMirror->hwContext, flags );
 
-    if (sarea->ctx_owner != pDriMirror->hwContext) {
-        sarea->ctx_owner = pDriMirror->hwContext;
+        if (sarea->ctx_owner != pDriMirror->hwContext) {
+            sarea->ctx_owner = pDriMirror->hwContext;
+        }
     }
 
     if (dPriv) {
@@ -387,7 +393,14 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
     * Since the hardware state depends on having the latest drawable
     * clip rects, all state checking must be done _after_ this call.
     */
-    DRI_VALIDATE_DRAWABLE_INFO( sPriv, dPriv );
+    if (sPriv->dri3)
+    {
+        DRI3_VALIDATE_DRAWABLE_INFO( sPriv, dPriv );
+    }
+    else
+    {
+        DRI_VALIDATE_DRAWABLE_INFO( sPriv, dPriv );
+    }
 
     x = dPriv->x;
     y = dPriv->y;
@@ -410,6 +423,15 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
         glPriv->width = w;
         glPriv->height = h;
         changeMask |= __GL_DRAWABLE_PENDING_RESIZE;
+    }
+
+    if (sPriv->dri3)
+    {
+        glPriv->wWidth = dPriv->wWidth;
+        glPriv->wHeight = dPriv->wHeight;
+        glPriv->xWOrigin = dPriv->xWOrigin;
+        glPriv->yWOrigin = dPriv->yWOrigin;
+        goto DRI3_NEXT;
     }
 
     /* Check the number of clipRects */
@@ -450,6 +472,7 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
     glPriv->backBufferPhysAddr = (GLuint)dPriv->phyAddress;
     glPriv->backNode = dPriv->backNode;
 
+DRI3_NEXT:
     /* If window size or position changed, we need to update the drawable */
     if (changeMask) {
         pDeviceInfo = sPriv->pDevPriv;
@@ -557,8 +580,6 @@ __GLscreenPrivate * vivCreateScreen( __DRIscreenPrivate *sPriv )
     /* Point to device specific information that returned from XF86DRIGetDeviceInfo().
     */
     vivScreen->pDevInfo = sPriv->pDevPriv;
-
-    vivScreen->fd = sPriv->fd;
 
     vivScreen->baseFBLinearAddress = sPriv->pLogicalAddr;
     vivScreen->baseFBPhysicalAddress = sPriv->pFB;
@@ -695,8 +716,6 @@ vivCreateContext( const __GLcontextModes *modes,
     vivDriMirror *pDriMirror;
     __GLcontext *gc;
 
-    GLint clientVersion = 0x32;
-
     GL_ASSERT(modes);
     GL_ASSERT(driContextPriv);
 
@@ -730,10 +749,8 @@ vivCreateContext( const __GLcontextModes *modes,
     imports.config = (void *)modes;
 
     /* create the core rendering context */
-    gc = GLESv2_DISPATCH_TABLE.createContext(gcvNULL, clientVersion, (VEGLimports *)&imports, (gctPOINTER)gcvNULL);
-/*
-    gc = __glCreateContext(&imports, (__GLcontextModes *)modes);
-*/
+    gc = GLESv2_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate);
+
     _glthread_UNLOCK_MUTEX(__vivCrtMutex);
 
     driContextPriv->driverPrivate = gc;
@@ -948,8 +965,8 @@ vivCreateDrawable( __DRIscreenPrivate *driScrnPriv,
         break;
     case 8:
         glPriv->rtFormatInfo = glPriv->modes.alphaBits
-                                 ? &__glFormatInfoTable[__GL_FMT_RGBA8]
-                                 : &__glFormatInfoTable[__GL_FMT_RGB8];
+                             ? &__glFormatInfoTable[__GL_FMT_RGBA8]
+                             : &__glFormatInfoTable[__GL_FMT_RGB8];
         break;
     default:
         GL_ASSERT(0);

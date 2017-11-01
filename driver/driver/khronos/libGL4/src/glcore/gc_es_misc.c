@@ -14,16 +14,13 @@
 #include "gc_es_context.h"
 #include "gc_es_device.h"
 #include "gc_es_object_inline.c"
-#ifdef OPENGL40
-#include "gc_gl_debug.h"
-#endif
 /*
 ** Enable/Disable
 */
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
 #ifdef OPENGL40
-/* temporiy keep this function in gc_gl_enbale.c, it perhaps is moved into gc_es_misc.c */
+/* temporarily keep this function in gc_gl_enbale.c, it perhaps is moved into gc_es_misc.c */
 GLvoid __glSetTexEnableDimension(__GLcontext *gc, GLuint unit)
 {
     __GLTextureEnableState *textureEnable = &gc->state.enables.texUnits[unit];
@@ -1518,71 +1515,79 @@ GLboolean __glDebugIsLogEnabled(__GLcontext *gc, GLenum source, GLenum type, GLe
     return enabled;
 }
 
-GLvoid __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, GLboolean needCopy)
+GLboolean __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, GLboolean needCopy)
 {
-    __GLdebugMachine *dbgMachine = &gc->debug;
+    GLboolean inserted = GL_FALSE;
 
-    if (!dbgMachine->dbgOut)
+    do
     {
-        return;
-    }
+        __GLdebugMachine *dbgMachine = &gc->debug;
 
-    if (!__glDebugIsLogEnabled(gc, source, type, severity, id))
-    {
-        return;
-    }
-
-    if (dbgMachine->callback)
-    {
-        GLsizei msgLen = (length < 0) ? (GLsizei)strlen(message) : length;
-        dbgMachine->callback(source, type, id, severity, msgLen, message, dbgMachine->userParam);
-    }
-    /* If the message log is not full */
-    else if (dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
-    {
-        __GLdbgMsgLog *msgLog = (__GLdbgMsgLog*)gc->imports.malloc(gc, sizeof(__GLdbgMsgLog));
-        GLsizei msgLen = (length < 0 || needCopy) ? (GLsizei)strlen(message) : length;
-
-        msgLen = __GL_MIN(dbgMachine->maxMsgLen - 1, msgLen);
-
-        msgLog->src = source;
-        msgLog->type = type;
-        msgLog->severity = severity;
-        msgLog->id = id;
-        msgLog->length = msgLen + 1;
-        if (needCopy)
+        if (!dbgMachine->dbgOut)
         {
-            msgLog->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
-            __GL_MEMCOPY(msgLog->message, message, msgLen * sizeof(GLchar));
-            msgLog->message[msgLen] = '\0';
+            break;
         }
-        else
-        {
-            msgLog->message = (GLchar*)message;
-        }
-        msgLog->next = NULL;
 
-        /* Insert to tail */
-        if (dbgMachine->msgLogHead)
+        if (!__glDebugIsLogEnabled(gc, source, type, severity, id))
         {
-            GL_ASSERT(dbgMachine->msgLogTail);
-            dbgMachine->msgLogTail->next = msgLog;
+            break;
         }
-        else
-        {
-            dbgMachine->msgLogHead = msgLog;
-        }
-        dbgMachine->msgLogTail = msgLog;
 
-        ++dbgMachine->loggedMsgs;
-    }
+        if (dbgMachine->callback)
+        {
+            GLsizei msgLen = (length < 0) ? (GLsizei)strlen(message) : length;
+            dbgMachine->callback(source, type, id, severity, msgLen, message, dbgMachine->userParam);
+        }
+        /* If the message log is not full */
+        else if (dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
+        {
+            __GLdbgMsgLog *msgLog = (__GLdbgMsgLog*)gc->imports.malloc(gc, sizeof(__GLdbgMsgLog));
+            GLsizei msgLen = (length < 0 || needCopy) ? (GLsizei)strlen(message) : length;
+
+            msgLen = __GL_MIN(dbgMachine->maxMsgLen - 1, msgLen);
+
+            msgLog->src = source;
+            msgLog->type = type;
+            msgLog->severity = severity;
+            msgLog->id = id;
+            msgLog->length = msgLen + 1;
+            if (needCopy)
+            {
+                msgLog->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+                __GL_MEMCOPY(msgLog->message, message, msgLen * sizeof(GLchar));
+                msgLog->message[msgLen] = '\0';
+            }
+            else
+            {
+                msgLog->message = (GLchar*)message;
+                inserted = GL_TRUE;
+            }
+            msgLog->next = NULL;
+
+            /* Insert to tail */
+            if (dbgMachine->msgLogHead)
+            {
+                GL_ASSERT(dbgMachine->msgLogTail);
+                dbgMachine->msgLogTail->next = msgLog;
+            }
+            else
+            {
+                dbgMachine->msgLogHead = msgLog;
+            }
+            dbgMachine->msgLogTail = msgLog;
+
+            ++dbgMachine->loggedMsgs;
+        }
+    } while (GL_FALSE);
+
+    return inserted;
 }
 
 GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLuint id, GLenum severity, const GLchar *format, ...)
 {
     __GLdebugMachine *dbgMachine = &gc->debug;
 
-    if (dbgMachine->dbgOut)
+    if (dbgMachine->dbgOut && __glDebugIsLogEnabled(gc, source, type, severity, id))
     {
         GLuint offset = 0;
         gctARGUMENTS args;
@@ -1594,7 +1599,11 @@ GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLu
         gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
         gcmARGUMENTS_END(args);
 
-        __glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE);
+        if (!__glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE))
+        {
+            /* If inserting message to list failed, free it here to avoid memory leak. */
+            gc->imports.free(gc, message);
+        }
     }
 }
 
@@ -2505,11 +2514,6 @@ GLvoid APIENTRY __glim_EnableClientState(__GLcontext *gc, GLenum array)
     __GLvertexArrayState * pVertexArrayState;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_EnableClientState", DT_GLenum, array, DT_GLnull);
-#endif
-
     pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
 
     /* Note: Do not add __GL_VERTEX_BUFFER_FLUSH(gc) in this function */
@@ -2578,11 +2582,6 @@ GLvoid APIENTRY __glim_DisableClientState(__GLcontext *gc, GLenum array)
     GLbitfield bit;
     __GLvertexArrayState * pVertexArrayState;
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_DisableClientState", DT_GLenum, array, DT_GLnull);
-#endif
 
     pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
 
@@ -2683,22 +2682,12 @@ GLvoid APIENTRY __glim_EnableIndexedEXT(__GLcontext *gc, GLenum target, GLuint i
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_EnableIndexedEXT", DT_GLenum, target, DT_GLuint, index);
-#endif
-
     __glEnableDisableIndexedEXT(gc, target, index, GL_TRUE);
 }
 
 GLvoid APIENTRY __glim_DisableIndexedEXT(__GLcontext *gc, GLenum target, GLuint index)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_DisableIndexedEXT", DT_GLenum, target, DT_GLuint, index);
-#endif
 
     __glEnableDisableIndexedEXT(gc, target, index, GL_FALSE);
 }
@@ -2708,11 +2697,6 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
     __GLenableState *es;
 
     __GL_SETUP_NOT_IN_BEGIN_RET(gc, GL_FALSE);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_IsEnabledIndexedEXT", DT_GLenum, target, DT_GLuint, index);
-#endif
 
     GL_ASSERT(index < __GL_MAX_DRAW_BUFFERS);
 
@@ -2728,5 +2712,20 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
     }
 }
 #endif
+
+GLvoid GLAPIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
+{
+    /* to do */
+}
+
+GLvoid GLAPIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLenum mode)
+{
+    /* to do */
+}
+
+GLvoid GLAPIENTRY __glim_EndConditionalRender(__GLcontext *gc)
+{
+    /* to do */
+}
 #endif
 

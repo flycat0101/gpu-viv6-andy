@@ -1495,7 +1495,7 @@ __GLdlist * __glCompileDisplayList(__GLcontext *gc, __GLcompiledDlist *compDlist
             {
                 /* Look up list execute function based on opcode.
                 */
-                fp = __glListExecFuncTable[opcode];
+                fp = (__GLlistExecFunc*)__glListExecFuncTable[opcode];
 
                 *((__GLlistExecFunc **)data) = fp;
 

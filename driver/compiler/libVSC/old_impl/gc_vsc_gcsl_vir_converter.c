@@ -83,12 +83,12 @@
 typedef VIR_OpCode
 (* CONV_VIR_OPCODE_FUNC_PTR)(
     IN gcSHADER         Shader,
-    IN gctUINT16        CodeIndex
+    IN gctUINT32        CodeIndex
     );
 
 VIR_OpCode _ConvTEXLOD(
     IN gcSHADER         Shader,
-    IN gctUINT16        CodeIndex
+    IN gctUINT32        CodeIndex
     )
 {
     VIR_OpCode          virOpcode = OPCODE_TEXLOD;
@@ -109,7 +109,7 @@ VIR_OpCode _ConvTEXLOD(
 
 VIR_OpCode _ConvTEXBIAS(
     IN gcSHADER         Shader,
-    IN gctUINT16        CodeIndex
+    IN gctUINT32        CodeIndex
     )
 {
     VIR_OpCode          virOpcode = OPCODE_TEXBIAS;
@@ -381,8 +381,8 @@ typedef struct _conv2VirsVirRegMap
 {
     VIR_Function *inFunction;
     VIR_SymId     virRegId;   /* virreg symbol id */
-    gctUINT       components;
-    gctBOOL       packed;
+    gctUINT       components : 10;
+    gctBOOL       packed : 2;
 }
 conv2VirsVirRegMap;
 
@@ -862,53 +862,53 @@ _ConvSwizzle2Vir(
     return  virSwizzle;
 }
 
-static VIR_LayoutQual
+static VIR_ImageFormat
 _ConvImageFormat2Vir(
     IN gceIMAGE_FORMAT ImageFormat
     )
 {
-    VIR_LayoutQual virImageFormat = VIR_LAYQUAL_NONE;
+    VIR_ImageFormat virImageFormat = VIR_IMAGE_FORMAT_NONE;
 
     switch (ImageFormat)
     {
     case gcIMAGE_FORMAT_RGBA32F:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA32F;
         break;
     case gcIMAGE_FORMAT_RGBA16F:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16F;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA16F;
         break;
     case gcIMAGE_FORMAT_R32F:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_R32F;
+        virImageFormat = VIR_IMAGE_FORMAT_R32F;
         break;
     case gcIMAGE_FORMAT_RGBA8:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA8;
         break;
     case gcIMAGE_FORMAT_RGBA8_SNORM:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8_SNORM;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA8_SNORM;
         break;
     case gcIMAGE_FORMAT_RGBA32I:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA32I;
         break;
     case gcIMAGE_FORMAT_RGBA16I:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16I;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA16I;
         break;
     case gcIMAGE_FORMAT_RGBA8I:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8I;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA8I;
         break;
     case gcIMAGE_FORMAT_R32I:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_R32I;
+        virImageFormat = VIR_IMAGE_FORMAT_R32I;
         break;
     case gcIMAGE_FORMAT_RGBA32UI:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA32UI;
         break;
     case gcIMAGE_FORMAT_RGBA16UI:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA16UI;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA16UI;
         break;
     case gcIMAGE_FORMAT_RGBA8UI:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_RGBA8UI;
+        virImageFormat = VIR_IMAGE_FORMAT_RGBA8UI;
         break;
     case gcIMAGE_FORMAT_R32UI:
-        virImageFormat = VIR_LAYQUAL_IMAGE_FORMAT_R32UI;
+        virImageFormat = VIR_IMAGE_FORMAT_R32UI;
         break;
     default:
         break;
@@ -1057,6 +1057,14 @@ _ConvUniformKind2Vir(
 
     case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
         virUniformKind = VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS;
+        break;
+
+    case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+        virUniformKind = VIR_UNIFORM_WORK_THREAD_COUNT;
+        break;
+
+    case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+        virUniformKind = VIR_UNIFORM_WORK_GROUP_COUNT;
         break;
 
     default:
@@ -1434,6 +1442,34 @@ VIR_PrimitiveTypeId  gcSLType2VIRTypeMapping[] =
     VIR_TYPE_INT64_X16,
     VIR_TYPE_UINT64_X8,
     VIR_TYPE_UINT64_X16,
+
+    VIR_TYPE_FLOAT64, /* gcSHADER_FLOAT64_X1   0xB6 */
+    VIR_TYPE_FLOAT64_X2, /* gcSHADER_FLOAT64_X2   0xB7 */
+    VIR_TYPE_FLOAT64_X3, /* gcSHADER_FLOAT64_X3   0xB8 */
+    VIR_TYPE_FLOAT64_X4, /* gcSHADER_FLOAT64_X4   0xB9 */
+    VIR_TYPE_FLOAT64_2X2, /* gcSHADER_FLOAT64_2X2  0xBA */
+    VIR_TYPE_FLOAT64_3X3, /* gcSHADER_FLOAT64_3X3  0xBB */
+    VIR_TYPE_FLOAT64_4X4, /* gcSHADER_FLOAT64_4X4  0xBC */
+    VIR_TYPE_FLOAT64_2X3, /* gcSHADER_FLOAT64_2X3  0xBD */
+    VIR_TYPE_FLOAT64_2X4, /* gcSHADER_FLOAT64_2X4  0xBE */
+    VIR_TYPE_FLOAT64_3X2, /* gcSHADER_FLOAT64_3X2  0xBF */
+    VIR_TYPE_FLOAT64_3X4, /* gcSHADER_FLOAT64_3X4  0xC0 */
+    VIR_TYPE_FLOAT64_4X2, /* gcSHADER_FLOAT64_4X2  0xC1 */
+    VIR_TYPE_FLOAT64_4X3, /* gcSHADER_FLOAT64_4X3  0xC2 */
+    VIR_TYPE_FLOAT64_X8, /* gcSHADER_FLOAT64_X8   0xC3 */
+    VIR_TYPE_FLOAT64_X16, /* gcSHADER_FLOAT64_X16  0xC4 */
+
+    /* OpenGL 4.0 types */
+    VIR_TYPE_SAMPLER_2D_RECT, /* gcSHADER_SAMPLER_2D_RECT, 0xC5 */
+    VIR_TYPE_ISAMPLER_2D_RECT, /* gcSHADER_ISAMPLER_2D_RECT, 0xC6 */
+    VIR_TYPE_USAMPLER_2D_RECT, /* gcSHADER_USAMPLER_2D_RECT, 0xC7 */
+    VIR_TYPE_SAMPLER_2D_RECT_SHADOW, /* gcSHADER_SAMPLER_2D_RECT_SHADOW, 0xC8 */
+    VIR_TYPE_ISAMPLER_1D_ARRAY, /* gcSHADER_ISAMPLER_1D_ARRAY, 0xC9 */
+    VIR_TYPE_USAMPLER_1D_ARRAY, /* gcSHADER_USAMPLER_1D_ARRAY, 0xCA */
+    VIR_TYPE_ISAMPLER_1D, /* gcSHADER_ISAMPLER_1D, 0xCB */
+    VIR_TYPE_USAMPLER_1D, /* gcSHADER_USAMPLER_1D, 0xCC */
+    VIR_TYPE_SAMPLER_1D_SHADOW, /* gcSHADER_SAMPLER_1D_SHADOW, 0xCD */
+
     VIR_TYPE_UNKNOWN
 };
 /* compile-time assertion if the gcSLType2VIRTypeMapping is not the same length as gcSHADER_TYPE_COUNT */
@@ -2230,33 +2266,31 @@ _ConvShaderUniformIdx2Vir(
                 VIR_LayoutQual qual = ((!isUniformStruct(uniform) && gcmType_isMatrix(uniform->u.type)) ?
                                               (uniform->isRowMajor ? VIR_LAYQUAL_ROW_MAJOR : VIR_LAYQUAL_COLUMN_MAJOR) :
                                               VIR_LAYQUAL_NONE);
+                VIR_ImageFormat imageFormat = VIR_IMAGE_FORMAT_NONE;
 
                 if (isUniformImage(uniform))
                 {
-                    qual |= _ConvImageFormat2Vir(uniform->imageFormat);
+                    imageFormat = _ConvImageFormat2Vir(uniform->imageFormat);
                 }
                 else if (isUniformSamplerBuffer(uniform))
                 {
-                    VIR_LayoutQual q = VIR_LAYQUAL_NONE;
-
                     if (GetUniformType(uniform) == gcSHADER_SAMPLER_BUFFER)
                     {
-                        q = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F;
+                        imageFormat = VIR_IMAGE_FORMAT_RGBA32F;
                     }
                     else if (GetUniformType(uniform) == gcSHADER_ISAMPLER_BUFFER)
                     {
-                        q = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I;
+                        imageFormat = VIR_IMAGE_FORMAT_RGBA32I;
                     }
                     else
                     {
-                        q = VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI;
+                        imageFormat = VIR_IMAGE_FORMAT_RGBA32UI;
                     }
-
-                    qual |= q;
                 }
                 VIR_Symbol_SetLayoutQualifier(sym, qual);
                 VIR_Symbol_SetBinding(sym, GetUniformBinding(uniform));
                 VIR_Symbol_SetLocation(sym, GetUniformLayoutLocation(uniform));
+                VIR_Symbol_SetImageFormat(sym, imageFormat);
             }
             break;
 
@@ -2280,11 +2314,11 @@ _ConvShaderUniformIdx2Vir(
                     uniformBlock = Shader->uniformBlocks[GetUniformBlockID(uniform)];
                     qual |= _gcmConvMemoryLayout2Vir(GetUBMemoryLayout(uniformBlock));
                 }
+                VIR_Symbol_SetLayoutQualifier(sym, qual);
                 if (isUniformImage(uniform))
                 {
-                    qual |= _ConvImageFormat2Vir(uniform->imageFormat);
+                    VIR_Symbol_SetImageFormat(sym, _ConvImageFormat2Vir(uniform->imageFormat));
                 }
-                VIR_Symbol_SetLayoutQualifier(sym, qual);
             }
             VIR_FieldInfo_SetTempRegOrUniformOffset(VIR_Symbol_GetFieldInfo(sym), currUniformIndex - StartUniformIndex);
             break;
@@ -2415,9 +2449,9 @@ _ConvShaderVariable2Vir(
     VIR_NameId nameId;
     VIR_TypeId typeId;
     VIR_TypeId structTypeId;
-    gctUINT currStartRegIndex = (gctUINT16) - 1;
-    gctUINT currEndRegIndex = (gctUINT16) - 1;
-    gctUINT startRegIndex = (gctUINT16) - 1;
+    gctUINT currStartRegIndex = (gctUINT32) - 1;
+    gctUINT currEndRegIndex = (gctUINT32) - 1;
+    gctUINT startRegIndex = (gctUINT32) - 1;
     VIR_Precision precision;
     gctBOOL firstTime = gcvTRUE;
 
@@ -2782,13 +2816,13 @@ _ConvShaderLocalVariable2Vir(
     IN gcVARIABLE *         FunctionLocalVariables,
     IN gcVARIABLE           LocalVariable,
     IN conv2VirsVirRegMap * VirRegMapArr,
-    IN gctUINT16            StartRegIndex,
+    IN gctUINT32            StartRegIndex,
     IN VIR_Shader *         VirShader,
     IN VIR_Function *       VirFunction,
     IN VIR_Type *           StructType,
     IN VIR_Symbol *         StructVariable,
-    OUT gctUINT16 *         StructStartRegIndex,
-    OUT gctUINT16 *         StructEndRegIndex
+    OUT gctUINT32 *         StructStartRegIndex,
+    OUT gctUINT32 *         StructEndRegIndex
     )
 {
     VSC_ErrCode virErrCode;
@@ -2798,9 +2832,9 @@ _ConvShaderLocalVariable2Vir(
     VIR_Symbol *sym;
     VIR_TypeId typeId;
     VIR_TypeId structTypeId;
-    gctUINT16 currStartRegIndex = (gctUINT16) - 1;
-    gctUINT16 currEndRegIndex = (gctUINT16) - 1;
-    gctUINT16 startRegIndex = (gctUINT16) - 1;
+    gctUINT32 currStartRegIndex = (gctUINT32) - 1;
+    gctUINT32 currEndRegIndex = (gctUINT32) - 1;
+    gctUINT32 startRegIndex = (gctUINT32) - 1;
     gctSTRING localVariableName;
     VIR_Precision precision;
     gctBOOL firstTime = gcvTRUE;
@@ -3051,7 +3085,7 @@ _ConvShaderLocalVariable2Vir(
     return VSC_ERR_NONE;
 }
 
-static gctUINT16
+static gctUINT32
 _GetStartRegIndex(
     gcSHADER Shader,
     gcVARIABLE Variable
@@ -3065,13 +3099,13 @@ _GetStartRegIndex(
             return _GetStartRegIndex(Shader, firstChild);
         }
         else {
-            return (gctUINT16) -1;
+            return (gctUINT32) -1;
         }
     }
     else return Variable->tempIndex;
 }
 
-static gctUINT16
+static gctUINT32
 _GetLocalStartRegIndex(
     IN gctUINT32            FunctionLocalVariableCount,
     IN gcVARIABLE *         FunctionLocalVariables,
@@ -3087,7 +3121,7 @@ _GetLocalStartRegIndex(
 
             return _GetLocalStartRegIndex(FunctionLocalVariableCount, FunctionLocalVariables, firstChild);
         }
-        else return (gctUINT16) -1;
+        else return (gctUINT32) -1;
     }
     else return LocalVariable->tempIndex;
 }
@@ -3162,6 +3196,57 @@ _getRowTypeId(
     }
     else
         return VIR_TYPE_UNKNOWN;
+}
+
+static gctUINT
+_getRealRowsUsedByParam(
+    IN gcSHADER   Shader,
+    IN gcFUNCTION Function,
+    IN gctUINT    ParamNo,
+    OUT gctUINT * EndIndex)
+{
+    gcsFUNCTION_ARGUMENT *argument;
+    gcVARIABLE variable = gcvNULL;
+    gctUINT32 startIndex = 0, endIndex;
+    gctUINT32 components = 0, rows = 1;
+
+    gcmASSERT(ParamNo < Function->argumentCount);
+    argument = &Function->arguments[ParamNo];
+    gcmASSERT(argument->variableIndex < Shader->variableCount);
+    variable = Shader->variables[argument->variableIndex];
+    if (variable)
+        {
+        gcTYPE_GetTypeInfo(variable->u.type, &components, &rows, 0);
+        rows *= variable->arraySize;
+
+        gcSHADER_GetVariableIndexingRange(Shader,
+                                            variable,
+                                            gcvFALSE,
+                                            &startIndex,
+                                            &endIndex);
+        /* check if the variable is already expanded, if so, do not expand it again */
+        if (rows > 1)
+        {
+            /* if the start index of variable is not the same as argument's
+             * tempIndex, or if the next arg share the same variable as this arg,
+             * that means the variable is expanded to multiple rows,
+             */
+            if (startIndex != argument->index ||
+                ((ParamNo+1 < Function->argumentCount) &&
+                 (Function->arguments[ParamNo+1].variableIndex == argument->variableIndex)))
+            {
+                /* check if the next arg share the same variable as this arg*/
+                rows = 1;
+                endIndex = argument->index + 1;
+            }
+        }
+    }
+    else
+    {
+        endIndex = argument->index + 1;
+    }
+    *EndIndex = endIndex;
+    return rows;
 }
 
 static VSC_ErrCode
@@ -3257,20 +3342,16 @@ _ConvShaderFunction2Vir(
         rowTypeId = _getRowTypeId(typeId);
         if (variable)
         {
-            gcTYPE_GetTypeInfo(variable->u.type, &components, &rows, 0);
-            rows *= variable->arraySize;
-            packed = gcTYPE_IsTypePacked(variable->u.type);
-
-            gcSHADER_GetVariableIndexingRange(Shader,
-                                              variable,
-                                              gcvFALSE,
-                                              gcvNULL,
-                                              &endIndex);
+            rows = _getRealRowsUsedByParam(Shader, Function, i, &endIndex);
+            if (rows == 1)
+            {
+                typeId = rowTypeId;
+            }
         }
         else
         {
             components = _GetEnableComponentCount(argument->enable);
-            endIndex = argument->index;
+            endIndex = argument->index + 1;
         }
 
         /* make parameter name */
@@ -3360,8 +3441,8 @@ _ConvShaderFunction2Vir(
     for (i = 0; i < Function->localVariableCount; i++)
     {
         gcVARIABLE localVariable;
-        gctUINT16 startRegIndex;
-        gctUINT16 endRegIndex;
+        gctUINT32 startRegIndex;
+        gctUINT32 endRegIndex;
 
         if (Function->localVariables[i] == gcvNULL) continue;
 
@@ -3672,8 +3753,8 @@ _ConvShaderKernelFunction2Vir(
     for (i = 0; i < KernelFunction->localVariableCount; i++)
     {
         gcVARIABLE localVariable;
-        gctUINT16 startRegIndex;
-        gctUINT16 endRegIndex;
+        gctUINT32 startRegIndex;
+        gctUINT32 endRegIndex;
 
         if (KernelFunction->localVariables[i] == gcvNULL) continue;
 
@@ -3861,7 +3942,7 @@ _ConvUniformBlock2Vir(
 static VSC_ErrCode
 _ConvShaderOutput2Vir(
     IN gcSHADER             Shader,
-    IN gctUINT16*           Index,
+    IN gctUINT32*           Index,
     IN gcOUTPUT             Output,
     IN VIR_SymId*           VirOutIdArr,
     IN conv2VirsVirRegMap*  VirRegMapArr,
@@ -3908,7 +3989,7 @@ _ConvShaderOutput2Vir(
                                              &typeId);
         ON_ERROR2STATUS(virErrCode, "Failed to add VIR array type Id");
         /* advance index to output to account for arrayed outputs being expanded */
-        *Index += (gctUINT16) Output->arraySize - 1;
+        *Index += (gctUINT32) Output->arraySize - 1;
     }
 
     if (nameId == VIR_NAME_SUBSAMPLE_DEPTH)
@@ -4037,7 +4118,7 @@ OnError:
 static VSC_ErrCode
 _ConvShaderAttribute2Vir(
     IN gcSHADER             Shader,
-    IN gctUINT16            Index,
+    IN gctUINT32            Index,
     IN gcATTRIBUTE          Attribute,
     IN VIR_SymId*           VirAttrIdArr,
     IN conv2VirsVirRegMap*  VirRegMapArr,
@@ -4056,7 +4137,7 @@ _ConvShaderAttribute2Vir(
     VIR_SymId           symId;
     VIR_Symbol          *sym;
     VIR_NameId          nameId;
-    gctUINT16           j;
+    gctUINT             j;
     gctUINT             attrVirRegCount = *AttrVirRegCount;
     VIR_SymId           virRegId;
 
@@ -4476,7 +4557,7 @@ _ConvIOBlock2Vir(
     VIR_SymId           symId;
     VIR_Symbol          *sym;
     VIR_IOBlock         *virIOBlock;
-    gctINT16            childIndex;
+    gctINT32            childIndex;
     gcOUTPUT            output = gcvNULL;
     gcATTRIBUTE         attribute = gcvNULL;
     gctBOOL             hasInstanceName = GetSBInstanceNameLength(IOBlock) > 0;
@@ -4643,7 +4724,7 @@ _ConvIOBlock2Vir(
                                           &output));
 
             virErrCode = _ConvShaderOutput2Vir(Shader,
-                                               (gctUINT16 *)&childIndex,
+                                               (gctUINT32 *)&childIndex,
                                                output,
                                                VirOutputIdArr,
                                                VirRegMapArr,
@@ -4661,7 +4742,7 @@ _ConvIOBlock2Vir(
                                              &attribute));
 
             virErrCode = _ConvShaderAttribute2Vir(Shader,
-                                                  (gctUINT16)childIndex,
+                                                  (gctUINT32)childIndex,
                                                   attribute,
                                                   VirAttrIdArr,
                                                   VirRegMapArr,
@@ -4924,7 +5005,7 @@ _ConvSource2VirOperand(
     IN  VIR_Shader *        VirShader,
     IN  VIR_Function *      VirFunction,
     IN  gcSL_INSTRUCTION    Code,
-    IN  gctUINT16           CodeIndex,
+    IN  gctUINT32           CodeIndex,
     IN  gctINT              SrcNo,
     IN  conv2VirsVirRegMap *VirRegMapArr,
     IN  VIR_SymId *         VirAttrIdArr,
@@ -5602,7 +5683,7 @@ _ConvCode2VirInstruction(
     IN  VIR_Shader *        VirShader,
     IN  VIR_Function *      VirFunction,
     IN  gcSL_INSTRUCTION    Code,
-    IN  gctUINT16           CodeIndex,
+    IN  gctUINT32           CodeIndex,
     IN  conv2VirsVirRegMap *VirRegMapArr,
     IN  VIR_SymId *         VirAttrIdArr,
     IN  VIR_SymId *         VirOutIdArr,
@@ -5625,7 +5706,7 @@ _ConvCode2VirInstruction(
     gctUINT             constIdx = 0;
     VIR_VirRegId        virRegId;
     VSC_ErrCode         virErrCode = VSC_ERR_NONE;
-    gctUINT16           i;
+    gctUINT32           i;
     gctUINT             components = 0, rows = 0;
     gctBOOL             packed = gcvFALSE;
     VIR_TypeId          typeId;
@@ -6208,7 +6289,7 @@ _ConvCode2VirInstruction(
                     packed = gcvFALSE;
                     if(components) {
                         if(gcmOPT_oclPackedBasicType() || gcShaderHasVivVxExtension(Shader)) {
-                             packed = gcvTRUE;
+                            packed = gcvTRUE;
                         }
                     }
                     else {
@@ -6339,7 +6420,7 @@ gcSHADER_Conv2VIR(
     )
 {
     gceSTATUS   status = gcvSTATUS_OK;
-    gctUINT16   i, j, k;
+    gctUINT32   i, j, k;
     VIR_Function *virFunction;
     VIR_SymId   symId;
     VIR_Symbol  *sym;
@@ -6440,6 +6521,7 @@ gcSHADER_Conv2VIR(
                             &pointer));
 
     virRegMapStart = pointer;
+    gcmASSERT(totalVirRegCount + 4 < 0x00fffff);  /* < 2M temp registers */
     for(i = 0; i < totalVirRegCount + 4; i++) {
         virRegMapStart[i].inFunction = gcvNULL;
         virRegMapStart[i].virRegId = VIR_INVALID_ID;
@@ -7043,7 +7125,7 @@ gcSHADER_Conv2VIR(
         }
 
         initialRegIndex = _GetStartRegIndex(Shader, variable);
-        if(initialRegIndex != (gctUINT16) -1 &&
+        if(initialRegIndex != (gctUINT32) -1 &&
            variable->prevSibling == -1) {
             virErrCode =_ConvShaderVariable2Vir(Shader,
                                                 Shader->variables[i],
@@ -7214,6 +7296,7 @@ gcSHADER_Conv2VIR(
         {
             VirShader->shaderLayout.compute.workGroupSize[i] = Shader->shaderLayout.compute.workGroupSize[i];
         }
+        VirShader->shaderLayout.compute.isWorkGroupSizeFixed = Shader->shaderLayout.compute.isWorkGroupSizeFixed;
         break;
     case VIR_SHADER_TESSELLATION_CONTROL:
         VirShader->shaderLayout.tcs.tcsPatchOutputVertices = Shader->shaderLayout.tcs.tcsPatchOutputVertices;
@@ -7243,6 +7326,9 @@ gcSHADER_Conv2VIR(
     default:
         break;
     }
+
+    /* Save the private memory size. */
+    VIR_Shader_SetPrivateMemorySize(VirShader, GetShaderPrivateMemorySize(Shader));
 
 
 OnError:
@@ -8143,7 +8229,7 @@ _SetConvType(
         }
         else components = _GetEnableComponentCount(VIR_Operand_GetEnable(dest));
         typeId = _ConvScalarFormatToVirVectorTypeId((gcSL_FORMAT)VIR_Operand_GetImmediateUint(conv0Inst->src[1]),
-                                                    components, gcvFALSE);
+                                                     components, gcvFALSE);
         VIR_Operand_SetTypeId(Opnd, typeId);
     }
     return gcvTRUE;

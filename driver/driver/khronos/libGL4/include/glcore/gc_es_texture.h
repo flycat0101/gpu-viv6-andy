@@ -103,6 +103,9 @@ enum
         size = 1;               \
     }
 
+#define __GL_IS_1D_TEXTURE_ARRAY(targetIdx) \
+    (targetIdx == __GL_TEXTURE_1D_ARRAY_INDEX)
+
 #define __GL_IS_2D_TEXTURE_ARRAY(targetIdx) \
     ((targetIdx == __GL_TEXTURE_2D_ARRAY_INDEX) || (targetIdx == __GL_TEXTURE_2D_MS_ARRAY_INDEX))
 
@@ -111,7 +114,8 @@ enum
 
 #define __GL_IS_TEXTURE_ARRAY(targetIdx) \
     ((__GL_IS_2D_TEXTURE_ARRAY(targetIdx)) || \
-     (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX))
+     (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX) || \
+     (__GL_IS_1D_TEXTURE_ARRAY(targetIdx)))
 
 #define __GL_IS_TEXTURE_CUBE(targetIdx) \
     ((targetIdx == __GL_TEXTURE_CUBEMAP_INDEX) || (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX))
@@ -203,7 +207,7 @@ typedef struct __GLtextureParamStateRec
     GLenum swizzle[__GL_TEX_COMPONENT_NUM];
 
     /* Depth stencil texture mode */
-    GLenum depthStTexMode;
+    GLenum dsTexMode;
 
     /* VIV private property */
     GLboolean contentProtected;
@@ -244,6 +248,9 @@ struct __GLmipMapLevelRec
 
     /* Requested internal format */
     GLint requestedFormat;
+
+    /* internal format */
+    GLint interalFormat;
 
     /* Base internal format */
     GLenum baseFormat;
@@ -388,18 +395,31 @@ struct __GLtextureObjectRec
 };
 #ifdef OPENGL40
 /*
+
 ** Client state set with glTexGen
+
 */
+
 typedef struct __GLtextureCoordStateRec
+
 {
+
     /* How coordinates are being generated */
+
     GLenum mode;
 
+
+
     /* eye plane equation (used iff mode == GL_EYE_LINEAR) */
+
     __GLcoord eyePlaneEquation;
 
+
+
     /* object plane equation (used iff mode == GL_OBJECT_LINEAR) */
+
     __GLcoord objectPlaneEquation;
+
 } __GLtextureCoordState;
 
 /*
@@ -455,8 +475,11 @@ typedef struct __GLtextureUnitStateRec
     GLuint realEnableDim;
 #ifdef OPENGL40
     __GLtextureCoordState s;
+
     __GLtextureCoordState t;
+
     __GLtextureCoordState r;
+
     __GLtextureCoordState q;
 
     /* Texture environment state */
@@ -513,9 +536,13 @@ typedef struct __GLtextureMachineRec
 
 #ifdef OPENGL40
        /* If a stage has any texture target enabled
+
     ** (gc->state.enables.texUnits[unit].enabledDimension > 0)
+
     ** the corresponding bit will be set.
+
     */
+
     GLbitfield enabledMask;
     /* Texture objects for proxy textures */
     __GLtextureObject proxyTextures[__GL_MAX_TEXTURE_BINDINGS];

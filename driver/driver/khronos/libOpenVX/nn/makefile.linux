@@ -57,7 +57,7 @@ CFLAGS += $(INCLUDE)
 LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 
-LIBS += -l dl -l pthread -lm
+LIBS += -l dl -l pthread -lm -Wl,-z,defs
 
 ################################################################################
 # Add extra include path.

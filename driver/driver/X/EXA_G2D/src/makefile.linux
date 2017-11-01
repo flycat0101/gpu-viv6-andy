@@ -32,26 +32,50 @@ include $(AQROOT)/makefile.linux.def
 
 target := vivante_drv.so
 
-IMX_DISPLAY_OBJ := vivante_fbdev/imx_display.o
 
+ifeq ($(X11_DRI3),1)
+IMX_DISPLAY_OBJ := vivante_fbdev/imx_display.o \
+		imx_drm/dumb_bo.o \
+		imx_drm/drmmode_display.o \
+        imx_drm/imx_drm_driver.o \
+
+else
+IMX_DISPLAY_OBJ := vivante_fbdev/imx_display.o
+endif
 
 IMX_2D := vivante_exa/vivante_exa_g2d.o \
-    vivante_exa/vivante_pixmap_g2d.o \
-    vivante_gal/vivante_gal_blit.o \
-    vivante_exa/vivante_solid.o \
-    vivante_exa/vivante_copy.o \
-    vivante_exa/vivante_composite.o \
-    vivante_exa/vivante_pixmap.o \
-    vivante_exa/vivante_exa.o \
+	vivante_exa/vivante_pixmap_g2d.o \
+	vivante_gal/vivante_gal_blit.o \
+	vivante_exa/vivante_solid.o \
+	vivante_exa/vivante_copy.o \
+	vivante_exa/vivante_composite.o \
+	vivante_exa/vivante_pixmap.o \
+	vivante_exa/vivante_exa.o \
 
+
+
+ifeq ($(X11_DRI3),1)
 OBJS := vivante_gal/vivante_gal_gpu.o \
-    vivante_gal/vivante_gal_surface.o \
-    vivante_fbdev/vivante_fbdev_driver.o \
-    vivante_exa/vivante_exa_null.o \
-    vivante_extension/vivante_ext.o \
-    vivante_fbdev/vivante_dri.o \
-    $(IMX_2D) \
-    $(IMX_DISPLAY_OBJ)
+	vivante_gal/vivante_gal_surface.o \
+	vivante_fbdev/vivante_fbdev_driver.o \
+	vivante_exa/vivante_exa_null.o \
+	vivante_fbdev/vivante_dri3.o \
+        imx_driver.o \
+        $(IMX_2D) \
+        $(IMX_DISPLAY_OBJ)
+
+else
+OBJS := vivante_gal/vivante_gal_gpu.o \
+	vivante_gal/vivante_gal_surface.o \
+	vivante_fbdev/vivante_fbdev_driver.o \
+	vivante_exa/vivante_exa_null.o \
+	vivante_extension/vivante_ext.o \
+	vivante_fbdev/vivante_dri.o \
+        $(IMX_2D) \
+        $(IMX_DISPLAY_OBJ)
+
+endif
+
 
 PIXMAN := pixman-1
 
@@ -65,16 +89,34 @@ ifeq ($(HAVE_G2D),1)
     CFLAGS  += -DHAVE_G2D
 endif
 
+ifeq ($(X11_DRI3),1)
+CFLAGS += -DENABLE_VIVANTE_DRI3
+else
+CFLAGS += -DUSE_PROBE_VIV_FBDEV_DRIVER
+endif
+
 CFLAGS += -Wno-maybe-uninitialized -Wno-unused-function -Wno-unused-variable -Wno-return-type
 CFLAGS  += -DSMALL_THRESHOLD -DADD_FSL_XRANDR
 CFLAGS += -fvisibility=hidden -fPIC -DPIC
-CFLAGS += -I. -I..  -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
+CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
+          -I$(ROOTFS_USR)/include/libdrm -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
+
 CFLAGS += -I./vivante_gal -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I./vivante_extension
+ifeq ($(X11_DRI3),1)
+CFLAGS += -I./imx_drm
+endif
+
 CFLAGS += -I$(ROOTFS_USR)/include/drm
-CFLAGS += -I$(AQROOT)/build/sdk/include
+CFLAGS += -I$(AQROOT)/hal/kernel/inc
 
 LFLAGS += -fPIC
-LFLAGS += -Wl,-soname -Wl,vivante_drv.so -L$(AQROOT)/build/sdk/drivers -lm -ldl -lGAL
+
+ifeq ($(X11_DRI3),1)
+LFLAGS += -Wl,-soname -Wl,vivante_drv.so -L$(AQROOT)/hal/user/$(OBJ_DIR) -lm -ldl -lGAL -ldrm -ldrm_vivante
+else
+LFLAGS += -Wl,-soname -Wl,vivante_drv.so -L$(AQROOT)/hal/user/$(OBJ_DIR) -lm -ldl -lGAL -ldrm
+endif
+
 ifeq ($(HAVE_G2D),1)
     LFLAGS  += -lg2d
 endif

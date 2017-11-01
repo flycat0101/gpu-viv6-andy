@@ -1435,7 +1435,7 @@ void _UpdateFeatureEvisForSimulator(gcoHARDWARE Hardware, gctBOOL * Features, gc
 **          Features to be filled.
 */
 static gceSTATUS
-_FillInFeatureTableByDatabase(
+_FillInFeatureTable(
     IN gcoHARDWARE  Hardware,
     IN gctBOOL *    Features
     )
@@ -1638,7 +1638,7 @@ _FillInFeatureTableByDatabase(
 
     Features[gcvFEATURE_PE_DITHER_FIX] = database->REG_BugFixes15;
 
-    if (Hardware->specialHint & (1 << 2))
+    if (Hardware->specialHint & gcvHINT_BIT_1)
     {
         Features[gcvFEATURE_PE_DITHER_FIX] = gcvTRUE;
     }
@@ -1707,7 +1707,6 @@ _FillInFeatureTableByDatabase(
         Features[gcvFEATURE_TEX_BASELOD] = gcvTRUE;
         Features[gcvFEATURE_TEX_SEAMLESS_CUBE] = gcvTRUE;
         Features[gcvFEATURE_TEX_ETC2] = gcvTRUE;
-        Features[gcvFEATURE_FENCE_32BIT] = gcvTRUE;
     }
 
     if (chipModel == gcv900 && chipRevision == 0x5250)
@@ -1744,7 +1743,8 @@ _FillInFeatureTableByDatabase(
 
     Features[gcvFEATURE_VMSAA] = database->VMSAA;
 
-    if (Features[gcvFEATURE_128BTILE])
+    if (Features[gcvFEATURE_128BTILE] &&
+       (Hardware->options.allowCompression & gcvCOMPRESSION_OPTION_COLOR))
     {
         Features[gcvFEATURE_COLOR_COMPRESSION] = gcvTRUE;
     }
@@ -1992,7 +1992,6 @@ _FillInFeatureTableByDatabase(
         Features[gcvFEATURE_LOD_FIX_FOR_BASELEVEL] = gcvTRUE;
         Features[gcvFEATURE_NEW_STEERING_AND_ICACHE_FLUSH] = gcvTRUE;
         Features[gcvFEATURE_TX_8BPP_TS_FIX] = gcvTRUE;
-        Features[gcvFEATURE_FENCE_64BIT] = gcvTRUE;
         Features[gcvFEATURE_TX_DEFAULT_VALUE_FIX] = gcvTRUE;
         Features[gcvFEATURE_TX_MIPFILTER_NONE_FIX] = gcvTRUE;
         Features[gcvFEATURE_MC_STENCIL_CTRL] = gcvTRUE;
@@ -2266,7 +2265,7 @@ _FillInFeatureTableByDatabase(
     Features[gcvFEATURE_TX_INTEGER_COORDINATE] = database->TX_INTEGER_COORDINATE;
     Features[gcvFEATURE_DRAW_ID] = database->DRAWID;
     Features[gcvFEATURE_PSIO_SAMPLEMASK_IN_R0ZW_FIX] = database->PSIO_SAMPLEMASK_IN_R0ZW_FIX;
-    Features[gcvFEATURE_SECURITY] = gcvFALSE;
+    Features[gcvFEATURE_SECURITY] = database->SECURITY;
     Features[gcvFEATURE_ROBUSTNESS] = database->ROBUSTNESS;
     Features[gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG] = database->MULTI_CORE_BLOCK_SET_CONFIG;
     Features[gcvFEATURE_SNAPPAGE_CMD] = database->SNAPPAGE_CMD;
@@ -2310,6 +2309,13 @@ _FillInFeatureTableByDatabase(
     Features[gcvFEATURE_ASYNC_BLIT] = database->ASYNC_BLT;
     Features[gcvFEATURE_ASYNC_FE_FENCE_FIX] = database->ASYNC_FE_FENCE_FIX;
     Features[gcvFEATURE_PSCS_THROTTLE] = gcvFALSE;
+    Features[gcvFEATURE_FENCE_32BIT] = database->FENCE_32BIT;
+    Features[gcvFEATURE_FENCE_64BIT] = database->FENCE_64BIT;
+    Features[gcvFEATURE_FENCE] = Features[gcvFEATURE_FENCE_32BIT] ||
+                                 Features[gcvFEATURE_FENCE_64BIT] ||
+                                 (Hardware->config->resolvePipes > 0);
+
+    Features[gcvFEATURE_PE_DEPTH_ONLY_OQFIX] = database->PE_DEPTH_ONLY_OQFIX;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
@@ -2402,13 +2408,12 @@ _DetermineSuperTileModeByDatabase(
 #endif
 
 static gceSTATUS
-_FillInConfigTableByDatabase(
+_FillInConfigTable(
     IN gcoHARDWARE          Hardware,
     IN gcsHARDWARE_CONFIG * Config
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
     gcsFEATURE_DATABASE * featureDatabase;
 
 #if gcdENABLE_3D
@@ -2421,36 +2426,6 @@ _FillInConfigTableByDatabase(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    /***********************************************************************
-    ** Query chip identity.
-    */
-
-    iface.ignoreTLS = gcvFALSE;
-    iface.command = gcvHAL_QUERY_CHIP_IDENTITY;
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    Config->chipModel              = iface.u.QueryChipIdentity.chipModel;
-    Config->chipRevision           = iface.u.QueryChipIdentity.chipRevision;
-    Config->productID              = iface.u.QueryChipIdentity.productID;
-    Config->chipFlags              = iface.u.QueryChipIdentity.chipFlags;
-
-    Hardware->featureDatabase = gcQueryFeatureDB(
-        Config->chipModel,
-        Config->chipRevision,
-        iface.u.QueryChipIdentity.productID,
-        iface.u.QueryChipIdentity.ecoID,
-        iface.u.QueryChipIdentity.customerID);
-
-    gcmASSERT(Hardware->featureDatabase != gcvNULL);
-
-    _AdjustChipRevision(Config);
 
     featureDatabase = Hardware->featureDatabase;
 
@@ -2570,16 +2545,16 @@ if (halti5){    Config->vsConstBase  = 0xD000;
 #endif
 
 #if gcdENABLE_3D && gcdUSE_VX
-    Config->nnConfig.nnMadPerCoure       = featureDatabase->NNMadPerCore;
+    Config->nnConfig.nnMadPerCore        = featureDatabase->NNMadPerCore;
     Config->nnConfig.nnCoreCount         = featureDatabase->NNCoreCount;
     Config->nnConfig.nnInputBufferDepth  = featureDatabase->NNInputBufferDepth;
     Config->nnConfig.nnAccumBufferDepth  = featureDatabase->NNAccumBufferDepth;
+    Config->nnConfig.vipSRAMSize         = featureDatabase->VIP_SRAM_SIZE;
+    Config->nnConfig.tpCoreCount         = featureDatabase->TPEngine_CoreCount;
+    Config->nnConfig.tpPwlLUTCount       = featureDatabase->TPEngine_PwlLUTCount;
+    Config->nnConfig.tpPwlLUTSize        = featureDatabase->TPEngine_PwlLUTSize;
 #endif
 
-    gcmFOOTER_NO();
-    return status;
-
-OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -2624,7 +2599,73 @@ _FillInSWWATable(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
-#endif
+
+static gceSTATUS
+ _QueryHardwareIdAndOptions(
+    gcoHARDWARE Hardware
+    )
+{
+    gcsHARDWARE_CONFIG *config = Hardware->config;
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER();
+
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_QUERY_CHIP_IDENTITY;
+
+    gcmONERROR(gcoOS_DeviceControl(
+        gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface)
+        ));
+
+    config->chipModel              = iface.u.QueryChipIdentity.chipModel;
+    config->chipRevision           = iface.u.QueryChipIdentity.chipRevision;
+    config->productID              = iface.u.QueryChipIdentity.productID;
+    config->customerID             = iface.u.QueryChipIdentity.customerID;
+    config->ecoID                  = iface.u.QueryChipIdentity.ecoID;
+    config->chipFlags              = iface.u.QueryChipIdentity.chipFlags;
+
+
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_QUERY_CHIP_OPTION;
+
+    gcmONERROR(gcoOS_DeviceControl(
+        gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface)
+        ));
+
+    gcmONERROR(iface.status);
+
+    gcoOS_MemCopy((gctPOINTER)&Hardware->options,
+                  (gctPOINTER)&iface.u.QueryChipOptions,
+                  gcmSIZEOF(gcsHAL_QUERY_CHIP_OPTIONS));
+
+
+    /***********************************************************************
+    ** Query feature database
+    */
+    Hardware->featureDatabase = gcQueryFeatureDB(
+        Hardware->config->chipModel,
+        Hardware->config->chipRevision,
+        Hardware->config->productID,
+        Hardware->config->ecoID,
+        Hardware->config->customerID);
+
+    gcmASSERT(Hardware->featureDatabase != gcvNULL);
+
+    _AdjustChipRevision(Hardware->config);
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+#endif /* #if gcdENABLE_2D || gcdENABLE_3D */
 
 #if gcdENABLE_3D
 typedef struct _gcoPATCH_BENCH
@@ -2666,7 +2707,11 @@ gcoHARDWARE_DetectProcess(
             "\xb8\xb3\xbd\x9a\x91\x9c\x97\x92\x9e\x8d\x94\xcd\xc8",
             gcvFALSE
         },
-
+        {
+            gcvPATCH_GFXBENCH,
+            "\x8b\x9a\x8c\x8b\x99\x88\xa0\x9e\x8f\x8f",
+            gcvFALSE
+        },
 
 #if defined(ANDROID)
         {
@@ -3556,6 +3601,15 @@ gcoHARDWARE_DetectProcess(
             "\xab\x9a\x8c\x8b\xa0\x97\x9e\x93\x99",
             gcvFALSE
         },
+
+        {
+            gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION,
+#if (ANDROID_SDK_VERSION >= 24)
+            /* "android.graphics.cts" */ "\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x98\x8d\x9e\x8f\x97\x96\x9c\x8c\xd1\x9c\x8b\x8c"
+#else
+            /* "com.android.cts.graphics" */ "\x9c\x90\x92\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x9c\x8b\x8c\xd1\x98\x8d\x9e\x8f\x97\x96\x9c\x8c"
+#endif
+        },
 #endif
 
         {
@@ -3714,6 +3768,13 @@ gcoHARDWARE_DetectProcess(
              gcvPATCH_ANDROID_WEBGL,
              /* "android.webgl.cts" */ "\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x88\x9a\x9d\x98\x93\xd1\x9c\x8b\x8c",
              gcvFALSE
+        },
+        {
+            gcvPATCH_ANDROID_CTS_UIRENDERING,
+            /* android.uirendering.cts */
+            "\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x8a\x96\x8d\x9a\x91\x9b\x9a\x8d"
+            "\x96\x91\x98\xd1\x9c\x8b\x8c",
+            gcvFALSE
         },
         {
             gcvPATCH_ANDROID_CTS_MEDIA,
@@ -4258,29 +4319,69 @@ OnError:
     return status;
 }
 
-gceSTATUS
-gcoHARDWARE_SetSpecialHintData(
+static gceSTATUS
+_SetSpecialHint(
     IN gcoHARDWARE Hardware
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT hint = 0;
     gcmHEADER();
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
-    Hardware->specialHintData = 0;
+    switch (Hardware->patchID)
+    {
+    case gcvPATCH_BM21:
+    case gcvPATCH_MM06:
+    case gcvPATCH_MM07:
+    case gcvPATCH_GLBM11:
+        hint = gcvHINT_BIT_1;
+        break;
+
+    case gcvPATCH_NEOCORE:
+    case gcvPATCH_NENAMARK:
+    case gcvPATCH_NENAMARK2:
+        hint = gcvHINT_BIT_0;
+        break;
+
+    case gcvPATCH_BM3:
+    case gcvPATCH_BMGUI:
+    case gcvPATCH_QUADRANT:
+    case gcvPATCH_ANTUTU:
+    case gcvPATCH_ANTUTU4X:
+    case gcvPATCH_ANTUTU5X:
+    case gcvPATCH_SMARTBENCH:
+    case gcvPATCH_JPCT:
+    case gcvPATCH_RTESTVA:
+    case gcvPATCH_GLBM21:
+    case gcvPATCH_GLBM25:
+    case gcvPATCH_GLBM27:
+    case gcvPATCH_GLBMGUI:
+    case gcvPATCH_GFXBENCH:
+    case gcvPATCH_BASEMARKX:
+        hint = gcvHINT_BIT_1 | gcvHINT_BIT_0 | gcvHINT_BIT_2;
+        break;
+    case gcvPATCH_GFXBENCH4:
+        hint = gcvHINT_BIT_2;
+        break;
+    default:
+        break;
+    }
+
+    Hardware->specialHint = hint;
 
     switch(Hardware->patchID)
     {
-        case gcvPATCH_GLBM27:
+    case gcvPATCH_GLBM27:
         Hardware->specialHintData = 200;
-            break;
-        case gcvPATCH_GFXBENCH:
-            Hardware->specialHintData = 420;
-            break;
-        default:
-            break;
+        break;
+    case gcvPATCH_GFXBENCH:
+        Hardware->specialHintData = 420;
+        break;
+    default:
+        break;
     }
 
     gcmFOOTER();
@@ -4307,9 +4408,6 @@ OnError:
     gcmFOOTER();
     return status;
 }
-#endif
-
-#if gcdENABLE_3D
 
 static gcsHARDWARE_ExeFuncs _v60Funcs =
 {
@@ -4654,10 +4752,6 @@ gcoHARDWARE_Construct(
     hardware->threadDefault = ThreadDefault;
 
 #if gcdENABLE_3D
-    gcmONERROR(gcSHADER_SpecialHint(hardware->patchID, &hardware->specialHint));
-
-    gcmONERROR(gcoHARDWARE_SetSpecialHintData(hardware));
-
     /* Set default API. */
     hardware->api = gcvAPI_OPENGL;
 
@@ -5141,8 +5235,12 @@ gcoHARDWARE_Construct(
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsHARDWARE_CONFIG), &pointer));
     gcoOS_ZeroMemory(pointer,gcmSIZEOF(gcsHARDWARE_CONFIG));
     hardware->config = pointer;
-    gcmONERROR(_FillInConfigTableByDatabase(hardware, hardware->config));
-    gcmVERIFY_OK(_FillInFeatureTableByDatabase(hardware, hardware->features));
+    gcmVERIFY_OK(_QueryHardwareIdAndOptions(hardware));
+#if gcdENABLE_3D
+    gcmONERROR(_SetSpecialHint(hardware));
+#endif
+    gcmONERROR(_FillInConfigTable(hardware, hardware->config));
+    gcmVERIFY_OK(_FillInFeatureTable(hardware, hardware->features));
     gcmVERIFY_OK(_FillInSWWATable(hardware, hardware->swwas));
 
 #if gcdENABLE_3D
@@ -5430,6 +5528,36 @@ gcoHARDWARE_Construct(
     {
         hardware->PROBEStates->status = gcvPROBE_Disabled;
     }
+
+    /* set up quick references */
+    hardware->streamRegV2 = hardware->features[gcvFEATURE_HALTI2] || (hardware->config->streamCount > 8);
+    if (hardware->streamRegV2)
+    {
+        hardware->streamAddressState = 0x5180;
+        hardware->streamStrideState  = 0x5190;
+    }
+    else if (hardware->config->streamCount > 1)
+    {
+        hardware->streamAddressState = 0x01A0;
+        hardware->streamStrideState  = 0x01A8;
+    }
+    else
+    {
+        hardware->streamAddressState = 0x0193;
+        hardware->streamStrideState  = 0x0194;
+    }
+
+    if (hardware->features[gcvFEATURE_NEW_GPIPE])
+    {
+        hardware->shaderCtrlState = 0x0230;
+        hardware->genericWState = 0x5E80;
+    }
+    else
+    {
+        hardware->shaderCtrlState = 0x0208;
+        hardware->genericWState = 0x01E0;
+    }
+
 #endif
 
     /*
@@ -5451,23 +5579,21 @@ gcoHARDWARE_Construct(
 #if gcdENABLE_3D
     /*Set a invalid value when init*/
     *(gctUINT32 *)&(hardware->PEStates->alphaStates.floatReference) = 0xFFFFFFFF;
-#endif
 
-#if gcdENABLE_3D
 #if gcdSYNC
     for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
     {
         hardware->fence[i] = gcvNULL;
     }
 #endif
-#endif
 
-#if gcdENABLE_3D
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsHARDWARE_SLOT), &pointer));
 
     hardware->hwSlot = pointer;
 
+#if gcdENABLE_KERNEL_FENCE
     gcmONERROR(gcoHARDWARE_ResetHWSlot(hardware));
+#endif
 #endif
 
     gcmONERROR(_InitializeFlatMappingRange(hardware));
@@ -5732,7 +5858,7 @@ gceSTATUS gcoHARDWARE_Destroy(
             }
 
             /* Free the video memory by event. */
-            if (surf->node.u.normal.node != 0)
+            if (surf->node.pool != gcvPOOL_UNKNOWN)
             {
                 gcmONERROR(gcsSURF_NODE_Destroy(
                     &Hardware->temp2DSurf[i]->node
@@ -6925,7 +7051,9 @@ static void _WaitRlvFenceBack(gctUINT64 id, gcoFENCE fence)
     }
 
     /* Time Out */
+#if gcdDEBUG
     gcmPRINT("Fence Wait TimeOut!");
+#endif
     {
         gcsHAL_INTERFACE iface;
         iface.u.QueryResetTimeStamp.timeStamp = 0;
@@ -6989,7 +7117,9 @@ static void _WaitHWFenceBack(gctUINT64 id, gcoFENCE fence, gctBOOL isHwFence64bi
     }
 
     /* Time Out */
+#if gcdDEBUG
     gcmPRINT("Fence Wait TimeOut!");
+#endif
     {
         gcsHAL_INTERFACE iface;
         iface.u.QueryResetTimeStamp.timeStamp = 0;
@@ -7496,13 +7626,15 @@ _ConstructFence(
     {
         fence->type = gcvFENCE_CPU;
     }
-    if (Hardware->features[gcvFEATURE_FENCE_32BIT])
+    if (Hardware->features[gcvFEATURE_FENCE_32BIT] ||
+        Hardware->features[gcvFEATURE_FENCE_64BIT])
     {
         fence->type = gcvFENCE_HW;
     }
     else
     {
         fence->type = gcvFENCE_RLV;
+        gcmASSERT(Hardware->config->resolvePipes > 0);
     }
 
     /* BLT engine only work with HW fence for now,
@@ -7555,8 +7687,8 @@ _ConstructFence(
         gctINT32 bytes = 8;
 
         /*gcvFEATURE_MC_FCCACHE_BYTEMASK feature is fix for v621 HW cache overlap bug*/
-        if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400]) &&
-            !Hardware->features[gcvFEATURE_MC_FCCACHE_BYTEMASK])
+        if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
+        &&  !Hardware->features[gcvFEATURE_MC_FCCACHE_BYTEMASK])
         {
             bytes += 128;
         }
@@ -7613,7 +7745,7 @@ _ConstructFence(
 #if gcdFPGA_BUILD
     fence->delayCount   = 20000000;
 #else
-    fence->delayCount   = 20000;
+    fence->delayCount   = 2000000;
 #endif
 
     iface.ignoreTLS = gcvFALSE;
@@ -7745,6 +7877,12 @@ gcoHARDWARE_SendFence(
     gcmGETHARDWARE(Hardware);
 
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    if(!Hardware->features[gcvFEATURE_FENCE])
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     /* sometime we could call this function to send user fence, but skip, if it's kernel fence */
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_KERNEL_FENCE))
@@ -8153,7 +8291,7 @@ OnError:
 
 #endif
 
-#if gcdENABLE_3D
+#if gcdENABLE_3D && gcdENABLE_KENREL_FENCE
 gceSTATUS
 gcoHARDWARE_SetHWSlot(
     IN gcoHARDWARE Hardware,
@@ -13600,7 +13738,11 @@ gcoHARDWARE_CallEvent(
 
 #if gcdIN_QUEUE_RECORD_LIMIT
     if ((Hardware->engine[engine].queue->recordCount >= gcdIN_QUEUE_RECORD_LIMIT) &&
-        (Hardware->config->gpuCoreCount <= 1))
+        ((Hardware->config->gpuCoreCount <= 1)
+#if gcdENABLE_3D
+     || !(Hardware->specialHint & gcvHINT_BIT_2)
+#endif
+        ))
     {
         gcmONERROR(gcoHARDWARE_Commit(Hardware));
     }
@@ -13610,6 +13752,44 @@ OnError:
     /* Return status. */
     gcmFOOTER();
 #endif  /* (gcdENABLE_3D || gcdENABLE_2D) */
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_QueryQueuedMaxUnlockBytes(
+    IN  gcoHARDWARE Hardware,
+    OUT gctUINT_PTR Bytes
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+#if (gcdENABLE_3D || gcdENABLE_2D)
+    gceENGINE engine;
+    gctUINT maxUnlockBytes = 0;
+
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+    gcmDEBUG_VERIFY_ARGUMENT(Bytes);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    for (engine = 0 ; engine < gcvENGINE_GPU_ENGINE_COUNT; ++engine)
+    {
+        gcoQUEUE queue = Hardware->engine[engine].queue;
+        if (queue && maxUnlockBytes < queue->maxUnlockBytes)
+        {
+            maxUnlockBytes = queue->maxUnlockBytes;
+        }
+    }
+    *Bytes = maxUnlockBytes;
+
+OnError:
+    /* Return status. */
+    gcmFOOTER_ARG("Bytes=%d", maxUnlockBytes);
+#endif  /* (gcdENABLE_3D || gcdENABLE_2D) */
+
     return status;
 }
 
@@ -14015,7 +14195,7 @@ OnError:
                 ));
         }
 
-        if (surf->node.u.normal.node != 0)
+        if (surf->node.pool != gcvPOOL_UNKNOWN)
         {
             gcmVERIFY_OK(gcsSURF_NODE_Destroy(&surf->node));
         }
@@ -16362,11 +16542,10 @@ _EnableTileStatus(
  6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
  6:6)));
 
-        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] ||
-            Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
+        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
         {
             /* in case it's depth only, we need set this too */
-            if (Surface->isMsaa)
+            if (Surface->isMsaa && gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400))
             {
                 Hardware->MCStates->memoryConfig = ((((gctUINT32) (Hardware->MCStates->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
@@ -16675,10 +16854,9 @@ _EnableTileStatus(
  11:8)));
         }
 
-        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] ||
-            Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
+        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
         {
-            if (Surface->isMsaa)
+            if (Surface->isMsaa && gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400))
             {
                 Hardware->MCStates->memoryConfig = ((((gctUINT32) (Hardware->MCStates->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
@@ -17088,10 +17266,9 @@ _EnableTileStatusMRT(
  6:3)));
     }
 
-    if (Hardware->features[gcvFEATURE_COMPRESSION_V4] ||
-        Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
+    if (Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
     {
-        if (Surface->isMsaa)
+        if (Surface->isMsaa && gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400))
         {
             Hardware->MCStates->memoryConfigMRT[RtIndex] = ((((gctUINT32) (Hardware->MCStates->memoryConfigMRT[RtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:9) - (0 ? 9:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:9) - (0 ? 9:9) + 1))))))) << (0 ?
@@ -17161,10 +17338,9 @@ _EnableTileStatusMRT(
  11:8)));
         }
 
-        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] ||
-            Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
+        if (Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
         {
-            if (Surface->isMsaa)
+            if (Surface->isMsaa && gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400))
             {
                 Hardware->MCStates->memoryConfig = ((((gctUINT32) (Hardware->MCStates->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
@@ -17693,9 +17869,9 @@ gcoHARDWARE_FillFromTileStatus(
 
     /* If not support BLT_ENGINE, no multiSlice support when tile status enabled for now.*/
     gcmASSERT(SurfView->numSlices == 1);
-
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_BLT_DST, Surface->node.u.normal.node,0);
-
+#endif
     current = Hardware->PEStates->colorStates.target[0].surface;
     tmpView.surf = current;
     tmpView.firstSlice = Hardware->PEStates->colorStates.target[0].sliceIndex;
@@ -23468,13 +23644,35 @@ gcoHARDWARE_QueryCompression(
             {
                 compressed = gcvFALSE;
             }
+
+            if (Surface->isMsaa)
+            {
+                compressed &= (Hardware->options.allowCompression & gcvCOMPRESSION_OPTION_MSAA_DEPTH) ? gcvTRUE : gcvFALSE;
+            }
+            else
+            {
+                compressed &= (Hardware->options.allowCompression & gcvCOMPRESSION_OPTION_DEPTH) ? gcvTRUE : gcvFALSE;
+            }
         }
         else
         {
             gcmASSERT(Surface->formatInfo.fmtClass != gcvFORMAT_CLASS_DEPTH);
 
-            compressed = ((format != -1) &&
-                           (Surface->isMsaa || Hardware->features[gcvFEATURE_COLOR_COMPRESSION]));
+            if (format != -1)
+            {
+                if (Surface->isMsaa)
+                {
+                    compressed = (Hardware->options.allowCompression & gcvCOMPRESSION_OPTION_MSAA_COLOR) ? gcvTRUE : gcvFALSE;
+                }
+                else
+                {
+                    compressed = Hardware->features[gcvFEATURE_COLOR_COMPRESSION];
+                }
+            }
+            else
+            {
+                compressed = gcvFALSE;
+            }
         }
 
         /*
@@ -23496,6 +23694,11 @@ gcoHARDWARE_QueryCompression(
         }
 
         if (Surface->hints & gcvSURF_NO_COMPRESSION)
+        {
+            compressed = gcvFALSE;
+        }
+
+        if (!gcoHAL_GetOption(gcvNULL, gcvOPTION_COMPRESSION_DEC400))
         {
             compressed = gcvFALSE;
         }
@@ -23658,8 +23861,8 @@ static gceSTATUS _InitCompilerAPIs(
 
     gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
         blitDraw->vscLib,
-        "gcHINTS_Destroy",
-        (gctPOINTER*) &vscAPIs->gcHINTS_Destroy));
+        "gcFreeProgramState",
+        (gctPOINTER*) &vscAPIs->gcFreeProgramState));
 
     gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
         blitDraw->vscLib,
@@ -24397,18 +24600,7 @@ gceSTATUS _DestroyBlitDraw(
         for (j = 0; j < gcmMAX_VARIATION_NUM; j++)
         {
             gcsPROGRAM_STATE_VARIATION *temp = &blitDraw->programState[i][j];
-            if (temp->programState.hints)
-            {
-                (*vscAPIs->gcHINTS_Destroy)(temp->programState.hints);
-                gcmOS_SAFE_FREE(gcvNULL, temp->programState.hints);
-                temp->programState.hints = gcvNULL;
-            }
-
-            if (temp->programState.stateBuffer)
-            {
-                gcmOS_SAFE_FREE(gcvNULL, temp->programState.stateBuffer);
-                temp->programState.stateBuffer = gcvNULL;
-            }
+            (*vscAPIs->gcFreeProgramState)(temp->programState);
         }
 
         if (blitDraw->psShader[i])
@@ -24674,18 +24866,7 @@ _PickBlitDrawShader(
             if (i >= gcmMAX_VARIATION_NUM)
             {
                 gcmASSERT(temp);
-                if (temp->programState.hints)
-                {
-                    gcmONERROR(g_vscAPIs->gcHINTS_Destroy(temp->programState.hints));
-                    gcmOS_SAFE_FREE(gcvNULL, temp->programState.hints);
-                    temp->programState.hints = gcvNULL;
-                }
-
-                if (temp->programState.stateBuffer)
-                {
-                    gcmOS_SAFE_FREE(gcvNULL, temp->programState.stateBuffer);
-                    temp->programState.stateBuffer = gcvNULL;
-                }
+                g_vscAPIs->gcFreeProgramState(temp->programState);
             }
 
             gcmASSERT(temp->programState.stateBuffer == gcvNULL);
@@ -24778,9 +24959,7 @@ _PickBlitDrawShader(
                                                     gcvSHADER_REMOVE_UNUSED_UNIFORMS |
                                                     gcvSHADER_DISABLE_DEFAULT_UBO    |
                                                     gcvSHADER_FLUSH_DENORM_TO_ZERO),
-                                                   &temp->programState.stateBufferSize,
-                                                   &temp->programState.stateBuffer,
-                                                   &temp->programState.hints));
+                                                   &temp->programState));
 
             *programState = &temp->programState;
             temp->destFmt = requestDstFmt;
@@ -26371,166 +26550,174 @@ gcoHARDWARE_GetProductName(
     chipNameBase =
     chipName     = (gctSTRING) pointer;
 
-    if (Hardware->features[gcvFEATURE_HAS_PRODUCTID])
+    do
     {
-        gctUINT32 productID = Hardware->config->productID;
-        gctUINT32 type = (((((gctUINT32) (productID)) >> (0 ? 27:24)) & ((gctUINT32) ((((1 ? 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1)))))) );
-        gctUINT32 grade = (((((gctUINT32) (productID)) >> (0 ? 3:0)) & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1)))))) );
-
-        chipID = (((((gctUINT32) (productID)) >> (0 ? 23:4)) & ((gctUINT32) ((((1 ? 23:4) - (0 ? 23:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:4) - (0 ? 23:4) + 1)))))) );
-
-        switch (type)
+        if (Hardware->features[gcvFEATURE_HAS_PRODUCTID])
         {
-        case 0:
-            *chipName++ = 'G';
-            *chipName++ = 'C';
-            break;
-        case 1:
-            *chipName++ = 'D';
-            *chipName++ = 'E';
-            *chipName++ = 'C';
-            break;
-        case 2:
-            *chipName++ = 'D';
-            *chipName++ = 'C';
-            break;
-        case 3:
-            *chipName++ = 'V';
-            *chipName++ = 'G';
-            break;
-        case 4:
-            *chipName++ = 'S';
-            *chipName++ = 'C';
-            break;
-        case 5:
-            *chipName++ = 'V';
-            *chipName++ = 'P';
-            break;
-        default:
-            *chipName++ = '?';
-            *chipName++ = '?';
-            gcmPRINT("GAL: Invalid product type");
-            break;
-        }
+            gctUINT32 productID = Hardware->config->productID;
+            gctUINT32 type = (((((gctUINT32) (productID)) >> (0 ? 27:24)) & ((gctUINT32) ((((1 ? 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1)))))) );
+            gctUINT32 grade = (((((gctUINT32) (productID)) >> (0 ? 3:0)) & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1)))))) );
 
-        /* Translate the ID. */
-        for (i = 0; i < 8; i++)
-        {
-            /* Get the current digit. */
-            gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
-
-            /* Append the digit to the string. */
-            if (foundID || digit)
+            if (productID == 0x424F5343)
             {
-                *chipName++ = '0' + digit;
-                foundID = gcvTRUE;
+                gcoOS_StrCatSafe(chipNameBase, 32, "GCNanoVIP");
+                break;
+            }
+            chipID = (((((gctUINT32) (productID)) >> (0 ? 23:4)) & ((gctUINT32) ((((1 ? 23:4) - (0 ? 23:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:4) - (0 ? 23:4) + 1)))))) );
+
+            switch (type)
+            {
+            case 0:
+                *chipName++ = 'G';
+                *chipName++ = 'C';
+                break;
+            case 1:
+                *chipName++ = 'D';
+                *chipName++ = 'E';
+                *chipName++ = 'C';
+                break;
+            case 2:
+                *chipName++ = 'D';
+                *chipName++ = 'C';
+                break;
+            case 3:
+                *chipName++ = 'V';
+                *chipName++ = 'G';
+                break;
+            case 4:
+                *chipName++ = 'S';
+                *chipName++ = 'C';
+                break;
+            case 5:
+                *chipName++ = 'V';
+                *chipName++ = 'P';
+                break;
+            default:
+                *chipName++ = '?';
+                *chipName++ = '?';
+                gcmPRINT("GAL: Invalid product type");
+                break;
             }
 
-            /* Advance to the next digit. */
-            chipID <<= 4;
-        }
-
-        switch (grade)
-        {
-        case 0:             /* Normal id */
-        default:
-            break;
-
-        case 1:
-            gcoOS_StrCatSafe(chipNameBase, 32, "Nano");
-            break;
-
-        case 2:
-            gcoOS_StrCatSafe(chipNameBase, 32, "L");
-            break;
-
-        case 3:
-            gcoOS_StrCatSafe(chipNameBase, 32, "UL");
-            break;
-
-        case 4:
-            gcoOS_StrCatSafe(chipNameBase, 32, "XS");
-            break;
-
-        case 5:
-            gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra");
-            break;
-
-        case 6:
-            gcoOS_StrCatSafe(chipNameBase, 32, "NanoLite");
-            break;
-
-        case 7:
-            gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra3");
-            break;
-
-        case 8:
-            gcoOS_StrCatSafe(chipNameBase, 32, "XSVX");
-            break;
-
-        case 9:
-            gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra2");
-            break;
-
-        case 10:
-            gcoOS_StrCatSafe(chipNameBase, 32, "LXS");
-            break;
-
-        case 11:
-            gcoOS_StrCatSafe(chipNameBase, 32, "LXSVX");
-            break;
-
-        case 12:
-            gcoOS_StrCatSafe(chipNameBase, 32, "ULXS");
-            break;
-
-        case 13:
-            gcoOS_StrCatSafe(chipNameBase, 32, "VX");
-            break;
-
-        case 14:
-            gcoOS_StrCatSafe(chipNameBase, 32, "LVX");
-            break;
-
-        case 15:
-            gcoOS_StrCatSafe(chipNameBase, 32, "ULVX");
-            break;
-        }
-    }
-    else
-    {
-        chipID = Hardware->config->chipModel;
-
-        if (Hardware->config->chipFlags & gcvCHIP_FLAG_GC2000_R2)
-        {
-            chipID = gcv2000;
-        }
-
-        *chipName++ = 'G';
-        *chipName++ = 'C';
-
-        /* Translate the ID. */
-        for (i = 0; i < 8; i++)
-        {
-            /* Get the current digit. */
-            gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
-
-            /* Append the digit to the string. */
-            if (foundID || digit)
+            /* Translate the ID. */
+            for (i = 0; i < 8; i++)
             {
-                *chipName++ = '0' + digit;
-                foundID = gcvTRUE;
+                /* Get the current digit. */
+                gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
+
+                /* Append the digit to the string. */
+                if (foundID || digit)
+                {
+                    *chipName++ = '0' + digit;
+                    foundID = gcvTRUE;
+                }
+
+                /* Advance to the next digit. */
+                chipID <<= 4;
             }
 
-            /* Advance to the next digit. */
-            chipID <<= 4;
-        }
+            switch (grade)
+            {
+            case 0:             /* Normal id */
+            default:
+                break;
 
-        if (Hardware->config->chipFlags & gcvCHIP_FLAG_GC2000_R2)
-        {
-            *chipName++ ='+';
+            case 1:
+                gcoOS_StrCatSafe(chipNameBase, 32, "Nano");
+                break;
+
+            case 2:
+                gcoOS_StrCatSafe(chipNameBase, 32, "L");
+                break;
+
+            case 3:
+                gcoOS_StrCatSafe(chipNameBase, 32, "UL");
+                break;
+
+            case 4:
+                gcoOS_StrCatSafe(chipNameBase, 32, "XS");
+                break;
+
+            case 5:
+                gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra");
+                break;
+
+            case 6:
+                gcoOS_StrCatSafe(chipNameBase, 32, "NanoLite");
+                break;
+
+            case 7:
+                gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra3");
+                break;
+
+            case 8:
+                gcoOS_StrCatSafe(chipNameBase, 32, "XSVX");
+                break;
+
+            case 9:
+                gcoOS_StrCatSafe(chipNameBase, 32, "NanoUltra2");
+                break;
+
+            case 10:
+                gcoOS_StrCatSafe(chipNameBase, 32, "LXS");
+                break;
+
+            case 11:
+                gcoOS_StrCatSafe(chipNameBase, 32, "LXSVX");
+                break;
+
+            case 12:
+                gcoOS_StrCatSafe(chipNameBase, 32, "ULXS");
+                break;
+
+            case 13:
+                gcoOS_StrCatSafe(chipNameBase, 32, "VX");
+                break;
+
+            case 14:
+                gcoOS_StrCatSafe(chipNameBase, 32, "LVX");
+                break;
+
+            case 15:
+                gcoOS_StrCatSafe(chipNameBase, 32, "ULVX");
+                break;
+            }
         }
-    }
+        else
+        {
+            chipID = Hardware->config->chipModel;
+
+            if (Hardware->config->chipFlags & gcvCHIP_FLAG_GC2000_R2)
+            {
+                chipID = gcv2000;
+            }
+
+            *chipName++ = 'G';
+            *chipName++ = 'C';
+
+            /* Translate the ID. */
+            for (i = 0; i < 8; i++)
+            {
+                /* Get the current digit. */
+                gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
+
+                /* Append the digit to the string. */
+                if (foundID || digit)
+                {
+                    *chipName++ = '0' + digit;
+                    foundID = gcvTRUE;
+                }
+
+                /* Advance to the next digit. */
+                chipID <<= 4;
+            }
+
+            if (Hardware->config->chipFlags & gcvCHIP_FLAG_GC2000_R2)
+            {
+                *chipName++ ='+';
+            }
+        }
+    } while (gcvFALSE);
 
     gcoOS_StrDup(gcvNULL, pointer, ProductName);
 

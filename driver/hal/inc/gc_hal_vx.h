@@ -28,10 +28,10 @@ extern "C" {
 
 typedef gcoVX_Hardware_Context *    gcsVX_KERNEL_PARAMETERS_PTR;
 #else
-
-
 /* VX kernel parameters. */
 typedef struct _gcsVX_KERNEL_PARAMETERS * gcsVX_KERNEL_PARAMETERS_PTR;
+
+
 typedef struct _gcsVX_KERNEL_PARAMETERS
 {
     gctUINT32           kernel;
@@ -150,7 +150,7 @@ gceSTATUS
 gcoVX_AllocateMemory(
     IN gctUINT32        Size,
     OUT gctPOINTER*     Logical,
-    OUT gctPHYS_ADDR*   Physical,
+    OUT gctUINT32*      Physical,
     OUT gcsSURF_NODE_PTR* Node
     );
 
@@ -182,9 +182,7 @@ gcoVX_BindKernel(
 
 gceSTATUS
 gcoVX_LoadKernelShader(
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
+    IN gcsPROGRAM_STATE ProgramState
     );
 
 gceSTATUS
@@ -215,6 +213,7 @@ gceSTATUS
 gcoVX_ProgrammCrossEngine(
     IN gctPOINTER                Data,
     IN gceVX_ACCELERATOR_TYPE    Type,
+    IN gctPOINTER                Options,
     IN OUT gctUINT32_PTR        *Instruction
     );
 
@@ -246,14 +245,14 @@ gcoVX_FlushCache(
 gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32 *         Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     );
 
 gceSTATUS
 gcoVX_FreeMemoryEx(
-    IN gctPHYS_ADDR         Physical,
+    IN gctUINT32            Physical,
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
     IN gcsSURF_NODE_PTR     Node

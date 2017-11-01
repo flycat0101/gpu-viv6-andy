@@ -127,6 +127,8 @@ viv_handle_create_buffer(struct wl_client *client,
     surface->node.pool          = (gcePOOL) pool;
     surface->node.size          = (gctSIZE_T) size;
 
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
+
 #if gcdENABLE_3D
     /* Import tile status video memory node. */
     if (tsNode != 0)
@@ -137,6 +139,8 @@ viv_handle_create_buffer(struct wl_client *client,
     surface->tileStatusNode.u.normal.node = tsNode;
     surface->tileStatusNode.pool          = (gcePOOL  ) tsPool;
     surface->tileStatusNode.size          = (gctSIZE_T) tsSize;
+
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->tileStatusNode.sharedMutex));
 
     /* Set tile status disabled by default for compositor. */
     surface->tileStatusDisabled[0] = gcvTRUE;
@@ -257,6 +261,15 @@ veglQueryWaylandBuffer(
     )
 {
     struct wl_viv_buffer *buffer;
+
+    if (!wl_resource_instance_of(Buffer,
+                                  &wl_buffer_interface,
+                                  &wl_viv_buffer_implementation))
+    {
+        /* Not a wl_viv_buffer. */
+        return EGL_FALSE;
+    }
+
     buffer = wl_resource_get_user_data(Buffer);
 
     if (Width)

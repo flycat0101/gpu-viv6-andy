@@ -13,7 +13,6 @@
 
 #include "gc_es_context.h"
 #include "gc_gl_api_inline.c"
-#include "gc_gl_debug.h"
 
 
 #if defined(_WIN32)
@@ -97,11 +96,6 @@ GLvoid APIENTRY __glim_FogCoordd(__GLcontext *gc, GLdouble coord)
 {
     GLfloat fv[1];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FogCoordd", DT_GLdouble, coord, DT_GLnull);
-#endif
-
     fv[0] = coord;
     __glFogCoordfv( gc, fv );
 }
@@ -110,32 +104,17 @@ GLvoid APIENTRY __glim_FogCoorddv(__GLcontext *gc, const GLdouble *coord)
 {
     GLfloat fv[1];
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FogCoorddv", DT_GLdouble_ptr, coord, DT_GLnull);
-#endif
-
     fv[0] = *coord;
     __glFogCoordfv(gc, fv );
 }
 
 GLvoid APIENTRY __glim_FogCoordf(__GLcontext *gc, GLfloat coord)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FogCoordf", DT_GLfloat, coord, DT_GLnull);
-#endif
-
     __glFogCoordfv(gc, &coord );
 }
 
 GLvoid APIENTRY __glim_FogCoordfv(__GLcontext *gc, const GLfloat *coord)
 {
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FogCoordfv", DT_GLfloat_ptr, coord, DT_GLnull);
-#endif
-
     __glFogCoordfv(gc, (GLfloat *)coord );
 }
 

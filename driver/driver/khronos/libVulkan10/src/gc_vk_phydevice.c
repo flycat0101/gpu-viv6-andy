@@ -21,10 +21,11 @@
 
 const VkExtensionProperties g_DeviceExtensions[] =
 {
+    {VK_KHR_MAINTENANCE1_EXTENSION_NAME, VK_KHR_maintenance1},
 #if defined(VK_USE_PLATFORM_ANDROID_KHR) && (ANDROID_SDK_VERSION >= 24)
     {VK_ANDROID_NATIVE_BUFFER_EXTENSION_NAME, VK_ANDROID_NATIVE_BUFFER_SPEC_VERSION},
 #else
-    {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SWAPCHAIN_SPEC_VERSION},
+    {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SWAPCHAIN_SPEC_VERSION}
 #endif
 };
 
@@ -231,13 +232,26 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     }
     if (database->REG_Halti5)
     {
-        attribBufSizeInKbyte = database->USC_MAX_PAGES - (database->L1CacheSize / 4);
 
+        static const gctFLOAT s_uscCacheRatio[] =
+        {
+            1.0f,
+            0.5f,
+            0.25f,
+            0.125f,
+            0.0625f,
+            0.03125f,
+            0.75f,
+            0.0f,
+        };
+
+        attribBufSizeInKbyte = (uint32_t)
+           (database->USC_MAX_PAGES - (database->L1CacheSize * s_uscCacheRatio[phyDev->phyDevConfig.options.uscL1CacheRatio]));
         attribBufSizeInKbyte -= fragmentSizeInKbyte;
     }
 
-    pVscHwCfg->maxUSCSizeInKbyte = database->REG_Halti5 ? attribBufSizeInKbyte : 0;
-    pVscHwCfg->maxLocalMemSizeInByte = database->LocalStorageSize * 1024;
+    pVscHwCfg->maxUSCAttribBufInKbyte = database->REG_Halti5 ? attribBufSizeInKbyte : 0;
+    pVscHwCfg->maxLocalMemSizeInByte = attribBufSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize = database->RESULT_WINDOW_MAX_SIZE;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0 = database->REG_Halti0;
@@ -248,6 +262,7 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->hwFeatureFlags.hasHalti5 = database->REG_Halti5;
     pVscHwCfg->hwFeatureFlags.supportGS = database->REG_GeometryShader;
     pVscHwCfg->hwFeatureFlags.supportTS = database->REG_TessellationShaders;
+    pVscHwCfg->hwFeatureFlags.supportUSC = database->REG_Halti5;
     pVscHwCfg->hwFeatureFlags.supportInteger = supportInteger;
     pVscHwCfg->hwFeatureFlags.hasSignFloorCeil = database->REG_ExtraShaderInstructions0;
     pVscHwCfg->hwFeatureFlags.hasSqrtTrig = database->REG_ExtraShaderInstructions1;
@@ -306,6 +321,8 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->hwFeatureFlags.supportImgAddr = database->REG_Halti3;
     pVscHwCfg->hwFeatureFlags.hasUscGosAddrFix = database->USC_GOS_ADDR_FIX;
     pVscHwCfg->hwFeatureFlags.multiCluster = database->MULTI_CLUSTER;
+    /* Now LODQ can't return the correct raw LOD value as spec require. */
+    pVscHwCfg->hwFeatureFlags.hasLODQFix = gcvFALSE;
 
     return;
 }
@@ -508,6 +525,10 @@ static void __vki_InitializePhysicalDeviceFeatures(
         phyDevConfig->ecoID,
         phyDevConfig->customerID);
 
+    iface.command = gcvHAL_QUERY_CHIP_OPTION;
+    __VK_VERIFY_OK(__vk_DeviceControl(&iface, 0));
+    phyDevConfig->options = iface.u.QueryChipOptions;
+
     phyDev->phyDevFeatures.robustBufferAccess                      = VK_TRUE; /* phyDevConfig->database->ROBUSTNESS */
     phyDev->phyDevFeatures.fullDrawIndexUint32                     = VK_FALSE;
     phyDev->phyDevFeatures.imageCubeArray                          = phyDevConfig->database->REG_Halti5;
@@ -534,7 +555,7 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.textureCompressionBC                    = VK_FALSE;
     phyDev->phyDevFeatures.occlusionQueryPrecise                   = VK_TRUE;
     phyDev->phyDevFeatures.pipelineStatisticsQuery                 = VK_FALSE;
-    phyDev->phyDevFeatures.vertexPipelineStoresAndAtomics          = phyDevConfig->database->REG_Halti2;
+    phyDev->phyDevFeatures.vertexPipelineStoresAndAtomics          = VK_FALSE;
     phyDev->phyDevFeatures.fragmentStoresAndAtomics                = phyDevConfig->database->REG_Halti2;
     phyDev->phyDevFeatures.shaderTessellationAndGeometryPointSize  = phyDevConfig->database->REG_TessellationShaders;
     phyDev->phyDevFeatures.shaderImageGatherExtended               = VK_FALSE;
@@ -960,7 +981,7 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.limits.framebufferNoAttachmentsSampleCounts            = sampleMask;
     phyDev->phyDevProp.limits.maxColorAttachments                             = __VK_MAX_RENDER_TARGETS;
     phyDev->phyDevProp.limits.sampledImageColorSampleCounts                   = sampleMask;
-    phyDev->phyDevProp.limits.sampledImageIntegerSampleCounts                 = sampleMask;
+    phyDev->phyDevProp.limits.sampledImageIntegerSampleCounts                 = VK_SAMPLE_COUNT_1_BIT;
     phyDev->phyDevProp.limits.sampledImageDepthSampleCounts                   = sampleMask;
     phyDev->phyDevProp.limits.sampledImageStencilSampleCounts                 = sampleMask;
     phyDev->phyDevProp.limits.storageImageSampleCounts                        = phyDev->phyDevFeatures.shaderStorageImageMultisample
@@ -1251,38 +1272,71 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties(
         {
             VkPhysicalDeviceLimits *pLimits = &phyDev->phyDevProp.limits;
 
+            sampleCounts = ~(VkSampleCountFlags)0;
+
             if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
             {
-                sampleCounts |= pLimits->storageImageSampleCounts;
+                sampleCounts &= pLimits->storageImageSampleCounts;
             }
-            else
+            if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+            {
+                sampleCounts &= pLimits->framebufferColorSampleCounts;
+            }
+            if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
             {
                 switch (format)
                 {
                 case VK_FORMAT_D16_UNORM:
                 case VK_FORMAT_X8_D24_UNORM_PACK32:
                 case VK_FORMAT_D32_SFLOAT:
-                    sampleCounts |= pLimits->sampledImageDepthSampleCounts;
+                    sampleCounts &= pLimits->framebufferDepthSampleCounts;
                     break;
                 case VK_FORMAT_S8_UINT:
-                    sampleCounts |= pLimits->sampledImageStencilSampleCounts;
+                    sampleCounts &= pLimits->framebufferStencilSampleCounts;
                     break;
                 case VK_FORMAT_D16_UNORM_S8_UINT:
                 case VK_FORMAT_D24_UNORM_S8_UINT:
                 case VK_FORMAT_D32_SFLOAT_S8_UINT:
-                    sampleCounts |= (pLimits->sampledImageDepthSampleCounts & pLimits->sampledImageStencilSampleCounts);
+                    sampleCounts &= (pLimits->framebufferDepthSampleCounts & pLimits->framebufferStencilSampleCounts);
+                    break;
+                default:
+                    __VK_ASSERT(!"Must have depth or stencil aspect");
+                    break;
+                }
+            }
+            if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+            {
+                switch (format)
+                {
+                case VK_FORMAT_D16_UNORM:
+                case VK_FORMAT_X8_D24_UNORM_PACK32:
+                case VK_FORMAT_D32_SFLOAT:
+                    sampleCounts &= pLimits->sampledImageDepthSampleCounts;
+                    break;
+                case VK_FORMAT_S8_UINT:
+                    sampleCounts &= pLimits->sampledImageStencilSampleCounts;
+                    break;
+                case VK_FORMAT_D16_UNORM_S8_UINT:
+                case VK_FORMAT_D24_UNORM_S8_UINT:
+                case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                    sampleCounts &= (pLimits->sampledImageDepthSampleCounts & pLimits->sampledImageStencilSampleCounts);
                     break;
                 default:
                     if (formatInfo->category == __VK_FMT_CATEGORY_UINT || formatInfo->category == __VK_FMT_CATEGORY_SINT)
                     {
-                        sampleCounts |= pLimits->sampledImageIntegerSampleCounts;
+                        sampleCounts &= pLimits->sampledImageIntegerSampleCounts;
                     }
                     else
                     {
-                        sampleCounts |= pLimits->sampledImageColorSampleCounts;
+                        sampleCounts &= pLimits->sampledImageColorSampleCounts;
                     }
                     break;
                 }
+            }
+
+            if (sampleCounts == ~(VkSampleCountFlags)0)
+            {
+                sampleCounts &= VK_SAMPLE_COUNT_1_BIT;
             }
         }
 
@@ -1354,5 +1408,256 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceMemoryProperties(
         pMemoryProperties[i] = inst->physicalDevice[i].phyDevMemProp;
     }
 }
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties(
+    VkPhysicalDevice physicalDevice,
+    VkFormat format,
+    VkImageType type,
+    VkSampleCountFlagBits samples,
+    VkImageUsageFlags usage,
+    VkImageTiling tiling,
+    uint32_t* pPropertyCount,
+    VkSparseImageFormatProperties* pProperties
+    )
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+
+    if (!pProperties)
+    {
+        *pPropertyCount = phyDev->phyDevFeatures.sparseBinding;
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFeatures2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    VkPhysicalDeviceFeatures2KHR*               pFeatures)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+
+    pFeatures->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
+    pFeatures->pNext = VK_NULL_HANDLE;
+    pFeatures->features = phyDev->phyDevFeatures;
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    VkPhysicalDeviceProperties2KHR*             pProperties)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+
+    pProperties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
+    pProperties->pNext = VK_NULL_HANDLE;
+    pProperties->properties = phyDev->phyDevProp;
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    VkFormat                                    format,
+    VkFormatProperties2KHR*                     pFormatProperties)
+{
+    pFormatProperties->sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2_KHR;
+    pFormatProperties->pNext = VK_NULL_HANDLE;
+    pFormatProperties->formatProperties = g_vkFormatInfoTable[format].formatProperties;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    const VkPhysicalDeviceImageFormatInfo2KHR*  pImageFormatInfo,
+    VkImageFormatProperties2KHR*                pImageFormatProperties)
+{
+    VkResult ret = VK_SUCCESS;
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    uint32_t maxDim = phyDev->phyDevConfig.database->REG_Texture8K ? 8192 : 2048;
+    VkFormat format = pImageFormatInfo->format;
+    VkImageTiling tiling = pImageFormatInfo->tiling;
+    VkImageUsageFlags usage = pImageFormatInfo->usage;
+    VkImageType type = pImageFormatInfo->type;
+    VkImageCreateFlags flags = pImageFormatInfo->flags;
+    __vkFormatInfo *formatInfo = &g_vkFormatInfoTable[format];
+    VkFormatFeatureFlags formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
+                                        ? formatInfo->formatProperties.linearTilingFeatures
+                                        : formatInfo->formatProperties.optimalTilingFeatures;
+
+    if (formatFeatures == 0)
+    {
+        ret = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT) && !(formatFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT))
+    {
+        ret = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    else if ((usage & VK_IMAGE_USAGE_STORAGE_BIT) && !(formatFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT))
+    {
+        ret = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    else if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) && !(formatFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
+    {
+        ret = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    else if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) && !(formatFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
+    {
+        ret = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+
+    if (ret != VK_SUCCESS)
+    {
+        /* For unsupported combinations, then all members will be filled with zero*/
+        __VK_MEMZERO(&pImageFormatProperties->imageFormatProperties, sizeof(VkImageFormatProperties));
+    }
+    else
+    {
+        VkSampleCountFlags sampleCounts = VK_SAMPLE_COUNT_1_BIT;
+
+        if (tiling == VK_IMAGE_TILING_OPTIMAL && type == VK_IMAGE_TYPE_2D &&
+            !(flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) &&
+            (formatFeatures & (VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)))
+        {
+            VkPhysicalDeviceLimits *pLimits = &phyDev->phyDevProp.limits;
+
+            sampleCounts = ~(VkSampleCountFlags)0;
+
+            if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+            {
+                sampleCounts &= pLimits->storageImageSampleCounts;
+            }
+            if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+            {
+                sampleCounts &= pLimits->framebufferColorSampleCounts;
+            }
+            if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+            {
+                switch (format)
+                {
+                case VK_FORMAT_D16_UNORM:
+                case VK_FORMAT_X8_D24_UNORM_PACK32:
+                case VK_FORMAT_D32_SFLOAT:
+                    sampleCounts &= pLimits->framebufferDepthSampleCounts;
+                    break;
+                case VK_FORMAT_S8_UINT:
+                    sampleCounts &= pLimits->framebufferStencilSampleCounts;
+                    break;
+                    case VK_FORMAT_D16_UNORM_S8_UINT:
+                case VK_FORMAT_D24_UNORM_S8_UINT:
+                case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                    sampleCounts &= (pLimits->framebufferDepthSampleCounts & pLimits->framebufferStencilSampleCounts);
+                    break;
+                default:
+                    __VK_ASSERT(!"Must have depth or stencil aspect");
+                    break;
+                }
+            }
+            if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+            {
+                switch (format)
+                {
+                case VK_FORMAT_D16_UNORM:
+                case VK_FORMAT_X8_D24_UNORM_PACK32:
+                case VK_FORMAT_D32_SFLOAT:
+                    sampleCounts &= pLimits->sampledImageDepthSampleCounts;
+                    break;
+                case VK_FORMAT_S8_UINT:
+                    sampleCounts &= pLimits->sampledImageStencilSampleCounts;
+                    break;
+                case VK_FORMAT_D16_UNORM_S8_UINT:
+                case VK_FORMAT_D24_UNORM_S8_UINT:
+                case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                    sampleCounts &= (pLimits->sampledImageDepthSampleCounts & pLimits->sampledImageStencilSampleCounts);
+                    break;
+                default:
+                    if (formatInfo->category == __VK_FMT_CATEGORY_UINT || formatInfo->category == __VK_FMT_CATEGORY_SINT)
+                    {
+                        sampleCounts &= pLimits->sampledImageIntegerSampleCounts;
+                    }
+                    else
+                    {
+                        sampleCounts &= pLimits->sampledImageColorSampleCounts;
+                    }
+                    break;
+                }
+            }
+
+            if (sampleCounts == ~(VkSampleCountFlags)0)
+            {
+                sampleCounts &= VK_SAMPLE_COUNT_1_BIT;
+            }
+        }
+
+        pImageFormatProperties->imageFormatProperties.maxExtent.width       = maxDim;
+        pImageFormatProperties->imageFormatProperties.maxExtent.height      = 1;
+        pImageFormatProperties->imageFormatProperties.maxExtent.depth       = 1;
+        if (type > VK_IMAGE_TYPE_1D)
+            pImageFormatProperties->imageFormatProperties.maxExtent.height = maxDim;
+        if (type == VK_IMAGE_TYPE_3D)
+            pImageFormatProperties->imageFormatProperties.maxExtent.depth  = maxDim;
+        pImageFormatProperties->imageFormatProperties.maxArrayLayers       = (type == VK_IMAGE_TYPE_3D) ? 1 : maxDim;
+        pImageFormatProperties->imageFormatProperties.maxMipLevels         = __vkFloorLog2(maxDim) + 1;
+        pImageFormatProperties->imageFormatProperties.sampleCounts         = sampleCounts;
+        pImageFormatProperties->imageFormatProperties.maxResourceSize      = 1u << 31;
+    }
+
+    return ret;
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceQueueFamilyProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t*                                   pQueueFamilyPropertyCount,
+    VkQueueFamilyProperties2KHR*                pQueueFamilyProperties)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    uint32_t i, count;
+
+    if (!pQueueFamilyProperties)
+    {
+        /* Just return the number of queue families available */
+        *pQueueFamilyPropertyCount = phyDev->queueFamilyCount;
+    }
+    else
+    {
+        count = gcmMIN(*pQueueFamilyPropertyCount, phyDev->queueFamilyCount);
+        for (i = 0; i < count; i++)
+        {
+            pQueueFamilyProperties[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2_KHR;
+            pQueueFamilyProperties[i].pNext = VK_NULL_HANDLE;
+            pQueueFamilyProperties[i].queueFamilyProperties = phyDev->queueProp[i];
+        }
+        /* Return the actual queue family count */
+        *pQueueFamilyPropertyCount = count;
+    }
+
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceMemoryProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    VkPhysicalDeviceMemoryProperties2KHR*       pMemoryProperties)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    __vkInstance *inst = phyDev->pInst;
+    uint32_t i;
+
+    pMemoryProperties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2_KHR;
+    pMemoryProperties->pNext = VK_NULL_HANDLE;
+
+    for (i = 0; i < inst->physicalDeviceCount; i++)
+    {
+        pMemoryProperties[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2_KHR;
+        pMemoryProperties[i].pNext = VK_NULL_HANDLE;
+        pMemoryProperties[i].memoryProperties = inst->physicalDevice[i].phyDevMemProp;
+    }
+
+}
+
+VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties2KHR(
+    VkPhysicalDevice                            physicalDevice,
+    const VkPhysicalDeviceSparseImageFormatInfo2KHR* pFormatInfo,
+    uint32_t*                                   pPropertyCount,
+    VkSparseImageFormatProperties2KHR*          pProperties)
+{
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    if (!pProperties)
+    {
+        *pPropertyCount = phyDev->phyDevFeatures.sparseBinding;
+    }
+}
+
 
 

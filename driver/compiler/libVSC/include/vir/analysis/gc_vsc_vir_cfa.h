@@ -138,7 +138,8 @@ typedef enum _VIR_CFG_EDGE_TYPE
 {
     VIR_CFG_EDGE_TYPE_ALWAYS    = 0,
     VIR_CFG_EDGE_TYPE_TRUE,
-    VIR_CFG_EDGE_TYPE_FALSE
+    VIR_CFG_EDGE_TYPE_FALSE,
+    VIR_CFG_EDGE_TYPE_COUNT,
 }VIR_CFG_EDGE_TYPE;
 
 typedef enum _VIR_CFG_DFS_EDGE_TYPE
@@ -454,7 +455,8 @@ VIR_BB_ChangeSuccBBs(
     );
 void
 VIR_BB_RemoveBranch(
-    VIR_BASIC_BLOCK* bb
+    VIR_BASIC_BLOCK* bb,
+    gctBOOL setNop
     );
 VSC_ErrCode
 VIR_BB_Append(

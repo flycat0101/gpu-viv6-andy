@@ -687,6 +687,9 @@ struct __GLchipSLProgramRec
     /* Bit-mask to record which samplers are of any shadow type, they need to be recompiled */
     __GLbitmask                         shadowSamplerMask;
 
+    /* Bit-mask to record which samplers used as texelFetch and related builtin functions */
+    __GLbitmask                         texelFetchSamplerMask;
+
     /* The array is indexed by HAL sampler physical index, which should be same as HW's sampler index */
     __GLchipSampler                     samplerMap[__GL_MAX_GLSL_SAMPLERS];
 

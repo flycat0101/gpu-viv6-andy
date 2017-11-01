@@ -110,6 +110,7 @@ SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/linker/gc_vsc_vir_linker.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/passmanager/gc_vsc_options.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/passmanager/gc_vsc_vir_pass_mnger.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/transform/gc_vsc_vir_misc_opts.o
+SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/transform/gc_vsc_vir_param_opts.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/transform/gc_vsc_vir_peephole.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/transform/gc_vsc_vir_scalarization.o
 SOURCE_OBJECTS += $(driver_root)/compiler/libVSC/vir/transform/gc_vsc_vir_simplification.o

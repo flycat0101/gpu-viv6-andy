@@ -253,6 +253,7 @@ void drawQuadUsingTexture()
     glUniform1i(locTexture, 0);
 
     /* Clear background.*/
+    glViewport(0, 0, width, height);
     glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -297,6 +298,7 @@ void Render()
     glUniformMatrix4fv(locTransformMat, 1, GL_FALSE, transformMatrix);
 
     /* Clear background.*/
+    glViewport(0, 0, texWidth, texHeight);
     glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 

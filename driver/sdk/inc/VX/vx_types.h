@@ -317,6 +317,8 @@ typedef struct _vx_tensor_addressing_t  * vx_tensor_addressing;
 
 typedef struct _vx_weights_biases_parameter *     vx_weights_biases_parameter;
 
+typedef struct _vx_nn_convolution_relu_pooling_params_t * vx_nn_convolution_relu_pooling_params;
+
 /*! \brief A Boolean value.
  * This allows 0 to be FALSE, as it is in C, and any non-zero to be TRUE.
  * \code
@@ -786,6 +788,7 @@ enum vx_df_image_e {
      */
     VX_DF_IMAGE_S32  = VX_DF_IMAGE('S','0','3','2'),
 };
+
 /*! \brief The Target Enumeration.
  * \ingroup group_basic_features
  */
@@ -1341,6 +1344,32 @@ enum vx_border_policy_e {
     VX_BORDER_POLICY_RETURN_ERROR = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_BORDER_POLICY) + 0x1,
 };
 
+/*! \brief The pad mode list.
+ * \ingroup group_borders
+ */
+enum vx_pad_mode_e {
+    /*! \brief For nodes that support this behavior, a constant value is
+     * \e filled-in when accessing padding pixels.
+     * eg. [1,2,3,4]->C,C,[1,2,3,4]C,C
+     */
+    VX_PAD_CONSTANT = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_BORDER) + 0x0,
+    /*! \brief For nodes that support this behavior, a relicateion of the nearest
+     * edge pixels value is given for padding pixels.
+     * eg. [1,2,3,4]->1,1,[1,2,3,4],4,4
+     */
+    VX_PAD_REPLICATE = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_BORDER) + 0x1,
+    /*! \brief For nodes that support this behavior, a mirror of the nearest
+     * edge pixels value is given for padding pixels. ege is duplicate.
+     * eg. [1,2,3,4]->2,1,[1,2,3,4],4,3
+     */
+    VX_PAD_MIRROR_SYMMETRIC = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_BORDER) + 0x2,
+    /*! \brief For nodes that support this behavior, a mirror of the nearest
+     * edge pixels value is given for padding pixels. ege is not duplicate.
+     * eg. [1,2,3,4]->3,2,[1,2,3,4],3,2
+     */
+    VX_PAD_MIRROR_REFLECT = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_BORDER) + 0x3,
+};
+
 /*! \brief The termination criteria list.
  * \see group_vision_function_opticalflowpyrlk
  * \ingroup group_context
@@ -1406,45 +1435,6 @@ enum vx_round_policy_e {
     /*! \brief When scaling, this rounds to nearest even output value. */
     VX_ROUND_POLICY_TO_NEAREST_EVEN = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_ROUND_POLICY) + 0x2,
 };
-
-/*!
- * \brief The entry point into modules loaded by <tt>\ref vxLoadKernels</tt>.
- * \param [in] context The handle to the implementation context.
- * \note The symbol exported from the user module must be <tt>vxPublishKernels</tt> in extern C format.
- * \ingroup group_user_kernels
- */
-typedef vx_status (VX_API_CALL *vx_publish_kernels_f)(vx_context context);
-
-/*!
- * \brief The pointer to the Host side kernel.
- * \param [in] node The handle to the node that contains this kernel.
- * \param [in] parameters The array of parameter references.
- * \param [in] num The number of parameters.
- * \ingroup group_user_kernels
- */
-typedef vx_status (VX_CALLBACK *vx_kernel_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-/*!
- * \brief The pointer to the kernel initializer. If the host code requires a call
- * to initialize data once all the parameters have been validated, this function is called
- * if not NULL.
- * \param [in] node The handle to the node that contains this kernel.
- * \param [in] parameters The array of parameter references.
- * \param [in] num The number of parameters.
- * \ingroup group_user_kernels
- */
-typedef vx_status (VX_CALLBACK *vx_kernel_initialize_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-/*!
- * \brief The pointer to the kernel deinitializer. If the host code requires a call
- * to deinitialize data during a node garbage collection, this function is called
- * if not NULL.
- * \param [in] node The handle to the node that contains this kernel.
- * \param [in] parameters The array of parameter references.
- * \param [in] num The number of parameters.
- * \ingroup group_user_kernels
- */
-typedef vx_status (VX_CALLBACK *vx_kernel_deinitialize_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
 
 /*!
  * \brief The user-defined kernel node input parameter validation function.
@@ -1684,7 +1674,8 @@ typedef struct _vx_border_t {
 } vx_border_t;
 
 typedef struct _vx_weights_biases_parameter_optimizations_t {
-    vx_uint8 zrl;          /*!< \brief The zero run length. */
+    vx_int8 zrl;          /*!< \brief The zero run length. Set negtive value to disable*/
+    vx_enum outputFormat;  /*!< \brief The output format. */
 } vx_weights_biases_parameter_optimizations_t;
 
 /*!

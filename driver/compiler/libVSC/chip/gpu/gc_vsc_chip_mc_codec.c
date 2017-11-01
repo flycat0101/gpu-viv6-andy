@@ -5486,7 +5486,12 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
     if (pCodecHelperInst->instCtrl.instType == 0x1)
     {
         if (pCodecHelperInst->baseOpcode != 0x72 &&
-            pCodecHelperInst->baseOpcode != 0x09 &&
+            /* For MOV, it can support FLOAT16 only in dual-t. */
+            !(pCodecHelperInst->baseOpcode == 0x09
+              &&
+              pMcCodec->bDual16ModeEnabled
+              &&
+              pCodecHelperInst->instCtrl.threadType == 0x0) &&
             pCodecHelperInst->baseOpcode != 0x2B &&
             pCodecHelperInst->baseOpcode != 0x32 &&
             pCodecHelperInst->baseOpcode != 0x39 &&
@@ -5719,20 +5724,18 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D ||
         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_STORE_ATTR)
     {
-        if (!(pMcCodec->pHwCfg->hwFeatureFlags.hasHalti5 && pMcCodec->pHwCfg->maxUSCSizeInKbyte > 0))
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportUSC)
         {
             GotoError();
         }
     }
 
-    if (IS_MEM_ACCESS_MC_OPCODE(pCodecHelperInst->baseOpcode) ||
-        (pCodecHelperInst->baseOpcode == 0x7F &&
-         pCodecHelperInst->extOpcode == 0x13))
+    if (IS_MEM_ACCESS_MC_OPCODE(pCodecHelperInst->baseOpcode))
     {
         /* For local memory l/s, USC must be armed on chips */
         if (pCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage)
         {
-            if (!(pMcCodec->pHwCfg->maxUSCSizeInKbyte > 0))
+            if (!(pMcCodec->pHwCfg->maxLocalMemSizeInByte > 0))
             {
                 GotoError();
             }

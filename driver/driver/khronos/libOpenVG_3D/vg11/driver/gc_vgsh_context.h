@@ -161,6 +161,7 @@ struct _VGContext
     gctHANDLE                   dll;
     gctGLSLInitCompiler         pfInitCompiler;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
+    gcoPROFILER                 profilerObj;
 };
 
 

@@ -89,13 +89,14 @@ _GenExtension(
     char * str;
     gctSIZE_T len = 0;
     struct eglExtension * ext;
+    gcePATCH_ID patchId   = gcvPATCH_INVALID;
 
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FBDEV_VIV ||
-        Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR ||
-        Display->platform->platform == EGL_PLATFORM_GBM_KHR)
+        Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV ||
+        Display->platform->platform == EGL_PLATFORM_GBM_VIV)
     {
         extensions[VEGL_EXTID_EXT_buffer_age].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_KHR_partial_update].enabled      = EGL_TRUE;
@@ -103,7 +104,7 @@ _GenExtension(
 #endif
 
 #if defined(ANDROID)
-    if (Display->platform->platform == EGL_PLATFORM_ANDROID_KHR)
+    if (Display->platform->platform == EGL_PLATFORM_ANDROID_VIV)
     {
         extensions[VEGL_EXTID_EXT_buffer_age].enabled              = EGL_TRUE;
         extensions[VEGL_EXTID_KHR_partial_update].enabled          = EGL_TRUE;
@@ -121,12 +122,19 @@ _GenExtension(
     extensions[VEGL_EXTID_WL_bind_wayland_display].enabled             = EGL_TRUE;
     extensions[VEGL_EXTID_WL_create_wayland_buffer_from_image].enabled = EGL_TRUE;
 
-    if (Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR)
+    if (Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV)
     {
         extensions[VEGL_EXTID_EXT_swap_buffers_with_damage].enabled = EGL_TRUE;
         extensions[VEGL_EXTID_KHR_swap_buffers_with_damage].enabled = EGL_TRUE;
     }
 #endif
+
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+    if (patchId == gcvPATCH_DEQP &&
+        !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_ROBUSTNESS))
+    {
+        extensions[VEGL_EXTID_EXT_create_context_robustness].enabled = EGL_FALSE;
+    }
 
     if (Thread->security)
     {
@@ -165,6 +173,11 @@ _GenExtension(
     /* Remove the tail space. */
     str[len - 2] = '\0';
     Display->extString = str;
+}
+
+EGLBoolean _IsExtSuppored(EGLenum extId)
+{
+    return extensions[extId].enabled;
 }
 
 static const char clientExtension[] =
@@ -465,7 +478,7 @@ _FillIn(
 
 #if defined(ANDROID)
     gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+    if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
         && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
         esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
     {
@@ -598,27 +611,6 @@ _SetTraceMode(
         Once = gcvTRUE;
     }
 
-#if VIVANTE_PROFILER
-    /* single thread mode has to be used when running in profile mode */
-    if (enableSwapWorker)
-    {
-        char *env = gcvNULL;
-        gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &env);
-
-        if ((env != gcvNULL) && (!gcmIS_SUCCESS(gcoOS_StrCmp(env, "0"))))
-        {
-            enableSwapWorker = gcvFALSE;
-
-            gcoOS_GetEnv(gcvNULL, "VP_SYNC_MODE", &env);
-
-            if ((env != gcvNULL) && (gcmIS_SUCCESS(gcoOS_StrCmp(env, "0"))))
-            {
-                enableSwapWorker = gcvTRUE;
-            }
-        }
-    }
-#endif
-
     return;
 }
 
@@ -697,9 +689,6 @@ _SupportedPlatforms[] =
 #if defined(WL_EGL_PLATFORM)
     {"wayland", veglGetWaylandPlatform},
 #endif
-#if defined(__GBM__)
-    {"gbm",     veglGetGbmPlatform},
-#endif
 #if defined(__QNXNTO__)
     {"qnx",     veglGetQnxPlatform},
 #endif
@@ -710,6 +699,10 @@ _SupportedPlatforms[] =
     {"fbdev",   veglGetFbdevPlatform},
 #endif
     {"nullws",  veglGetNullwsPlatform},
+    /* make sure gbm is after default platform */
+#if defined(__GBM__)
+    {"gbm",     veglGetGbmPlatform},
+#endif
 };
 
 static EGLDisplay
@@ -1542,7 +1535,20 @@ veglInitilizeDisplay(
             gcmASSERT(Display->workerThread == gcvNULL);
 
 #if defined(X11) || (defined(X_PROTOCOL) && X_PROTOCOL)
+
+#ifdef X11_DRI3
+            /* Start the thread. */
+            if (enableSwapWorker)
+            {
+                gcmERR_BREAK(gcoOS_CreateThread(
+                    gcvNULL, veglSwapWorker, Display, &Display->workerThread
+                    ));
+            }
+
+#else
             Display->workerThread = gcvNULL;
+#endif
+
 #elif gcdANDROID_NATIVE_FENCE_SYNC >= 2
             /*
              * Swap worker is not required when android native fence sync

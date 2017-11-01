@@ -44,6 +44,14 @@
     vkApiMacro(GetDisplayPlaneCapabilitiesKHR) \
     vkApiMacro(CreateDisplayPlaneSurfaceKHR) \
     vkApiMacro(CreateSwapchainKHR) \
+    vkApiMacro(GetPhysicalDeviceFeatures2KHR) \
+    vkApiMacro(GetPhysicalDeviceProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceFormatProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceImageFormatProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceQueueFamilyProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceMemoryProperties2KHR) \
+    vkApiMacro(GetPhysicalDeviceSparseImageFormatProperties2KHR) \
+    vkApiMacro(TrimCommandPoolKHR) \
     vkApiMacro(CreateDebugReportCallbackEXT) \
     vkApiMacro(DestroyDebugReportCallbackEXT) \
     vkApiMacro(DebugReportMessageEXT) \

@@ -37,6 +37,15 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unistd.h>
 #include <X11/Xlibint.h>
 #include <X11/extensions/Xext.h>
+
+#ifdef X11_DRI3
+#include <X11/Xlib-xcb.h>
+#include <X11/xshmfence.h>
+#include <xcb/xcb.h>
+#include <xcb/dri3.h>
+#include <xcb/present.h>
+#endif
+
 #include "extutil.h"
 #include "glxclient.h"
 #include "xf86dri.h"
@@ -361,6 +370,21 @@ static GLvoid driDestroyDisplay(Display *dpy, GLvoid *private)
  */
 typedef GLvoid (*TDESDISP)(__DRInativeDisplay *dpy, GLvoid *displayPrivate);
 
+#ifdef X11_DRI3
+static GLboolean check_dri3(xcb_connection_t *con) {
+    const xcb_query_extension_reply_t *ext;
+
+    xcb_prefetch_extension_data (con, &xcb_dri3_id);
+    xcb_prefetch_extension_data (con, &xcb_present_id);
+    ext = xcb_get_extension_data(con, &xcb_dri3_id);
+    if (!(ext && ext->present))
+        return GL_FALSE;
+    ext = xcb_get_extension_data(con, &xcb_present_id);
+    if (!(ext && ext->present))
+        return GL_FALSE;
+    return GL_TRUE;
+}
+#endif
 
 GLvoid *driCreateDisplay(Display *dpy, __DRIdisplay *pdisp)
 {
@@ -369,6 +393,15 @@ GLvoid *driCreateDisplay(Display *dpy, __DRIdisplay *pdisp)
     int eventBase, errorBase;
     int major = 4, minor = 0, patch = 0;
     int scrn;
+    GLboolean dri3;
+
+#ifdef X11_DRI3
+    xcb_connection_t                     *c = XGetXCBConnection(dpy);
+    xcb_dri3_query_version_cookie_t      dri3_cookie;
+    xcb_dri3_query_version_reply_t       *dri3_reply;
+    xcb_generic_error_t                  *error;
+    GLboolean hasdri3;
+#endif
 
     /* Initialize these fields to NULL in case we fail.
      * If we don't do this we may later get segfaults trying to free random
@@ -378,6 +411,9 @@ GLvoid *driCreateDisplay(Display *dpy, __DRIdisplay *pdisp)
     pdisp->destroyDisplay = NULL;
     pdisp->createScreen = NULL;
 
+#ifndef X11_DRI3
+
+    dri3 = GL_FALSE;
     if (!XF86DRIQueryExtension(dpy, &eventBase, &errorBase)) {
         return NULL;
     }
@@ -386,6 +422,39 @@ GLvoid *driCreateDisplay(Display *dpy, __DRIdisplay *pdisp)
         return NULL;
     }
 
+
+#else
+
+    hasdri3 = check_dri3(c);
+    if (!hasdri3){
+
+        if (!XF86DRIQueryExtension(dpy, &eventBase, &errorBase)) {
+            return NULL;
+        }
+
+        if (!XF86DRIQueryVersion(dpy, &major, &minor, &patch)) {
+            return NULL;
+        }
+        dri3 = GL_FALSE;
+
+    } else {
+        dri3 = GL_TRUE;
+
+        dri3_cookie = xcb_dri3_query_version(c,
+                                        XCB_DRI3_MAJOR_VERSION,
+                                        XCB_DRI3_MINOR_VERSION);
+        dri3_reply = xcb_dri3_query_version_reply(c, dri3_cookie, &error);
+        if (!dri3_reply) {
+            free(error);
+            return NULL;
+        }
+        major = dri3_reply->major_version;
+        minor = dri3_reply->minor_version;
+        free(dri3_reply);
+    }
+
+#endif
+
     pdpyp = (__DRIdisplayPrivate *)Xmalloc(sizeof(__DRIdisplayPrivate));
     if (!pdpyp) {
         return NULL;
@@ -393,6 +462,7 @@ GLvoid *driCreateDisplay(Display *dpy, __DRIdisplay *pdisp)
     pdpyp->driMajor = major;
     pdpyp->driMinor = minor;
     pdpyp->driPatch = patch;
+    pdpyp->dri3 = dri3;
 
     pdisp->destroyDisplay = (TDESDISP)driDestroyDisplay;
 

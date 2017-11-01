@@ -238,7 +238,7 @@ mov(
 static gceSTATUS
 deleteCaller(
     IN gcLINKTREE    Tree,
-    IN gctUINT16     CodeIndex,
+    IN gctUINT32     CodeIndex,
     IN gctINT        CallerIndex
     )
 {
@@ -246,7 +246,7 @@ deleteCaller(
     gcSL_INSTRUCTION code = Tree->shader->code + CodeIndex;
 
     /* If the target of this caller is outside the shader, skip it. */
-    if (CodeIndex >= (gctUINT16)Tree->shader->codeCount)
+    if (CodeIndex >= Tree->shader->codeCount)
     {
         return gcvSTATUS_OK;
     }
@@ -6083,7 +6083,7 @@ conditionGE(
 static gctBOOL
 _HasModInAllUses(
     IN gcLINKTREE Tree,
-    IN gctINT defTemp
+    IN gctUINT32 defTemp
     )
 {
     gcsLINKTREE_LIST_PTR users;
@@ -6391,7 +6391,7 @@ _t0_destHP(
  31:31) + 1))))))) << (0 ? 31:31)));
 
     if(gcmSL_SOURCE_GET(Instruction->source0, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source0Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source0Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
@@ -6422,7 +6422,7 @@ _t0_destHP(
     }
 
     if(gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source1Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source1Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
@@ -6471,7 +6471,7 @@ _t0_destMP(
  31:31) + 1))))))) << (0 ? 31:31)));
 
     if(gcmSL_SOURCE_GET(Instruction->source0, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source0Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source0Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
@@ -6502,7 +6502,7 @@ _t0_destMP(
     }
 
     if(gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source1Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source1Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
@@ -6554,7 +6554,7 @@ _t1_destHP(
  31:31) + 1))))))) << (0 ? 31:31)));
 
     if(gcmSL_SOURCE_GET(Instruction->source0, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source0Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source0Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
@@ -6596,7 +6596,7 @@ _t1_destHP(
     }
 
     if(gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source1Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source1Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
@@ -6658,7 +6658,7 @@ _t1_destMP(
  31:31) + 1))))))) << (0 ? 31:31)));
 
     if(gcmSL_SOURCE_GET(Instruction->source0, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source0Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source0Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
@@ -6700,7 +6700,7 @@ _t1_destMP(
     }
 
     if(gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-       CodeGen->usePosition && Instruction->source1Index == CodeGen->positionIndex)
+       CodeGen->usePosition && Instruction->source1Index == (gctUINT32)CodeGen->positionIndex)
     {
         States[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
@@ -7597,7 +7597,7 @@ getSwizzleForShadowTexture(
 {
     gcSL_TYPE type = gcmSL_SOURCE_GET(Instruction->source0, Type);
     gcUNIFORM uniform = gcvNULL;
-    gctUINT16 index = gcmSL_INDEX_GET(Instruction->source0Index, Index);
+    gctUINT32 index = gcmSL_INDEX_GET(Instruction->source0Index, Index);
     gctUINT8 sourceSwizzle;
     gctUINT8 newSourceSwizzle;
 
@@ -7617,8 +7617,8 @@ getSwizzleForShadowTexture(
             if (!isSamplerType(uniform->u.type))
                 continue;
 
-            if (index >= uniform->physical &&
-                index <= (uniform->physical + uniform->arraySize - 1))
+            if (index >= (gctUINT32)uniform->physical &&
+                index <= (gctUINT32)(uniform->physical + uniform->arraySize - 1))
             {
                 break;
             }
@@ -7706,7 +7706,7 @@ getSource1Usage(
     )
 {
     gctSOURCE_t source = Instruction->source1;
-    gctUINT16 index  = Instruction->source1Index;
+    gctUINT32 index  = Instruction->source1Index;
 
     gctUINT32 usage = 0;
     if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
@@ -8856,9 +8856,9 @@ branch(
                 ((gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_TEMP )       &&
                   gcmSL_SOURCE_GET(Instruction->source1, Precision) == gcSL_PRECISION_HIGH) ||
                 ((gcmSL_SOURCE_GET(Instruction->source0, Type) == gcSL_ATTRIBUTE && /* check for sources being gl_FragCoord */
-                  CodeGen->usePosition && Instruction->source0Index == CodeGen->positionIndex)) ||
+                  CodeGen->usePosition && Instruction->source0Index == (gctUINT32)CodeGen->positionIndex)) ||
                 ((gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_ATTRIBUTE &&
-                  CodeGen->usePosition && Instruction->source1Index == CodeGen->positionIndex)))
+                  CodeGen->usePosition && Instruction->source1Index == (gctUINT32)CodeGen->positionIndex)))
             {
                 entry->duplicatedT0T1 = gcvTRUE;
             }
@@ -11682,7 +11682,7 @@ _set_helper_or_not(
     gcSL_CONDITION Condition = (gcSL_CONDITION)gcmSL_TARGET_GET(Instruction->temp, Condition);
     gcSL_TYPE      src0Type = (gcSL_TYPE)gcmSL_SOURCE_GET(Instruction->source0, Type);
     gcSL_FORMAT    src0Fmt = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source0, Format);
-    gctUINT16      src0Idx = gcmSL_INDEX_GET(Instruction->source0Index, Index);
+    gctUINT32      src0Idx = gcmSL_INDEX_GET(Instruction->source0Index, Index);
     gcSL_TYPE      src1Type = (gcSL_TYPE)gcmSL_SOURCE_GET(Instruction->source1, Type);
     gcSL_FORMAT    src1Fmt = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source1, Format);
     gctUINT32      src1Constant = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
@@ -11754,7 +11754,7 @@ _HandleBiasedTextureLoad(
     IN OUT gctUINT32 * States
     )
 {
-    gctINT temp = gcmSL_INDEX_GET(Instruction->source1Index, Index);
+    gctUINT32 temp = gcmSL_INDEX_GET(Instruction->source1Index, Index);
     gctUINT32 components = 0, rows = 0;
 
     /* source is Attribute ot Temp ?*/

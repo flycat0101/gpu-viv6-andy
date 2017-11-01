@@ -4226,6 +4226,128 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
     return (bHasDef ? gcvTRUE : gcvFALSE);
 }
 
+#define GotoResult(Value)  do { (result) = (Value); goto OnError; } while (0)
+
+static gctBOOL _CheckTwoBasicBlockSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
+                                             VIR_BB*             pFromBB,
+                                             VIR_BB*             pToBB,
+                                             VSC_BIT_VECTOR*     pBBMask)
+{
+    VSC_ADJACENT_LIST*      pList = &pFromBB->dgNode.succList;
+    VIR_CFG_EDGE*           pEdge;
+    VSC_ADJACENT_LIST_ITERATOR   edgeIter;
+    gctBOOL                 result = gcvFALSE;
+
+    /* Detect a recursion, just return FALSE. */
+    if (vscBV_TestBit(pBBMask, pFromBB->globalBbId))
+    {
+        GotoResult(gcvFALSE);
+    }
+    vscBV_SetBit(pBBMask, pFromBB->globalBbId);
+
+    /* Same BB, return TRUE.*/
+    if (pFromBB == pToBB)
+    {
+        GotoResult(gcvTRUE);
+    }
+
+    /* Check the edges. */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, pList);
+    pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+
+    /* No edge. */
+    if (pEdge == gcvNULL)
+    {
+        GotoResult(gcvFALSE);
+    }
+    else
+    {
+        /* We only have two leaves for a success branch, TRUE of FALSE. */
+        gctBOOL leafResult[2] = { gcvFALSE, gcvFALSE };
+        gctUINT leafIdx = 0;
+
+        for (; pEdge != gcvNULL; pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+        {
+            VIR_BB* pNextBB = CFG_EDGE_GET_TO_BB(pEdge);
+
+            /*
+            ** Three situations:
+            ** 1) This BB is a conditional branch, check if TRUE and FALSE branch can both reach the dest BB.
+            ** 2) This BB is a non-conditional branch:
+            **      a) The target BB is the dest BB, match case.
+            **      b) The target BB is not the dest BB, check this target BB.
+            **
+            */
+            if (CFG_EDGE_GET_TYPE(pEdge) != VIR_CFG_EDGE_TYPE_ALWAYS)
+            {
+                gcmASSERT(leafIdx < 2);
+
+                leafResult[leafIdx] = _CheckTwoBasicBlockSameBranch(pDuInfo, pNextBB, pToBB, pBBMask);
+
+                if (leafIdx == 0)
+                {
+                    if (!leafResult[0])
+                    {
+                        GotoResult(gcvFALSE);
+                    }
+                }
+                else if (leafIdx == 1)
+                {
+                    if (leafResult[0] && leafResult[1])
+                    {
+                        GotoResult(gcvTRUE);
+                    }
+                    else
+                    {
+                        GotoResult(gcvFALSE);
+                    }
+                }
+
+                leafIdx++;
+            }
+            else if (pNextBB == pToBB)
+            {
+                GotoResult(gcvTRUE);
+            }
+            else
+            {
+                result = _CheckTwoBasicBlockSameBranch(pDuInfo, pNextBB, pToBB, pBBMask);
+                GotoResult(result);
+            }
+        }
+    }
+
+OnError:
+    vscBV_ClearBit(pBBMask, pFromBB->globalBbId);
+    return result;
+}
+
+gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
+                                               VIR_Instruction*    pUsageInst,
+                                               VIR_Instruction*    pDefInst)
+{
+    gctBOOL                 bSameBranch = gcvFALSE;
+    VIR_BB*                 pUsageBB = VIR_Inst_GetBasicBlock(pUsageInst);
+    VIR_BB*                 pDefBB = VIR_Inst_GetBasicBlock(pDefInst);
+    VIR_Function*           pUsageFunc = VIR_Inst_GetFunction(pUsageInst);
+    VIR_Function*           pDefFunc = VIR_Inst_GetFunction(pDefInst);
+    gctUINT                 bbCount;
+    VSC_BIT_VECTOR          bbMask;
+
+    if (pUsageFunc != pDefFunc)
+    {
+        return bSameBranch;
+    }
+
+    bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(pUsageFunc)->pOwnerCG);
+    vscBV_Initialize(&bbMask, &pDuInfo->pmp.mmWrapper, bbCount);
+
+    bSameBranch = _CheckTwoBasicBlockSameBranch(pDuInfo, pDefBB, pUsageBB, &bbMask);
+
+    vscBV_Finalize(&bbMask);
+    return bSameBranch;
+}
+
 gctBOOL vscVIR_DoesDefInstHaveUniqueUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                               VIR_Instruction*    pDefInst,
                                               gctBOOL             bUniqueOperand,

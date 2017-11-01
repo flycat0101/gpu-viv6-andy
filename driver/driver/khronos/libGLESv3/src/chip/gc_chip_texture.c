@@ -22,7 +22,9 @@
 #      include <private/ui/android_natives_priv.h>
 #   endif
 
-#   include <gc_gralloc_priv.h>
+#if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+#      include <gc_gralloc_priv.h>
+#   endif
 #endif
 
 
@@ -751,9 +753,9 @@ gcChipResidentTextureLevel(
             patchCase = __GL_CHIP_FMT_PATCH_CASE3;
         }
         else if ((mipmap->formatInfo->drvFormat == __GL_FMT_Z16) &&
-                 (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1) == gcvTRUE) &&
-                 ((gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvTRUE) ||
-                  (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TILE_FILLER) == gcvTRUE) ||
+                 chipCtx->chipFeature.hwFeature.hasCompressionV1 &&
+                 (chipCtx->chipFeature.hwFeature.hasTxTileStatus ||
+                  chipCtx->chipFeature.hwFeature.hasTileFiller ||
                   (chipCtx->patchId == gcvPATCH_GTFES30) || gcdPROC_IS_WEBGL(chipCtx->patchId)
                  ) &&
                  (texObj->targetIndex != __GL_TEXTURE_2D_ARRAY_INDEX) &&
@@ -783,7 +785,7 @@ gcChipResidentTextureLevel(
                    (mipmap->requestedFormat <= GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR)
                   )
                  ) &&
-                 !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_ASTC_MULTISLICE_FIX) &&
+                 !chipCtx->chipFeature.hwFeature.hasTxASTCMultiSliceFix &&
                  (__GL_IS_TEXTURE_CUBE(texObj->targetIndex) || __GL_IS_TEXTURE_ARRAY(texObj->targetIndex)))
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
@@ -1820,7 +1822,7 @@ gcChipCopyTexImage(
         /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
         (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
         gcmIS_SUCCESS(gcoSURF_IsRenderable(texView.surf)) &&
-        chipCtx->chipFeature.hasSupertiledTx
+        chipCtx->chipFeature.hwFeature.hasSupertiledTx
         )
     {
         tryShader = gcvTRUE;
@@ -2269,7 +2271,7 @@ gcChipCopyTexSubImage(
         /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
         (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
         ((chipMipLevel->formatMapInfo->flags & __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE) == 0) &&
-        chipCtx->chipFeature.hasSupertiledTx
+        chipCtx->chipFeature.hwFeature.hasSupertiledTx
         )
     {
         tryShader = gcvTRUE;
@@ -2493,6 +2495,7 @@ gcChipTexNeedShadow(
     GLint *samplesUsed
     )
 {
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     GLboolean need = GL_FALSE;
     khrEGL_IMAGE * eglImage = gcvNULL;
 
@@ -2526,11 +2529,9 @@ gcChipTexNeedShadow(
     {
         need = GL_TRUE;
     }
-    else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MULTI_PIXELPIPES) &&
-             !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER))
+    else if (chipCtx->chipFeature.hwFeature.hasMultiPixelPipes &&
+             !chipCtx->chipFeature.hwFeature.hasSingleBuffer)
     {
-        __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-
         /* If HW required multi tiled/supertiled rt, these rt surface can only
         ** be used as single mipmaped 2D texture.
         */
@@ -3613,7 +3614,7 @@ __glChipGenerateMipMap(
         if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) && !splitTexture)
         {
             /* For blit engine, we generate mipmap in one shot */
-            if (chipCtx->chipFeature.hasBlitEngine)
+            if (chipCtx->chipFeature.hwFeature.hasBlitEngine)
             {
                 if (level == *maxLevel)
                 {
@@ -4167,8 +4168,8 @@ __glChipTexDirectVIV(
          * or yuv-assembler.
          */
         if (planarYuv &&
-            !chipCtx->chipFeature.hasYuv420Tiler &&
-            !chipCtx->chipFeature.hasYuvAssembler)
+            !chipCtx->chipFeature.hwFeature.hasYuv420Tiler &&
+            !chipCtx->chipFeature.hwFeature.hasYuvAssembler)
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -4176,7 +4177,7 @@ __glChipTexDirectVIV(
         if ((format == GL_VIV_YUV420_10_ST ||
              format == GL_VIV_YUV420_TILE_ST ||
              format == GL_VIV_YUV420_TILE_10_ST) &&
-            (!chipCtx->chipFeature.hasYuvAssembler10bit))
+            (!chipCtx->chipFeature.hwFeature.hasYuvAssembler10bit))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -4191,8 +4192,8 @@ __glChipTexDirectVIV(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->direct.directSample = gcvTRUE;
         }
@@ -4200,8 +4201,8 @@ __glChipTexDirectVIV(
     else
     {
         /* RGB class texture. */
-        if ((chipCtx->chipFeature.hasLinearTx) &&
-            (chipCtx->chipFeature.hasTxSwizzle || sourceFormat == textureFormat))
+        if ((chipCtx->chipFeature.hwFeature.hasLinearTx) &&
+            (chipCtx->chipFeature.hwFeature.hasTxSwizzle || sourceFormat == textureFormat))
         {
             /* Direct if format supported. */
             texInfo->direct.directSample = gcvTRUE;
@@ -4446,7 +4447,7 @@ __glChipTexDirectVIVMap(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (sourceYuv && planarYuv && !chipCtx->chipFeature.hasYuv420Tiler)
+    if (sourceYuv && planarYuv && !chipCtx->chipFeature.hwFeature.hasYuv420Tiler)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -4460,8 +4461,8 @@ __glChipTexDirectVIVMap(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->direct.directSample = gcvTRUE;
         }
@@ -4469,8 +4470,8 @@ __glChipTexDirectVIVMap(
     else
     {
         /* RGB class texture. */
-        if ((chipCtx->chipFeature.hasLinearTx) &&
-            (chipCtx->chipFeature.hasTxSwizzle || sourceFormat == textureFormat))
+        if ((chipCtx->chipFeature.hwFeature.hasLinearTx) &&
+            (chipCtx->chipFeature.hwFeature.hasTxSwizzle || sourceFormat == textureFormat))
         {
             /* Direct if format supported. */
             texInfo->direct.directSample = gcvTRUE;
@@ -5246,6 +5247,13 @@ __glChipCreateEglImageTexture(
 
     texInfo = (__GLchipTextureInfo*)texObj->privateData;
 
+    /* Test if surface is a sibling of any eglImage. */
+    if ((face == 0) && (texInfo->eglImage.image != gcvNULL))
+    {
+        gcmFOOTER_ARG("return=0x%04x", EGL_BAD_ACCESS);
+        return EGL_BAD_ACCESS;
+    }
+
     texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, face);
 
     if (texView.surf == gcvNULL)
@@ -5255,13 +5263,6 @@ __glChipCreateEglImageTexture(
     }
 
     gcmONERROR(gcoSURF_GetSize(texView.surf, &width, &height, gcvNULL));
-
-    /* Test if surface is a sibling of any eglImage. */
-    if ((face == 0) && (texInfo->eglImage.image != gcvNULL))
-    {
-        gcmFOOTER_ARG("return=0x%04x", EGL_BAD_ACCESS);
-        return EGL_BAD_ACCESS;
-    }
 
     /* If texture was drawn before, resolve to texture surface before used as EGLimage source */
     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, depth));
@@ -5769,8 +5770,8 @@ __glChipEglImageTargetTexture2DOES(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->eglImage.directSample = gcvTRUE;
         }
@@ -5778,16 +5779,16 @@ __glChipEglImageTargetTexture2DOES(
     else
     {
         /* RGB class texture. */
-        if ((srcType == gcvSURF_BITMAP && chipCtx->chipFeature.hasLinearTx) ||
+        if ((srcType == gcvSURF_BITMAP && chipCtx->chipFeature.hwFeature.hasLinearTx) ||
             (srcType == gcvSURF_TEXTURE) ||
-            (srcType == gcvSURF_RENDER_TARGET && chipCtx->chipFeature.hasSupertiledTx))
+            (srcType == gcvSURF_RENDER_TARGET && chipCtx->chipFeature.hwFeature.hasSupertiledTx))
         {
             /* Direct if format supported. */
             if (srcFormat == dstFormat)
             {
                 texInfo->eglImage.directSample = gcvTRUE;
             }
-            else if (chipCtx->chipFeature.hasTxSwizzle)
+            else if (chipCtx->chipFeature.hwFeature.hasTxSwizzle)
             {
                 switch (srcFormat)
                 {
@@ -5813,12 +5814,12 @@ __glChipEglImageTargetTexture2DOES(
         {
             /* Check tile status. */
             texView.surf = surface;
-            if (!chipCtx->chipFeature.hasTxTileStatus && gcoSURF_IsTileStatusEnabled(&texView))
+            if (!chipCtx->chipFeature.hwFeature.hasTxTileStatus && gcoSURF_IsTileStatusEnabled(&texView))
             {
                 texInfo->eglImage.directSample = gcvFALSE;
             }
             /* Check compression. */
-            else if (!chipCtx->chipFeature.hasTxDecompressor && gcoSURF_IsCompressed(&texView))
+            else if (!chipCtx->chipFeature.hwFeature.hasTxDecompressor && gcoSURF_IsCompressed(&texView))
             {
                 texInfo->eglImage.directSample = gcvFALSE;
             }

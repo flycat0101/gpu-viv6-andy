@@ -13,6 +13,7 @@
 
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
+#include "gc_chip_misc.h"
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
@@ -21,15 +22,19 @@
 #      include <private/ui/android_natives_priv.h>
 #   endif
 
-#   include <gc_gralloc_priv.h>
+#if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
+#      include <gc_gralloc_priv.h>
+#   endif
 #endif
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_FBO
 
 extern __GLformatInfo __glFormatInfoTable[];
 
-#if (defined(DEBUG) || defined(_DEBUG))
-extern GLboolean g_dbgPerDrawKickOff;
+#if gcdFRAMEINFO_STATISTIC
+extern GLboolean  g_dbgPerDrawKickOff;
+extern GLbitfield g_dbgDumpImagePerDraw;
+extern GLboolean  g_dbgSkipDraw;
 #endif
 
 /************************************************************************/
@@ -185,6 +190,7 @@ gcChipUtilReleaseShadowTex(
 }
 
 
+
 /************************************************************************/
 /* Implementation for EXPORTED FUNCTIONS                                */
 /************************************************************************/
@@ -252,7 +258,7 @@ gcChipGetFramebufferAttachedSurfaceAndImage(
             }
             else
             {
-                surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->level, attachPoint->slice);
+                surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->layered, attachPoint->level, attachPoint->slice);
             }
 
             if (image)
@@ -305,6 +311,12 @@ gcChipPickReadBufferForFBO(
         rtView.firstSlice = 0;
         dView.firstSlice  = 0;
         sView.firstSlice  = 0;
+    }
+    else
+    {
+        rtView.numSlices = 1;
+        dView.numSlices = 1;
+        sView.numSlices = 1;
     }
 
     gcmONERROR(gcChipSetReadBuffers(gc, fbo->fbIntMask, &rtView, &dView, &sView, readYInverted, fbo->fbLayered));
@@ -391,12 +403,21 @@ gcChipPickDrawBufferForFBO(
         {
             rtViews[i].firstSlice = 0;
         }
+        else
+        {
+            rtViews[i].numSlices = 1;
+        }
     }
 
     if (fbo->fbLayered)
     {
         dView.firstSlice = 0;
         sView.firstSlice = 0;
+    }
+    else
+    {
+        dView.numSlices = 1;
+        sView.numSlices = 1;
     }
 
     gcmONERROR(gcChipSetDrawBuffers(gc,
@@ -423,7 +444,7 @@ OnError:
 ** For FBO rendering, this function is to sync shadow(RT) to master at some sync points.
 */
 gceSTATUS
-gcChipFramebufferMasterSyncFromShadow(
+gcChipFboSyncFromShadow(
     __GLcontext *gc,
     __GLframebufferObject *fbo
     )
@@ -448,16 +469,9 @@ gcChipFramebufferMasterSyncFromShadow(
             {
                 __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
                 __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
-                __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
 
                 if ((texInfo->eglImage.image) ||
-                    (texInfo->direct.source)  ||
-                    (fmtMapInfo &&
-                     (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE |
-                                           __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE)
-                     )
-                    )
-                   )
+                    (texInfo->direct.source))
                 {
                     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
                                                                texObj,
@@ -480,23 +494,7 @@ gcChipFramebufferMasterSyncFromShadow(
                 __GLrenderbufferObject *rbo = (__GLrenderbufferObject*)attachPoint->object;
                 if (rbo && rbo->eglImage)
                 {
-                    __GLchipRenderbufferObject *chipRBO = NULL;
-                    __GLchipResourceShadow *shadow = NULL;
-                    chipRBO = (__GLchipRenderbufferObject*)(rbo->privateData);
-                    GL_ASSERT(chipRBO);
-                    shadow = &chipRBO->shadow;
-
-                    if (shadow->surface && shadow->shadowDirty)
-                    {
-                        gcsSURF_VIEW shadowView = {shadow->surface,  0, 1};
-                        gcsSURF_VIEW rboView    = {chipRBO->surface, 0, 1};
-
-                        gcmONERROR(gcoSURF_ResolveRect(&shadowView, &rboView, gcvNULL));
-                        shadow->shadowDirty = GL_FALSE;
-
-                        /* Commit commands. */
-                        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
-                    }
+                    gcChipRboSyncFromShadow(gc, rbo);
                 }
             }
         }
@@ -507,15 +505,120 @@ gcChipFramebufferMasterSyncFromShadow(
     return status;
 }
 
+/* Temporarily for chrome freon. */
+gceSTATUS
+gcChipFboSyncFromShadowFreon(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    GLuint attachIdx;
+    __GLfboAttachPoint *attachPoint;
+
+    gcmHEADER_ARG("gc=0x%x fbo=0x%x", gc, fbo);
+
+    /*
+    ** Default fbo(window drawable) won't have indirectly rendering.
+    */
+    if (!fbo->name)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    /* Loop through all draw buffer, if it was from texture */
+    for (attachIdx = 0; attachIdx < __GL_MAX_ATTACHMENTS; ++attachIdx)
+    {
+        attachPoint = &fbo->attachPoint[attachIdx];
+
+        if (attachPoint->objType == GL_TEXTURE)
+        {
+            khrEGL_IMAGE_PTR image;
+            __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
+            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+            __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
+
+            image = (khrEGL_IMAGE_PTR) texInfo->eglImage.image;
+
+            if ((image && image->magic == KHR_EGL_IMAGE_MAGIC_NUM &&
+                 image->type == KHR_IMAGE_LINUX_DMA_BUF) ||
+                (fmtMapInfo &&
+                 (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE |
+                                       __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE))))
+            {
+                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
+                                                           texObj,
+                                                           attachPoint->face,
+                                                           attachPoint->level,
+                                                           attachPoint->layer));
+            }
+        }
+    }
+
+ OnError:
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPoint)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("gc=0x%x  attachPoint=0x%x", gc, attachPoint);
+
+    if (attachPoint->objType == GL_TEXTURE)
+    {
+        __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
+        if(texObj)
+        {
+            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+            if ((texInfo && texInfo->eglImage.image) ||
+                (texInfo && texInfo->direct.source) )
+            {
+                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
+                    texObj,
+                    attachPoint->face,
+                    attachPoint->level,
+                    attachPoint->layer));
+            }
+            /* Sync Master to direct source. */
+            if(texInfo && texInfo->direct.source &&
+                !texInfo->direct.directSample &&
+                attachPoint->level == 0
+                )
+            {
+                gcmONERROR(gcChipTexDirectSourceSyncFromMipSlice(gc,
+                    texObj));
+            }
+        }
+    }
+    else if (attachPoint->objType == GL_RENDERBUFFER)
+    {
+        __GLrenderbufferObject *rbo = (__GLrenderbufferObject*)attachPoint->object;
+        if (rbo && rbo->eglImage)
+        {
+            gcChipRboSyncFromShadow(gc, rbo);
+
+        }
+    }
+OnError:
+    gcmFOOTER();
+    return status;
+
+}
+
+
 GLvoid
 __glChipFramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *fbo,
     GLint attachIndex,
-    __GLrenderbufferObject *rbo
+    __GLrenderbufferObject *rbo,
+    __GLfboAttachPoint *preAttach
     )
 {
-
+   gcChipFBOSyncAttachment(gc, preAttach);
 }
 
 GLboolean
@@ -528,16 +631,18 @@ __glChipFramebufferTexture(
     GLint face,
     GLsizei samples,
     GLint zoffset,
-    GLboolean layered
+    GLboolean layered,
+    __GLfboAttachPoint *preAttach
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
     __GLmipMapLevel *mipmap;
 
-    gcmHEADER_ARG("gc=0x%x fbo=0x%x attachIndex=%d texObj=0x%x level=%d face=%d samples=%d zoffset=%d layered=%d",
-                  gc, fbo, attachIndex, texObj, level, face, samples, zoffset, layered);
+    gcmHEADER_ARG("gc=0x%x fbo=0x%x attachIndex=%d texObj=0x%x level=%d face=%d samples=%d zoffset=%d layered=%d preAttach=0x%x",
+        gc, fbo, attachIndex, texObj, level, face, samples, zoffset, layered, preAttach);
 
+    gcmONERROR(gcChipFBOSyncAttachment(gc, preAttach));
     mipmap = texObj ? &texObj->faceMipmap[face][level] : gcvNULL;
 
     if (mipmap && (mipmap->width * mipmap->height * mipmap->depth))
@@ -580,7 +685,7 @@ __glChipFramebufferTexture(
         if (gcChipTexNeedShadow(gc, texObj, texInfo, formatMapInfo, samples, &attachPoint->samplesUsed))
         {
             __GLimageUser *fboList = texObj->fboList;
-            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, level, slice);
 
             if (texView.surf && chipMipLevel->shadow[slice].shadowDirty && chipMipLevel->shadow[slice].surface)
             {
@@ -652,72 +757,67 @@ __glChipIsFramebufferComplete(
     )
 {
     GLuint i;
-    __GLrenderbufferObject *rbo = NULL;
-    __GLtextureObject *tex = NULL;
-    __GLmipMapLevel *mipmap = NULL;
-    __GLfboAttachPoint *attachPoint = NULL;
-
-    GLboolean noImageAttached = GL_TRUE;
-    GLuint width = 0, height = 0, samples = 0;
     GLuint fbwidth = 0, fbheight = 0, fbsamples = 0;
-    GLboolean fixedSampleLoc = GL_TRUE;
-    __GLformatInfo *formatInfo = NULL;
-    GLboolean renderable = GL_TRUE;
-
-    GLenum error = GL_FRAMEBUFFER_COMPLETE;
-    GLuint fbIntMask = 0;
-    GLuint fbFloatMask = 0;
-    GLuint fbUIntMask = 0;
-    GLuint fbUNormalizedMask = 0;
     GLboolean fbFixedSampleLoc = GL_TRUE;
     GLboolean fbLayered = GL_FALSE;
     GLenum fbLayeredTarget = __GL_TEXTURE_2D_INDEX;
-
     GLenum depthObjType = GL_NONE;
     GLenum stencilObjType = GL_NONE;
     GLuint depthObjName = 0;
     GLuint stencilObjName = 0;
     GLboolean depthObjSet = GL_FALSE;
     GLboolean stencilObjSet = GL_FALSE;
+    GLboolean noImageAttached = GL_TRUE;
     GLboolean shadowRender = GL_FALSE;
-    __GLchipRenderbufferObject *chipRBO;
-    __GLchipTextureInfo *texInfo;
-    __GLchipMipmapInfo *chipMipLevel;
-    GLboolean ret = GL_FALSE;
     GLboolean hasDefaultDimesion = GL_FALSE;
     GLboolean useDefault = GL_FALSE;
     GLbitfield attribFlag = 0;
-    GLboolean layered = GL_FALSE;
-    GLenum layeredTarget = __GL_TEXTURE_2D_INDEX;
     GLuint maxLayers = ~(GLuint)0;
+    GLboolean ret = GL_TRUE;
+    GLenum error = GL_FRAMEBUFFER_COMPLETE;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     gcmHEADER_ARG("gc=0x%x framebufferObj=0x%x", gc, framebufferObj);
 
-    /* Default FBO is always complete */
-    if (framebufferObj->name == 0)
-    {
-        gcmFOOTER_ARG("return=%d", GL_TRUE);
-        return GL_TRUE;
-    }
+    /* Default FBO must already be checked when make current. */
+    GL_ASSERT(framebufferObj->name || (framebufferObj->flag & __GL_FRAMEBUFFER_IS_CHECKED));
 
     if (framebufferObj->flag & __GL_FRAMEBUFFER_IS_CHECKED)
     {
         ret = (framebufferObj->flag & __GL_FRAMEBUFFER_IS_COMPLETE) ? GL_TRUE : GL_FALSE;
-        gcmFOOTER_ARG("return=%d", ret);
-        return ret;
+        goto OnExit;
     }
 
-    for (i = 0; i < __GL_MAX_ATTACHMENTS; i++)
+    /* Zero flag and masks before starting evaluation */
+    framebufferObj->flag = 0;
+    framebufferObj->fbIntMask = 0;
+    framebufferObj->fbFloatMask = 0;
+    framebufferObj->fbUIntMask = 0;
+    framebufferObj->fbUnormMask = 0;
+
+    for (i = 0; i < __GL_MAX_ATTACHMENTS; ++i)
     {
-        /* All framebuffer attachment points are "framebuffer attachment complete". */
+        GLuint width = 0, height = 0, samples = 0;
+        GLenum layeredTarget = __GL_TEXTURE_2D_INDEX;
+        GLboolean fixedSampleLoc = GL_TRUE;
+        GLboolean layered = GL_FALSE;
+        GLboolean renderable = GL_TRUE;
 
-        fbIntMask = 0;
-        fbFloatMask = 0;
-        fbUIntMask = 0;
-        fbUNormalizedMask = 0;
+        GLuint maskInt = 0;
+        GLuint maskFloat = 0;
+        GLuint maskUint = 0;
+        GLuint maskUnorm = 0;
 
-        attachPoint = &framebufferObj->attachPoint[i];
+        __GLformatInfo *formatInfo = NULL;
+        __GLrenderbufferObject *rbo = gcvNULL;
+        __GLtextureObject *tex = gcvNULL;
+        __GLmipMapLevel *mipmap = gcvNULL;
+        __GLchipRenderbufferObject *chipRBO = gcvNULL;
+        __GLchipTextureInfo *texInfo = gcvNULL;
+        __GLchipMipmapInfo *chipMipLevel = gcvNULL;
+
+        __GLfboAttachPoint *attachPoint = &framebufferObj->attachPoint[i];
+
         if (attachPoint->objType == GL_NONE)
         {
             hasDefaultDimesion = (framebufferObj->defaultWidth > 0) &&
@@ -734,14 +834,14 @@ __glChipIsFramebufferComplete(
             if (!rbo)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             /* Image dimension not zero */
             if ((rbo->width == 0) || (rbo->height == 0) || (rbo->formatInfo == gcvNULL))
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             chipRBO = (__GLchipRenderbufferObject *)rbo->privateData;
@@ -753,13 +853,13 @@ __glChipIsFramebufferComplete(
                 shadowRender = GL_TRUE;
             }
 
-            width     = rbo->width;
-            height    = rbo->height;
+            width = rbo->width;
+            height = rbo->height;
             formatInfo = rbo->formatInfo;
-            samples   = rbo->samplesUsed;
+            samples = rbo->samplesUsed;
             fixedSampleLoc = GL_TRUE;
             attribFlag |= __GL_FRAMEBUFFER_ATTACH_RBO;
-            layered  = attachPoint->layered;
+            layered = attachPoint->layered;
             maxLayers = 1;
             GL_ASSERT(!layered);
             break;
@@ -769,14 +869,14 @@ __glChipIsFramebufferComplete(
             if (!tex)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
             mipmap = &tex->faceMipmap[attachPoint->face][attachPoint->level];
 
             if (mipmap->width == 0 || mipmap->height == 0 || mipmap->formatInfo == gcvNULL)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             fixedSampleLoc = GL_TRUE;
@@ -791,7 +891,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->depth >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->depth < maxLayers)
                 {
@@ -804,7 +904,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->arrays < maxLayers)
                 {
@@ -817,7 +917,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 /* fall through */
             case __GL_TEXTURE_2D_MS_INDEX:
@@ -834,7 +934,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->arrays < maxLayers)
                 {
@@ -872,31 +972,35 @@ __glChipIsFramebufferComplete(
             formatInfo = mipmap->formatInfo;
             attribFlag |= __GL_FRAMEBUFFER_ATTACH_TEX;
             break;
+
+        default:
+            GL_ASSERT(GL_FALSE);
+            break;
         }
 
-        fbUIntMask = ((GL_UNSIGNED_INT == formatInfo->category)? 0x1: 0x0) << i;
-        fbIntMask = ((fbUIntMask || (GL_INT == formatInfo->category))? 0x1: 0x0) << i;
-        fbFloatMask = ((GL_FLOAT == formatInfo->category)? 0x1: 0x0) << i;
-        fbUNormalizedMask = ((GL_UNSIGNED_NORMALIZED == formatInfo->category)? 0x1: 0x0) << i;
+        maskUint = ((GL_UNSIGNED_INT == formatInfo->category)? 0x1: 0x0) << i;
+        maskInt = ((maskUint || (GL_INT == formatInfo->category))? 0x1: 0x0) << i;
+        maskUnorm = ((GL_UNSIGNED_NORMALIZED == formatInfo->category)? 0x1: 0x0) << i;
+        maskFloat = ((GL_FLOAT == formatInfo->category)? 0x1: 0x0) << i;
 
         if (i < __GL_MAX_COLOR_ATTACHMENTS)
         {
             renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat != GL_DEPTH_COMPONENT &&
-                                                    formatInfo->baseFormat != GL_DEPTH_STENCIL &&
-                                                    formatInfo->baseFormat != GL_STENCIL));
+                                                                   formatInfo->baseFormat != GL_DEPTH_STENCIL &&
+                                                                   formatInfo->baseFormat != GL_STENCIL));
         }
         else if (__GL_DEPTH_ATTACHMENT_POINT_INDEX == i)
         {
             renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_COMPONENT ||
-                                                    formatInfo->baseFormat == GL_DEPTH_STENCIL));
+                                                                   formatInfo->baseFormat == GL_DEPTH_STENCIL));
             depthObjType = attachPoint->objType;
             depthObjName = attachPoint->objName;
             depthObjSet = GL_TRUE;
         }
         else if (__GL_STENCIL_ATTACHMENT_POINT_INDEX == i)
         {
-            renderable =renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_STENCIL ||
-                                                    formatInfo->baseFormat == GL_STENCIL));
+            renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_STENCIL ||
+                                                                   formatInfo->baseFormat == GL_STENCIL));
             stencilObjType = attachPoint->objType;
             stencilObjName = attachPoint->objName;
             stencilObjSet = GL_TRUE;
@@ -905,7 +1009,7 @@ __glChipIsFramebufferComplete(
         if (!renderable)
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-            goto return_not_complete;
+            goto OnExit;
         }
 
         /*
@@ -924,19 +1028,20 @@ __glChipIsFramebufferComplete(
         {
             /* ES30 will not generate the error */
             error = GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
-            goto return_not_complete;
+            goto OnExit;
         }
         else if ((fbsamples != samples) || (fbFixedSampleLoc != fixedSampleLoc))
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE;
-            goto return_not_complete;
+            goto OnExit;
         }
         else if ((fbLayered != layered) ||
                  (fbLayered && (fbLayeredTarget != layeredTarget)))
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT;
-            goto return_not_complete;
+            goto OnExit;
         }
+
         /*
         ** As ES30 SPEC required, both depth and stencil attach point must refer to same image.
         ** For ES20, SPEC implicitly indicates implementation cannot support the combination,
@@ -949,14 +1054,14 @@ __glChipIsFramebufferComplete(
                 (depthObjName != stencilObjName))
             {
                 error = GL_FRAMEBUFFER_UNSUPPORTED;
-                goto return_not_complete;
+                goto OnExit;
             }
         }
 
-        framebufferObj->fbIntMask |= fbIntMask;
-        framebufferObj->fbFloatMask |= fbFloatMask;
-        framebufferObj->fbUIntMask |= fbUIntMask;
-        framebufferObj->fbUNormalizedMask |= fbUNormalizedMask;
+        framebufferObj->fbIntMask |= maskInt;
+        framebufferObj->fbUIntMask |= maskUint;
+        framebufferObj->fbUnormMask |= maskUnorm;
+        framebufferObj->fbFloatMask |= maskFloat;
 
         noImageAttached = GL_FALSE;
     }
@@ -996,7 +1101,7 @@ __glChipIsFramebufferComplete(
         else
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
-            goto return_not_complete;
+            goto OnExit;
         }
     }
 
@@ -1011,21 +1116,21 @@ __glChipIsFramebufferComplete(
     framebufferObj->fbLayered = fbLayered;
     framebufferObj->fbMaxLayers = maxLayers;
 
-    ret = GL_TRUE;
-    gcmFOOTER_ARG("return=%d", ret);
-    return ret;
+OnExit:
+    if (error != GL_FRAMEBUFFER_COMPLETE)
+    {
+        framebufferObj->flag |=  __GL_FRAMEBUFFER_IS_CHECKED;
+        framebufferObj->checkCode = error;
+        framebufferObj->fbWidth = framebufferObj->fbHeight = 0;
+        framebufferObj->fbSamples = 0;
+        framebufferObj->fbIntMask = 0;
+        framebufferObj->fbFloatMask = 0;
+        framebufferObj->fbLayered = 0;
+        framebufferObj->fbMaxLayers = 0;
 
-return_not_complete:
+        ret = GL_FALSE;
+    }
 
-    framebufferObj->flag |=  __GL_FRAMEBUFFER_IS_CHECKED;
-    framebufferObj->checkCode = error;
-    framebufferObj->fbWidth = framebufferObj->fbHeight = 0;
-    framebufferObj->fbSamples = 0;
-    framebufferObj->fbIntMask = 0;
-    framebufferObj->fbFloatMask = 0;
-    framebufferObj->fbLayered = 0;
-    framebufferObj->fbMaxLayers = 0;
-    ret = GL_FALSE;
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
 }
@@ -1106,7 +1211,7 @@ gcChipBlitFramebufferResolve(
         GLuint i;
 
         gcmONERROR(gcoSURF_GetSize(chipCtx->readRtView.surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
-        gcmONERROR(gcChipTexShadowSyncFromMaster(gc, &chipCtx->readRtView, GL_TRUE));
+        gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->readRtView, GL_TRUE));
         /* Get pixel plan for msaa source */
         gcmONERROR(gcChipUtilGetPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
 
@@ -1115,12 +1220,12 @@ gcChipBlitFramebufferResolve(
 
         for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
         {
-            gcsSURF_VIEW *rtView = &chipCtx->drawRtViews[i];
-            if (rtView->surf)
+            gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
+            if (rtView.surf)
             {
                 /* Set up the dst surface and rect */
-                gcmONERROR(gcoSURF_GetSize(rtView->surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
-                gcmONERROR(gcChipTexShadowSyncFromMaster(gc, rtView, GL_FALSE));
+                gcmONERROR(gcoSURF_GetSize(rtView.surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &rtView, GL_FALSE));
 
                 if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
                     rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
@@ -1129,7 +1234,12 @@ gcChipBlitFramebufferResolve(
                     gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
                 }
 
-                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, rtView, &rlvArgs));
+                /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+                ** If the draw framebuffer is layered, pixel values are written to layer zero.
+                ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+                */
+                pixelPlaneView.numSlices = rtView.numSlices = 1;
+                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, &rtView, &rlvArgs));
             }
         }
         /* Destroy pixel plane if needed */
@@ -1143,6 +1253,7 @@ gcChipBlitFramebufferResolve(
         gceSURF_FORMAT readFmt, drawFmt;
         gcsSURF_VIEW *readDsView = chipCtx->readDepthView.surf ? &chipCtx->readDepthView : &chipCtx->readStencilView;
         gcsSURF_VIEW *drawDsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
+        gctUINT drawDsNumSlice = chipCtx->drawDepthView.surf ? chipCtx->drawDepthView.numSlices : chipCtx->drawStencilView.numSlices;
 
         /* If both read/draw are valid, they must be same. */
         GL_ASSERT(!(chipCtx->readDepthView.surf && chipCtx->readStencilView.surf) ||
@@ -1167,7 +1278,7 @@ gcChipBlitFramebufferResolve(
         if (readDsView->surf && drawDsView->surf)
         {
             gcmONERROR(gcoSURF_GetSize(readDsView->surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
-            gcmONERROR(gcChipTexShadowSyncFromMaster(gc, readDsView, GL_TRUE));
+            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, readDsView, GL_TRUE));
             /* Get Pixel Plane if source is msaa surface */
             gcmONERROR(gcChipUtilGetPixelPlane(gc, readDsView, &pixelPlaneView));
 
@@ -1175,7 +1286,7 @@ gcChipBlitFramebufferResolve(
             rlvArgs.uArgs.v2.rectSize.y = __GL_MIN(srcHeight, (srcY1 - srcY0));
 
             gcmONERROR(gcoSURF_GetSize(drawDsView->surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
-            gcmONERROR(gcChipTexShadowSyncFromMaster(gc, drawDsView, GL_FALSE));
+            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, drawDsView, GL_FALSE));
 
             if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
                 rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
@@ -1184,10 +1295,19 @@ gcChipBlitFramebufferResolve(
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
 
+            /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+            ** If the draw framebuffer is layered, pixel values are written to layer zero.
+            ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+            */
+            pixelPlaneView.numSlices = drawDsView->numSlices = 1;
+
             gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, drawDsView, &rlvArgs));
 
             /* Destroy pixel plane if needed */
             gcmONERROR(gcChipUtilDestroyPixelPlane(gc, readDsView, &pixelPlaneView));
+
+            /* restore the numSlice for drawDsView*/
+            drawDsView->numSlices = drawDsNumSlice;
         }
 
         /*
@@ -1290,7 +1410,7 @@ gcChipBlitFramebuffer3Dblit(
             }
         }
 
-        masterView = gcChipMasterSyncFromShadow(gc, &chipCtx->readRtView, GL_TRUE);
+        masterView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
         if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.indirectRTT)))
         {
@@ -1308,7 +1428,7 @@ gcChipBlitFramebuffer3Dblit(
             {
                 GL_ASSERT(chipCtx->drawRtViews[i].firstSlice == 0);
 
-                gcmONERROR(gcChipTexShadowSyncFromMaster(gc, &chipCtx->drawRtViews[i], GL_FALSE));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->drawRtViews[i], GL_FALSE));
                 gcmONERROR(gcoSURF_DrawBlit(&shadowView, &chipCtx->drawRtViews[i], &blitArgs));
             }
         }
@@ -1401,12 +1521,14 @@ gcChipBlitFramebufferSoftware(
     blitArgs.srcWidth           = srcX1 - srcX0;
     blitArgs.srcHeight          = srcY1 - srcY0;
     blitArgs.srcDepth           = 1;
+    blitArgs.srcNumSlice        = 1;
     blitArgs.dstX               = dstX0;
     blitArgs.dstY               = dstY0;
     blitArgs.dstZ               = 0;
     blitArgs.dstWidth           = dstX1 - dstX0;
     blitArgs.dstHeight          = dstY1 - dstY0;
     blitArgs.dstDepth           = 1;
+    blitArgs.dstNumSlice        = 1;
     blitArgs.xReverse           = xReverse;
     blitArgs.yReverse           = yReverse;
     blitArgs.scissorTest        = scissorEnable;
@@ -1419,7 +1541,7 @@ gcChipBlitFramebufferSoftware(
     {
         GLuint i;
 
-        gcmONERROR(gcChipTexShadowSyncFromMaster(gc, &chipCtx->readRtView, GL_TRUE));
+        gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->readRtView, GL_TRUE));
         gcmONERROR(gcChipUtilGetPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
 
         blitArgs.srcSurface = pixelPlaneView.surf;
@@ -1434,7 +1556,7 @@ gcChipBlitFramebufferSoftware(
                 blitArgs.dstSurface = rtView->surf;
                 blitArgs.dstZ = rtView->firstSlice;
 
-                gcmONERROR(gcChipTexShadowSyncFromMaster(gc, rtView, GL_FALSE));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, rtView, GL_FALSE));
                 gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
             }
         }
@@ -1460,8 +1582,8 @@ gcChipBlitFramebufferSoftware(
         /* Consider stencil and depth sharing same surface */
         if (readDsView->surf && drawDsView->surf)
         {
-            gcmONERROR(gcChipTexShadowSyncFromMaster(gc, readDsView, GL_TRUE));
-            gcmONERROR(gcChipTexShadowSyncFromMaster(gc, drawDsView, GL_FALSE));
+            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, readDsView, GL_TRUE));
+            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, drawDsView, GL_FALSE));
 
             /* Get Pixel Plane if source is msaa surface */
             gcmONERROR(gcChipUtilGetPixelPlane(gc, readDsView, &pixelPlaneView));
@@ -1498,6 +1620,19 @@ __glChipBlitFramebufferBegin(
     __GLcontext *gc
     )
 {
+#if gcdFRAMEINFO_STATISTIC
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    gcoHAL_FrameInfoOps(chipCtx->hal,
+                        gcvFRAMEINFO_DRAW_NUM,
+                        gcvFRAMEINFO_OP_INC,
+                        gcvNULL);
+    if (g_dbgSkipDraw)
+    {
+        return GL_FALSE;
+    }
+#endif
+
     return GL_TRUE;
 }
 
@@ -1532,14 +1667,14 @@ __glChipBlitFramebufferEnd(
     __GLcontext *gc
     )
 {
-#if (defined(DEBUG) || defined(_DEBUG)) || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
+#if gcdFRAMEINFO_STATISTIC || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 #endif
 
-#if (defined(DEBUG) || defined(_DEBUG))
+#if gcdFRAMEINFO_STATISTIC
     if (g_dbgPerDrawKickOff)
     {
         /* Flush the cache. */
@@ -1548,13 +1683,18 @@ __glChipBlitFramebufferEnd(
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
+
+    if (g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS))
+    {
+        gcmONERROR(gcChipUtilsDumpRT(gc, (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS)));
+    }
 #endif
 
 #if (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
     gcmONERROR(gcChipUtilsVerifyRT(gc));
 #endif
 
-#if (defined(DEBUG) || defined(_DEBUG)) || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
+#if gcdFRAMEINFO_STATISTIC || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -1592,9 +1732,6 @@ GLvoid __glChipBlitFramebuffer(__GLcontext *gc,
                   "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
                    gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1,
                    mask, xReverse, yReverse, filter);
-
-    /* make compiler happy */
-    chipCtx = chipCtx;
 
     if (chipCtx->drawYInverted)
     {
@@ -1739,7 +1876,7 @@ __glChipBindDrawFramebuffer(
     ** known tests. In fact, there is still hole when other client uses EGLimage w/o unbinding from ES3 client.
     ** For later chips support direct RTT, no need to sync any more.
     */
-    gcmONERROR(gcChipFramebufferMasterSyncFromShadow(gc, preFBO));
+    gcmONERROR(gcChipFboSyncFromShadow(gc, preFBO));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -1889,6 +2026,13 @@ __glChipRenderbufferStorage(
 
     }
 
+    if (drvFormat == __GL_FMT_RGBA4 &&
+        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)&&
+        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+    {
+        drvFormat = __GL_FMT_RGBA8;
+    }
+
     if ((rbo->formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8) &&
         (chipCtx->patchId == gcvPATCH_GTFES30) &&
         ((rbo->width == 0x1f4 && rbo->height == 0x1f4) ||
@@ -1912,7 +2056,16 @@ __glChipRenderbufferStorage(
         patchCase = __GL_CHIP_FMT_PATCH_8BIT_MSAA;
     }
 
+    if (drvFormat == __GL_FMT_RGBA4 &&
+        chipCtx->patchId == gcvPATCH_DEQP &&
+        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+    {
+        drvFormat = __GL_FMT_RGBA8;
+    }
+
     formatMapInfo = gcChipGetFormatMapInfo(gc, drvFormat, patchCase);
+
+    chipRBO->formatMapInfo = formatMapInfo;
 
     if (rbo->samples > 0)
     {
@@ -1932,8 +2085,6 @@ __glChipRenderbufferStorage(
         rbo->samplesUsed = rbo->samples;
     }
 
-    chipRBO->formatMapInfo = formatMapInfo;
-
     GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
     GL_ASSERT(formatMapInfo->writeFormat != gcvSURF_UNKNOWN);
 
@@ -1948,6 +2099,9 @@ __glChipRenderbufferStorage(
         surfType = gcvSURF_RENDER_TARGET;
         break;
     }
+
+    chipCtx->needRTRecompile = chipCtx->needRTRecompile
+                             || gcChipCheckRecompileEnable(gc, formatMapInfo->writeFormat);
 
     /* Create render target. */
     gcmONERROR(gcoSURF_Construct(chipCtx->hal,
@@ -2138,6 +2292,8 @@ __glChipCreateEglImageRenderbuffer(
     khrEGL_IMAGE * eglImage = gcvNULL;
     gctINT32 referenceCount = 0;
     GLenum ret;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSURF_FORMAT format;
     gcmHEADER_ARG("gc=0x%x rbo=0x%x image=0x%x", gc, rbo, image);
 
 
@@ -2181,6 +2337,10 @@ __glChipCreateEglImageRenderbuffer(
     eglImage->u.texture.level  = 0;
     /* Type is not yet set. Default to unknown/invalid. */
     eglImage->u.texture.type = 0xFFFFFFFFu;
+
+    gcoSURF_GetFormat(surface, gcvNULL, &format);
+
+    chipCtx->needRTRecompile = chipCtx->needRTRecompile || gcChipCheckRecompileEnable(gc, format);
 
     ret = EGL_SUCCESS;
     gcmFOOTER_ARG("return=0x%04x", ret);
@@ -2239,6 +2399,8 @@ __glChipEglImageTargetRenderbufferStorageOES(
     case gcvSURF_D16:
     case gcvSURF_D24X8:
     case gcvSURF_D24S8:
+    case gcvSURF_X24S8:
+    case gcvSURF_S8:
         type = gcvSURF_DEPTH;
         break;
 
@@ -2446,6 +2608,13 @@ gcChipRellocShadowResource(
             surfType |= gcvSURF_NO_COMPRESSION;
         }
 
+        chipCtx->needRTRecompile = chipCtx->needRTRecompile
+                                 || gcChipCheckRecompileEnable(gc, targetFormat);
+
+        chipCtx->needTexRecompile = chipCtx->needTexRecompile
+                                  || gcChipCheckRecompileEnable(gc, targetFormat);
+
+
         gcmONERROR(gcoSURF_Construct(chipCtx->hal, targetW, targetH, 1, surfType,
                                      targetFormat, gcvPOOL_DEFAULT, &shadow->surface));
         gcmONERROR(gcoSURF_SetSamples(shadow->surface, targetSamples));
@@ -2522,7 +2691,7 @@ gcChipFBOMarkShadowRendered(
                     if (shadow->masterDirty)
                     {
                         gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawRtViews[rtIdx], gcvTRUE));
-                        texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                        texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                         if (texView.surf)
                         {
                             shadowView.surf = shadow->surface;
@@ -2574,7 +2743,7 @@ gcChipFBOMarkShadowRendered(
                 if (shadow->masterDirty)
                 {
                     gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawDepthView, gcvTRUE));
-                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                     if (texView.surf)
                     {
                         shadowView.surf = shadow->surface;
@@ -2627,7 +2796,7 @@ gcChipFBOMarkShadowRendered(
                 if (shadow->masterDirty)
                 {
                     gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawStencilView, gcvTRUE));
-                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                     if (texView.surf)
                     {
                         shadowView.surf = shadow->surface;
@@ -2690,7 +2859,7 @@ gcChipTexMipSliceSyncFromShadow(
     {
         if (shadow->shadowDirty)
         {
-            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
             if (texView.surf)
             {
                 gcsSURF_VIEW shadowView = {shadow->surface, 0 ,1};
@@ -2715,6 +2884,40 @@ OnError:
 }
 
 gceSTATUS
+gcChipRboSyncFromShadow(
+    __GLcontext* gc,
+    __GLrenderbufferObject *rbo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipRenderbufferObject *chipRBO = NULL;
+    __GLchipResourceShadow *shadow = NULL;
+
+    gcmHEADER_ARG("gc=0x%x rbo=0x%x ", gc, rbo);
+
+    chipRBO = (__GLchipRenderbufferObject*)(rbo->privateData);
+    GL_ASSERT(chipRBO);
+    shadow = &chipRBO->shadow;
+
+    if (shadow->surface && shadow->shadowDirty)
+    {
+        gcsSURF_VIEW shadowView = {shadow->surface,  0, 1};
+        gcsSURF_VIEW rboView    = {chipRBO->surface, 0, 1};
+
+        gcmONERROR(gcoSURF_ResolveRect(&shadowView, &rboView, gcvNULL));
+        gcmONERROR(gcChipSetImageSrc(rbo->eglImage, rboView.surf));
+        shadow->shadowDirty = GL_FALSE;
+
+        /* Commit commands. */
+        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcChipTexDirectSourceSyncFromMipSlice(
     __GLcontext* gc,
     __GLtextureObject *texObj
@@ -2728,7 +2931,7 @@ gcChipTexDirectSourceSyncFromMipSlice(
     gcmHEADER_ARG("gc=0x%x texObj=0x%x ", gc, texObj);
 
     /* Only Fbo been touched */
-    texView = gcChipGetTextureSurface(chipCtx, texObj, 0, 0);
+    texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, 0, 0);
     if (texView.surf)
     {
         gcsSURF_VIEW directView = {texInfo->direct.source, 0, 1};
@@ -2787,7 +2990,7 @@ gcChipTexSyncFromShadow(
             {
                 if (shadow->shadowDirty)
                 {
-                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
                     if (texView.surf)
                     {
                         gcsSURF_VIEW shadowView = {shadow->surface, 0, 1};
@@ -2819,7 +3022,7 @@ OnError:
 ** surface will be dirty for ES3.0 API (no drawpixels path).
 */
 gceSTATUS
-gcChipTexShadowSyncFromMaster(
+gcChipFboSyncFromMasterSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     GLboolean read
@@ -2894,7 +3097,7 @@ gcChipTexShadowSyncFromMaster(
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
         __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)(texObj->privateData);
-        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
         __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[attachPoint->level];
         __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
@@ -2923,7 +3126,7 @@ OnError:
 ** Currently we assume 'surface' is always the current read buffer
 */
 gcsSURF_VIEW
-gcChipMasterSyncFromShadow(
+gcChipFboSyncFromShadowSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     GLboolean read
@@ -3006,7 +3209,7 @@ gcChipMasterSyncFromShadow(
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
         __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)(texObj->privateData);
-        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
         __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[attachPoint->level];
         __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
@@ -3195,3 +3398,4 @@ gcChipFBOSyncEGLImageNativeBuffer(
     return gcvSTATUS_OK;
 }
 #endif
+

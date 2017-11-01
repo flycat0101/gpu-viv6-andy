@@ -559,7 +559,7 @@ GLvoid __glLoadUnpackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
         ** Data came straight from the application.
         */
         GLint lineLength, imageHeight;
-        __GLpixelUnpackMode *unpackModes = &gc->clientState.pixel.unpackModes;
+        __GLpixelPackMode *unpackModes = &gc->clientState.pixel.unpackModes;
 
         lineLength = unpackModes->lineLength;
         spanInfo->srcAlignment  = unpackModes->alignment;

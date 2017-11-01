@@ -23,7 +23,7 @@
 VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref)
 {
     struct timeval start = {0};
-    if(ref->context->perfEnable)
+    if(ref->context->options.enableCNNPerf)
     {
         gettimeofday(&start, 0);
     }
@@ -35,7 +35,7 @@ VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, struct timeval start)
 {
     vx_uint32 interval = 0;
 
-    if(ref->context->perfEnable)
+    if(ref->context->options.enableCNNPerf)
     {
         struct timeval end = {0};
         gettimeofday(&end, 0);
@@ -533,7 +533,7 @@ gcfVX_GetImageInfo(
                 size = vxComputeImagePatchSize(Image, &rect, plane);
 
                 gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
-                                            (gctPHYS_ADDR*)&Image->memory.physicals[plane],
+                                            &Image->memory.physicals[plane],
                                             &Image->memory.nodePtrs[plane]);
 
                 context->memoryCount ++;
@@ -553,6 +553,9 @@ gcfVX_GetImageInfo(
                  Image->importType == VX_MEMORY_TYPE_HOST_UNCACHED)
         {
             Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+#if gcdDUMP
+            Info->logicals[plane] = Image->memory.logicals[plane];
+#endif
         }
         else
         {
@@ -669,12 +672,12 @@ gcfVX_GetImageInfoFromTensor(
         goto OnError;
     }
 
-    Info->stride[0] = Info->width * (Info->bpp / 8);
-    Info->physicals[0] = (gctUINT32)tensor->tensorBuffer->memory.physicals[0];
+    vxoTensor_GetTensorViewMemory(tensor, VX_NULL, &(Info->physicals[0]));
+    Info->stride[0] = TENSOR_STRIDE_INDEX(tensor, 1);
+    Info->sliceSize = TENSOR_STRIDE_INDEX(tensor, 2);
 
     /* for imageArray/image3D  plane count should be 1 */
     Info->arraySize = (tensor->viewRegion.dimCount == 3 ? (tensor->viewRegion.viewEnds[2] - tensor->viewRegion.viewStarts[2]) : 1);
-    Info->sliceSize = Info->height * Info->stride[0];
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1078,11 +1081,11 @@ gcfVX_Kernel(
     }
 
 
-    gcmFOOTER();
+    gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
 
 OnError:
-    gcmFOOTER();
+    gcmFOOTER_ARG("%d", status);
 
     return VX_FAILURE;
 }
@@ -1118,9 +1121,15 @@ vx_status gcfVX_Accel(
 
     status = gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent);
 
-#if NN_LAYER_FLUSH
-    status = gcoVX_Flush(gcvTRUE);
-#endif
+    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+    {
+        status = gcoVX_Flush(gcvFALSE);
+    }
+    else
+    {
+        status = gcoVX_Flush(gcvTRUE);
+    }
+
     return status;
 }
 

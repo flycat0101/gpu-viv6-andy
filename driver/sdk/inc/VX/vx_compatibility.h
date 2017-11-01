@@ -139,10 +139,6 @@
 #define VX_META_FORMAT_ATTRIBUTE_DELTA_RECTANGLE  (VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_META_FORMAT) + 0x0)
 #define VX_HINT_SERIALIZE (VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_HINT) + 0x0)
 
-typedef vx_status(VX_CALLBACK *vx_kernel_input_validate_f)(vx_node node, vx_uint32 index);
-
-typedef vx_status(VX_CALLBACK *vx_kernel_output_validate_f)(vx_node node, vx_uint32 index, vx_meta_format meta);
-
 #ifdef __cplusplus
 extern "C" {
 #endif

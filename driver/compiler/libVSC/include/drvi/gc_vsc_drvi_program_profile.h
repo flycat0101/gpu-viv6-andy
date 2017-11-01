@@ -747,6 +747,16 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
 
+    /* For image storage, it might need a image-size attached. As each image in
+       storageBinding::arraySize array has image-size, so this is the first entry
+       of image-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
+       array, if one image has extra image, all other images must have extra image, so
+       this is the first entry of extra-image */
+    SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
+
     /* Different shader stage may have different HW mappings. */
     PROG_VK_INPUT_ATTACHMENT_HW_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
 }

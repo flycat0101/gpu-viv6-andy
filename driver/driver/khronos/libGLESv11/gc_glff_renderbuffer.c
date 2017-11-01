@@ -346,13 +346,6 @@ glfGetEGLImageAttributes(
 
     do
     {
-        /* Validate the image. */
-        if ((Image == gcvNULL) || (Image->magic != KHR_EGL_IMAGE_MAGIC_NUM))
-        {
-            status = gcvSTATUS_INVALID_ARGUMENT;
-            break;
-        }
-
         Attributes->nativeBuffer = gcvNULL;
 
         /* Get texture attributes. */
@@ -1238,6 +1231,17 @@ GL_API void GL_APIENTRY glEGLImageTargetRenderbufferStorageOES(
 
         /* Get the eglImage. */
         image = (khrEGL_IMAGE_PTR) Image;
+
+        /* Validate the image. */
+        /* According to extension OES_EGL_image:
+        ** If <image> does not refer to a valid eglImageOES object,
+        ** the error INVALID_VALUE is generated.
+        */
+        if ((image == gcvNULL) || (image->magic != KHR_EGL_IMAGE_MAGIC_NUM))
+        {
+            glmERROR(GL_INVALID_VALUE);
+            break;
+        }
 
         /* Get texture attributes from eglImage. */
         status = glfGetEGLImageAttributes(image, &attributes);

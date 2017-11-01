@@ -1966,7 +1966,7 @@ void vgfSetDefaultStates(
     Context->maxSeparableKernelSize = vgvMAX_SEPARABLE_KERNEL_SIZE;
     Context->maxColorRampStops      = vgvMAX_COLOR_RAMP_STOPS;
 
-    Context->maxImageWidth          = gcoHAL_IsFeatureAvailable(Context->hal, gcvFEATURE_TEXTURE_8K) ? 8192 : 2048;
+    Context->maxImageWidth          = gcoHAL_IsFeatureAvailable(Context->hal, gcvFEATURE_VG_RESOLUTION_8K) ? 8192 : 2048;
     Context->maxImageHeight         = Context->maxImageWidth;
     Context->maxImagePixels         = Context->maxImageWidth * Context->maxImageHeight;
     Context->maxImageBytes          = Context->maxImagePixels * 4;

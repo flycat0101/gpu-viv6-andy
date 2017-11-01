@@ -224,6 +224,13 @@ struct _gcoVERTEXARRAY
 
     /* Uncacheable stream. */
     gcoSTREAM                   uncacheableStream;
+
+    struct
+    {
+        gctUINT32               hasLineLoop                   : 1;
+        gctUINT32               hasIndexedTriangleStripFix    : 1;
+        gctUINT32               hasMixedStreams               : 1;
+    }hwFeature;
 };
 
 gceSTATUS
@@ -269,6 +276,13 @@ gcoVERTEXARRAY_Construct(
                                            &vertexPtr->maxStreams,
                                            gcvNULL,
                                            &vertexPtr->maxAttribOffset));
+
+
+    vertexPtr->hwFeature.hasLineLoop = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP);
+    vertexPtr->hwFeature.hasIndexedTriangleStripFix = gcoHAL_IsFeatureAvailable(gcvNULL,
+        gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP);
+    vertexPtr->hwFeature.hasMixedStreams = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS);
+
 
 
     /* Return the gcoVERTEXARRAY object. */
@@ -694,12 +708,12 @@ gcoVERTEXARRAY_IndexBind_Ex(
 
     /* Check for hardware line loop support. */
     fakeLineLoop = (StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP)
-                 ? !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP)
+                 ? !Vertex->hwFeature.hasLineLoop
                  : gcvFALSE;
 
     convertToIndexedTriangleList = (StreamInfo->primMode == gcvPRIMITIVE_TRIANGLE_STRIP)
                                 && ((IndexInfo->u.es11.indexBuffer == gcvNULL) && (IndexInfo->indexMemory != gcvNULL))
-                                && (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP) != gcvSTATUS_TRUE);
+                                && !Vertex->hwFeature.hasIndexedTriangleStripFix;
 
 
     /* Check if we need to fake the line loop */
@@ -944,14 +958,12 @@ gcoVERTEXARRAY_StreamBind_Ex(
 
     /* Check for hardware line loop support. */
     fakeLineLoop = (StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP)
-                 ? !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP)
+                 ? !Vertex->hwFeature.hasLineLoop
                  : gcvFALSE;
 
     convertToIndexedTriangleList = (StreamInfo->primMode == gcvPRIMITIVE_TRIANGLE_STRIP)
         && ((IndexInfo->u.es11.indexBuffer == gcvNULL) && (IndexInfo->indexMemory != gcvNULL))
-        && (gcoHAL_IsFeatureAvailable(
-                    gcvNULL,
-                    gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP) != gcvSTATUS_TRUE);
+        && !Vertex->hwFeature.hasIndexedTriangleStripFix;
 
     if((StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP) && (!fakeLineLoop))
     {
@@ -1066,7 +1078,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
                 gcmONERROR(gcoSTREAM_Lock(vertexPtr->stream,
                                           &pointer,
                                           &streamPtr->physical));
-                gcmONERROR(gcoSTREAM_Size(vertexPtr->stream, &Size));
+                Size = gcoSTREAM_GetSize(vertexPtr->stream);
                 if(Size < attributePtr->offset)
                 {
                     gcmONERROR(gcvSTATUS_INVALID_DATA);
@@ -1605,10 +1617,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
 
     /* Fix mixed stream issue.*/
 #if OPT_VERTEX_ARRAY
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) &&
-        (Vertex->maxStreams > 1) &&
-        (n > 1)
-        )
+    if (!Vertex->hwFeature.hasMixedStreams && (Vertex->maxStreams > 1) && (n > 1))
     {
         gcmONERROR(gcoVERTEX_AdjustStreamPool(Vertex->dynamicStream,
                                               bufferCount, bufferArray,
@@ -2472,9 +2481,7 @@ gcoVERTEXARRAY_StreamBind(
     }
 
     /* Check Stream pool and fix the issue.*/
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) &&
-        (streamCount > 1)
-        )
+    if (!Vertex->hwFeature.hasMixedStreams && (streamCount > 1))
     {
         gcmONERROR(gcoVERTEX_AdjustStreamPoolEx(Vertex->dynamicStream,
                                                 streams,
@@ -2529,23 +2536,77 @@ gceSTATUS gcoVERTEXARRAY_Destroy(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS gcoVERTEXARRAY_Bind(
+gceSTATUS
+gcoVERTEXARRAY_Bind(
     IN gcoVERTEXARRAY Vertex,
     IN gctUINT32 EnableBits,
     IN gcsVERTEXARRAY_PTR VertexArray,
     IN gctUINT First,
-    IN gctSIZE_T Count,
+    IN gctSIZE_T * Count,
     IN gceINDEX_TYPE IndexType,
     IN gcoINDEX IndexObject,
     IN gctPOINTER IndexMemory,
     IN OUT gcePRIMITIVE * PrimitiveType,
+#if gcdUSE_WCLIP_PATCH
     IN OUT gctUINT * PrimitiveCount,
     IN OUT gctFLOAT * WLimitRms,
     IN OUT gctBOOL * WLimitRmsDirty
+#else
+    IN OUT gctUINT * PrimitiveCount
+#endif
     )
 {
     return gcvSTATUS_OK;
 }
+
+gceSTATUS
+gcoVERTEXARRAY_IndexBind(
+    IN gcoVERTEXARRAY Vertex,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoVERTEXARRAY_IndexBind_Ex(
+    IN gcoVERTEXARRAY Vertex,
+    IN OUT gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoVERTEXARRAY_StreamBind(
+    IN gcoVERTEXARRAY Vertex,
+#if gcdUSE_WCLIP_PATCH
+    IN OUT gctFLOAT * WLimitRms,
+    IN OUT gctBOOL * WLimitRmsDirty,
+#endif
+    IN gcsVERTEXARRAY_STREAM_INFO_CONST_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_CONST_PTR IndexInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoVERTEXARRAY_StreamBind_Ex(
+    IN gcoVERTEXARRAY Vertex,
+#if gcdUSE_WCLIP_PATCH
+    IN OUT gctFLOAT * WLimitRms,
+    IN OUT gctBOOL * WLimitRmsDirty,
+#endif
+    gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+
 
 #endif /* gcdNULL_DRIVER < 2 */
 #endif

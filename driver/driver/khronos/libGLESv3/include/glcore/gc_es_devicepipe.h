@@ -97,7 +97,7 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*deleteQuery)(__GLcontext*, __GLqueryObject*);
 
     /* Flush, Finish */
-    GLboolean (*flush)(__GLcontext*);
+    GLboolean (*flush)(__GLcontext*, GLboolean);
     GLboolean (*finish)(__GLcontext*);
     GLboolean (*clear)(__GLcontext*, GLbitfield);
     GLboolean (*clearBuffer)(__GLcontext*, GLenum, GLint, GLvoid*, GLenum);

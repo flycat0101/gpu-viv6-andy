@@ -132,6 +132,7 @@ _AddGeneralVariable(
     gctINT                       location = -1;
     gctUINT                      i;
     gctUINT                      regCount = VIR_Type_GetVirRegCount(Shader, type, -1);
+    gctUINT                      indexRange = 0;
 
     /* The parent symbol is a parameter. */
     if (VIR_Id_isFunctionScope(VIR_Symbol_GetIndex(ParentSym)))
@@ -208,6 +209,12 @@ _AddGeneralVariable(
             sym = VIR_Shader_GetSymFromId(Shader, symId);
         }
         gcmASSERT(sym);
+
+        /* For built-in variables, don't need to check SKIP-NAME-CHECK flag. */
+        if (VIR_Shader_IsNameBuiltIn(Shader, VIR_Symbol_GetName(sym)))
+        {
+            flags &= ~VIR_SYMFLAG_SKIP_NAME_CHECK;
+        }
 
         if (Location)
         {
@@ -312,9 +319,22 @@ _AddGeneralVariable(
         VIR_Symbol_SetVariableVregIndex(sym, regId);
         if(*UpcomingRegCount)
         {
-            VIR_Symbol_SetIndexRange(sym, regId + *UpcomingRegCount);
+            indexRange = regId + *UpcomingRegCount;
             (*UpcomingRegCount) -= regCount;
         }
+        /*
+        ** If the UpComingRegCount is 0, then this variable is a normal variable or the last element of a struct/block,
+        ** just use the regCount as the indexRange.
+        */
+        else
+        {
+            if (!isSymCombinedSampler(sym))
+            {
+                indexRange = regId + regCount;
+            }
+        }
+
+        VIR_Symbol_SetIndexRange(sym, indexRange);
 
         for (i = 0; i < regCount; i++)
         {
@@ -336,6 +356,7 @@ _AddGeneralVariable(
                 VIR_Symbol_SetParamFuncSymId(regSym, VIR_Function_GetSymId(func));
             }
             VIR_Symbol_SetPrecision(regSym, VIR_Symbol_GetPrecision(sym));
+            VIR_Symbol_SetIndexRange(regSym, indexRange);
         }
     }
 
@@ -401,6 +422,7 @@ _SplitStructVariable(
     for (i = 0; i < VIR_IdList_Count(fields); i++)
     {
         VIR_Precision    precision;
+        gctINT           location = NOT_ASSIGNED;
 
         id = VIR_IdList_GetId(VIR_Type_GetFields(Type), i);
         fieldSym = VIR_Shader_GetSymFromId(Shader, id);
@@ -412,6 +434,15 @@ _SplitStructVariable(
         fieldName = VIR_Shader_GetSymNameString(Shader, fieldSym);
         fieldType = VIR_Symbol_GetType(fieldSym);
         baseTypeId = VIR_Type_GetBaseTypeId(fieldType);
+
+        /*
+        ** In the early vulkan100 CTS, the location of a struct member is defined by OpMemberDecorate,
+        ** so the location is saved in the struct member symbol, we need to check this.
+        */
+        if (VIR_Layout_HasLocation(VIR_Symbol_GetLayout(fieldSym)))
+        {
+            location = VIR_Symbol_GetLocation(fieldSym);
+        }
 
         /* Cat field name: 'prefixName.fieldName'. */
         gcoOS_StrCopySafe(mixName, __MAX_SYM_NAME_LENGTH__, prevName);
@@ -435,7 +466,7 @@ _SplitStructVariable(
                                                AllocateSym,
                                                AllocateReg,
                                                UpcomingRegCount,
-                                               Location,
+                                               (location == NOT_ASSIGNED) ? Location : &location,
                                                (firstElementId == VIR_INVALID_ID) ? FirstElementId : gcvNULL,
                                                IdList);
                 CHECK_ERROR(errCode, "_SplitStructVariable failed.");
@@ -462,7 +493,7 @@ _SplitStructVariable(
                                               AllocateSym,
                                               AllocateReg,
                                               *UpcomingRegCount ? UpcomingRegCount : &upcomingRegCount,
-                                              Location,
+                                              (location == NOT_ASSIGNED) ? Location : &location,
                                               (firstElementId == VIR_INVALID_ID) ? FirstElementId : gcvNULL,
                                               IdList);
 
@@ -498,7 +529,7 @@ _SplitStructVariable(
                                       AllocateReg,
                                       UpcomingRegCount,
                                       mixName,
-                                      Location,
+                                      (location == NOT_ASSIGNED) ? Location : &location,
                                       &symId,
                                       IdList);
         CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
@@ -2367,11 +2398,14 @@ static VSC_ErrCode _VIR_HL_Reg_Alloc(
         VIR_Function        *func = func_node->function;
         VIR_VariableIdList  *paramList = VIR_Function_GetParameters(func);
         VIR_VariableIdList  *localVarList = VIR_Function_GetLocalVar(func);
+        gctINT              i;
+        gctUINT             origParamCount;
 
         /* Allocate register for parameters. */
         listLength = VIR_IdList_Count(paramList);
-        for (i = 0; i < listLength; i++)
+        for (i = 0; i < (gctINT)listLength; i++)
         {
+            origParamCount = VIR_IdList_Count(paramList);
             symbol = VIR_Function_GetSymFromId(func, VIR_IdList_GetId(paramList, i));
             storageClass = VIR_Symbol_GetStorageClass(symbol);
 
@@ -2392,11 +2426,19 @@ static VSC_ErrCode _VIR_HL_Reg_Alloc(
 
             /* Mark symbol as reg allocated. */
             VIR_Symbol_ClrFlag(symbol, VIR_SYMFLAG_WITHOUT_REG);
+
+            /* If a new parameter is added, then the original one is not longer needed.*/
+            if (origParamCount != VIR_IdList_Count(paramList))
+            {
+                VIR_IdList_DeleteByIndex(paramList, i);
+                listLength--;
+                i--;
+            }
         }
 
         /* Allocate register for local variables. */
         listLength = VIR_IdList_Count(localVarList);
-        for (i = 0; i < listLength; i++)
+        for (i = 0; i < (gctINT)listLength; i++)
         {
             symbol = VIR_Function_GetSymFromId(func, VIR_IdList_GetId(localVarList, i));
             storageClass = VIR_Symbol_GetStorageClass(symbol);
@@ -2454,9 +2496,14 @@ _ReplaceSymWithFirstElementSym(
         if (VIR_Symbol_isUniform(elementSym) &&
             VIR_Symbol_GetUniformKind(elementSym) == VIR_UNIFORM_PUSH_CONSTANT)
         {
-            /* SPIV generates constIndexing for field access(will change) */
+            /* SPIV generates constIndexing for field access(will change)
+             * skip cases which symbole type are array/matrix/vector.
+             * The value of constindexing may not be continuous for the size/element numbers while
+             * elementSymId is continous*/
             if (VIR_Operand_GetIsConstIndexing(Operand) &&
-                !VIR_Type_isArray(VIR_Symbol_GetType(elementSym)))
+                !VIR_Type_isArray(VIR_Symbol_GetType(elementSym)) &&
+                !VIR_Type_isMatrix(VIR_Symbol_GetType(elementSym)) &&
+                !VIR_Type_isVector(VIR_Symbol_GetType(elementSym)))
             {
                 elementSymId += VIR_Operand_GetConstIndexingImmed(Operand);
                 VIR_Operand_SetIsConstIndexing(Operand, gcvFALSE);

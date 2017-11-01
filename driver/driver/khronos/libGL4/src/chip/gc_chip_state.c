@@ -17,8 +17,9 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_STATE
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgDumpTexturePerDraw;
+extern GLbitfield g_dbgDumpImagePerDraw;
 #endif
+
 #ifdef OPENGL40
 extern GLenum gcChipSetAlphaTestReference(
     __GLchipContext *chipCtx,
@@ -144,6 +145,7 @@ gcChipUtilConvertWrapMode(
         case GL_REPEAT:
             ret = gcvTEXTURE_WRAP;
             break;
+        case GL_CLAMP:
         case GL_CLAMP_TO_EDGE:
             ret = gcvTEXTURE_CLAMP;
             break;
@@ -1121,23 +1123,16 @@ gcChipValidateAlphaBlend(
 
     if (localMask & (__GL_BLEND_ENDISABLE_BIT | __GL_BLENDEQUATION_BIT | __GL_BLENDFUNC_BIT))
     {
-        __GLchipSLProgramInstance *fsInstance = gcvNULL;
         GLboolean advBlendInShader;
+        __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ? chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
         gceLAYOUT_QUALIFIER layoutBit = gcChipUtilConvertLayoutQualifier(gc->state.raster.blendEquationRGB[0], &advBlendInShader);
-#ifdef OPENGL40
-        if(!chipCtx->fixProgramFlag)
-        {
-            fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
-        }
-#else
-        fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
-#endif
+
         if (localMask & (__GL_BLENDEQUATION_BIT | __GL_BLEND_ENDISABLE_BIT))
         {
             chipCtx->advBlendMode = layoutBit;
             chipCtx->advBlendInShader = (advBlendInShader && gc->state.enables.colorBuffer.blend[0]);
 
-            if (fsInstance && fsInstance->advBlendState)
+            if ( fsInstance && fsInstance->advBlendState)
             {
                 fsInstance->advBlendState->dirty = gcvTRUE;
             }
@@ -1170,7 +1165,7 @@ gcChipSetTextureParameters(
     __GLcontext *gc,
     __GLtextureObject *tex,
     GLuint unit,
-    GLuint localMask
+    GLuint64 localMask
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -1188,7 +1183,7 @@ gcChipSetTextureParameters(
         GL_LINEAR,          /* gcvTEXTURE_LINEAR */
     };
 
-    gcmHEADER_ARG("gc=0x%x tex=0x%x unit=%u localMask=%u", gc, tex, unit, localMask);
+    gcmHEADER_ARG("gc=0x%x tex=0x%x unit=%u localMask=0x%llx", gc, tex, unit, localMask);
 
     if (tex == gcvNULL)
     {
@@ -1247,10 +1242,9 @@ gcChipSetTextureParameters(
         halTexture->swizzle[gcvTEXTURE_COMPONENT_A] = gcChipUtilConvertTexSwizzle(tex->params.swizzle[__GL_TEX_COMPONENT_A]);
     }
 
-    if (localMask & __GL_TEXPARAM_D_ST_TEXMODE_BIT)
+    if (localMask & __GL_TEXPARAM_DS_TEXMODE_BIT)
     {
-        halTexture->dsMode = gcChipUtilConvertDSMode(tex->params.depthStTexMode);
-
+        halTexture->dsMode = gcChipUtilConvertDSMode(tex->params.dsTexMode);
     }
 
     if(localMask & __GL_TEXPARAM_SRGB_BIT)
@@ -1365,7 +1359,7 @@ gcChipSetTextureParameters(
         halTexture->compareFunc = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
     }
 
-    if (localMask & __GL_TEXPARAM_MAX_ANISTROPY_BIT)
+    if (localMask & __GL_TEXPARAM_MAX_ANISOTROPY_BIT)
     {
         halTexture->anisoFilter = __GL_MIN(gc->constants.maxAnistropic, gcoMATH_Float2UInt(samplerStates->maxAnistropy));
     }
@@ -1784,7 +1778,7 @@ GLvoid updatePrimitive(__GLcontext *gc,
         case GL_QUAD_STRIP:
         case GL_POLYGON:
             chipCtx->hashKey.hashTwoSidedLighting =
-            chipCtx->lightingStates.doTwoSidedlighting = gc->state.light.model.twoSided;
+            chipCtx->lightingStates.doTwoSidedlighting = gc->state.light.model.twoSided ? GL_TRUE : GL_FALSE;
             break;
         default:
             break;
@@ -1901,7 +1895,7 @@ gcChipValidateAttribGroup1(
 
             if (!chipCtx->chipFeature.hasHwTFB)
             {
-                chipCtx->chipDirty.uDefer.sDefer.depthTest = 1;
+                chipCtx->chipDirty.uDefer.sDefer.viewportScissor = 1;
             }
         }
     }
@@ -1992,8 +1986,6 @@ gcChipValidateAttribGroup2(
                 gcmONERROR(gco3D_SetMinSampleShadingValue(chipCtx->engine, gc->state.multisample.minSampleShadingValue));
             }
         }
-
-
     }
 
 OnError:
@@ -2254,7 +2246,6 @@ static gceSTATUS validateShader(__GLcontext *gc,
         gco3D_SetShading(chipCtx->engine, gcvSHADING_SMOOTH);
     }
 
-OnError:
     gcmFOOTER();
     return status;
 }
@@ -2584,7 +2575,7 @@ gcChipValidateGL4FixState(
                 (gc->vertexStreams.primMode == GL_POINTS),
                 0);
 
-        }
+    }
     }
 
     gcmONERROR(gcChipValidateAttribGroup3(gc, chipCtx));
@@ -2717,12 +2708,15 @@ gcChipValidateShader(
         chipCtx->chipDirty.uDefer.sDefer.activeUniform = 1;
     }
 
+    if (localMask & __GL_DIRTY_GLSL_FS_SWITCH || chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty)
+    {
+        chipCtx->chipDirty.uDefer.sDefer.lastFragData = 1;
+    }
+
 OnError:
     gcmFOOTER();
     return status;
 }
-
-
 
 __GL_INLINE gceSTATUS
 gcChipValidateProgramSamplersCB(
@@ -2801,7 +2795,8 @@ gcChipValidateProgramSamplersCB(
                 chipCtx->texture.halTexture[unit].magFilter = gcvTEXTURE_POINT;
         }
 
-        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER)
+        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER
+         || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
         {
             gcsTEXTURE texParams;
             if (gcvNULL == chipCtx->rtTexture)
@@ -2883,8 +2878,8 @@ gcChipValidateProgramSamplersCB(
             {
                 gctUINT samplers[gcdMAX_SURF_LAYERS], layers = 1, samplerBaseOffset = 0;
                 gctBOOL swizzled = gcvFALSE;
-                gceTEXTURE_SWIZZLE backedSwizzle[gcvTEXTURE_COMPONENT_NUM];
-                const gceTEXTURE_SWIZZLE defaultSwizzle[gcvTEXTURE_COMPONENT_NUM] =
+                gceTEXTURE_SWIZZLE backedSwizzle[gcvTEXTURE_COMPONENT_NUM] = {gcvTEXTURE_SWIZZLE_INVALID};
+                static const gceTEXTURE_SWIZZLE defaultSwizzle[gcvTEXTURE_COMPONENT_NUM] =
                 {
                     gcvTEXTURE_SWIZZLE_R,
                     gcvTEXTURE_SWIZZLE_G,
@@ -2892,7 +2887,7 @@ gcChipValidateProgramSamplersCB(
                     gcvTEXTURE_SWIZZLE_A,
                 };
 
-                const gcePROGRAM_STAGE shaderKindToProgStage[] =
+                static const gcePROGRAM_STAGE shaderKindToProgStage[] =
                 {
                     gcvPROGRAM_STAGE_LAST,     /* gcSHADER_TYPE_UNKNOWN = 0 */
                     gcvPROGRAM_STAGE_VERTEX,   /* gcSHADER_TYPE_VERTEX */
@@ -2999,7 +2994,7 @@ gcChipValidateProgramSamplersCB(
             texObj->uObjStateDirty.objStateDirty = 0;
 
 #if gcdFRAMEINFO_STATISTIC
-            if (g_dbgDumpTexturePerDraw)
+            if (g_dbgDumpImagePerDraw & __GL_PERDRAW_DUMP_TEXTURE)
             {
                 gcmVERIFY_OK(gcChipUtilsDumpTexture(gc, texObj));
             }
@@ -3051,7 +3046,7 @@ gcChipValidateProgramSamplersCB(
         }
     } /* End of while */
 
-    for (index = 0; index < gc->constants.shaderCaps.maxCombinedTextureImageUnits; index++)
+    for (index = 0; index < progObj->maxUnit; index++)
     {
         __GLtexUnit2Sampler *texUnit2SamplerTmp = &gc->shaderProgram.texUnit2Sampler[index];
 #if gcdSYNC
@@ -3144,7 +3139,7 @@ gcChipBindFixSamplers(
 
                 GL_ASSERT(chipCtx->texture.sampler[unit].binding == texInfo);
 
-                samplerBase = gcHINTS_GetSamplerBaseOffset(chipCtx->currProgram->hints, chipCtx->currProgram->fs.shader);
+                samplerBase = gcHINTS_GetSamplerBaseOffset(chipCtx->currProgram->programState.hints, chipCtx->currProgram->fs.shader);
 
                 /* Get the sampler number. */
                 gcmERR_BREAK(gcUNIFORM_GetSampler(
@@ -3195,9 +3190,9 @@ gcChipBindFixSamplers(
                 }
 
 #if gcdFRAMEINFO_STATISTIC
-                if (g_dbgDumpTexturePerDraw)
+                if (g_dbgDumpImagePerDraw & __GL_PERDRAW_DUMP_TEXTURE)
                 {
-                gcmVERIFY_OK(gcChipUtilsDumpTexture(gc, texObj));
+                    gcmVERIFY_OK(gcChipUtilsDumpTexture(gc, texObj));
                 }
 #endif
 
@@ -3206,11 +3201,9 @@ gcChipBindFixSamplers(
                     gcmONERROR(gcoTEXTURE_FlushVS(texInfo->object));
                     gcmONERROR(gcoTEXTURE_Flush(texInfo->object));
                 }
-
             }
 
         } /* End of while */
-
     }
 
     /* Set line stipple and polygon stipple and accum texinfo */
@@ -3219,7 +3212,7 @@ gcChipBindFixSamplers(
         __GLchipTextureInfo *texInfoX = gcvNULL;
         gctUINT samplerNumberX;
         gctUINT samplerBaseX;
-        samplerBaseX = gcHINTS_GetSamplerBaseOffset(chipCtx->currProgram->hints, chipCtx->currProgram->fs.shader);
+        samplerBaseX = gcHINTS_GetSamplerBaseOffset(chipCtx->currProgram->programState.hints, chipCtx->currProgram->fs.shader);
         if (chipCtx->hashKey.accumMode != gccACCUM_UNKNOWN)
         {
             /* To add */
@@ -3765,7 +3758,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
     {
         __GLbitmask unitMask = gc->texUnitAttrDirtyMask;
         GLuint64 localMask;
-        GLint  unit = -1;
+        GLint unit = -1;
         __GLtextureObject* tex = gcvNULL;
         while (!__glBitmaskIsAllZero(&unitMask))
         {
@@ -3776,7 +3769,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
             localMask = gc->texUnitAttrState[unit];
             tex = gc->texture.units[unit].currentTexture;
 
-            if(unit >= (GLint)gc->constants.shaderCaps.maxTextureSamplers) {
+            if (unit >= __GL_MIN((GLint)gc->constants.shaderCaps.maxTextureSamplers, 8)) {
                 break;
             }
 
@@ -3805,7 +3798,8 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
                 continue;
             }
 */
-            if (localMask & __GL_SAMPLERPARAMETER_BITS) {
+            if (localMask & __GL_SAMPLERPARAMETER_BITS)
+            {
                 gctUINT8 hashTextureWrapBit = 0;
                 gcChipSetTextureParameters(gc, tex, unit, localMask);
                 /* simulate the wrap mode GL_CLAMP in LINEAR */
@@ -3864,12 +3858,8 @@ gcChipValidateTexture(
     {
         __GLtextureObject *tex;
         __GLbitmask unitMask = gc->texUnitAttrDirtyMask;
-#ifdef OPENGL40
         GLuint64 localMask;
-#else
-        GLuint localMask;
-#endif
-        GLint  unit = -1;
+        GLint unit = -1;
 
         while (!__glBitmaskIsAllZero(&unitMask))
         {
@@ -3883,7 +3873,7 @@ gcChipValidateTexture(
 
             if (localMask & __GL_TEXPARAMETER_BITS)
             {
-                gcChipSetTextureParameters(gc, tex, unit, (GLuint)localMask);
+                gcChipSetTextureParameters(gc, tex, unit, localMask);
             }
         }
     }
@@ -3957,12 +3947,9 @@ gcChipValidateXFB(
             {
                 xfbBindingPoint = &pBindingPoints[0];
                 GL_ASSERT(xfbBindingPoint->boundBufObj);
-                bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-#if gcdSYNC
-                gcoBUFOBJ_GetFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE);
-#endif
-                gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
 
+                bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
+                gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
                 physical += (gctUINT32)xfbBindingPoint->bufOffset;
 
                 sizeRange = (xfbBindingPoint->bufSize == 0) ?
@@ -3985,12 +3972,9 @@ gcChipValidateXFB(
                 {
                     xfbBindingPoint = &pBindingPoints[i];
                     GL_ASSERT(xfbBindingPoint->boundBufObj);
-                    bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-#if gcdSYNC
-                    gcoBUFOBJ_GetFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE);
-#endif
-                    gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
 
+                    bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
+                    gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
                     physical += (gctUINT32)xfbBindingPoint->bufOffset;
 
                     sizeRange = (xfbBindingPoint->bufSize == 0) ?
@@ -4012,24 +3996,10 @@ gcChipValidateXFB(
     }
     else
     {
-        __GLprogramObject *vsProgrObj = gcvNULL;
-        __GLchipSLProgram *vsProgram = gcvNULL;
-        __GLchipSLProgramInstance* pgInstance = gcvNULL;
-        gctINT enabled = ((xfbObj->active) && (!xfbObj->paused)) ? 1 : 0;
-#ifdef OPENGL40
-
-        if(chipCtx->fixProgramFlag)
-        {
-        }
-        else
-        {
-#endif
         __GLprogramObject *vsProgrObj = gc->shaderProgram.activeProgObjs[__GLSL_STAGE_VS];
-        __GLchipSLProgram *vsProgram = (__GLchipSLProgram*)vsProgrObj->privateData;
-        __GLchipSLProgramInstance* pgInstance = vsProgram->curPgInstance;
-#ifdef OPENGL40
-        }
-#endif
+        __GLchipSLProgram *vsProgram = vsProgrObj ? (__GLchipSLProgram*)vsProgrObj->privateData : gcvNULL;
+        __GLchipSLProgramInstance* pgInstance = vsProgram ? vsProgram->curPgInstance : gcvNULL;
+        gctINT enabled = ((xfbObj->active) && (!xfbObj->paused)) ? 1 : 0;
 
 
         if (pgInstance && pgInstance->xfbActiveUniform)
@@ -4066,9 +4036,6 @@ gcChipValidateXFB(
                         GL_ASSERT(xfbBindingPoint->boundBufObj);
 
                         bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-#if gcdSYNC
-                        gcoBUFOBJ_GetFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE);
-#endif
                         gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
                         physical += xfbObj->offset * vsProgram->xfbStride;
 
@@ -4096,9 +4063,6 @@ gcChipValidateXFB(
                             GL_ASSERT(xfbBindingPoint->boundBufObj);
 
                             bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-#if gcdSYNC
-                            gcoBUFOBJ_GetFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE);
-#endif
                             gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
                             physical += (gctUINT32)(xfbBindingPoint->bufOffset + xfbObj->offset * vsProgram->xfbVaryings[index].stride);
 
@@ -4144,8 +4108,10 @@ gcChipValidateMiscState(
         chipCtx->chipDirty.uDefer.sDefer.vsReload = 1;
     }
 
-    if(!chipCtx->fixProgramFlag) {
-
+#ifdef OPENGL40
+    if (!chipCtx->fixProgramFlag)
+#endif
+    {
         if (pointPrimTypeSwitch || (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_PROGRAM_SWITCH))
         {
             gctBOOL enable = (GL_POINTS == chipCtx->primitveType) ? gcvTRUE : gcvFALSE;
@@ -4163,7 +4129,6 @@ gcChipValidateMiscState(
             /* Enable primtive-id. */
             gcmONERROR(gco3D_SetPrimitiveIdEnable(chipCtx->engine, ((psHints->primIdComponent != -1) && !prePAhints->prePaShaderHasPrimitiveId)));
         }
-
     }
 
     /* Save current primitive type. */
@@ -4242,17 +4207,14 @@ gcChipSetAlphaBlend(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipSLProgramInstance *fsInstance = gcvNULL;
-    GLboolean shaderBlendPatch = GL_FALSE;
+    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ? chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+    GLboolean shaderBlendPatch = fsInstance ? ((fsInstance->pgStateKeyMask.s.hasShaderBlend == 1) ? GL_TRUE : GL_FALSE) : GL_FALSE;
     gctUINT i, j;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
 #ifdef OPENGL40
     shaderBlendPatch = GL_FALSE;
-#else
-    fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
-    shaderBlendPatch = (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)  ? GL_TRUE: GL_FALSE;
 #endif
 
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
@@ -4263,7 +4225,8 @@ gcChipSetAlphaBlend(
 
             GLboolean hwBlend = (!shaderBlendPatch &&
                                  !chipCtx->advBlendInShader &&
-                                 gc->state.enables.colorBuffer.blend[i]);
+                                 gc->state.enables.colorBuffer.blend[i]) &&
+                                 (fsInstance ? !fsInstance->pgStateKeyMask.s.hasAlphaBlend : GL_TRUE);
 
             gcmONERROR(gco3D_EnableBlendingIndexed(chipCtx->engine, halRTIndex, hwBlend));
 
@@ -4336,19 +4299,27 @@ gcChipSetViewportScissor(
     GLint vpLeft, vpTop, vpRight, vpBottom;
     /* scissor size */
     GLint scLeft, scTop, scRight, scBottom;
+    GLboolean scissorTest = gc->state.enables.scissorTest;
+    __GLscissor *pScissor = &(gc->state.scissor);
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
+
+    if (gc->state.enables.rasterizerDiscard && !chipCtx->chipFeature.hasHwTFB)
+    {
+        static __GLscissor zeroScissor = {0, 0, 0, 0};
+
+        scissorTest = GL_TRUE;
+        pScissor = &zeroScissor;
+    }
 
     vpLeft   = pViewport->x;
     vpTop    = pViewport->y;
     vpRight  = pViewport->x + (GLint)chipCtx->viewportWidth;
     vpBottom = pViewport->y + (GLint)chipCtx->viewportHeight;
 
-    if (gc->state.enables.scissorTest)
+    if (scissorTest)
     {
-        __GLscissor *pScissor = &(gc->state.scissor);
-
         /* Intersect scissor with RT size, HW cannot handle out of range scissor */
         scLeft    = __GL_MIN(__GL_MAX(0, pScissor->scissorX), rtWidth);
         scTop     = __GL_MIN(__GL_MAX(0, pScissor->scissorY), rtHeight);
@@ -4673,7 +4644,8 @@ gcChipRecompileShader(
     __GLchipProgramStateKey* pgStateKey =  pgInstance->pgStateKey;
     __GLchipProgramStateKeyMask* pgStateKeyMask = &pgInstance->pgStateKeyMask;
     __GLchipRecompileInfo *recompileInfo = &pgInstance->recompilePatchInfo;
-
+    gctBOOL recompileNoDirective = gcvFALSE;
+    gctUINT32 recompileOptions = 0;
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     /* Currently, we have two methods of recompiling, one is full-time compile and the other is
@@ -4700,7 +4672,7 @@ gcChipRecompileShader(
 
                 gcmONERROR(gcChipTexGetFormatInfo(gc, texObj, &txFormatInfo));
 
-                depthStencilMode = (texObj->params.depthStTexMode == GL_DEPTH_COMPONENT) ? gcvTRUE : gcvFALSE;
+                depthStencilMode = (texObj->params.dsTexMode == GL_DEPTH_COMPONENT) ? gcvTRUE : gcvFALSE;
 
                 if (!gcIsSameInputDirectiveExist(program->samplerMap[sampler].uniform,
                                                  (gctINT)program->samplerMap[sampler].arrayIndex,
@@ -4874,10 +4846,35 @@ gcChipRecompileShader(
         }
     }
 
-    if (recompileInfo->recompilePatchDirectivePtr)
+    /* 12, shader blend */
+    if (pgStateKeyMask->s.hasAlphaBlend)
+    {
+        if (pgStateKey->staticKey->alphaBlend)
+        {
+            gcmONERROR(gcCreateAlphaBlendDirective(0, &pgInstance->recompilePatchInfo.recompilePatchDirectivePtr));
+        }
+    }
+
+    /* 13, shader polygon offset */
+    if (pgStateKeyMask->s.hasPolygonOffset)
+    {
+        if (pgStateKey->staticKey->ShaderPolygonOffset)
+        {
+            gcmONERROR(gcCreateDepthBiasDirective(&pgInstance->recompilePatchInfo.recompilePatchDirectivePtr));
+        }
+    }
+
+    /* 14, output highp conversion */
+    if (pgStateKeyMask->s.hasPSOutHighpConversion)
+    {
+        recompileNoDirective = gcvTRUE;
+        recompileOptions |= __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION;
+    }
+
+    if (recompileInfo->recompilePatchDirectivePtr || recompileNoDirective)
     {
         /* Do first kind of recompile */
-        gcmONERROR(gcChipDynamicPatchProgram(gc, progObj, recompileInfo->recompilePatchDirectivePtr));
+        gcmONERROR(gcChipDynamicPatchProgram(gc, progObj, recompileInfo->recompilePatchDirectivePtr, recompileOptions));
     }
 
 OnError:
@@ -4915,50 +4912,56 @@ gcChipNeedRecompile(
     /* Initialize statekey and its mask to unneeded state */
     pgStateKeyMask->value = 0;
 
-    for (i = 0; i < gc->constants.shaderCaps.maxTextureSamplers; i++)
+    if (chipCtx->needTexRecompile)
     {
-        /* Only if the program have the shader stage */
-        if (program->stageBits & stageBits[program->samplerMap[i].stage])
+        for (i = 0; i < gc->constants.shaderCaps.maxTextureSamplers; i++)
         {
-            if (pgKeyState->shadowMapCmpInfo[i].texFmt != gcvSURF_UNKNOWN)
+            /* Only if the program have the shader stage */
+            if (program->stageBits & stageBits[program->samplerMap[i].stage])
             {
-                __GL_MEMCOPY(&pgStateKey->shadowMapCmpInfo[i], &pgKeyState->shadowMapCmpInfo[i], sizeof(__GLchipPgStateKeyShadowMapCmpInfo));
-                pgStateKeyMask->s.hasShadowMapCmp = 1;
-            }
+                if (pgKeyState->shadowMapCmpInfo[i].texFmt != gcvSURF_UNKNOWN)
+                {
+                    __GL_MEMCOPY(&pgStateKey->shadowMapCmpInfo[i], &pgKeyState->shadowMapCmpInfo[i], sizeof(__GLchipPgStateKeyShadowMapCmpInfo));
+                    pgStateKeyMask->s.hasShadowMapCmp = 1;
+                }
 
-            if (pgKeyState->texPatchInfo[i].format != gcvSURF_UNKNOWN)
-            {
-                __GL_MEMCOPY(&pgStateKey->texPatchInfo[i], &pgKeyState->texPatchInfo[i], sizeof(__GLchipPgStateKeyTexPatchInfo));
-                pgStateKeyMask->s.hasTexPatchFmt = 1;
-            }
+                if (pgKeyState->texPatchInfo[i].format != gcvSURF_UNKNOWN)
+                {
+                    __GL_MEMCOPY(&pgStateKey->texPatchInfo[i], &pgKeyState->texPatchInfo[i], sizeof(__GLchipPgStateKeyTexPatchInfo));
+                    pgStateKeyMask->s.hasTexPatchFmt = 1;
+                }
 
 #if gcdUSE_NPOT_PATCH
-            if ((pgKeyState->NP2AddrMode[i].add.addrModeS != gcvTEXTURE_INVALID) ||
-                (pgKeyState->NP2AddrMode[i].add.addrModeT != gcvTEXTURE_INVALID) ||
-                (pgKeyState->NP2AddrMode[i].add.addrModeR != gcvTEXTURE_INVALID)
-               )
-            {
-                pgStateKey->NP2AddrMode[i].value = pgKeyState->NP2AddrMode[i].value;
-                pgStateKeyMask->s.hasNP2AddrMode = 1;
-            }
+                if ((pgKeyState->NP2AddrMode[i].add.addrModeS != gcvTEXTURE_INVALID) ||
+                    (pgKeyState->NP2AddrMode[i].add.addrModeT != gcvTEXTURE_INVALID) ||
+                    (pgKeyState->NP2AddrMode[i].add.addrModeR != gcvTEXTURE_INVALID)
+                    )
+                {
+                    pgStateKey->NP2AddrMode[i].value = pgKeyState->NP2AddrMode[i].value;
+                    pgStateKeyMask->s.hasNP2AddrMode = 1;
+                }
 #endif
+            }
         }
     }
 
     if (program->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT)
     {
-        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        if (chipCtx->needRTRecompile)
         {
-            if (pgKeyState->staticKey->rtPatchFmt[i] != gcvSURF_UNKNOWN)
+            for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
             {
-                pgStateKey->staticKey->rtPatchFmt[i] = pgKeyState->staticKey->rtPatchFmt[i];
-                pgStateKeyMask->s.hasRtPatchFmt = 1;
-            }
+                if (pgKeyState->staticKey->rtPatchFmt[i] != gcvSURF_UNKNOWN)
+                {
+                    pgStateKey->staticKey->rtPatchFmt[i] = pgKeyState->staticKey->rtPatchFmt[i];
+                    pgStateKeyMask->s.hasRtPatchFmt = 1;
+                }
 
-            if (pgKeyState->staticKey->removeAlpha[i])
-            {
-                pgStateKey->staticKey->removeAlpha[i] = pgKeyState->staticKey->removeAlpha[i];
-                pgStateKeyMask->s.hasRemoveAlpha = 1;
+                if (pgKeyState->staticKey->removeAlpha[i])
+                {
+                    pgStateKey->staticKey->removeAlpha[i] = pgKeyState->staticKey->removeAlpha[i];
+                    pgStateKeyMask->s.hasRemoveAlpha = 1;
+                }
             }
         }
 
@@ -4996,6 +4999,24 @@ gcChipNeedRecompile(
         {
             pgStateKey->staticKey->colorKill = gcvTRUE;
             pgStateKeyMask->s.hasColorKill = 1;
+        }
+
+        if (pgKeyState->staticKey->alphaBlend)
+        {
+            pgStateKey->staticKey->alphaBlend = GL_TRUE;
+            pgStateKeyMask->s.hasAlphaBlend = 1;
+        }
+
+        if (pgKeyState->staticKey->ShaderPolygonOffset)
+        {
+            pgStateKey->staticKey->ShaderPolygonOffset = GL_TRUE;
+            pgStateKeyMask->s.hasPolygonOffset = 1;
+        }
+
+        if (chipCtx->pgKeyState->staticKey->highpConversion)
+        {
+            pgStateKey->staticKey->highpConversion = GL_TRUE;
+            pgStateKeyMask->s.hasPSOutHighpConversion = 1;
         }
     }
 
@@ -5037,19 +5058,10 @@ gcChipRecompileEvaluateKeyStates(
     GLuint maxSamplers[__GLSL_STAGE_LAST] = {0};
     GLuint numSamplers[__GLSL_STAGE_LAST] = {0};
     gceSTATUS status = gcvSTATUS_OK;
+    gctBOOL needTxRecompile = gcvFALSE;
+    gctBOOL needRtRecompile = gcvFALSE;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
-
-    if (progSwitched)
-    {
-        __glBitmaskInitAllOne(&samplerDirtyMask, gc->constants.shaderCaps.maxTextureSamplers);
-    }
-    else
-    {
-        __glBitmaskInitOR(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
-    }
-
-    samplerDirtyMaskCopy = samplerDirtyMask;
 
     if (program->progFlags.skipRecompile)
     {
@@ -5057,313 +5069,333 @@ gcChipRecompileEvaluateKeyStates(
         goto OnError;
     }
 
-    if (!__glBitmaskIsAllZero(&samplerDirtyMask))
+    needTxRecompile = chipCtx->needTexRecompile ||
+                      program->curPgInstance->hasTXGatherSample;
+    chipCtx->needTexRecompile = needTxRecompile;
+
+    needRtRecompile = chipCtx->needRTRecompile ||
+                      program->masterPgInstance->programState.hints->removeAlphaAssignment;
+    chipCtx->needRTRecompile = needRtRecompile;
+
+    if (needTxRecompile)
     {
-        __GLSLStage stage;
-        gctBOOL useUnifiedSampler = gcvFALSE;
-        /* There are only 5 bits for sampler index, so the max sampler count is 32. */
-        gctUINT32 maxSamplerCountForOneShader = 32;
-
-        /* Get already used sampler count */
-        for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
+        if (progSwitched)
         {
-            if (program->masterPgInstance->binaries[stage])
-            {
-                gcmONERROR(gcSHADER_GetSamplerCount(program->masterPgInstance->binaries[stage], &numSamplers[stage]));
-                useUnifiedSampler = (GetShaderSamplerAllocStrategy(program->masterPgInstance->binaries[stage]) != gcSHADER_ALLOC_STRATEGY_FIXED_ADDR_OFFSET);
-            }
-        }
-
-        if (useUnifiedSampler)
-        {
-            maxSamplers[__GLSL_STAGE_VS]    = __GL_MIN(maxSamplerCountForOneShader,
-                                                       gc->constants.shaderCaps.maxVertTextureImageUnits + gc->constants.shaderCaps.maxFragTextureImageUnits);
-            maxSamplers[__GLSL_STAGE_FS]    =
-            maxSamplers[__GLSL_STAGE_CS]    =
-            maxSamplers[__GLSL_STAGE_TCS]   =
-            maxSamplers[__GLSL_STAGE_TES]   =
-            maxSamplers[__GLSL_STAGE_GS]    = maxSamplers[__GLSL_STAGE_VS];
+            __glBitmaskInitAllOne(&samplerDirtyMask, gc->constants.shaderCaps.maxTextureSamplers);
         }
         else
         {
-            maxSamplers[__GLSL_STAGE_VS]    = gc->constants.shaderCaps.maxVertTextureImageUnits;
-            maxSamplers[__GLSL_STAGE_FS]    = gc->constants.shaderCaps.maxFragTextureImageUnits;
-            maxSamplers[__GLSL_STAGE_CS]    = gc->constants.shaderCaps.maxCmptTextureImageUnits;
-            maxSamplers[__GLSL_STAGE_TCS]   = gc->constants.shaderCaps.maxTcsTextureImageUnits;
-            maxSamplers[__GLSL_STAGE_TES]   = gc->constants.shaderCaps.maxTesTextureImageUnits;
-            maxSamplers[__GLSL_STAGE_GS]    = gc->constants.shaderCaps.maxGsTextureImageUnits;
+            __glBitmaskInitOR(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
         }
-    }
 
-    while (!__glBitmaskIsAllZero(&samplerDirtyMask))
-    {
-        __GLchipPgStateKeyShadowMapCmpInfo shadowMapCmpInfo;
-        __GLchipPgStateKeyTexPatchInfo texPatchInfo;
+        if (!__glBitmaskIsAllZero(&samplerDirtyMask))
+        {
+            __GLSLStage stage;
+            gctBOOL useUnifiedSampler = gcvFALSE;
+            /* There are only 5 bits for sampler index, so the max sampler count is 32. */
+            gctUINT32 maxSamplerCountForOneShader = 32;
+
+            /* Get already used sampler count */
+            for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
+            {
+                if (program->masterPgInstance->binaries[stage])
+                {
+                    gcmONERROR(gcSHADER_GetSamplerCount(program->masterPgInstance->binaries[stage], &numSamplers[stage]));
+                    useUnifiedSampler = (GetShaderSamplerAllocStrategy(program->masterPgInstance->binaries[stage]) != gcSHADER_ALLOC_STRATEGY_FIXED_ADDR_OFFSET);
+                }
+            }
+
+            if (useUnifiedSampler)
+            {
+                maxSamplers[__GLSL_STAGE_VS]    = __GL_MIN(maxSamplerCountForOneShader,
+                    gc->constants.shaderCaps.maxVertTextureImageUnits + gc->constants.shaderCaps.maxFragTextureImageUnits);
+                maxSamplers[__GLSL_STAGE_FS]    =
+                    maxSamplers[__GLSL_STAGE_CS]    =
+                    maxSamplers[__GLSL_STAGE_TCS]   =
+                    maxSamplers[__GLSL_STAGE_TES]   =
+                    maxSamplers[__GLSL_STAGE_GS]    = maxSamplers[__GLSL_STAGE_VS];
+            }
+            else
+            {
+                maxSamplers[__GLSL_STAGE_VS]    = gc->constants.shaderCaps.maxVertTextureImageUnits;
+                maxSamplers[__GLSL_STAGE_FS]    = gc->constants.shaderCaps.maxFragTextureImageUnits;
+                maxSamplers[__GLSL_STAGE_CS]    = gc->constants.shaderCaps.maxCmptTextureImageUnits;
+                maxSamplers[__GLSL_STAGE_TCS]   = gc->constants.shaderCaps.maxTcsTextureImageUnits;
+                maxSamplers[__GLSL_STAGE_TES]   = gc->constants.shaderCaps.maxTesTextureImageUnits;
+                maxSamplers[__GLSL_STAGE_GS]    = gc->constants.shaderCaps.maxGsTextureImageUnits;
+            }
+        }
+
+        while (!__glBitmaskIsAllZero(&samplerDirtyMask))
+        {
+            __GLchipPgStateKeyShadowMapCmpInfo shadowMapCmpInfo;
+            __GLchipPgStateKeyTexPatchInfo texPatchInfo;
 
 #if gcdUSE_NPOT_PATCH
-        GLuint rMode = gcvTEXTURE_INVALID;
-        GLuint sMode = gcvTEXTURE_INVALID;
-        GLuint tMode = gcvTEXTURE_INVALID;
+            GLuint rMode = gcvTEXTURE_INVALID;
+            GLuint sMode = gcvTEXTURE_INVALID;
+            GLuint tMode = gcvTEXTURE_INVALID;
 #endif
-        if (!__glBitmaskTestAndClear(&samplerDirtyMask, ++sampler))
-        {
-            continue;
-        }
-
-        __GL_MEMZERO(&shadowMapCmpInfo, sizeof(shadowMapCmpInfo));
-        shadowMapCmpInfo.cmp.cmpMode = gcvTEXTURE_COMPARE_MODE_NONE;
-        shadowMapCmpInfo.cmp.cmpOp   = gcvCOMPARE_LESS_OR_EQUAL;
-        shadowMapCmpInfo.texFmt  = gcvSURF_UNKNOWN;
-
-        __GL_MEMZERO(&texPatchInfo, sizeof(texPatchInfo));
-        texPatchInfo.format = gcvSURF_UNKNOWN;
-        texPatchInfo.needFormatConvert = GL_FALSE;
-
-        unit = program->samplerMap[sampler].unit;
-
-        if ((program->samplerMap[sampler].stage < __GLSL_STAGE_LAST) &&
-            (__glBitmaskTest(&gc->texture.currentEnableMask, unit)))
-        {
-            __GLtextureObject *texObj = gc->texture.units[unit].currentTexture;
-            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
-            gcsSURF_FORMAT_INFO_PTR txFormatInfo = gcvNULL;
-            gceSURF_FORMAT texFmt = gcvSURF_UNKNOWN;
-
-            if (!isUniformUsedInShader(program->samplerMap[sampler].uniform) &&
-                isUniformSamplerCalculateTexSize(program->samplerMap[sampler].uniform))
+            if (!__glBitmaskTestAndClear(&samplerDirtyMask, ++sampler))
             {
                 continue;
             }
 
-            if (gcmIS_SUCCESS(gcChipTexGetFormatInfo(gc, texObj, &txFormatInfo)))
-            {
-                texFmt = txFormatInfo->format;
-            }
+            __GL_MEMZERO(&shadowMapCmpInfo, sizeof(shadowMapCmpInfo));
+            shadowMapCmpInfo.cmp.cmpMode = gcvTEXTURE_COMPARE_MODE_NONE;
+            shadowMapCmpInfo.cmp.cmpOp   = gcvCOMPARE_LESS_OR_EQUAL;
+            shadowMapCmpInfo.texFmt  = gcvSURF_UNKNOWN;
 
-            /* 1 Tex fmt key state */
-            if (
-                   (texFmt >= gcvSURF_X16B16G16R16F_2_A8R8G8B8 && texFmt <= gcvSURF_B10G11R11F_1_A8R8G8B8) ||
-                   (texFmt >= gcvSURF_G32R32I_2_A8R8G8B8 && texFmt <= gcvSURF_B32G32R32UI_3_A8R8G8B8) ||
-                   ( !(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
-                     (texFmt == gcvSURF_S8D32F_2_A8R8G8B8 || texFmt == gcvSURF_D24S8_1_A8R8G8B8)
-                   ) ||
-                   (isUniformUsedAsTexGatherSampler(program->samplerMap[sampler].uniform) &&
+            __GL_MEMZERO(&texPatchInfo, sizeof(texPatchInfo));
+            texPatchInfo.format = gcvSURF_UNKNOWN;
+            texPatchInfo.needFormatConvert = GL_FALSE;
+
+            unit = program->samplerMap[sampler].unit;
+
+            if ((program->samplerMap[sampler].stage < __GLSL_STAGE_LAST) &&
+                (__glBitmaskTest(&gc->texture.currentEnableMask, unit)))
+            {
+                __GLtextureObject *texObj = gc->texture.units[unit].currentTexture;
+                __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+                gcsSURF_FORMAT_INFO_PTR txFormatInfo = gcvNULL;
+                gceSURF_FORMAT texFmt = gcvSURF_UNKNOWN;
+
+                if (!isUniformUsedInShader(program->samplerMap[sampler].uniform) &&
+                    isUniformSamplerCalculateTexSize(program->samplerMap[sampler].uniform))
+                {
+                    continue;
+                }
+
+                if (gcmIS_SUCCESS(gcChipTexGetFormatInfo(gc, texObj, &txFormatInfo)))
+                {
+                    texFmt = txFormatInfo->format;
+                }
+
+                /* 1 Tex fmt key state */
+                if (
+                    (texFmt >= gcvSURF_X16B16G16R16F_2_A8R8G8B8 && texFmt <= gcvSURF_B10G11R11F_1_A8R8G8B8) ||
+                    (texFmt >= gcvSURF_G32R32I_2_A8R8G8B8 && texFmt <= gcvSURF_B32G32R32UI_3_A8R8G8B8) ||
+                    ( !(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
+                    (texFmt == gcvSURF_S8D32F_2_A8R8G8B8 || texFmt == gcvSURF_D24S8_1_A8R8G8B8)
+                    ) ||
+                    (isUniformUsedAsTexGatherSampler(program->samplerMap[sampler].uniform) &&
                     (texFmt == gcvSURF_R32F  || texFmt == gcvSURF_G32R32F ||
-                     texFmt == gcvSURF_R32I  || texFmt == gcvSURF_G32R32I ||
-                     texFmt == gcvSURF_R32UI || texFmt == gcvSURF_G32R32UI ||
-                     texFmt == gcvSURF_S8D32F_1_G32R32F)
-                   ) ||
-                   (!(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
-                     (texFmt == gcvSURF_S8D32F_1_G32R32F) &&
-                     (texObj->params.depthStTexMode == GL_STENCIL_INDEX)
-                   ) ||
-                   (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX) &&
+                    texFmt == gcvSURF_R32I  || texFmt == gcvSURF_G32R32I ||
+                    texFmt == gcvSURF_R32UI || texFmt == gcvSURF_G32R32UI ||
+                    texFmt == gcvSURF_S8D32F_1_G32R32F)
+                    ) ||
+                    (!(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
+                    (texFmt == gcvSURF_S8D32F_1_G32R32F) &&
+                    (texObj->params.dsTexMode == GL_STENCIL_INDEX)
+                    ) ||
+                    (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX) &&
                     ((texFmt == gcvSURF_R8I) || (texFmt == gcvSURF_R16I)||
-                     (texFmt == gcvSURF_G8R8I) ||(texFmt == gcvSURF_G16R16I) ||
-                     (texFmt == gcvSURF_X8B8G8R8I) || (texFmt == gcvSURF_X16B16G16R16I) ||
-                     (texFmt == gcvSURF_A8B8G8R8I) || (texFmt == gcvSURF_A16B16G16R16I)
+                    (texFmt == gcvSURF_G8R8I) ||(texFmt == gcvSURF_G16R16I) ||
+                    (texFmt == gcvSURF_X8B8G8R8I) || (texFmt == gcvSURF_X16B16G16R16I) ||
+                    (texFmt == gcvSURF_A8B8G8R8I) || (texFmt == gcvSURF_A16B16G16R16I)
                     )
-                   ) ||
-                   (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER32_FIX) &&
+                    ) ||
+                    (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER32_FIX) &&
                     ((texFmt == gcvSURF_R32I) || (texFmt == gcvSURF_R32UI) ||
-                     (texFmt == gcvSURF_G32R32I) || (texFmt == gcvSURF_G32R32UI)
+                    (texFmt == gcvSURF_G32R32I) || (texFmt == gcvSURF_G32R32UI)
                     )
-                   ) ||
-                   (!(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
-                     (texFmt == gcvSURF_D24S8) &&
-                     (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_D24S8_SAMPLE_STENCIL)) &&
-                     (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) &&
-                     (texObj->params.depthStTexMode == GL_STENCIL_INDEX)
-                   ))
-            {
-                __GLSLStage stage = program->samplerMap[sampler].stage;
-                numSamplers[stage] += (txFormatInfo->layers - 1);
-                if (numSamplers[stage] > maxSamplers[stage])
+                    ) ||
+                    (!(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
+                    (texFmt == gcvSURF_D24S8) &&
+                    (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_D24S8_SAMPLE_STENCIL)) &&
+                    (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) &&
+                    (texObj->params.dsTexMode == GL_STENCIL_INDEX)
+                    ))
                 {
-                    gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    __GLSLStage stage = program->samplerMap[sampler].stage;
+                    numSamplers[stage] += (txFormatInfo->layers - 1);
+                    if (numSamplers[stage] > maxSamplers[stage])
+                    {
+                        gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    }
+
+                    texPatchInfo.format = texFmt;
+                    texPatchInfo.needFormatConvert = GL_TRUE;
+                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_R]);
+                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_G] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_G]);
+                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_B] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_B]);
+                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_A] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
                 }
 
-                texPatchInfo.format = texFmt;
-                texPatchInfo.needFormatConvert = GL_TRUE;
-                texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_R]);
-                texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_G] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_G]);
-                texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_B] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_B]);
-                texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_A] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
-            }
+                if(texFmt >= gcvSURF_A32F_1_R32F && texFmt <= gcvSURF_A32L32F_1_G32R32F)
+                {
 
-            if(texFmt >= gcvSURF_A32F_1_R32F && texFmt <= gcvSURF_A32L32F_1_G32R32F)
-            {
+                    static const gceTEXTURE_SWIZZLE baseComponents_000r[] =
+                    {
+                        gcvTEXTURE_SWIZZLE_0,
+                        gcvTEXTURE_SWIZZLE_0,
+                        gcvTEXTURE_SWIZZLE_0,
+                        gcvTEXTURE_SWIZZLE_R
+                    };
+                    static const gceTEXTURE_SWIZZLE baseComponents_rrrg[] =
+                    {
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_G
+                    };
+                    static const gceTEXTURE_SWIZZLE baseComponents_rrr1[] =
+                    {
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_R,
+                        gcvTEXTURE_SWIZZLE_1
+                    };
+                    gceTEXTURE_SWIZZLE swizzle;
+                    const  gceTEXTURE_SWIZZLE *swizzArray = gcvNULL;
+                    __GLSLStage stage = program->samplerMap[sampler].stage;
+                    numSamplers[stage] += (txFormatInfo->layers - 1);
+                    if (numSamplers[stage] > maxSamplers[stage])
+                    {
+                        gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    }
 
-                static const gceTEXTURE_SWIZZLE baseComponents_000r[] =
-                {
-                    gcvTEXTURE_SWIZZLE_0,
-                    gcvTEXTURE_SWIZZLE_0,
-                    gcvTEXTURE_SWIZZLE_0,
-                    gcvTEXTURE_SWIZZLE_R
-                };
-                static const gceTEXTURE_SWIZZLE baseComponents_rrrg[] =
-                {
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_G
-                };
-                static const gceTEXTURE_SWIZZLE baseComponents_rrr1[] =
-                {
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_R,
-                    gcvTEXTURE_SWIZZLE_1
-                };
-                  gceTEXTURE_SWIZZLE swizzle;
-                 const  gceTEXTURE_SWIZZLE *swizzArray = gcvNULL;
-                 __GLSLStage stage = program->samplerMap[sampler].stage;
-                numSamplers[stage] += (txFormatInfo->layers - 1);
-                if (numSamplers[stage] > maxSamplers[stage])
-                {
-                    gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    switch (texFmt)
+                    {
+                    case gcvSURF_A32F_1_R32F:
+                        swizzArray = baseComponents_000r;
+                        break;
+                    case gcvSURF_L32F_1_R32F:
+                        swizzArray = baseComponents_rrr1;
+                        break;
+                    case gcvSURF_A32L32F_1_G32R32F:
+                        swizzArray = baseComponents_rrrg;
+                        break;
+
+                    default:
+                        break;
+                    }
+                    gcmASSERT(swizzArray != gcvNULL);
+                    texPatchInfo.format = texFmt;
+                    texPatchInfo.needFormatConvert = GL_FALSE;
+
+                    swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_R]);
+
+                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    {
+                        texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = swizzle;
+                    }
+                    else
+                    {
+                        texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = swizzArray[swizzle];
+                    }
+
+                    swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_G]);
+
+                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    {
+                        texPatchInfo.swizzle[__GL_TEX_COMPONENT_G] = swizzle;
+                    }
+                    else
+                    {
+                        texPatchInfo.swizzle[__GL_TEX_COMPONENT_G] = swizzArray[swizzle];
+                    }
+
+                    swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_B]);
+
+                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    {
+                        texPatchInfo.swizzle[__GL_TEX_COMPONENT_B] = swizzle;
+                    }
+                    else
+                    {
+                        texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_B] = swizzArray[swizzle];
+                    }
+                    swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
+
+                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    {
+                        texPatchInfo.swizzle[__GL_TEX_COMPONENT_A] = swizzle;
+                    }
+                    else
+                    {
+                        texPatchInfo.swizzle[__GL_TEX_COMPONENT_A] = swizzArray[swizzle];
+                    }
+
                 }
 
-                switch (texFmt)
+                /* 2. Shadow map key state */
+                if ((__glBitmaskTest(&shadowSamplerMask, sampler)) &&
+                    ((chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) ?
+                    (texFmt != gcvSURF_UNKNOWN) :
+                (texFmt == gcvSURF_S8D32F_1_G32R32F)
+                    )
+                    )
                 {
-                case gcvSURF_A32F_1_R32F:
-                    swizzArray = baseComponents_000r;
-                    break;
-                case gcvSURF_L32F_1_R32F:
-                    swizzArray = baseComponents_rrr1;
-                    break;
-                case gcvSURF_A32L32F_1_G32R32F:
-                    swizzArray = baseComponents_rrrg;
-                    break;
+                    __GLsamplerObject *samplerObj = gc->texture.units[unit].boundSampler;
+                    __GLsamplerParamState *samplerStates = samplerObj
+                        ? &samplerObj->params
+                        : (__GLsamplerParamState*)&texObj->params;
 
-                default:
-                    break;
+                    shadowMapCmpInfo.cmp.cmpMode = gcChipUtilConvertCompareMode(samplerStates->compareMode);
+                    shadowMapCmpInfo.cmp.cmpOp   = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
+                    shadowMapCmpInfo.texFmt  = texFmt;
                 }
-                gcmASSERT(swizzArray != gcvNULL);
-                texPatchInfo.format = texFmt;
-                texPatchInfo.needFormatConvert = GL_FALSE;
-
-                swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_R]);
-
-                if(swizzle >= gcvTEXTURE_SWIZZLE_0)
-                {
-                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = swizzle;
-                }
-                else
-                {
-                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = swizzArray[swizzle];
-                }
-
-                swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_G]);
-
-                if(swizzle >= gcvTEXTURE_SWIZZLE_0)
-                {
-                    texPatchInfo.swizzle[__GL_TEX_COMPONENT_G] = swizzle;
-                }
-                else
-                {
-                    texPatchInfo.swizzle[__GL_TEX_COMPONENT_G] = swizzArray[swizzle];
-                }
-
-                swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_B]);
-
-                if(swizzle >= gcvTEXTURE_SWIZZLE_0)
-                {
-                    texPatchInfo.swizzle[__GL_TEX_COMPONENT_B] = swizzle;
-                }
-                else
-                {
-                    texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_B] = swizzArray[swizzle];
-                }
-                swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
-
-                if(swizzle >= gcvTEXTURE_SWIZZLE_0)
-                {
-                    texPatchInfo.swizzle[__GL_TEX_COMPONENT_A] = swizzle;
-                }
-                else
-                {
-                    texPatchInfo.swizzle[__GL_TEX_COMPONENT_A] = swizzArray[swizzle];
-                }
-
-            }
-
-            /* 2. Shadow map key state */
-            if ((__glBitmaskTest(&shadowSamplerMask, sampler)) &&
-                ((chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) ?
-                 (texFmt != gcvSURF_UNKNOWN) :
-                 (texFmt == gcvSURF_S8D32F_1_G32R32F)
-                )
-               )
-            {
-                __GLsamplerObject *samplerObj = gc->texture.units[unit].boundSampler;
-                __GLsamplerParamState *samplerStates = samplerObj
-                                                     ? &samplerObj->params
-                                                     : (__GLsamplerParamState*)&texObj->params;
-
-                shadowMapCmpInfo.cmp.cmpMode = gcChipUtilConvertCompareMode(samplerStates->compareMode);
-                shadowMapCmpInfo.cmp.cmpOp   = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
-                shadowMapCmpInfo.texFmt  = texFmt;
-            }
 
 #if gcdUSE_NPOT_PATCH
-            /* 3. NPOT key state. Only for 2D texture for now */
-            if ((texInfo->isNP2) &&
-                (texObj->targetIndex == __GL_TEXTURE_2D_INDEX) &&
-                (chipCtx->chipFeature.patchNP2Texture))
-            {
-                gcoTEXTURE tex = texInfo->object;
-                gcoSURF     mip = gcvNULL;
-                /* Just to check whether it has only 1 level of mipmap. */
-                gcoTEXTURE_GetMipMap(tex, texObj->params.baseLevel + 1, &mip);
-                if ((!mip) ||
-                    (texObj->params.sampler.minFilter == GL_NEAREST ||
-                     texObj->params.sampler.minFilter == GL_LINEAR)
-                   )
+                /* 3. NPOT key state. Only for 2D texture for now */
+                if ((texInfo->isNP2) &&
+                    (texObj->targetIndex == __GL_TEXTURE_2D_INDEX) &&
+                    (chipCtx->chipFeature.patchNP2Texture))
                 {
-                    if ((texObj->params.sampler.sWrapMode != GL_CLAMP_TO_EDGE) ||
-                        (texObj->params.sampler.tWrapMode != GL_CLAMP_TO_EDGE) ||
-                        (texObj->params.sampler.rWrapMode != GL_CLAMP_TO_EDGE)
-                       )
+                    gcoTEXTURE tex = texInfo->object;
+                    gcoSURF     mip = gcvNULL;
+                    /* Just to check whether it has only 1 level of mipmap. */
+                    gcoTEXTURE_GetMipMap(tex, texObj->params.baseLevel + 1, &mip);
+                    if ((!mip) ||
+                        (texObj->params.sampler.minFilter == GL_NEAREST ||
+                        texObj->params.sampler.minFilter == GL_LINEAR)
+                        )
+                    {
+                        if ((texObj->params.sampler.sWrapMode != GL_CLAMP_TO_EDGE) ||
+                            (texObj->params.sampler.tWrapMode != GL_CLAMP_TO_EDGE) ||
+                            (texObj->params.sampler.rWrapMode != GL_CLAMP_TO_EDGE)
+                            )
+                        {
+                            rMode = gcChipUtilConvertWrapMode(texObj->params.sampler.rWrapMode);
+                            sMode = gcChipUtilConvertWrapMode(texObj->params.sampler.sWrapMode);
+                            tMode = gcChipUtilConvertWrapMode(texObj->params.sampler.tWrapMode);
+                        }
+                    }
+                    else
                     {
                         rMode = gcChipUtilConvertWrapMode(texObj->params.sampler.rWrapMode);
                         sMode = gcChipUtilConvertWrapMode(texObj->params.sampler.sWrapMode);
                         tMode = gcChipUtilConvertWrapMode(texObj->params.sampler.tWrapMode);
                     }
                 }
-                else
-                {
-                    rMode = gcChipUtilConvertWrapMode(texObj->params.sampler.rWrapMode);
-                    sMode = gcChipUtilConvertWrapMode(texObj->params.sampler.sWrapMode);
-                    tMode = gcChipUtilConvertWrapMode(texObj->params.sampler.tWrapMode);
-                }
+#endif
+            }
+
+            if (__GL_MEMCMP(&pgKeyState->texPatchInfo[sampler], &texPatchInfo, sizeof(texPatchInfo)) != 0)
+            {
+                __GL_MEMCOPY(&pgKeyState->texPatchInfo[sampler], &texPatchInfo, sizeof(texPatchInfo));
+                pgKeyDirty = GL_TRUE;
+            }
+
+            if (__GL_MEMCMP(&pgKeyState->shadowMapCmpInfo[sampler], &shadowMapCmpInfo, sizeof(shadowMapCmpInfo)) != 0)
+            {
+                __GL_MEMCOPY(&pgKeyState->shadowMapCmpInfo[sampler], &shadowMapCmpInfo, sizeof(shadowMapCmpInfo));
+                pgKeyDirty = GL_TRUE;
+            }
+
+#if gcdUSE_NPOT_PATCH
+            if ((pgKeyState->NP2AddrMode[sampler].add.addrModeR != rMode) ||
+                (pgKeyState->NP2AddrMode[sampler].add.addrModeS != sMode) ||
+                (pgKeyState->NP2AddrMode[sampler].add.addrModeT != tMode))
+            {
+                pgKeyState->NP2AddrMode[sampler].add.addrModeR = (GLubyte)rMode;
+                pgKeyState->NP2AddrMode[sampler].add.addrModeS = (GLubyte)sMode;
+                pgKeyState->NP2AddrMode[sampler].add.addrModeT = (GLubyte)tMode;
+                pgKeyDirty = GL_TRUE;
             }
 #endif
         }
-
-        if (__GL_MEMCMP(&pgKeyState->texPatchInfo[sampler], &texPatchInfo, sizeof(texPatchInfo)) != 0)
-        {
-            __GL_MEMCOPY(&pgKeyState->texPatchInfo[sampler], &texPatchInfo, sizeof(texPatchInfo));
-            pgKeyDirty = GL_TRUE;
-        }
-
-        if (__GL_MEMCMP(&pgKeyState->shadowMapCmpInfo[sampler], &shadowMapCmpInfo, sizeof(shadowMapCmpInfo)) != 0)
-        {
-            __GL_MEMCOPY(&pgKeyState->shadowMapCmpInfo[sampler], &shadowMapCmpInfo, sizeof(shadowMapCmpInfo));
-            pgKeyDirty = GL_TRUE;
-        }
-
-#if gcdUSE_NPOT_PATCH
-        if ((pgKeyState->NP2AddrMode[sampler].add.addrModeR != rMode) ||
-            (pgKeyState->NP2AddrMode[sampler].add.addrModeS != sMode) ||
-            (pgKeyState->NP2AddrMode[sampler].add.addrModeT != tMode))
-        {
-            pgKeyState->NP2AddrMode[sampler].add.addrModeR = (GLubyte)rMode;
-            pgKeyState->NP2AddrMode[sampler].add.addrModeS = (GLubyte)sMode;
-            pgKeyState->NP2AddrMode[sampler].add.addrModeT = (GLubyte)tMode;
-            pgKeyDirty = GL_TRUE;
-        }
-#endif
     }
 
     if (program->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT)
@@ -5375,6 +5407,17 @@ gcChipRecompileEvaluateKeyStates(
             (gcvSTATUS_FALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_PIPE_HALTI1))
            )
         {
+            if (progSwitched)
+            {
+                __glBitmaskInitAllOne(&samplerDirtyMask, gc->constants.shaderCaps.maxTextureSamplers);
+            }
+            else
+            {
+                __glBitmaskInitOR(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
+            }
+
+            samplerDirtyMaskCopy = samplerDirtyMask;
+
             if ((gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_ALPHABLEND_ATTR_BITS) ||
                 !__glBitmaskIsAllZero(&samplerDirtyMaskCopy))
             {
@@ -5443,9 +5486,11 @@ gcChipRecompileEvaluateKeyStates(
         }
 
         /* rt format relevant recompilation */
-        if (progSwitched ||
+        if (needRtRecompile &&
+            (progSwitched ||
             chipDirty->uBuffer.sBuffer.rtSurfDirty ||
             (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_BLEND_ENDISABLE_BIT))
+           )
         {
             GLuint i;
             for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
@@ -5475,6 +5520,7 @@ gcChipRecompileEvaluateKeyStates(
 
         if (chipDirty->uBuffer.sBuffer.rtSurfDirty || progSwitched)
         {
+            GLuint i;
             gctBOOL drawYInverted = program->masterPgInstance->programState.hints->yInvertAware &&
                                     chipCtx->drawYInverted;
 
@@ -5483,10 +5529,48 @@ gcChipRecompileEvaluateKeyStates(
                 pgKeyState->staticKey->drawYInverted = drawYInverted;
                 pgKeyDirty = GL_TRUE;
             }
+
+            if(!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_DUAL16_32bpc_FIX))
+            {
+                gctBOOL highpConversion = gcvFALSE;
+                for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+                {
+                    if (chipCtx->drawRtViews[i].surf && i < program->maxOutLoc && program->loc2Out[i])
+                    {
+                        gceSURF_FORMAT rtFormat = gcvSURF_UNKNOWN;
+                        gcmVERIFY_OK(gcoSURF_GetFormat(chipCtx->drawRtViews[i].surf, gcvNULL, &rtFormat));
+
+                        switch (rtFormat)
+                        {
+                        case gcvSURF_R32F:
+                        case gcvSURF_R32I:
+                        case gcvSURF_R32UI:
+                        case gcvSURF_G32R32F:
+                        case gcvSURF_G32R32I:
+                        case gcvSURF_G32R32UI:
+                        case gcvSURF_A32B32G32R32F_2_G32R32F:
+                        case gcvSURF_A32B32G32R32I_2_G32R32F:
+                        case gcvSURF_A32B32G32R32UI_2_G32R32F:
+                            highpConversion = gcvTRUE;
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                }
+
+                if (pgKeyState->staticKey->highpConversion != highpConversion)
+                {
+                    pgKeyState->staticKey->highpConversion = highpConversion;
+                    pgKeyDirty = GL_TRUE;
+                }
+            }
         }
 
-        if (chipDirty->uBuffer.sBuffer.rtSurfDirty || progSwitched ||
+        if (needRtRecompile&&
+            (chipDirty->uBuffer.sBuffer.rtSurfDirty || progSwitched ||
             (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & (__GL_BLENDFUNC_BIT | __GL_BLEND_ENDISABLE_BIT)))
+            )
         {
             GLuint i, j;
             for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
@@ -5562,7 +5646,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL sampleMask = gc->state.enables.multisample.sampleMask &&
-                                     (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                     (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->sampleMask != sampleMask)
                 {
@@ -5575,7 +5659,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL sampleCov = gc->state.enables.multisample.coverage &&
-                                    (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                    (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->sampleCoverage != sampleCov)
                 {
@@ -5588,7 +5672,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL alphaCov = gc->state.enables.multisample.alphaToCoverage &&
-                                   (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                   (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->alpha2Coverage != alphaCov)
                 {
@@ -5635,6 +5719,54 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
+    if ((chipCtx->patchId == gcvPATCH_DEQP) &&
+        (gc->apiVersion == __GL_API_VERSION_ES20) &&
+        (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_ALPHABLEND_ATTR_BITS) &&
+        (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE) == gcvFALSE)
+        )
+    {
+        if (gc->state.enables.colorBuffer.blend[0] &&
+            (!gc->frameBuffer.drawFramebufObj->name) &&
+            (program->progFlags.alphaBlend == 1) &&
+            (gc->vertexArray.indexCount == 6))
+        {
+            if( pgKeyState->staticKey->alphaBlend != gcvTRUE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->alphaBlend = gcvTRUE;
+        }
+        else
+        {
+            if(pgKeyState->staticKey->alphaBlend != gcvFALSE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->alphaBlend = gcvFALSE;
+        }
+    }
+
+    if ((chipCtx->patchId == gcvPATCH_DEQP) && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
+        (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DEPTH_BIAS_FIX) == gcvFALSE))
+    {
+        if (gc->state.enables.polygon.polygonOffsetFill)
+        {
+            if (pgKeyState->staticKey->ShaderPolygonOffset != gcvTRUE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->ShaderPolygonOffset = gcvTRUE;
+        }
+        else
+        {
+            if (pgKeyState->staticKey->ShaderPolygonOffset != gcvFALSE)
+            {
+               pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->ShaderPolygonOffset = gcvFALSE;
+        }
+    }
+
     status = pgKeyDirty ? gcvSTATUS_TRUE : gcvSTATUS_FALSE;
 
 OnError:
@@ -5673,6 +5805,8 @@ gcChipValidateRecompileStateCB(
 
     if (status == gcvSTATUS_TRUE)
     {
+        GLint i;
+
         gcmONERROR(gcChipPgStateKeyAlloc(gc, &pgStateKey));
         /* Convert key states to state key to check whether we really need a recompile */
         if (gcChipNeedRecompile(gc, chipCtx, program, pgStateKey, &pgStateKeyMask))
@@ -5711,6 +5845,16 @@ gcChipValidateRecompileStateCB(
                     gcmONERROR(gcChipRecompileShader(gc, chipCtx, progObj, program));
                 }
 
+                /* If program change, the sampler dirty is full, but when only instance change
+                recompile could have more sampler, which we need dirty the
+                mapDirty to trigger the validate texture.
+                In __glBuildTexEnableDim, we don't get new pgInstance yet.
+                */
+                if (newPgInstance->pgStateKey->staticKey->alphaBlend)
+                {
+                    __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, newPgInstance->rtSampler);
+                }
+
                 pgInstanceChanged = GL_TRUE;
             }
         }
@@ -5732,9 +5876,11 @@ gcChipValidateRecompileStateCB(
 
         if (pgInstanceChanged)
         {
-            GLint i;
             gcePROGRAM_STAGE halStage = gcvPROGRAM_STAGE_VERTEX;
             gcePROGRAM_STAGE_BIT stageBits = program->stageBits;
+
+            /* set instance change dirty.*/
+            chipCtx->chipDirty.uDefer.sDefer.pgInsChanged = 1;
 
             /* Decrease ref of replaced one */
             gcChipUtilsObjectReleaseRef(oldPgInstance->ownerCacheObj);
@@ -5813,12 +5959,65 @@ gcChipValidateRecompileStateCB(
                 newPgInstance->privateUniforms[i].dirty = GL_TRUE;
             }
         }
+
+        if (newPgInstance->pgStateKeyMask.s.hasTexPatchFmt)
+        {
+            for (i = 0; i < (GLint)gc->constants.shaderCaps.maxTextureSamplers; i++)
+            {
+                __GLchipPgStateKeyTexPatchInfo *texPatchInfo = &newPgInstance->pgStateKey->texPatchInfo[i];
+                if (texPatchInfo->format != gcvSURF_UNKNOWN)
+                {
+                    gcsSURF_FORMAT_INFO_PTR formatInfo;
+                    gcoSURF_QueryFormat(texPatchInfo->format, &formatInfo);
+                    if (formatInfo->layers > 1)
+                    {
+                        __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, i);
+
+                    }
+                }
+            }
+        }
+    }
+
+    if (program->curPgInstance->pgStateKey->staticKey->alphaBlend &&
+        chipCtx->rtTexture)
+    {
+        gcoSURF rt = chipCtx->drawRtViews[0].surf;
+        gcoSURF tex = gcvNULL;
+        gcsSURF_VIEW mipView;
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+        gcmONERROR(gcoTEXTURE_GetMipMap(chipCtx->rtTexture, 0, &tex));
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted  = gcoSURF_QueryFlags(rt, gcvSURF_FLAG_CONTENT_YINVERTED);
+        rlvArgs.uArgs.v2.rectSize.x = (gctINT)chipCtx->drawRTWidth;
+        rlvArgs.uArgs.v2.rectSize.y = (gctINT)chipCtx->drawRTHeight;
+        rlvArgs.uArgs.v2.numSlices  = 1;
+        mipView.surf = tex;
+        mipView.firstSlice = 0;
+        mipView.numSlices = 1;
+        /* Flush all cache in pipe */
+        gcmONERROR(gcoSURF_Flush(rt));
+
+        /* Sync texture surface from current RT */
+        gcmONERROR(gcoSURF_ResolveRect(&chipCtx->drawRtViews[0], &mipView, &rlvArgs));
+
+        gcmONERROR(gcoTEXTURE_Flush(chipCtx->rtTexture));
+
+        gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
     }
 
     /* This draw does not need recompile, but previous recompile really failed */
     if (progObj->programInfo.invalidFlags)
     {
         gcmONERROR(gcvSTATUS_INVALID_OBJECT);
+    }
+
+    if ((gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_FS_SWITCH)
+        && chipCtx->activePrograms[__GLSL_STAGE_FS] && chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance->pLastFragData)
+    {
+        /* if ps shader have gl_LastFragData we need disable pe*/
+        chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = 1;
     }
 
 OnError:
@@ -5918,6 +6117,7 @@ gcChipValidateProgramImagesCB(
                 gceTILING tiling;
                 GLint face;
                 GLint numLayers;
+                GLboolean layered = ((type != __GL_IMAGE_2D) && (!imageUnit->singleLayered));
 
                 /* Invalid access if bound texture is incomplete */
                 if (imageUnit->invalid)
@@ -5958,7 +6158,7 @@ gcChipValidateProgramImagesCB(
                     break;
                 }
 
-                if (texObj && texObj->bufObj)
+                if (texObj->bufObj)
                 {
                     gcChipValidateProgramTexBufferUniform(gc, texObj, uniform, imageUnit);
                     valid = gcvTRUE;
@@ -5998,11 +6198,16 @@ gcChipValidateProgramImagesCB(
                     }
                 }
 
-                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
+                texView = gcChipGetTextureSurface(chipCtx, texObj, layered, imageUnit->level, imageUnit->actualLayer);
 
-                if (type != __GL_IMAGE_2D)
+                if ((type != __GL_IMAGE_2D) && (!imageUnit->singleLayered))
                 {
                     texView.firstSlice = 0;
+                }
+
+                if (imageUnit->singleLayered)
+                {
+                    texView.numSlices = 1;
                 }
 
                 if (1)

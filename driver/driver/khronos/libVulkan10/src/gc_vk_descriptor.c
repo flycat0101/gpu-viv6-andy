@@ -24,11 +24,6 @@ __VK_INLINE VkResult __vki_AllocateDescriptorSet(
     __vkDescriptorResourceRegion remainSize;
     VkResult result = VK_SUCCESS;
 
-    if (dsp->allocatedSets == dsp->maxSets)
-    {
-        return VK_ERROR_TOO_MANY_OBJECTS;
-    }
-
     __vk_utils_region_minus(&remainSize, &dsp->size, &dsp->cur);
 
     if (__vk_utils_region_gequal(&remainSize, &setLayout->size))
@@ -45,25 +40,10 @@ __VK_INLINE VkResult __vki_AllocateDescriptorSet(
         dsp->allocatedSets++;
 
         __VK_ONERROR((*devCtx->chipFuncs->AllocDescriptorSet)((VkDevice)(uintptr_t)devCtx, (VkDescriptorSet)(uintptr_t)descSet));
-
-        if (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->descSetList) == NULL)
-        {
-            dsp->descSetList = (VkDescriptorSet)(uintptr_t)descSet;
-        }
-        else
-        {
-            __vkDescriptorSet *tmp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->descSetList);
-
-            while (tmp->next)
-            {
-                tmp = tmp->next;
-            }
-            tmp->next = descSet;
-        }
     }
     else
     {
-        __VK_ONERROR(VK_ERROR_OUT_OF_HOST_MEMORY);
+        __VK_ONERROR(VK_ERROR_OUT_OF_POOL_MEMORY_KHR);
     }
 
     return VK_SUCCESS;
@@ -114,8 +94,6 @@ static void __vki_FreeDescriptorSet(
 {
     __vkDescriptorPool *dsp = descSet->descriptorPool;
     __vkDescriptorResourceRegion freeRegionEnd;
-    __vkDescriptorSet *descSetCur = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->descSetList);
-    __vkDescriptorSet *prev = VK_NULL_HANDLE;
 
     __vk_utils_region_add(&freeRegionEnd, &descSet->begin, &descSet->size);
     if (__vk_utils_region_equal(&freeRegionEnd, &dsp->cur))
@@ -124,26 +102,7 @@ static void __vki_FreeDescriptorSet(
     }
     __vk_utils_region_set(&descSet->size, 0, 0);
 
-    /* remove deleting descSet from the list if it's in there */
-    while (descSetCur)
-    {
-        if (descSetCur == descSet)
-        {
-            if (!prev)
-            {
-                dsp->descSetList = (VkDescriptorSet)(uintptr_t)descSetCur->next;
-            }
-            else
-            {
-                prev->next = descSetCur->next;
-            }
-            break;
-        }
-        prev = descSetCur;
-        descSetCur = descSetCur->next;
-    }
     __VK_VERIFY_OK((*devCtx->chipFuncs->FreeDescriptorSet)((VkDevice)(uintptr_t)devCtx, (VkDescriptorSet)(uintptr_t)descSet));
-    __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject *)descSet));
     if (dsp->allocatedSets)
     {
         dsp->allocatedSets--;
@@ -164,6 +123,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorPool(
     __vkDescriptorResourceRegion size;
     VkResult result;
     uint32_t i;
+    __vkDescriptorSet *des;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
@@ -207,6 +167,24 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorPool(
     __vk_utils_region_set(&dsp->cur, 0, 0);
     dsp->size = size;
 
+    dsp->pDescSets = (__vkDescriptorSetEntry *)__VK_ALLOC(dsp->maxSets * sizeof(__vkDescriptorSetEntry), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+
+    if (!dsp->pDescSets)
+    {
+        goto OnError;
+    }
+
+    __VK_MEMZERO(dsp->pDescSets, dsp->maxSets * sizeof(__vkDescriptorSetEntry));
+
+    for (i = 0; i < dsp->maxSets; i++)
+    {
+        __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_DESCRIPTORSET, sizeof(__vkDescriptorSet), (__vkObject**)&des));
+
+        /* Initialize __vkDescriptorSet specific data fields here */
+        des->descriptorPool = dsp;
+        dsp->pDescSets[i].descSet = (VkDescriptorSet)(uintptr_t)des;
+    }
+
     /* Return the object pointer as a 64-bit handle */
     *pDescriptorPool = (VkDescriptorPool)(uintptr_t)dsp;
 
@@ -225,6 +203,23 @@ OnError:
         dsp->sampler = VK_NULL_HANDLE;
     }
 
+    if (dsp->pDescSets)
+    {
+        uint32_t i = 0;
+
+        for (i = 0; i < dsp->maxSets; i++)
+        {
+            __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->pDescSets[i].descSet);
+            if (descSet)
+            {
+                __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject *)descSet));
+            }
+        }
+
+        __VK_FREE(dsp->pDescSets);
+        dsp->pDescSets = VK_NULL_HANDLE;
+    }
+
     if (dsp)
         __vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTOR_POOL, (__vkObject *)dsp);
 
@@ -239,6 +234,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorPool(
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkDescriptorPool *dsp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorPool *, descriptorPool);
+    uint32_t i = 0;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
@@ -246,6 +242,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorPool(
     if (dsp)
     {
         __vk_ResetDescriptorPool(device, descriptorPool, 0);
+        for (i = 0; i < dsp->maxSets; i++)
+        {
+            __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->pDescSets[i].descSet);
+            __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject *)descSet));
+        }
+
+        /* Free __vkDescriptorSetEntry */
+        if (dsp->pDescSets)
+        {
+            __VK_FREE(dsp->pDescSets);
+        }
         /* Free __vkDescriptorPool specific data fields here */
         if (dsp->resourceInfo)
             __VK_FREE(dsp->resourceInfo);
@@ -267,14 +274,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetDescriptorPool(
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkDescriptorPool *dsp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorPool *, descriptorPool);
-    __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->descSetList);
 
-    /* Loop through the command pool's command buffers */
-    while (descSet)
+    uint32_t i = 0;
+    for (i = 0; i < dsp->maxSets; i++)
     {
-        __vkDescriptorSet *tmp = descSet->next;
-        __vki_FreeDescriptorSet(devCtx, descSet);
-        descSet = tmp;
+        if (dsp->pDescSets[i].isUsed)
+        {
+            __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->pDescSets[i].descSet);
+            __vki_FreeDescriptorSet(devCtx, descSet);
+            dsp->pDescSets[i].isUsed = VK_FALSE;
+        }
     }
 
     __vk_utils_region_set(&dsp->cur, 0, 0);
@@ -299,15 +308,28 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateDescriptorSets(
     for (i = 0; i < pAllocateInfo->descriptorSetCount; i++)
     {
         uint32_t j;
+        uint32_t k;
         __vkDescriptorSetLayout *pDescriptorSetLayout = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetLayout *, pAllocateInfo->pSetLayouts[i]);
-        __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_DESCRIPTORSET, sizeof(__vkDescriptorSet), (__vkObject**)&des));
 
+        if (dsp->allocatedSets == dsp->maxSets)
+        {
+            return VK_ERROR_OUT_OF_POOL_MEMORY_KHR;
+        }
+
+        for (k = i; k < dsp->maxSets; k++)
+        {
+            if (!dsp->pDescSets[k].isUsed)
+            {
+                break;
+            }
+        }
         /* Initialize __vkDescriptorSet specific data fields here */
-        des->descriptorPool = dsp;
+        des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dsp->pDescSets[k].descSet);
+        dsp->pDescSets[k].isUsed = VK_TRUE;
         des->descSetLayout = pDescriptorSetLayout;
 
         /* Return the object pointer as a 64-bit handle */
-        pDescriptorSets[i] = (VkDescriptorSet)(uintptr_t)des;
+        pDescriptorSets[i] = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkDescriptorSet, &dsp->pDescSets[k]);
 
         __VK_ONERROR(__vki_AllocateDescriptorSet(devCtx, dsp, pDescriptorSetLayout, des));
 
@@ -335,7 +357,9 @@ OnError:
     {
         if (pDescriptorSets[i])
         {
-            __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]));
+            __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+            __vkDescriptorSet *des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
+            __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, des));
             pDescriptorSets[i] = VK_NULL_HANDLE;
         }
     }
@@ -357,7 +381,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FreeDescriptorSets(
     {
         if (pDescriptorSets[i])
         {
-            __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]));
+            __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+            __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
+            __vki_FreeDescriptorSet(devCtx, descSet);
+            pDescSets->isUsed = VK_FALSE;
         }
     }
 
@@ -385,7 +412,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         uint32_t index;
         uint32_t writeIndex = 0;
         VkWriteDescriptorSet *pWrite = (VkWriteDescriptorSet*)&pDescriptorWrites[i];
-        __vkDescriptorSet *dstDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pWrite->dstSet);
+        __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pWrite->dstSet);
+        __vkDescriptorSet *dstDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
         __vkDescriptorSetLayout *dstDescLayout = dstDesc->descSetLayout;
         __vkDescriptorPool *dstDescPool = dstDesc->descriptorPool;
 
@@ -467,8 +495,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         __vkSampler **srcSampler, **dstSampler;
         uint32_t index;
         VkCopyDescriptorSet *pCopy = (VkCopyDescriptorSet*)&pDescriptorCopies[i];
-        __vkDescriptorSet *srcDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pCopy->srcSet);
-        __vkDescriptorSet *dstDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pCopy->dstSet);
+        __vkDescriptorSetEntry *srcpDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pCopy->srcSet);
+        __vkDescriptorSet *srcDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, srcpDescSets->descSet);
+        __vkDescriptorSetEntry *dstpDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pCopy->dstSet);
+        __vkDescriptorSet *dstDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, dstpDescSets->descSet);
         __vkDescriptorSetLayout *srcDescLayout = srcDesc->descSetLayout;
         __vkDescriptorSetLayout *dstDescLayout = dstDesc->descSetLayout;
         __vkDescriptorPool *srcDescPool = srcDesc->descriptorPool;

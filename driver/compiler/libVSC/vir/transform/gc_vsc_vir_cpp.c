@@ -228,6 +228,103 @@ static gctBOOL _VSC_CPP_DefInstInBetween(
     return gcvFALSE;
 }
 
+static gctBOOL _VSC_CPP_DefBBInBetween(
+    IN VIR_BB               *pStartBB,
+    IN VIR_BB               *pEndBB,
+    IN VIR_BB               *pReDefBB,
+    IN VSC_BIT_VECTOR       *pFlowMask,
+    IN VSC_BIT_VECTOR       *pCheckStatusMask,
+    IN VSC_BIT_VECTOR       *pCheckValueMask,
+    INOUT gctBOOL           *pMeetReDefBB
+    )
+{
+    VSC_ADJACENT_LIST*          pList = &pStartBB->dgNode.succList;
+    VIR_CFG_EDGE*               pEdge;
+    VSC_ADJACENT_LIST_ITERATOR  edgeIter;
+    /* There are only three edge, ALWYAS, TRUE and FALSE. */
+    gctBOOL                     result[VIR_CFG_EDGE_TYPE_COUNT] = { gcvFALSE, gcvFALSE, gcvFALSE };
+    gctUINT                     idx = 0;
+
+    /* In any flow, when we meet EndBB, if we have already met ReDefBB, this ReDefBB is between StartBB and EndBB. */
+    gcmASSERT(pMeetReDefBB);
+
+    /* Check StartBB first. */
+    if (pStartBB == pReDefBB)
+    {
+        *pMeetReDefBB = gcvTRUE;
+    }
+    else if (pStartBB == pEndBB)
+    {
+        if (*pMeetReDefBB)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    /* Detect a loop flow, just return FALSE. */
+    if (vscBV_TestBit(pFlowMask, pStartBB->globalBbId))
+    {
+        return gcvFALSE;
+    }
+    vscBV_SetBit(pFlowMask, pStartBB->globalBbId);
+
+    /* Check if this bb is checked before, if so, just return the value. */
+    if (vscBV_TestBit(pCheckStatusMask, pStartBB->globalBbId))
+    {
+        return vscBV_TestBit(pCheckValueMask, pStartBB->globalBbId);
+    }
+
+    /* Check all edges. */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, pList);
+    for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+         pEdge != gcvNULL;
+         pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter), idx++)
+    {
+        VIR_BB* pNextBB = CFG_EDGE_GET_TO_BB(pEdge);
+        gctBOOL meetReDefBB = gcvFALSE;
+
+        /* Meet EndBB. */
+        if (pNextBB == pEndBB)
+        {
+            if (*pMeetReDefBB)
+            {
+                result[idx] = gcvTRUE;
+            }
+        }
+        else
+        {
+            meetReDefBB = *pMeetReDefBB;
+            if (pNextBB == pReDefBB)
+            {
+                meetReDefBB = gcvTRUE;
+            }
+            result[idx] = _VSC_CPP_DefBBInBetween(pNextBB,
+                                                  pEndBB,
+                                                  pReDefBB,
+                                                  pFlowMask,
+                                                  pCheckStatusMask,
+                                                  pCheckValueMask,
+                                                  &meetReDefBB);
+        }
+    }
+
+    /* Clear the flow mask. */
+    vscBV_ClearBit(pFlowMask, pStartBB->globalBbId);
+
+    /* Set the check status. */
+    vscBV_SetBit(pCheckStatusMask, pStartBB->globalBbId);
+
+    if (result[0] || result[1] || result[2])
+    {
+        vscBV_SetBit(pCheckValueMask, pStartBB->globalBbId);
+        return gcvTRUE;
+    }
+    else
+    {
+        return gcvFALSE;
+    }
+}
+
 /*
     If there is define of srcOpnd that is between startInst and endInst,
     return gcvTRUE.
@@ -238,6 +335,35 @@ static gctBOOL _VSC_CPP_DefInstInBetween(
     ADD t3.x, t1.x, t4.x  (endInst)
 
     Make sure the loop is correctly handled.
+
+    Above check is not enough, it can't handle if redefine is after the endInst and there is a back JMP to the startInst.
+    For example, check the below code segment, the redfine Inst "r2 += r2" is after the endInst "r3 = r1".
+    To solve this, use CFG to check if there is not refineInst BB between startBB and endBB.
+
+    gctBOOL check = gcvFALSE;
+    for (; ;)
+    {
+        if (cond_true)
+        {
+            if (!check)
+            {
+                r1 = r2;
+                check = gcvTRUE;
+            }
+        }
+        else if (check)
+        {
+            r3 = r1;
+        }
+
+        r2 += r2;
+
+        if (...)
+        {
+            ...
+            break;
+        }
+    }
 
 */
 static gctBOOL _VSC_CPP_RedefineBetweenInsts(
@@ -250,7 +376,7 @@ static gctBOOL _VSC_CPP_RedefineBetweenInsts(
     )
 {
     gctBOOL         retValue = gcvFALSE;
-
+    VIR_Instruction *pDefInst = gcvNULL;
     VSC_HASH_TABLE  *visitSet = gcvNULL;
 
     VIR_OperandInfo srcInfo;
@@ -284,16 +410,18 @@ static gctBOOL _VSC_CPP_RedefineBetweenInsts(
 
                 if (pDef->defKey.channel == channel)
                 {
-                    if (pDef->defKey.pDefInst == endInst ||
-                        pDef->defKey.pDefInst == startInst)
+                    pDefInst = pDef->defKey.pDefInst;
+
+                    if (pDefInst == endInst ||
+                        pDefInst == startInst)
                     {
                         retValue = gcvTRUE;
-                        *redefInst = pDef->defKey.pDefInst;
+                        *redefInst = pDefInst;
                         break;
                     }
 
-                    if (pDef->defKey.pDefInst != VIR_INPUT_DEF_INST &&
-                        pDef->defKey.pDefInst != VIR_UNDEF_INST)
+                    if (pDefInst != VIR_INPUT_DEF_INST &&
+                        pDefInst != VIR_UNDEF_INST)
                     {
                         vscHTBL_Reset(visitSet);
                         /* If any of the instructions in the workSet, that is between
@@ -302,8 +430,47 @@ static gctBOOL _VSC_CPP_RedefineBetweenInsts(
                                         pDef->defKey.pDefInst, visitSet))
                         {
                             retValue = gcvTRUE;
-                            *redefInst = pDef->defKey.pDefInst;
+                            *redefInst = pDefInst;
                             break;
+                        }
+                        else
+                        {
+                            if (VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(endInst)
+                                &&
+                                VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(pDefInst)
+                                )
+                            {
+                                VIR_BB* pStartBB = VIR_Inst_GetBasicBlock(startInst);
+                                VIR_BB* pEndBB = VIR_Inst_GetBasicBlock(endInst);
+                                VIR_BB* pReDefBB = VIR_Inst_GetBasicBlock(pDefInst);
+                                gctBOOL meetReDefBB = gcvFALSE;
+                                gctUINT bbCount;
+                                VSC_BIT_VECTOR bbFlowMask;
+                                VSC_BIT_VECTOR bbCheckStatusMask;
+                                VSC_BIT_VECTOR bbCheckValueMask;
+
+                                bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(VIR_Inst_GetFunction(startInst))->pOwnerCG);
+                                vscBV_Initialize(&bbFlowMask, cpp->pMM, bbCount);
+                                vscBV_Initialize(&bbCheckStatusMask, cpp->pMM, bbCount);
+                                vscBV_Initialize(&bbCheckValueMask, cpp->pMM, bbCount);
+
+                                if (_VSC_CPP_DefBBInBetween(pStartBB,
+                                                            pEndBB,
+                                                            pReDefBB,
+                                                            &bbFlowMask,
+                                                            &bbCheckStatusMask,
+                                                            &bbCheckValueMask,
+                                                            &meetReDefBB))
+                                {
+                                    retValue = gcvTRUE;
+                                    *redefInst = pDefInst;
+                                    break;
+                                }
+
+                                vscBV_Finalize(&bbFlowMask);
+                                vscBV_Finalize(&bbCheckStatusMask);
+                                vscBV_Finalize(&bbCheckValueMask);
+                            }
                         }
                     }
                 }
@@ -449,6 +616,14 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
              continue;
         }
 
+        /* cannot copy to temp256 pair, otherwise it will break the assumption that
+         * register pair will be contiguous*/
+        if (VIR_Operand_isTemp256High(srcOpnd) ||
+            VIR_Operand_isTemp256Low(srcOpnd))
+        {
+             continue;
+        }
+
         /* selectadd add an extra src4 to fake the partial write, do not copy
            propagate it away */
         if (instOpcode == VIR_OP_VX_SELECTADD &&
@@ -481,7 +656,8 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                     srcOpnd,
                     gcvFALSE,
                     defInst,
-                    gcvNULL))
+                    gcvNULL)
+                    )
             {
                 VIR_Operand     *movDst = VIR_Inst_GetDest(defInst);
                 VIR_Operand     *movSrc = VIR_Inst_GetSource(defInst, 0);
@@ -713,9 +889,9 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                           (VIR_GetTypeTypeKind(ty0) == VIR_TY_IMAGE)) &&
                          ((VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER) ||
                           (VIR_GetTypeTypeKind(ty1) == VIR_TY_IMAGE))) ||
-                          (VIR_GetTypeTypeKind(ty1) == VIR_TY_SAMPLER &&
-                           (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER))
-                          ))
+                        (VIR_GetTypeTypeKind(ty1) == VIR_TY_SAMPLER &&
+                         (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER)) ||
+                        ((ty0 == ty1) && (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_IS_SAMPLER))))
                     {
                         if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                                           VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
@@ -1243,7 +1419,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
     if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
         (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
         ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
-        (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
+        (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER)) ||
+        ((ty0 == ty1) && (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_IS_SAMPLER))))
     {
         if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                           VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))

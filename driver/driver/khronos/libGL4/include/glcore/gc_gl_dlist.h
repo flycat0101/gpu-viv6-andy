@@ -65,7 +65,7 @@
 */
 typedef struct __GLdlistRec __GLdlist;
 typedef struct __GLdlistOpRec __GLdlistOp;
-typedef const GLubyte *__GLlistExecFunc(__GLcontext *, const GLubyte *);
+typedef const GLubyte * __GLlistExecFunc(__GLcontext *, const GLubyte *);
 
 /*
 ** Implementation-specific function called to free display list

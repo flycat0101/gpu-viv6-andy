@@ -76,6 +76,8 @@
         eglSetDamageRegionKHR*;
         eglSwapBuffersWithDamageKHR*;
         eglSwapBuffersWithDamageEXT*;
+        eglQueryDmaBufFormatsEXT*;
+        eglQueryDmaBufModifiersEXT*;
 
         fb*;
         dfb*;

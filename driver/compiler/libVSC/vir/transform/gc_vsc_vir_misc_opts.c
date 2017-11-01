@@ -2518,13 +2518,13 @@ vscVIR_ConvertVirtualInstructions(
                     VIR_Uniform* samplerUniform;
                     VIR_Type* samplerType = gcvNULL;
                     VIR_Type* dstType;
-                    VIR_TypeId uniformTypeId = VIR_TYPE_FLOAT_X3;
+                    VIR_TypeId uniformTypeId = VIR_TYPE_FLOAT_X4;
 
                     dstType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst)));
 
                     if (VIR_Type_isInteger(dstType))
                     {
-                        uniformTypeId = VIR_TYPE_INTEGER_X3;
+                        uniformTypeId = VIR_TYPE_INTEGER_X4;
                     }
 
                     gcmASSERT(VIR_Operand_isSymbol(samplerSrc));
@@ -3810,6 +3810,46 @@ gctBOOL _CheckAlwaysInlineFunction(
     return gcvFALSE;
 }
 
+gctBOOL _CheckMLLevelAlwaysInlineFunction(
+    IN OUT VIR_Shader      *pShader,
+    IN OUT VIR_Function    *pFunc
+    )
+{
+    VIR_Instruction        *pInst;
+    VIR_InstIterator        instIter;
+    gctBOOL                 needInLine = gcvFALSE;
+
+    if (VIR_Function_GetInstCount(pFunc) == 0)
+    {
+        return gcvFALSE;
+    }
+
+    VIR_InstIterator_Init(&instIter, &pFunc->instList);
+    pInst = VIR_InstIterator_First(&instIter);
+    for (; pInst != gcvNULL; pInst = VIR_InstIterator_Next(&instIter))
+    {
+        VIR_OpCode          opcode = VIR_Inst_GetOpcode(pInst);
+        VIR_Operand        *pOperand = gcvNULL;
+        VIR_OperandInfo     opndInfo;
+        /*
+        ** If source0 of a TEXLD is not a uniform, then we need to inline it because it may need to be recompiled.
+        */
+        if (VIR_OPCODE_isTexLd(opcode))
+        {
+            pOperand = VIR_Inst_GetSource(pInst, 0);
+            VIR_Operand_GetOperandInfo(pInst, pOperand, &opndInfo);
+
+            if (!opndInfo.isUniform)
+            {
+                needInLine = gcvTRUE;
+                break;
+            }
+        }
+    }
+
+    return needInLine;
+}
+
 VSC_ErrCode _MarkFunctionAndAllCallerFunctions(
     IN OUT VIR_Shader      *pShader,
     IN  VIR_Function       *pFunc
@@ -3877,6 +3917,51 @@ VSC_ErrCode _CheckAlwaysInlineFunctions(
         }
 
         alwaysInline = _CheckAlwaysInlineFunction(pShader, pHwCfg, pFunc);
+
+        /* Mark this function and all its caller functions. */
+        if (alwaysInline)
+        {
+            errCode = _MarkFunctionAndAllCallerFunctions(pShader, pFunc);
+            ON_ERROR(errCode, "mark function and all its caller functions.");
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+VSC_ErrCode _CheckMLLevelAlwaysInlineFunctions(
+    IN OUT VIR_Shader      *pShader
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_FuncIterator            func_iter;
+    VIR_FunctionNode           *func_node;
+    VIR_Function               *pFunc;
+    gctBOOL                     alwaysInline = gcvFALSE;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        alwaysInline = gcvFALSE;
+        pFunc = func_node->function;
+
+        /* Skip main function. */
+        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_MAIN))
+        {
+            continue;
+        }
+
+        /* If this function is set before, then it means all its caller have been marked too. */
+        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE))
+        {
+            continue;
+        }
+
+        alwaysInline = _CheckMLLevelAlwaysInlineFunction(pShader, pFunc);
 
         /* Mark this function and all its caller functions. */
         if (alwaysInline)
@@ -4019,6 +4104,156 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After preprocess LL", pShader, gcvTRUE);
+    }
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PreprocessMLPostShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+    pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_PreprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    /* Check if a function is ALWAYSINLINE, no need to check a patch lib. */
+    errCode = _CheckMLLevelAlwaysInlineFunctions(pShader);
+    ON_ERROR(errCode, "Check ML level always inline functions");
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_ConvBaseSamplerIndexOnInst(
+    IN VIR_Shader                 *pShader,
+    INOUT VIR_Instruction         *pInst,
+    IN VIR_VirRegId               virRegId,
+    INOUT gctBOOL                 *pChanged
+    )
+{
+    VSC_ErrCode                   errCode = VSC_ERR_NONE;
+    VIR_Instruction               *pInstIter = gcvNULL;
+    VIR_Operand                   *pDest = gcvNULL, *pIndexOpnd = gcvNULL;
+    VIR_Operand                   *pSamplerOpnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_OpCode                    opCode;
+    gctBOOL                       bChanged = gcvFALSE;
+
+    for (pInstIter = VIR_Inst_GetPrev(pInst);
+         pInstIter && (VIR_Inst_GetFunction(pInstIter) == VIR_Inst_GetFunction(pInst));
+         pInstIter = VIR_Inst_GetPrev(pInstIter))
+    {
+        opCode = VIR_Inst_GetOpcode(pInstIter);
+        if (VIR_OPCODE_hasDest(opCode))
+        {
+            pDest = VIR_Inst_GetDest(pInstIter);
+
+            if (VIR_Operand_isSymbol(pDest) &&
+                VIR_Symbol_GetVregIndex(VIR_Operand_GetSymbol(pDest)) == virRegId)
+            {
+                gcmASSERT(opCode == VIR_OP_GET_SAMPLER_IDX);
+
+                VIR_Operand_Copy(pSamplerOpnd, VIR_Inst_GetSource(pInstIter, 0));
+
+                pIndexOpnd = VIR_Inst_GetSource(pInstIter, 1);
+
+                if (VIR_Operand_isImm(pIndexOpnd))
+                {
+                    VIR_Operand_SetIsConstIndexing(pSamplerOpnd, VIR_Operand_GetImmediateUint(pIndexOpnd));
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+
+                bChanged = gcvTRUE;
+                break;
+            }
+        }
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_ConvBaseSamplerIndexOnShader(
+    IN VIR_Shader                 *pShader,
+    INOUT gctBOOL                 *pChanged
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Function        *pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    gctBOOL             bChanged = gcvFALSE;
+    VIR_InstIterator    pInstIter;
+    VIR_Instruction     *pInst;
+    VIR_Operand         *pSrcOpnd;
+    VIR_Symbol          *pSrcSym, *pIdxSym;
+
+    VIR_InstIterator_Init(&pInstIter, VIR_Function_GetInstList(pMainFunc));
+    for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&pInstIter);
+         pInst != gcvNULL;
+         pInst = (VIR_Instruction*)VIR_InstIterator_Next(&pInstIter))
+    {
+        /* find the texld to patch */
+        if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pInst)))
+        {
+            pSrcOpnd = VIR_Inst_GetSource(pInst, 0);
+
+            if (VIR_Operand_isSymbol(pSrcOpnd))
+            {
+                pSrcSym = VIR_Operand_GetSymbol(pSrcOpnd);
+
+                if (VIR_Symbol_GetIndex(pSrcSym) == VIR_Shader_GetBaseSamplerId(pShader) &&
+                    VIR_Operand_GetRelAddrMode(pSrcOpnd) != VIR_INDEXED_NONE)
+                {
+                    pIdxSym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(pSrcOpnd));
+
+                    errCode = _ConvBaseSamplerIndexOnInst(pShader, pInst, VIR_Symbol_GetVregIndex(pIdxSym), &bChanged);
+                    ON_ERROR(errCode, "Convert base sampler index on instruction.");
+                }
+            }
+        }
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PostprocessMLPostShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+}
+
+VSC_ErrCode vscVIR_PostprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    gctBOOL     bChanged = gcvFALSE;
+
+    /* Convert BaseSampleIndex. */
+    errCode = _ConvBaseSamplerIndexOnShader(pShader, &bChanged);
+    ON_ERROR(errCode, "Convert base sampler index.");
+
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After convert base sampler index.", pShader, gcvTRUE);
     }
 
 OnError:
@@ -4318,16 +4553,17 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
         }
     }
 
+    /* In dual16, we need to put all HP attributes in front of MP attributes */
+    _SortAttributesOfDual16Shader(Shader, &compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg);
+
+    VIR_Shader_SetDual16Mode(Shader, gcvTRUE);
+
     if(VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(Shader), VIR_Shader_GetId(Shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE) ||
        VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_OUTPUT))
     {
         VIR_Shader_Dump(gcvNULL, "After dual16 shader transform.", Shader, gcvTRUE);
     }
 
-    /* In dual16, we need to put all HP attributes in front of MP attributes */
-    _SortAttributesOfDual16Shader(Shader, &compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg);
-
-    VIR_Shader_SetDual16Mode(Shader, gcvTRUE);
 
     return errCode;
 }
@@ -4505,21 +4741,86 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
         }
     }
 
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
+
+    return errCode;
+}
+
+static VSC_ErrCode _InsertInitializeInst(
+    VIR_DEF_USAGE_INFO*         pDuInfo,
+    VIR_Shader*                 pShader,
+    VIR_Function*               pFunc,
+    VIR_Symbol*                 pSym,
+    VIR_USAGE*                  pUsage,
+    VIR_TypeId                  typeId,
+    gctUINT                     firstRegNo,
+    gctUINT                     regNoRange,
+    VIR_Enable                  defEnableMask,
+    gctUINT8                    halfChannelMask,
+    gctUINT                     initValue,
+    gctBOOL                     bOutUage
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Instruction*            pNewMovInst = gcvNULL;
+    VIR_Operand*                opnd = gcvNULL;
+
+    /* Insert 'MOV reg, 0' at the begin of function */
+    VIR_Function_PrependInstruction(pFunc,
+                                    VIR_OP_MOV,
+                                    typeId,
+                                    &pNewMovInst);
+
+    /* Dst */
+    opnd = VIR_Inst_GetDest(pNewMovInst);
+    VIR_Operand_SetSymbol(opnd, pFunc, pSym->index);
+    VIR_Operand_SetEnable(opnd, defEnableMask);
+    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
+    VIR_Operand_SetTypeId(opnd, typeId);
+
+    /* Src */
+    opnd = VIR_Inst_GetSource(pNewMovInst, VIR_Operand_Src0);
+    if (VIR_TypeId_isSignedInteger(typeId) ||
+        VIR_TypeId_isBoolean(typeId))
     {
-        VIR_Symbol  *outputSym = gcvNULL;
-        VIR_SymId    symId;
+        VIR_Operand_SetImmediateUint(opnd, initValue);
+    }
+    else if (VIR_TypeId_isUnSignedInteger(typeId))
+    {
+        VIR_Operand_SetImmediateInt(opnd, initValue);
+    }
+    else
+    {
+        VIR_Operand_SetImmediateFloat(opnd, (gctFLOAT)initValue);
+    }
+    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
 
-        /* if last output is not used, then safely remove it */
-        symId = VIR_IdList_GetId(VIR_Shader_GetOutputs(pShader),
-                    VIR_IdList_Count(VIR_Shader_GetOutputs(pShader)) - 1);
-        outputSym = VIR_Shader_GetSymFromId(pShader, symId);
+    vscVIR_AddNewDef(pDuInfo, pNewMovInst, firstRegNo, regNoRange,
+                     defEnableMask, halfChannelMask, gcvNULL, gcvNULL);
 
-        if (isSymUnused(outputSym))
-        {
-            VIR_IdList_DeleteByIndex(VIR_Shader_GetOutputs(pShader),
-                VIR_IdList_Count(VIR_Shader_GetOutputs(pShader)) - 1);
-        }
+    if (pUsage != gcvNULL)
+    {
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                pNewMovInst,
+                                pUsage->usageKey.pUsageInst,
+                                pUsage->usageKey.pOperand,
+                                pUsage->usageKey.bIsIndexingRegUsage,
+                                firstRegNo,
+                                regNoRange,
+                                defEnableMask,
+                                halfChannelMask, gcvNULL);
+    }
+    else if (bOutUage)
+    {
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                pNewMovInst,
+                                VIR_OUTPUT_USAGE_INST,
+                                (VIR_Operand*)(gctUINTPTR_T)firstRegNo,
+                                gcvFALSE,
+                                firstRegNo,
+                                regNoRange,
+                                defEnableMask,
+                                halfChannelMask,
+                                gcvNULL);
     }
 
     return errCode;
@@ -4544,15 +4845,16 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     gctUINT                     i, usageCount, usageIdx, defIdx;
     VIR_OperandInfo             operandInfo, operandInfo1;
     gctUINT                     firstRegNo = 0, regNoRange = 0;
-    VIR_Enable                  defEnableMask = 0;
+    VIR_Enable                  defEnableMask = VIR_ENABLE_NONE;
     gctUINT8                    halfChannelMask = 0;
-    VIR_Instruction*            pNewMovInst;
     VIR_Symbol*                 pSym = gcvNULL;
     gctBOOL                     bNeedInitialization;
-    VIR_Operand *               opnd;
+    gctBOOL                     bChanged = gcvFALSE;
+    gctUINT                     initValue = 0;
 
     VIR_Shader_RenumberInstId(pShader);
 
+    /* Check all usages. */
     usageCount = BT_GET_MAX_VALID_ID(&pDuInfo->usageTable);
     for (usageIdx = 0; usageIdx < usageCount; usageIdx ++)
     {
@@ -4682,50 +4984,85 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                 }
 
                 /* Insert 'MOV reg, 0' at the begin of function */
-                VIR_Function_PrependInstruction(VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst),
-                                                VIR_OP_MOV,
+                errCode = _InsertInitializeInst(pDuInfo,
+                                                pShader,
+                                                VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst),
+                                                pSym,
+                                                pUsage,
                                                 VIR_Operand_GetTypeId(pUsage->usageKey.pOperand),
-                                                &pNewMovInst);
+                                                firstRegNo,
+                                                regNoRange,
+                                                defEnableMask,
+                                                halfChannelMask,
+                                                initValue,
+                                                gcvFALSE);
+                ON_ERROR(errCode, "Add MOV instruction.");
 
-                /* Dst */
-                opnd = VIR_Inst_GetDest(pNewMovInst);
-                VIR_Operand_SetSymbol(opnd, VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst), pSym->index);
-                VIR_Operand_SetEnable(opnd, defEnableMask);
-                VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
-                VIR_Operand_SetTypeId(opnd, VIR_Operand_GetTypeId(pUsage->usageKey.pOperand));
-
-                /* Src */
-                opnd = VIR_Inst_GetSource(pNewMovInst, VIR_Operand_Src0);
-                if (VIR_GetTypeFlag(VIR_Operand_GetTypeId(pUsage->usageKey.pOperand)) & VIR_TYFLAG_IS_UNSIGNED_INT ||
-                    VIR_GetTypeFlag(VIR_Operand_GetTypeId(pUsage->usageKey.pOperand)) & VIR_TYFLAG_IS_BOOLEAN)
-                {
-                    VIR_Operand_SetImmediateUint(opnd, 0);
-                }
-                else if (VIR_GetTypeFlag(VIR_Operand_GetTypeId(pUsage->usageKey.pOperand)) & VIR_TYFLAG_IS_SIGNED_INT)
-                {
-                     VIR_Operand_SetImmediateInt(opnd, 0);
-                }
-                else
-                {
-                    VIR_Operand_SetImmediateFloat(opnd, 0);
-                }
-                VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
-
-                vscVIR_AddNewDef(pDuInfo, pNewMovInst, firstRegNo, regNoRange,
-                                 defEnableMask, halfChannelMask, gcvNULL, gcvNULL);
-
-                vscVIR_AddNewUsageToDef(pDuInfo, pNewMovInst, pUsage->usageKey.pUsageInst, pUsage->usageKey.pOperand,
-                                        pUsage->usageKey.bIsIndexingRegUsage, firstRegNo, regNoRange, defEnableMask,
-                                        halfChannelMask, gcvNULL);
+                bChanged = gcvTRUE;
             }
         }
     }
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    /*
+    ** Check if there is any no-assignment output.
+    ** Right now only check gl_PointSize for GS to fix dEQP-VK.glsl.builtin.function.common.abs.float_highp_geometry.
+    */
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
+    {
+        VIR_OutputIdList*       pOutputList = VIR_Shader_GetOutputs(pShader);
+        gctUINT                 outputCount = VIR_IdList_Count(pOutputList);
+        gctUINT                 defIdx;
+        VIR_SymId               vregSymId = VIR_INVALID_ID;
+
+        for (i = 0; i < outputCount; i++)
+        {
+            initValue = 0;
+            pSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputList, i));
+
+            if (VIR_Symbol_GetName(pSym) == VIR_NAME_POINT_SIZE)
+            {
+                defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pSym));
+
+                if (VIR_INVALID_DEF_INDEX != defIdx)
+                {
+                    continue;
+                }
+
+                /* The default value of PointSize is 1.0. */
+                initValue = 1;
+
+                /* Insert 'MOV reg, 1' at the begin of function */
+                errCode = VIR_Shader_GetVirRegSymByVirRegId(pShader,
+                                                            VIR_Symbol_GetVregIndex(pSym),
+                                                            &vregSymId);
+                ON_ERROR(errCode, "Get vreg symbol.");
+
+                errCode = _InsertInitializeInst(pDuInfo,
+                                                pShader,
+                                                VIR_Shader_GetMainFunction(pShader),
+                                                VIR_Shader_GetSymFromId(pShader, vregSymId),
+                                                gcvNULL,
+                                                VIR_Symbol_GetTypeId(pSym),
+                                                VIR_Symbol_GetVregIndex(pSym),
+                                                1,
+                                                VIR_TypeId_Conv2Enable(VIR_Symbol_GetTypeId(pSym)),
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                initValue,
+                                                gcvTRUE);
+                ON_ERROR(errCode, "Add MOV instruction.");
+
+                bChanged = gcvTRUE;
+            }
+        }
+    }
+
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After variable initialization", pShader, gcvTRUE);
     }
 
+OnError:
     return errCode;
 }
 

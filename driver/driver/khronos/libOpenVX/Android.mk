@@ -56,6 +56,8 @@ LOCAL_SRC_FILES += \
     driver/src/gc_vx_interface.c \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_extension_interface.c \
+    driver/src/gc_vx_nn_util.c \
+    driver/src/ops/gc_vx_nn_extension_concat.c
 
 # Kernel
 LOCAL_SRC_FILES += \

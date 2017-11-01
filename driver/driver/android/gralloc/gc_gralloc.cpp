@@ -243,7 +243,7 @@ gc_gralloc_alloc_buffer(
     )
 {
     int err = 0;
-    int fd = open("/dev/null", O_RDONLY, 0);
+    int fd = -1;
 
     gceSTATUS status = gcvSTATUS_OK;
     gceHARDWARE_TYPE allocHwType = gcvHARDWARE_3D;
@@ -260,6 +260,7 @@ gc_gralloc_alloc_buffer(
     gctSIGNAL signal = gcvNULL;
     gctINT clientPID = 0;
     gctUINT32 node, tsNode;
+    gctUINT32 nodes[3];
 
     gctSHBUF shBuf = gcvNULL;
 
@@ -546,6 +547,14 @@ gc_gralloc_alloc_buffer(
     gcmONERROR(gcoSURF_AllocShBuffer(surface, &shBuf));
     LOGV(" > Create shBuf=%p", shBuf);
 
+    nodes[0] = surface->node.u.normal.node;
+#if gcdENABLE_3D
+    nodes[1] = surface->tileStatusNode.u.normal.node;
+#endif
+    nodes[2] = 0;
+
+    gcmONERROR(gcoHAL_GetGraphicBufferFd(nodes, shBuf, signal, &fd));
+
     /* Allocate buffer handle. */
     hnd = new private_handle_t(fd, stride * Height, 0);
     handle = gc_native_handle_get(hnd);
@@ -679,6 +688,12 @@ gc_gralloc_alloc_buffer(
     return 0;
 
 OnError:
+    /* Close opened fd. */
+    if (fd > 0)
+    {
+        close(fd);
+    }
+
     /* Restore hardware type. */
     gcoHAL_SetHardwareType(gcvNULL, allocHwType);
 
@@ -698,12 +713,6 @@ OnError:
     if (hnd != NULL)
     {
         delete hnd;
-    }
-
-    /* Close opened fd. */
-    if (fd > 0)
-    {
-        close(fd);
     }
 
     LOGE("Failed to allocate, status=%d", status);
@@ -768,6 +777,8 @@ gc_gralloc_free(
     /* Free buffer. */
     gralloc_module_t * module =
         reinterpret_cast<gralloc_module_t *>(Dev->common.module);
+
+    close(hnd->fd);
 
     if (hnd->base)
     {
@@ -849,7 +860,6 @@ gc_gralloc_free(
     /* Commit command buffer. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
-    close(hnd->fd);
     delete hnd;
 
     /* Restore hardware type. */
@@ -1225,6 +1235,8 @@ gc_gralloc_register_buffer(
         surface->node.pool          = (gcePOOL)   handle->nodePool;
         surface->node.size          = (gctSIZE_T) handle->nodeSize;
 
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
+
 #if gcdENABLE_3D
         /* Import tile status video memory node. */
         if (handle->tsNode != 0)
@@ -1235,6 +1247,8 @@ gc_gralloc_register_buffer(
         surface->tileStatusNode.u.normal.node = tsNode;
         surface->tileStatusNode.pool          = (gcePOOL  ) handle->tsNodePool;
         surface->tileStatusNode.size          = (gctSIZE_T) handle->tsNodeSize;
+
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->tileStatusNode.sharedMutex));
 #endif
 
         /* Lock once as it's done in gcoSURF_Construct with vidmem. */

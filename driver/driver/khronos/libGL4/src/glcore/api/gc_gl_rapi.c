@@ -12,7 +12,7 @@
 
 
 #include "gc_es_context.h"
-#include "gc_gl_debug.h"
+
 
 #if defined(_WIN32)
 #pragma warning(disable: 4244)
@@ -82,7 +82,9 @@ GLvoid __glConvertToScreenSpacePos(__GLcontext* gc, GLfloat* clipPos, GLfloat* s
     GLfloat px,py,ox,oy;
     GLfloat fAn; /* far + near */
     GLfloat fSn; /*far - near */
-    GLboolean invertY = (DRAW_FRAMEBUFFER_BINDING_NAME == 0) ? (gcoSURF_QueryFlags((gcoSURF)(gc->drawablePrivate->rtHandle[0]), gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_OK) : GL_FALSE;
+    GLboolean invertY = (DRAW_FRAMEBUFFER_BINDING_NAME == 0)
+                      ? (gcoSURF_QueryFlags((gcoSURF)(gc->drawablePrivate->rtHandles[0]), gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_OK)
+                      : GL_FALSE;
 
     ox = (GLfloat)lpViewport->x + (GLfloat)lpViewport->width/2;
     oy = (GLfloat)lpViewport->y + (GLfloat)lpViewport->height/2;

@@ -1331,7 +1331,7 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
 
         kernelContext->uniform_num ++;
 
-        if(border->mode == VX_BORDER_CONSTANT)
+
         {
             vx_uint32 bin[4];
 

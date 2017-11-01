@@ -67,28 +67,6 @@ arm-yocto)
     BUILD_YOCTO_DRI_BUILD=1
 ;;
 
-arm-his-eabi)
-    ARCH=arm
-    export ARCH_TYPE=$ARCH
-    #export FIXED_ARCH_TYPE=arm-his-arm-hismall-linux
-    export CPU_TYPE=arm920
-    export KERNEL_DIR=/home/software/Linux/linux-2.6.29-hisi
-    export CROSS_COMPILE=arm-hisi_vfpv3d16-linux-
-    export TOOLCHAIN=/opt/hisi-linux/x86-arm/gcc-4.4.0-uClibc-0.9.30.2-softvfpv3
-    export LIB_DIR=$TOOLCHAIN/usr/lib
-;;
-
-arm-his-oabi)
-    ARCH=arm
-    export ARCH_TYPE=$ARCH
-    #export FIXED_ARCH_TYPE=arm-his-arm-hismall-linux
-    export CPU_TYPE=arm920
-    export KERNEL_DIR=/home/software/Linux/linux-2.6.29-hisi
-    export CROSS_COMPILE=arm-hismall-linux-
-    export TOOLCHAIN=/opt/hisi-linux/x86-arm/gcc-3.4.3-uClibc-0.9.28
-    export LIB_DIR=$TOOLCHAIN/usr/lib
-;;
-
 unicore)
     export ARCH_TYPE=unicore
     export CPU_TYPE=0

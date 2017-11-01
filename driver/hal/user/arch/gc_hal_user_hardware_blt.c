@@ -1812,7 +1812,8 @@ gcoHARDWARE_3DBlitBlt(
         }
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-            && srcSurf->compressed && srcSurf->isMsaa)
+        &&  srcSurf->compressed
+        &&  srcSurf->isMsaa)
         {
             srcConfigEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
@@ -1850,7 +1851,8 @@ gcoHARDWARE_3DBlitBlt(
  17:17) - (0 ? 17:17) + 1))))))) << (0 ? 17:17)));
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-            && dstSurf->compressed && dstSurf->isMsaa)
+        &&  dstSurf->compressed
+        &&  dstSurf->isMsaa)
         {
             dstConfigEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
@@ -2744,8 +2746,10 @@ gcoHARDWARE_3DBlitBlt(
     gcsSURF_NODE_Unlock(&srcSurf->node, CurrentEngine);
     gcsSURF_NODE_Unlock(&dstSurf->node, CurrentEngine);
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, Args->uArgs.v2.engine, gcvHWSLOT_BLT_DST, srcSurf->node.u.normal.node, 0);
     gcoHARDWARE_SetHWSlot(gcvNULL, Args->uArgs.v2.engine, gcvHWSLOT_BLT_DST, dstSurf->node.u.normal.node, 0);
+#endif
 
     gcsSURF_NODE_GetFence(&srcSurf->node, CurrentEngine, gcvFENCE_TYPE_READ);
     gcsSURF_NODE_GetFence(&dstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
@@ -2994,7 +2998,8 @@ gcoHARDWARE_3DBlitClear(
     if (Hardware->features[gcvFEATURE_128BTILE])
     {
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-            && DstSurf->compressed && DstSurf->isMsaa)
+        &&  DstSurf->compressed
+        &&  DstSurf->isMsaa)
         {
             srcConfigEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
@@ -3890,8 +3895,9 @@ gcoHARDWARE_3DBlitClear(
 
     gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
-
+#endif
     gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     gcmFOOTER_NO();
@@ -4458,8 +4464,9 @@ gcoHARDWARE_3DBlitTileFill(
     /* unlock */
     gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
-
+#endif
     gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     gcmFOOTER_NO();
@@ -4940,10 +4947,10 @@ gcoHARDWARE_3DBlit420Tiler(
     gcsSURF_NODE_Unlock(&SrcSurf->node, CurrentEngine);
     gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
 
-
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_SRC, SrcSurf->node.u.normal.node, 0);
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
-
+#endif
     gcsSURF_NODE_GetFence(&SrcSurf->node, CurrentEngine, gcvFENCE_TYPE_READ);
     gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
@@ -5177,7 +5184,8 @@ gcoHARDWARE_3DBlitMipMap(
         }
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-            && srcSurf->compressed && srcSurf->isMsaa)
+        &&  srcSurf->compressed
+        &&  srcSurf->isMsaa)
         {
             srcConfigEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
@@ -5215,7 +5223,8 @@ gcoHARDWARE_3DBlitMipMap(
  17:17) - (0 ? 17:17) + 1))))))) << (0 ? 17:17)));
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-            && dstSurf->compressed && dstSurf->isMsaa)
+        &&  dstSurf->compressed
+        &&  dstSurf->isMsaa)
         {
             destConfigEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
@@ -5703,7 +5712,9 @@ gcoHARDWARE_3DBlitMipMap(
 
         lodNumber++;
 
+#if gcdENABLE_KERNEL_FENCE
         gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, Info->LODs[i]->node.u.normal.node, 0);
+#endif
     }
 
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -5846,8 +5857,9 @@ gcoHARDWARE_3DBlitMipMap(
     /* Trigger. */
     gcmONERROR(_3DBlitExecute(Hardware, Engine, gcv3DBLIT_MIPMAP, forceSGPU, &info, (gctPOINTER *)&memory));
 
+#if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, srcSurf->node.u.normal.node, 0);
-
+#endif
     gcsSURF_NODE_GetFence(&srcSurf->node, CurrentEngine, gcvFENCE_TYPE_ALL);
 
     /* Remove compiler warning. */

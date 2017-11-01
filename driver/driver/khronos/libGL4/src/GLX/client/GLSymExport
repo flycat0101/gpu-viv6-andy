@@ -1089,6 +1089,9 @@ VERSION {
         __driUtilUpdateDrawableInfo;
         __driUtilUpdateExtraDrawableInfo;
         __driUtilFullScreenCovered;
+        __dri3UtilUpdateDrawableInfo;
+        __dri3UtilUpdateExtraDrawableInfo;
+        __dri3UtilFullScreenCovered;
         __glContextModesCreate;
         _glapi_set_context;
         _glapi_get_context;

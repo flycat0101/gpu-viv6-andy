@@ -662,7 +662,7 @@ const GLubyte *__glle_ClearDepth(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearDepth_Rec *) PC;
     /*__glim_ClearDepth(gc, data->depth);*/
-    __gles_ClearDepthf(gc, data->depth);
+    __gles_ClearDepthf(gc, (GLfloat)data->depth);
     return PC + sizeof(struct __gllc_ClearDepth_Rec);
 }
 
@@ -1064,7 +1064,7 @@ const GLubyte *__glle_DepthRange(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthRange_Rec *) PC;
     /*__glim_DepthRange(gc, data->zNear, data->zFar);*/
-    __gles_DepthRangef(gc, data->zNear, data->zFar);
+    __gles_DepthRangef(gc, (GLfloat)data->zNear, (GLfloat)data->zFar);
     return PC + sizeof(struct __gllc_DepthRange_Rec);
 }
 
@@ -2660,7 +2660,6 @@ GL_ASSERT(0);
 
 const GLubyte *__glle_EnableIndexedEXT(__GLcontext *gc, const GLubyte *PC)
 {
-    struct __gllc_EnableIndexedEXT_Rec* data;
 /* still not added, to do*/
 GL_ASSERT(0);
     return (PC + sizeof(struct __gllc_EnableIndexedEXT_Rec));
@@ -2668,7 +2667,6 @@ GL_ASSERT(0);
 
 const GLubyte *__glle_DisableIndexedEXT(__GLcontext *gc, const GLubyte *PC)
 {
-    struct __gllc_DisableIndexedEXT_Rec* data;
 /* still not added, to do*/
 GL_ASSERT(0);
     return (PC + sizeof(struct __gllc_DisableIndexedEXT_Rec));

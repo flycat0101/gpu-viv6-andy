@@ -538,7 +538,8 @@ IN clsLexToken * Identifier
        expr = &variable->exprBase;
        if(clmDECL_IsArray(&name->decl)) {
           status = clScanLookAheadWithSkip(Compiler, '[', ')');
-          if(status == gcvSTATUS_NOT_FOUND) { /* the next token is not '[' */
+          if(status == gcvSTATUS_NOT_FOUND &&
+             clmDECL_IsAggregateTypeOverRegLimit(&name->decl)) { /* the next token is not '[' */
              /* Create the expression &A[0] for A being an array*/
              expr =  _EvaluateIndirectionExpr(Compiler,
                                               expr);
@@ -2535,13 +2536,24 @@ IN clsLexToken * FieldSelection
     if (Operand == gcvNULL) return gcvNULL;
 
     if (clmDATA_TYPE_IsStructOrUnion(Operand->decl.dataType)) {
-        gcmASSERT(Operand->decl.dataType->u.fieldSpace);
+        clsNAME_SPACE *fieldSpace = Operand->decl.dataType->u.fieldSpace;
+        gcmASSERT(fieldSpace && fieldSpace->scopeName);
+
         exprType = clvUNARY_FIELD_SELECTION;
-        status = clsNAME_SPACE_Search(Compiler,
-                          Operand->decl.dataType->u.fieldSpace,
-                          FieldSelection->u.fieldSelection,
-                          gcvFALSE,
-                          &fieldName);
+        if(fieldSpace->scopeName->u.typeInfo.hasUnnamedFields) {
+            status = clsNAME_SPACE_SearchFieldSpaceWithUnnamedField(Compiler,
+                                                                    fieldSpace,
+                                                                    FieldSelection->u.fieldSelection,
+                                                                    gcvTRUE,
+                                                                    &fieldName);
+        }
+        else {
+            status = clsNAME_SPACE_Search(Compiler,
+                              Operand->decl.dataType->u.fieldSpace,
+                              FieldSelection->u.fieldSelection,
+                              gcvFALSE,
+                              &fieldName);
+        }
         if (status != gcvSTATUS_OK) {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                             FieldSelection->lineNo,
@@ -2633,12 +2645,25 @@ IN clsLexToken * FieldSelection
    if(derefExpr == gcvNULL) return gcvNULL;
 
    gcmASSERT(Operand->decl.dataType->u.fieldSpace);
+
    exprType = clvUNARY_FIELD_SELECTION;
-   status = clsNAME_SPACE_Search(Compiler,
-                                 Operand->decl.dataType->u.fieldSpace,
-                                 FieldSelection->u.fieldSelection,
-                                 gcvFALSE,
-                                 &fieldName);
+   gcmASSERT (clmDATA_TYPE_IsStructOrUnion(Operand->decl.dataType));
+
+   if(Operand->decl.dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnnamedFields) {
+       status = clsNAME_SPACE_SearchFieldSpaceWithUnnamedField(Compiler,
+                                                               Operand->decl.dataType->u.fieldSpace,
+                                                               FieldSelection->u.fieldSelection,
+                                                               gcvTRUE,
+                                                               &fieldName);
+   }
+   else {
+       status = clsNAME_SPACE_Search(Compiler,
+                         Operand->decl.dataType->u.fieldSpace,
+                         FieldSelection->u.fieldSelection,
+                         gcvFALSE,
+                         &fieldName);
+   }
+
    if (status != gcvSTATUS_OK) {
       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                       FieldSelection->lineNo,
@@ -3428,77 +3453,155 @@ IN clsDECL *CastType
   return;
 }
 
-static gceSTATUS
-_CheckCastExpr(
+static cloIR_EXPR
+_CreateCastExpr(
 IN cloCOMPILER Compiler,
 IN clsDECL *Decl,
 IN cloIR_EXPR Operand
 )
 {
-  gcmASSERT(Operand);
+    gceSTATUS status;
+    cloIR_EXPR expr = gcvNULL;
 
-  gcmASSERT(Operand->decl.dataType);
-  /* Check the operand */
+    gcmASSERT(Operand);
+    gcmASSERT(Operand->decl.dataType);
 
-  if(!clmDECL_IsScalar(&Operand->decl)) {
-    if(clmDECL_IsArray(&Operand->decl)) {
-       if(clmDECL_IsPointerType(Decl) &&
-          (Decl->dataType->addrSpaceQualifier == clvQUALIFIER_NONE ||
-           Decl->dataType->addrSpaceQualifier == Operand->decl.dataType->addrSpaceQualifier)) {
-          return gcvSTATUS_OK;
-       }
-       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                       Operand->base.lineNo,
-                                       Operand->base.stringNo,
-                                       clvREPORT_ERROR,
-                                       "pointer casting between different address spaces not allowed"));
+    /* Check the operand */
+    do {
+        if(!clmDECL_IsScalar(&Operand->decl)) {
+            if(clmDECL_IsArray(&Operand->decl)) {
+               if(clmDECL_IsPointerType(Decl) &&
+                  (Decl->dataType->addrSpaceQualifier == clvQUALIFIER_NONE ||
+                   Decl->dataType->addrSpaceQualifier == Operand->decl.dataType->addrSpaceQualifier)) {
+
+                   status =  clParseMakeArrayPointerExpr(Compiler,
+                                                         Operand,
+                                                         &Operand);
+                   if (gcmIS_ERROR(status)) return gcvNULL;
+                   break;
+               }
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                               Operand->base.lineNo,
+                                               Operand->base.stringNo,
+                                               clvREPORT_ERROR,
+                                               "pointer casting between different address spaces not allowed"));
+               return gcvNULL;
+            }
+            else if(clmIsElementTypeSampler(Operand->decl.dataType->elementType) ||
+                    clmIsElementTypeEvent(Operand->decl.dataType->elementType)) {
+               break;
+            }
+            else if(gcmOPT_oclOpenCV()) {
+               clsDECL decl[1];
+               clePOLYNARY_EXPR_TYPE exprType = clvPOLYNARY_CONSTRUCT_NONE;
+               clsBUILTIN_DATATYPE_INFO *typeInfo = clGetBuiltinDataTypeInfo(Operand->decl.dataType->type);
+               cloIR_POLYNARY_EXPR polynaryExpr;
+
+               if(typeInfo != gcvNULL) {
+                   exprType = typeInfo->constructorType;
+               }
+               if(exprType == clvPOLYNARY_CONSTRUCT_NONE) {
+                   gcmASSERT(0);
+                   return gcvNULL;
+               }
+
+               status = cloCOMPILER_CreateDecl(Compiler,
+                                               Operand->decl.dataType->type,
+                                               gcvNULL,
+                                               clvQUALIFIER_CONST,
+                                               clvQUALIFIER_NONE,
+                                               decl);
+               if (gcmIS_ERROR(status)) return gcvNULL;
+
+               if (clmDECL_IsArray(&Operand->decl)) {
+                  decl->array = Operand->decl.array;
+                  exprType = clvPOLYNARY_CONSTRUCT_ARRAY;
+               }
+
+               /* Create polynary expression */
+               status = cloIR_POLYNARY_EXPR_Construct(Compiler,
+                                                      Operand->base.lineNo,
+                                                      Operand->base.stringNo,
+                                                      exprType,
+                                                      decl,
+                                                      gcvNULL,
+                                                      &polynaryExpr);
+                if (gcmIS_ERROR(status)) return gcvNULL;
+
+                status = cloIR_SET_Construct(Compiler,
+                                             Operand->base.lineNo,
+                                             Operand->base.stringNo,
+                                             clvEXPR_SET,
+                                             &polynaryExpr->operands);
+                if (gcmIS_ERROR(status)) return gcvNULL;
+                gcmASSERT(polynaryExpr->operands);
+
+                gcmVERIFY_OK(cloIR_SET_AddMember(Compiler,
+                                                 polynaryExpr->operands,
+                                                 &Operand->base));
+                return &polynaryExpr->exprBase;
+            }
+            else {
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                               Operand->base.lineNo,
+                                               Operand->base.stringNo,
+                                               clvREPORT_ERROR,
+                                               "cast expression must be of scalar type"));
+            }
+            return gcvNULL;
+        }
+        else if(clmDECL_IsPointerType(&Operand->decl)) {
+            if(clmDECL_IsPointerType(Decl)) {
+               if(Decl->dataType->addrSpaceQualifier == clvQUALIFIER_NONE ||
+                  Decl->dataType->addrSpaceQualifier == Operand->decl.dataType->addrSpaceQualifier) {
+                  break;
+               }
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                               Operand->base.lineNo,
+                                               Operand->base.stringNo,
+                                               clvREPORT_ERROR,
+                                               "pointer casting between different address spaces not allowed"));
+            }
+            else if(clmDECL_IsIntegerType(Decl)) {
+               break;
+            }
+            else {
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                               Operand->base.lineNo,
+                                               Operand->base.stringNo,
+                                               clvREPORT_ERROR,
+                                               "pointer expression can be cast to either pointer or integer"));
+            }
+            return gcvNULL;
+        }
+        else if(clmDECL_IsPointerType(Decl) && !clmDECL_IsIntegerType(&Operand->decl)) {
+          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                          Operand->base.lineNo,
+                                          Operand->base.stringNo,
+                                          clvREPORT_ERROR,
+                                          "pointer casting on a non integer"));
+          return gcvNULL;
+        }
+    } while (gcvFALSE);
+
+  /* Constant calculation */
+    if (cloIR_OBJECT_GetType(&Operand->base) == clvIR_CONSTANT) {
+       status = cloIR_CAST_EXPR_Evaluate(Compiler,
+                                         Decl,
+                                         (cloIR_CONSTANT)Operand);
+       if (gcmIS_ERROR(status)) return gcvNULL;
+       return Operand;
     }
-    else if(clmIsElementTypeSampler(Operand->decl.dataType->elementType) ||
-            clmIsElementTypeEvent(Operand->decl.dataType->elementType)) {
-       return gcvSTATUS_OK;
-    }
-    else {
-       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                       Operand->base.lineNo,
-                                       Operand->base.stringNo,
-                                       clvREPORT_ERROR,
-                                       "cast expression must be of scalar type"));
-    }
-    return gcvSTATUS_INVALID_ARGUMENT;
-  }
-  else if(clmDECL_IsPointerType(&Operand->decl)) {
-    if(clmDECL_IsPointerType(Decl)) {
-       if(Decl->dataType->addrSpaceQualifier == clvQUALIFIER_NONE ||
-          Decl->dataType->addrSpaceQualifier == Operand->decl.dataType->addrSpaceQualifier) {
-          return gcvSTATUS_OK;
-       }
-       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                       Operand->base.lineNo,
-                                       Operand->base.stringNo,
-                                       clvREPORT_ERROR,
-                                       "pointer casting between different address spaces not allowed"));
-    }
-    else if(clmDECL_IsIntegerType(Decl)) {
-        return gcvSTATUS_OK;
-    }
-    else {
-       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                       Operand->base.lineNo,
-                                       Operand->base.stringNo,
-                                       clvREPORT_ERROR,
-                                       "pointer expression can be cast to either pointer or integer"));
-    }
-    return gcvSTATUS_INVALID_ARGUMENT;
-  }
-  else if(clmDECL_IsPointerType(Decl) && !clmDECL_IsIntegerType(&Operand->decl)) {
-    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                    Operand->base.lineNo,
-                                    Operand->base.stringNo,
-                                    clvREPORT_ERROR,
-                                    "pointer casting on a non integer"));
-    return gcvSTATUS_INVALID_ARGUMENT;
-  }
-  return gcvSTATUS_OK;
+
+ /* Create cast expression */
+    status = cloIR_CAST_EXPR_Construct(Compiler,
+                                        Operand->base.lineNo,
+                                        Operand->base.stringNo,
+                                        Decl,
+                                        Operand,
+                                        &expr);
+    if (gcmIS_ERROR(status)) return gcvNULL;
+    return expr;
 }
 
 static cloIR_EXPR
@@ -5176,29 +5279,7 @@ IN cloIR_EXPR Operand
       return expr;
   }
   else {
-      gceSTATUS status;
-
-      status = _CheckCastExpr(Compiler, decl, Operand);
-      if (gcmIS_ERROR(status)) return gcvNULL;
-
-/* Constant calculation */
-      if (cloIR_OBJECT_GetType(base) == clvIR_CONSTANT) {
-         status = cloIR_CAST_EXPR_Evaluate(Compiler,
-                                           decl,
-                                           (cloIR_CONSTANT)Operand);
-         if (gcmIS_ERROR(status)) return gcvNULL;
-         return Operand;
-      }
-
-/* Create cast expression */
-      status = cloIR_CAST_EXPR_Construct(Compiler,
-                                          base->lineNo,
-                                          base->stringNo,
-                                          decl,
-                                          Operand,
-                                          &expr);
-      if (gcmIS_ERROR(status)) return gcvNULL;
-      return expr;
+      return _CreateCastExpr(Compiler, decl, Operand);
   }
 }
 
@@ -7170,7 +7251,8 @@ IN cloIR_EXPR RightOperand
            }
         }
         else if(clmDECL_IsUnderlyingStructOrUnion(&LeftOperand->decl) &&
-                clGetOperandCountForRegAlloc(&LeftOperand->decl) > _clmMaxOperandCountToUseMemory(&LeftOperand->decl)) {
+                (clGetOperandCountForRegAlloc(&LeftOperand->decl) > _clmMaxOperandCountToUseMemory(&LeftOperand->decl) ||
+                 LeftOperand->decl.dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnionFields)) {
            gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&RightOperand->decl));
            status = clParseSetOperandAddressed(Compiler,
                                                LeftOperand);
@@ -12248,26 +12330,78 @@ IN clsLexToken * TypeName
 void
 clParseStructDeclBegin(
 IN cloCOMPILER Compiler,
+IN clsLexToken * StartToken,
 IN clsLexToken * Identifier
 )
 {
     gceSTATUS    status;
-    clsNAME_SPACE *    nameSpace;
+    clsNAME_SPACE *nameSpace, *parentSpace;
     gctUINT fileNo = 0;
     gctUINT lineNo = 0;
     gctUINT colNo = 0;
-    clsNAME_SPACE *    parentSpace = gcvNULL;
+    slsSLINK_LIST *ptrDscr = gcvNULL;
+    cltPOOL_STRING symbol;
+    clsNAME *scopeName;
 
+    gcmASSERT(StartToken);
     parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
     if (Identifier){
         fileNo = Identifier->lineNo;
         lineNo = Identifier->lineNo;
         colNo = Identifier->stringNo;
+        ptrDscr = Identifier->u.identifier.ptrDscr;
+    }
+    else {
+        fileNo = lineNo = cloCOMPILER_GetCurrentLineNo(Compiler);
+        colNo = cloCOMPILER_GetCurrentStringNo(Compiler);
+    }
+
+    symbol = Identifier ? Identifier->u.identifier.name : "";
+    status = cloCOMPILER_CreateName(Compiler,
+                                    lineNo,
+                                    colNo,
+                                    StartToken->type == T_STRUCT ? clvSTRUCT_NAME : clvUNION_NAME,
+                                    gcvNULL,
+                                    symbol,
+                                    gcvNULL,
+                                    clvEXTENSION_NONE,
+                                    &scopeName);
+    if (gcmIS_ERROR(status)) {
+        gcmASSERT(0);
+        return;
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_StrCmp(symbol, "_vxc_pyramid"))) {
+        scopeName->isBuiltin = gcvTRUE;
     }
 
     status = cloCOMPILER_CreateNameSpace(Compiler, &nameSpace);
-    if (gcmIS_ERROR(status)) return;
-    nameSpace->symbol = Identifier ? Identifier->u.identifier.name : "";
+    if (gcmIS_ERROR(status)) {
+        gcmASSERT(0);
+        return;
+    }
+
+    nameSpace->symbol = symbol;
+    nameSpace->scopeName = scopeName;
+    status = cloCOMPILER_CreateDecl(Compiler,
+                                    StartToken->type,
+                                    nameSpace,
+                                    clvQUALIFIER_NONE,
+                                    clvQUALIFIER_NONE,
+                                    &scopeName->decl);
+    if (gcmIS_ERROR(status)) {
+        gcmASSERT(0);
+        return;
+    }
+
+    status = clMergePtrDscrToDecl(Compiler,
+                                  ptrDscr,
+                                  &scopeName->decl,
+                                  ptrDscr != gcvNULL);
+    if (gcmIS_ERROR(status)) {
+        gcmASSERT(0);
+        return;
+    }
 
     nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , nameSpace->symbol, fileNo, lineNo, lineNo, colNo);
 
@@ -12306,72 +12440,105 @@ IN clsNAME *StructName
     return;
 }
 
+static void
+_ParseCheckStructForFieldNameClash(
+IN cloCOMPILER Compiler,
+IN clsNAME *StructName
+)
+{
+    if(StructName->u.typeInfo.hasUnnamedFields) {
+        clsNAME *unnamedField;
+
+        FOR_EACH_DLINK_NODE(&StructName->decl.dataType->u.fieldSpace->names, clsNAME, unnamedField) {
+            if(unnamedField->symbol[0] == '\0') { /*Unnamed field */
+                clsNAME *fieldInReverse;
+                clsNAME *fld1, *fld2;
+
+                FOR_EACH_DLINK_NODE(&unnamedField->decl.dataType->u.fieldSpace->names, clsNAME, fld1) {
+                    if(fld1->symbol[0] == '\0') continue;
+                    FOR_EACH_DLINK_NODE(&StructName->decl.dataType->u.fieldSpace->names, clsNAME, fld2) {
+                        if(fld1->symbol == fld2->symbol) {
+                            gctSIZE_T prefixLength;
+
+                            if(StructName->type == clvSTRUCT_NAME) {
+                                prefixLength = sizeof(cldSTRUCT_NAME_PREFIX);
+                            }
+                            else {
+                                prefixLength = sizeof(cldUNION_NAME_PREFIX);
+                            }
+                            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                            fld1->lineNo,
+                                                            fld1->stringNo,
+                                                            clvREPORT_ERROR,
+                                                            "unnamed struct/union field name \'%s\' clash in struct/union \'%s\'",
+                                                            fld1->symbol,
+                                                            StructName->symbol + prefixLength -1));
+                        }
+                    }
+                }
+
+                FOR_EACH_DLINK_NODE_REVERSELY(&StructName->decl.dataType->u.fieldSpace->names, clsNAME, fieldInReverse) {
+                    if(fieldInReverse == unnamedField) break;
+                    if(fieldInReverse->symbol[0] == '\0') { /*Unnamed field */
+                        FOR_EACH_DLINK_NODE(&unnamedField->decl.dataType->u.fieldSpace->names, clsNAME, fld1) {
+                            if(fld1->symbol[0] == '\0') continue;
+                            FOR_EACH_DLINK_NODE(&fieldInReverse->decl.dataType->u.fieldSpace->names, clsNAME, fld2) {
+                                if(fld1->symbol == fld2->symbol) {
+                                    gctSIZE_T prefixLength;
+
+                                    if(StructName->type == clvSTRUCT_NAME) {
+                                        prefixLength = sizeof(cldSTRUCT_NAME_PREFIX);
+                                    }
+                                    else {
+                                        prefixLength = sizeof(cldUNION_NAME_PREFIX);
+                                    }
+                                    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                                    fld2->lineNo,
+                                                                    fld2->stringNo,
+                                                                    clvREPORT_ERROR,
+                                                                    "unnamed struct/uion field name \'%s\' clash with sibling\n"
+                                                                    "unnamed struct/union field name in struct/union \'%s\'",
+                                                                    fld2->symbol,
+                                                                    StructName->symbol + prefixLength -1));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 clsDATA_TYPE *
 clParseStructDeclEnd(
 IN cloCOMPILER Compiler,
-IN clsLexToken * StartToken,
 IN clsLexToken * Identifier,
 IN clsATTRIBUTE *Attr,
 IN gceSTATUS ParsingStatus
 )
 {
   gceSTATUS status;
-  clsDECL decl;
+  clsDECL *decl;
   clsNAME_SPACE *prevNameSpace=gcvNULL;
   clsNAME *fieldName;
-
-  gcmASSERT(StartToken);
 
   cloCOMPILER_PopCurrentNameSpace(Compiler, &prevNameSpace);
 
   if(gcmIS_ERROR(ParsingStatus)) return gcvNULL;
 
-  status = cloCOMPILER_CreateDecl(Compiler,
-                                  StartToken->type,
-                                  prevNameSpace,
-                                  clvQUALIFIER_NONE,
-                                  clvQUALIFIER_NONE,
-                                  &decl);
-  if (gcmIS_ERROR(status)) return gcvNULL;
-
-  gcmASSERT(prevNameSpace->scopeName == gcvNULL);
-  if(Identifier) {
-     status = cloCOMPILER_CreateName(Compiler,
-                     Identifier->lineNo,
-                     Identifier->stringNo,
-                     StartToken->type == T_STRUCT ? clvSTRUCT_NAME : clvUNION_NAME,
-                     &decl,
-                     Identifier->u.identifier.name,
-                     Identifier->u.identifier.ptrDscr,
-                     clvEXTENSION_NONE,
-                     &prevNameSpace->scopeName);
-     if (gcmIS_ERROR(status)) return gcvNULL;
-     if (gcmIS_SUCCESS(gcoOS_StrCmp(Identifier->u.identifier.name, "_vxc_pyramid"))) {
-         prevNameSpace->scopeName->isBuiltin = gcvTRUE;
-     }
-  }
-  else {
-     status = cloCOMPILER_CreateName(Compiler,
-                     StartToken->lineNo,
-                     StartToken->stringNo,
-                     StartToken->type == T_STRUCT ? clvSTRUCT_NAME : clvUNION_NAME,
-                     &decl,
-                     "",
-                     gcvNULL,
-                     clvEXTENSION_NONE,
-                     &prevNameSpace->scopeName);
-     if (gcmIS_ERROR(status)) return gcvNULL;
-  }
+  gcmASSERT(prevNameSpace->scopeName);
 
   prevNameSpace->scopeName->die = prevNameSpace->die;
 
   gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "</STRUCT_DECL>"));
+  decl = &prevNameSpace->scopeName->decl;
   if(Attr) {
      if(Attr->specifiedAttr & clvATTR_PACKED)  {
         gctBOOL packed;
 
         packed = Attr->packed;
-        FOR_EACH_DLINK_NODE(&decl.dataType->u.fieldSpace->names, clsNAME, fieldName) {
+        FOR_EACH_DLINK_NODE(&decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
            gcmASSERT(fieldName->type == clvFIELD_NAME);
            fieldName->u.variableInfo.specifiedAttr |= clvATTR_PACKED;
            fieldName->context.packed = packed;
@@ -12382,7 +12549,7 @@ IN gceSTATUS ParsingStatus
         gctUINT16 alignment;
 
         alignment = Attr->alignment;
-        fieldName = slsDLINK_LIST_First(&decl.dataType->u.fieldSpace->names, clsNAME);
+        fieldName = slsDLINK_LIST_First(&decl->dataType->u.fieldSpace->names, clsNAME);
         if(fieldName) {
            if(fieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
               if(fieldName->context.alignment < alignment) {
@@ -12399,7 +12566,8 @@ IN gceSTATUS ParsingStatus
      if (gcmIS_ERROR(status)) return gcvNULL;
   }
   _ParseCheckStructNeedMemoryAllocate(prevNameSpace->scopeName);
-  return decl.dataType;
+  _ParseCheckStructForFieldNameClash(Compiler, prevNameSpace->scopeName);
+  return decl->dataType;
 }
 
 clsDATA_TYPE *
@@ -12544,15 +12712,45 @@ IN clsLexToken * Identifier
     clsDECL decl;
     cleNAME_TYPE tagNameType;
     clsNAME *name;
+    cltPOOL_STRING symbol;
+    gctSTRING nameBuffer;
+    gctSIZE_T length, prefixLength;
+    gctSTRING prefix;
+    gctPOINTER pointer;
 
     gcmASSERT(StartToken);
     gcmASSERT(Identifier);
+
+    symbol = Identifier ? Identifier->u.identifier.name : "";
     switch(StartToken->type) {
     case T_STRUCT:
-        tagNameType = clvSTRUCT_NAME;
-        break;
     case T_UNION:
-        tagNameType = clvUNION_NAME;
+        if(StartToken->type == T_STRUCT) {
+            tagNameType = clvSTRUCT_NAME;
+            prefix = cldSTRUCT_NAME_PREFIX;
+        }
+        else {
+            tagNameType = clvUNION_NAME;
+             prefix = cldUNION_NAME_PREFIX;
+        }
+        gcoOS_StrLen(prefix, &prefixLength);
+        gcoOS_StrLen(symbol, &length);
+
+        length += prefixLength + 1;
+        status = cloCOMPILER_Allocate(Compiler,
+                                      length,
+                                      &pointer);
+        if (gcmIS_ERROR(status))  return NULL;
+        nameBuffer = pointer;
+
+        gcmVERIFY_OK(gcoOS_StrCopySafe(nameBuffer, length, prefix));
+        gcmVERIFY_OK(gcoOS_StrCatSafe(nameBuffer, length, symbol));
+
+        status = cloCOMPILER_AllocatePoolString(Compiler,
+                                                nameBuffer,
+                                                &symbol);
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, pointer));
+        if (gcmIS_ERROR(status)) return NULL;
         break;
     case T_ENUM:
         tagNameType = clvENUM_TAG_NAME;
@@ -12566,7 +12764,7 @@ IN clsLexToken * Identifier
         break;
     }
     if (Identifier != gcvNULL) {
-       status = cloCOMPILER_SearchName(Compiler, Identifier->u.identifier.name, gcvTRUE, &name);
+       status = cloCOMPILER_SearchName(Compiler, symbol, gcvTRUE, &name);
 
        if (status == gcvSTATUS_OK) {
           if(tagNameType != name->type) {
@@ -12729,6 +12927,8 @@ IN slsDLINK_LIST * FieldDeclList
    }
 
    do {
+      clsNAME_SPACE * currentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+
       if (clmDECL_IsVoid(declPtr)) {
           fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
           gcmASSERT(fieldDecl);
@@ -12743,8 +12943,6 @@ IN slsDLINK_LIST * FieldDeclList
       }
 
       if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
-          clsNAME_SPACE * currentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
-
           if(currentSpace &&
              !gcmIS_SUCCESS(gcoOS_StrCmp(currentSpace->symbol, "_vxc_pyramid"))) {
                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
@@ -12758,19 +12956,30 @@ IN slsDLINK_LIST * FieldDeclList
           }
       }
 
-      if(clmDECL_IsStructOrUnion(declPtr) &&
-         gcmIS_SUCCESS(gcoOS_StrCmp(declPtr->dataType->u.fieldSpace->scopeName->symbol, "_vxc_pyramid"))) {
-         fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
-         gcmASSERT(fieldDecl);
-         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                         fieldDecl->field->lineNo,
-                                         fieldDecl->field->stringNo,
-                                         clvREPORT_ERROR,
-                                         "struct/union field '%s' cannot have '%s' type",
-                                         fieldDecl->field->symbol,
-                                         "vxc_pyramid"));
-          status = gcvSTATUS_INVALID_DATA;
-          break;
+      if(clmDECL_IsStructOrUnion(declPtr)) {
+         gctBOOL hasUnion = gcvFALSE;
+
+         gcmASSERT(currentSpace->scopeName);
+         gcmASSERT(clmDECL_IsStructOrUnion(&currentSpace->scopeName->decl));
+
+         if(clmDECL_IsStruct(declPtr)) {
+             hasUnion = declPtr->dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnionFields;
+         }
+         currentSpace->scopeName->u.typeInfo.hasUnionFields = clmDECL_IsUnion(declPtr) || hasUnion;
+
+         if(gcmIS_SUCCESS(gcoOS_StrCmp(declPtr->dataType->u.fieldSpace->scopeName->symbol, "_vxc_pyramid"))) {
+             fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
+             gcmASSERT(fieldDecl);
+             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                             fieldDecl->field->lineNo,
+                                             fieldDecl->field->stringNo,
+                                             clvREPORT_ERROR,
+                                             "struct/union field '%s' cannot have '%s' type",
+                                             fieldDecl->field->symbol,
+                                             "vxc_pyramid"));
+              status = gcvSTATUS_INVALID_DATA;
+              break;
+          }
       }
       if(clmDECL_IsImage(declPtr)) {
           fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
@@ -12891,6 +13100,7 @@ IN clsFieldDecl * FieldDecl
     return FieldDeclList;
 }
 
+
 clsFieldDecl *
 clParseFieldDecl(
 IN cloCOMPILER Compiler,
@@ -12903,18 +13113,55 @@ IN clsATTRIBUTE *Attr
     clsNAME *field;
     clsFieldDecl *fieldDecl;
     gctPOINTER pointer;
+    slsSLINK_LIST *ptrDscr = gcvNULL;
+    cltPOOL_STRING symbol;
+    gctUINT lineNo, stringNo;
 
-    gcmASSERT(Identifier);
+    if(Identifier == gcvNULL) {
+        clsNAME_SPACE *fieldSpace;
 
+        lineNo = cloCOMPILER_GetCurrentLineNo(Compiler);
+        stringNo = cloCOMPILER_GetCurrentStringNo(Compiler);
+        if(_RELAX_SYNTAX_FOR_EMBEDDED_UNNAMED_STRUCT_OR_UNION) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_WARN,
+                                           "non-compliant extension: unnamed struct/union field"));
+           status = cloCOMPILER_AllocatePoolString(Compiler,
+                                                   "",
+                                                   &symbol);
+           if (gcmIS_ERROR(status)) return gcvNULL;
+        }
+        else {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "syntax error: struct/union field name expected"));
+           return gcvNULL;
+        }
+
+        fieldSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+        gcmASSERT(fieldSpace && fieldSpace->scopeName);
+        gcmASSERT(clmDECL_IsStructOrUnion(&fieldSpace->scopeName->decl));
+        fieldSpace->scopeName->u.typeInfo.hasUnnamedFields = gcvTRUE;
+    }
+    else {
+        ptrDscr = Identifier->u.identifier.ptrDscr;
+        symbol = Identifier->u.identifier.name;
+        lineNo = Identifier->lineNo;
+        stringNo = Identifier->stringNo;
+    }
     status = cloCOMPILER_CreateName(Compiler,
-                    Identifier->lineNo,
-                    Identifier->stringNo,
-                    clvFIELD_NAME,
-                    gcvNULL,
-                    Identifier->u.identifier.name,
-                    Identifier->u.identifier.ptrDscr,
-                    clvEXTENSION_NONE,
-                    &field);
+                                    lineNo,
+                                    stringNo,
+                                    clvFIELD_NAME,
+                                    gcvNULL,
+                                    symbol,
+                                    ptrDscr,
+                                    clvEXTENSION_NONE,
+                                    &field);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     status = cloCOMPILER_Allocate(Compiler,
@@ -12942,9 +13189,9 @@ IN clsATTRIBUTE *Attr
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
                       "<FIELD line=\"%d\" string=\"%d\" name=\"%s\" />",
-                      Identifier->lineNo,
-                      Identifier->stringNo,
-                      Identifier->u.identifier.name));
+                      lineNo,
+                      stringNo,
+                      symbol));
     _ParseFillVariableAttr(Compiler, gcvNULL, field, Attr);
     return fieldDecl;
 }

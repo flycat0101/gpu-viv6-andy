@@ -198,6 +198,13 @@ typedef enum _sleOPCODE
 }
 sleOPCODE;
 
+typedef enum _sleOPCODE_RES_TYPE
+{
+    slvOPCODE_RES_TYPE_NONE             = 0x0,
+    slvOPCODE_RES_TYPE_FETCH            = 0x1,
+    slvOPCODE_RES_TYPE_FETCH_MS         = 0x2,
+} sleOPCODE_RES_TYPE;
+
 gctCONST_STRING
 slGetOpcodeName(
     IN sleOPCODE Opcode

@@ -103,7 +103,8 @@ __glChipFramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *framebufferObj,
     GLint attachIndex,
-    __GLrenderbufferObject *renderbufferObj
+    __GLrenderbufferObject *renderbufferObj,
+    __GLfboAttachPoint *preAttach
     );
 
 GLboolean
@@ -116,7 +117,8 @@ __glChipFramebufferTexture(
     GLint face,
     GLsizei samples,
     GLint zoffset,
-    GLboolean layered
+    GLboolean layered,
+    __GLfboAttachPoint *preAttach
     );
 
 GLvoid
@@ -158,6 +160,12 @@ gcChipTexMipSliceSyncFromShadow(
     );
 
 gceSTATUS
+gcChipRboSyncFromShadow(
+    __GLcontext* gc,
+    __GLrenderbufferObject *rbo
+    );
+
+gceSTATUS
 gcChipTexDirectSourceSyncFromMipSlice(
     __GLcontext *gc,
     __GLtextureObject *texObj
@@ -171,16 +179,35 @@ gcChipTexSyncFromShadow(
     );
 
 gceSTATUS
-gcChipTexShadowSyncFromMaster(
+gcChipFboSyncFromMasterSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     GLboolean read
     );
 
 gcsSURF_VIEW
-gcChipMasterSyncFromShadow(
+gcChipFboSyncFromShadowSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
+    GLboolean read
+    );
+
+gceSTATUS
+gcChipFboSyncFromShadow(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    );
+
+gceSTATUS
+gcChipFboSyncFromShadowFreon(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    );
+
+gceSTATUS
+gcChipFBOSyncEGLImageNativeBuffer(
+    __GLcontext *gc,
+    gcoSURF surface,
     GLboolean read
     );
 
@@ -223,18 +250,6 @@ __glChipBlitFramebufferEnd(
     __GLcontext *gc
     );
 
-gceSTATUS
-gcChipFramebufferMasterSyncFromShadow(
-    __GLcontext *gc,
-    __GLframebufferObject *fbo
-    );
-
-gceSTATUS
-gcChipFBOSyncEGLImageNativeBuffer(
-    __GLcontext *gc,
-    gcoSURF surface,
-    GLboolean read
-    );
-
 
 #endif /* __chip_fbo_h__ */
+

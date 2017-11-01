@@ -220,7 +220,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
     }
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn rpn softmax CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start1));
 
     start1 = gcfVX_PerfStart((vx_reference)node);
@@ -264,7 +264,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
     }
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn rpn reshape CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start1));
 
     start1 = gcfVX_PerfStart((vx_reference)node);
@@ -311,7 +311,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
         }
 
 #if defined(__linux__)
-        if (node->base.context->perfEnable)
+        if (node->base.context->options.enableCNNPerf)
             printf("fast rcnn rpn transform CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start1));
 
         start1 = gcfVX_PerfStart((vx_reference)node);
@@ -323,7 +323,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
     qsort ((void*)pProbBox, 17901, 5*sizeof(vx_float32), compare);
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn rpn sort CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start1));
 
     start = gcfVX_PerfStart((vx_reference)node);
@@ -336,7 +336,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
 #endif
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn rpn nms CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start1));
 #endif
 
@@ -378,7 +378,7 @@ vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1)
    //free(pProbBox);
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn rpn         CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
 
@@ -551,7 +551,7 @@ vx_status vxRCNNSoftEnd(vx_node node, vx_array src, vx_array src_bbox, vx_array 
     memcpy((void*)(bbox->memory.logicals[0] + batchIndex * NUM_ROI * 20 * 4 * sizeof(vx_float32)), (void*)pBox, NUM_ROI*20*4*sizeof(vx_float32));
 
 #if defined(__linux__)
-    if (node->base.context->perfEnable)
+    if (node->base.context->options.enableCNNPerf)
         printf("fast rcnn softend     CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
 

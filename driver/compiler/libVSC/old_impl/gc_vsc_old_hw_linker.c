@@ -226,7 +226,7 @@ static gctBOOL
 _IsChannelUsedForAttribute(
     IN gcLINKTREE Tree,
     IN gcLINKTREE_ATTRIBUTE Attribute,
-    IN gctUINT16 Index,
+    IN gctUINT32 Index,
     IN gcSL_SWIZZLE MatchSwizzle
     )
 {
@@ -2352,7 +2352,7 @@ _FindReference(
 
         /* Setup instruction. */
         instruction->temp        = target;
-        instruction->tempIndex   = (gctUINT16) (-1 - index);
+        instruction->tempIndex   = (-1 - index);
         instruction->tempIndexed = 0;
 
         /* Setup reference. */
@@ -2425,7 +2425,7 @@ _CompareInstruction(
     gctSOURCE_t source  = (SourceIndex == 0)
                              ? Source->source0
                              : Source->source1;
-    gctUINT16 index   = (SourceIndex == 0)
+    gctUINT32 index   = (SourceIndex == 0)
                              ? Source->source0Index
                              : Source->source1Index;
     gctUINT16 indexed = (SourceIndex == 0)
@@ -3012,6 +3012,9 @@ _GetSamplerKind(gcSHADER_TYPE SamplerType)
     case gcSHADER_SAMPLER_1D_ARRAY_SHADOW:
     case gcSHADER_SAMPLER_2D_ARRAY:
     case gcSHADER_SAMPLER_2D_ARRAY_SHADOW:
+    case gcSHADER_SAMPLER_2D_RECT:
+    case gcSHADER_SAMPLER_2D_RECT_SHADOW:
+    case gcSHADER_SAMPLER_1D_SHADOW:
         return gceTK_FLOAT;
 
     case gcSHADER_ISAMPLER_2D:
@@ -3019,6 +3022,9 @@ _GetSamplerKind(gcSHADER_TYPE SamplerType)
     case gcSHADER_ISAMPLER_BUFFER:
     case gcSHADER_ISAMPLER_CUBIC:
     case gcSHADER_ISAMPLER_2D_ARRAY:
+    case gcSHADER_ISAMPLER_2D_RECT:
+    case gcSHADER_ISAMPLER_1D_ARRAY:
+    case gcSHADER_ISAMPLER_1D:
         return gceTK_INT;
 
     case gcSHADER_USAMPLER_2D:
@@ -3026,6 +3032,9 @@ _GetSamplerKind(gcSHADER_TYPE SamplerType)
     case gcSHADER_USAMPLER_BUFFER:
     case gcSHADER_USAMPLER_CUBIC:
     case gcSHADER_USAMPLER_2D_ARRAY:
+    case gcSHADER_USAMPLER_2D_RECT:
+    case gcSHADER_USAMPLER_1D_ARRAY:
+    case gcSHADER_USAMPLER_1D:
         return gceTK_UINT;
 
     case gcSHADER_SAMPLER_2D_MS:
@@ -3135,6 +3144,8 @@ _MapNonSamplerUniforms(
         case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
         case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
         case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+        case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+        case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
             break;
 
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3278,6 +3289,8 @@ _MapNonSamplerUniforms(
                 case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
                 case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
                 case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+                case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+                case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
                     break;
 
                 case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3496,6 +3509,8 @@ _MapUniforms(
             case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
             case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
             case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+            case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+            case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
                 break;
 
             case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -4592,7 +4607,8 @@ _MapFragmentOutputs(
                 index = Tree->outputArray[i].tempHolding;
                 temp = &Tree->tempArray[index];
                 if(temp->assigned == -1) { /* not yet assigned */
-                   temp->assigned = CodeGen->registerCount - 1; /* use last register first,
+                    gcmASSERT(CodeGen->registerCount <= 0xFF);
+                   temp->assigned = (gctUINT16)(CodeGen->registerCount - 1); /* use last register first,
                                                                  * later patch to real register after
                                                                  * allocate all other registers */
                    temp->shift   = 0;
@@ -4927,7 +4943,7 @@ _AllocateRegisterForTemp(
         else if (Temp->isIndexing && ((Temp->variable->arrayLengthCount > 0) || gcmType_isMatrix(Temp->variable->u.type)))
         {
             gcVARIABLE variable = Temp->variable;
-            gctINT tempIndex = (gctINT)(Temp - Tree->tempArray);
+            gctINT32 tempIndex = (gctINT32)(Temp - Tree->tempArray);
             gctUINT components, rows = 0;
             gctINT i, arraySize = 1;
 
@@ -4942,7 +4958,7 @@ _AllocateRegisterForTemp(
             }
 
             count = arraySize * rows;
-            if (tempIndex != variable->tempIndex)
+            if (tempIndex != (gctINT)variable->tempIndex)
             {
                 Temp = Tree->tempArray + variable->tempIndex;
 
@@ -4986,8 +5002,8 @@ _AllocateRegisterForTemp(
     Temp->shift = 0;
     do
     {
-        gctUINT8 enable;
-
+        gctUINT8 enable, swizzle = (gctUINT8)Temp->swizzle;
+        gctINT assigned = Temp->assigned, shift = Temp->shift;
         /* Allocate physical register. */
         gcmERR_BREAK(
             _FindRegisterUsage(CodeGen->registerUsage,
@@ -4996,12 +5012,14 @@ _AllocateRegisterForTemp(
                        count,
                        (Temp->lastUse == -1) ? gcvSL_RESERVED : Temp->lastUse,
                        (Temp->lastUse == -1),
-                       &Temp->assigned,
-                       &Temp->swizzle,
-                       &Temp->shift,
+                       &assigned,
+                       &swizzle,
+                       &shift,
                        &enable,
                        0));
-
+        Temp->assigned = assigned;
+        Temp->swizzle  = swizzle;
+        Temp->shift    = shift;
         gcCGUpdateMaxRegister(CodeGen, Temp->assigned, Tree);
 
         if (gcSHADER_DumpCodeGenVerbose(Tree->shader))
@@ -11524,7 +11542,7 @@ _ResetAddressRegChannel(
 
                     for (mapIdx = 0; mapIdx < addRegColoring->countOfMap; mapIdx ++)
                     {
-                        if (addRegColoring->tmp2addrMap[mapIdx].indexedReg == function->arguments[k].index)
+                        if ((gctUINT32)addRegColoring->tmp2addrMap[mapIdx].indexedReg == function->arguments[k].index)
                         {
                             gcSL_ENABLE enable = (gcSL_ENABLE_X >>
                                 addRegColoring->tmp2addrMap[mapIdx].startChannelInIndexedReg);
@@ -11550,7 +11568,7 @@ _ResetAddressRegChannel(
 
         for (mapIdx = 0; mapIdx < addRegColoring->countOfMap; mapIdx ++)
         {
-            if (addRegColoring->tmp2addrMap[mapIdx].indexedReg == Instruction->tempIndex)
+            if ((gctUINT32)addRegColoring->tmp2addrMap[mapIdx].indexedReg == Instruction->tempIndex)
             {
                 gcSL_ENABLE enable = (gcSL_ENABLE_X >>
                                             addRegColoring->tmp2addrMap[mapIdx].startChannelInIndexedReg);
@@ -12037,7 +12055,7 @@ _ProcessDestination(
             gcmERR_BREAK(_gcmSetDest(Tree,
                                      CodeGen,
                                      States,
-                                     *(gctINT16_PTR) &instruction->tempIndex,
+                                     instruction->tempIndex,
                                      addrIndexed,
                                      gcmSL_TARGET_GET(target, Enable),
                                      gcmSL_TARGET_GET(target, Precision),
@@ -12050,7 +12068,7 @@ _ProcessDestination(
                 ? instruction->source0
                 : instruction->source1;
 
-            gctUINT16 sourceIndex = (match->sourceIndex == 0)
+            gctUINT32 sourceIndex = (match->sourceIndex == 0)
                 ? instruction->source0Index
                 : instruction->source1Index;
 
@@ -12287,7 +12305,7 @@ _ProcessSource(
                                        States,
                                        Source,
                                        gcSL_TEMP,
-                                       *(gctINT16_PTR) &instruction->tempIndex,
+                                       instruction->tempIndex,
                                        0,
                                        addrIndexed,
                                        swizzle,
@@ -12301,7 +12319,7 @@ _ProcessSource(
             gctSOURCE_t source = (match->sourceIndex == 0)
                 ? instruction->source0
                 : instruction->source1;
-            gctUINT16 index = (match->sourceIndex == 0)
+            gctUINT32 index = (match->sourceIndex == 0)
                 ? instruction->source0Index
                 : instruction->source1Index;
             gctINT indexed = (match->sourceIndex == 0)
@@ -12479,7 +12497,7 @@ _ProcessSampler(
     gcsSL_REFERENCE_PTR match = gcvNULL;
     gcSL_INSTRUCTION instruction;
     gceSTATUS status;
-    gctUINT16 index = 0;
+    gctUINT32 index = 0;
     gctUINT32 indexed = 0, swizzle = 0, relative = 0;
     gctUINT8 addrEnable = 0;
     gctINT32 arrayLoc = 0;
@@ -13006,7 +13024,7 @@ _getSourceConstant(
         gctSOURCE_t source = (match->sourceIndex == 0)
             ? instruction->source0
             : instruction->source1;
-        gctUINT16 index = (match->sourceIndex == 0)
+        gctUINT32 index = (match->sourceIndex == 0)
             ? instruction->source0Index
             : instruction->source1Index;
         gctINT16 indexed = (match->sourceIndex == 0)
@@ -13857,8 +13875,8 @@ _GenerateFunction(
            CodeGen->isDual16Shader) {
            if(CodeGen->usePosition) {
                if (gcmSL_OPCODE_GET(instruction->opcode, Opcode) != gcSL_NORM &&
-                   ((gcmSL_SOURCE_GET(instruction->source0, Type) == gcSL_ATTRIBUTE && instruction->source0Index == CodeGen->positionIndex) ||
-                   (gcmSL_SOURCE_GET(instruction->source1, Type) == gcSL_ATTRIBUTE && instruction->source1Index == CodeGen->positionIndex)) &&
+                   ((gcmSL_SOURCE_GET(instruction->source0, Type) == gcSL_ATTRIBUTE && instruction->source0Index == (gctUINT32)CodeGen->positionIndex) ||
+                   (gcmSL_SOURCE_GET(instruction->source1, Type) == gcSL_ATTRIBUTE && instruction->source1Index == (gctUINT32)CodeGen->positionIndex)) &&
                    _IsNotMulFracPattern(Tree, CodeGen, instruction, count)) { /* check for sources being gl_FragCoord */
                    gcATTRIBUTE attribute = Tree->shader->attributes[CodeGen->positionIndex];
                    gcmASSERT(attribute->inputIndex != -1);
@@ -16514,7 +16532,7 @@ _GenerateStates(
             Hints != gcvNULL &&
             gcGetVIRCGKind(Tree->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None)
         {
-            gctINT16 index[gcdMAX_DRAW_BUFFERS] = {-1, -1, -1, -1};
+            gctINT32 index[gcdMAX_DRAW_BUFFERS] = {-1, -1, -1, -1};
             gctINT outputCount = 0;
 
             if (!gcSHADER_IsHaltiCompiler(Tree->shader))
@@ -16523,7 +16541,7 @@ _GenerateStates(
                 {
                     if (Tree->shader->outputs[i] != gcvNULL && Tree->shader->outputs[i]->nameLength == gcSL_COLOR)
                     {
-                        index[0] = (gctINT16)Tree->shader->outputs[i]->tempIndex;
+                        index[0] = Tree->shader->outputs[i]->tempIndex;
                         outputCount++;
                         break;
                     }
@@ -16541,7 +16559,7 @@ _GenerateStates(
                             continue;
 
                         gcmASSERT(Tree->shader->outputLocations[i] < gcdMAX_DRAW_BUFFERS);
-                        index[Tree->shader->outputLocations[i]] = (gctINT16)Tree->shader->outputs[i]->tempIndex;
+                        index[Tree->shader->outputLocations[i]] = Tree->shader->outputs[i]->tempIndex;
                         outputCount++;
                     }
                 }
@@ -18533,6 +18551,8 @@ _GenerateStates(
                         case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
                         case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
                         case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+                        case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+                        case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
                             break;
 
                         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -19164,16 +19184,8 @@ _GetDefaultSamplerBaseOffset(
 **
 **  OUTPUT:
 **
-**      gctUINT32 * StateBufferSize
-**          Pointer to a variable receiving the number of bytes ni the state
-**          buffer.
-**
-**      gctPOINTER * StateBuffer
-**          Pointer to a variable receiving the state buffer pointer.
-**
-**      gcsHINT_PTR * Hints
-**          Pointer to a variable receiving a gcsHINT structure pointer that
-**          contains information required when loading the shader states.
+**      IN OUT gcsPROGRAM_STATE             *ProgramState
+**          Pointer to a variable receiving the program states
 */
 gceSTATUS
 gcLINKTREE_GenerateStates(
@@ -19181,14 +19193,11 @@ gcLINKTREE_GenerateStates(
     IN gceSHADER_FLAGS                  Flags,
     IN gcsSL_USAGE_PTR                  UniformUsage,
     IN gcsSL_CONSTANT_TABLE_PTR         ConstUsage,
-    IN OUT gctUINT32 *                  StateBufferSize,
-    IN OUT gctPOINTER *                 StateBuffer,
-    OUT gcsHINT_PTR *                   Hints
+    IN OUT gcsPROGRAM_STATE             *ProgramState
     )
 {
     gceSTATUS           status;
     gctSIZE_T           size;
-    gctUINT8 *          stateBuffer = gcvNULL;
     gctPOINTER          pointer = gcvNULL;
     gctUINT32           i;
     gctUINT32           vsSamplers, psSamplers;
@@ -19197,19 +19206,22 @@ gcLINKTREE_GenerateStates(
     gcLINKTREE          tree = *pTree;
     /* Extract the gcSHADER shader object. */
     gcSHADER            shader = tree->shader;
+    gcsHINT_PTR         hints;
+    gctUINT32           stateBufferSize;
+    gctUINT8 *          stateBuffer = gcvNULL;
 
     /* The common code generator structure. */
     gcsCODE_GENERATOR   codeGen = { (gceSHADER_FLAGS) 0 };
 
-    gcmHEADER_ARG("pTree=0x%x Flags=%d StateBufferSize=0x%x "
-                    "StateBuffer=0x%x Hints=0x%x",
-                    pTree, Flags, StateBufferSize,
-                    StateBuffer, Hints);
+    gcmHEADER_ARG("pTree=0x%x Flags=%d ProgramState=0x%x",
+                    pTree, Flags, ProgramState);
 
     /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(StateBufferSize != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(StateBuffer != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Hints != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(ProgramState != gcvNULL);
+
+    /* old hints and stateBufferSize */
+    hints = ProgramState->hints;
+    stateBufferSize = ProgramState->stateBufferSize;
 
     /* count the code in the shader */
     gcoOS_ZeroMemory(&codeInfo, gcmSIZEOF(codeInfo));
@@ -19499,7 +19511,7 @@ gcLINKTREE_GenerateStates(
     codeGen.isRegOutOfResource = gcvFALSE;
 
     /* Allocate a new hint structure. */
-    if (*Hints == gcvNULL)
+    if (hints == gcvNULL)
     {
         gctUINT i;
 
@@ -19508,52 +19520,52 @@ gcLINKTREE_GenerateStates(
                                     &pointer));
         gcoOS_ZeroMemory(pointer, gcmSIZEOF(struct _gcsHINT));
 
-        *Hints = pointer;
+        hints = pointer;
 
         for (i = 0; i < GC_ICACHE_PREFETCH_TABLE_SIZE; i++)
         {
-            (*Hints)->vsICachePrefetch[i] = -1;
-            (*Hints)->fsICachePrefetch[i] = -1;
-            (*Hints)->tcsICachePrefetch[i] = -1;
-            (*Hints)->tesICachePrefetch[i] = -1;
-            (*Hints)->gsICachePrefetch[i] = -1;
+            hints->vsICachePrefetch[i] = -1;
+            hints->fsICachePrefetch[i] = -1;
+            hints->tcsICachePrefetch[i] = -1;
+            hints->tesICachePrefetch[i] = -1;
+            hints->gsICachePrefetch[i] = -1;
         }
 
-        (*Hints)->unifiedStatus.instVSEnd           = -1;
-        (*Hints)->unifiedStatus.instPSStart         = -1;
-        (*Hints)->unifiedStatus.constGPipeEnd       = -1;
-        (*Hints)->unifiedStatus.constPSStart        = -1;
-        (*Hints)->unifiedStatus.samplerGPipeStart   = vsSamplersBase;
-        (*Hints)->unifiedStatus.samplerPSEnd        = vsSamplersBase - 1;
-        (*Hints)->psOutCntl0to3                     = -1;
-        (*Hints)->psOutCntl4to7                     = -1;
+        hints->unifiedStatus.instVSEnd           = -1;
+        hints->unifiedStatus.instPSStart         = -1;
+        hints->unifiedStatus.constGPipeEnd       = -1;
+        hints->unifiedStatus.constPSStart        = -1;
+        hints->unifiedStatus.samplerGPipeStart   = vsSamplersBase;
+        hints->unifiedStatus.samplerPSEnd        = vsSamplersBase - 1;
+        hints->psOutCntl0to3                     = -1;
+        hints->psOutCntl4to7                     = -1;
     }
 
     if (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
     {
-        (*Hints)->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] = codeGen.uniformBase * 4;
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] = codeGen.uniformBase * 4;
     }
     else
     {
-        (*Hints)->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] = codeGen.uniformBase * 4;
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] = codeGen.uniformBase * 4;
     }
 
 #if gcdUSE_WCLIP_PATCH
-    if (*Hints != gcvNULL && tree->shader->type == gcSHADER_TYPE_VERTEX)
+    if (hints != gcvNULL && tree->shader->type == gcSHADER_TYPE_VERTEX)
     {
-        (*Hints)->strictWClipMatch = tree->strictWClipMatch;
-        (*Hints)->MVPCount = tree->MVPCount;
+        hints->strictWClipMatch = tree->strictWClipMatch;
+        hints->MVPCount = tree->MVPCount;
 
-        (*Hints)->WChannelEqualToZ = tree->WChannelEqualToZ;
+        hints->WChannelEqualToZ = tree->WChannelEqualToZ;
     }
 #endif
 
-    gcmASSERT(*Hints != gcvNULL);
+    gcmASSERT(hints != gcvNULL);
 
     /* If VS or PS disable EarlyZ, we disable it for this program. */
-    if (shader->disableEarlyZ && *Hints)
+    if (shader->disableEarlyZ && hints)
     {
-        (*Hints)->disableEarlyZ = gcvTRUE;
+        hints->disableEarlyZ = gcvTRUE;
     }
 
     /* Map all attributes. */
@@ -19565,11 +19577,11 @@ gcLINKTREE_GenerateStates(
             if(codeGen.isDual16Shader &&
                _CheckForPhase0HighpPositionEnabled(tree, &codeGen))
             {
-                gcmONERROR(_MapAttributesDual16RAEnabled(tree, &codeGen, codeGen.registerUsage, *Hints));
+                gcmONERROR(_MapAttributesDual16RAEnabled(tree, &codeGen, codeGen.registerUsage, hints));
             }
             else
             {
-                gcmONERROR(_MapAttributesRAEnabled(tree, &codeGen, codeGen.registerUsage, *Hints));
+                gcmONERROR(_MapAttributesRAEnabled(tree, &codeGen, codeGen.registerUsage, hints));
             }
         }
         else
@@ -19577,11 +19589,11 @@ gcLINKTREE_GenerateStates(
             if(codeGen.isDual16Shader &&
                _CheckForPhase0HighpPositionEnabled(tree, &codeGen))
             {
-                gcmONERROR(_MapAttributesDual16(tree, &codeGen, codeGen.registerUsage, &attributeCount, *Hints));
+                gcmONERROR(_MapAttributesDual16(tree, &codeGen, codeGen.registerUsage, &attributeCount, hints));
             }
             else
             {
-                gcmONERROR(_MapAttributes(tree, &codeGen, codeGen.registerUsage, &attributeCount, *Hints));
+                gcmONERROR(_MapAttributes(tree, &codeGen, codeGen.registerUsage, &attributeCount, hints));
             }
         }
 
@@ -19687,7 +19699,7 @@ gcLINKTREE_GenerateStates(
 
         if (output != gcvNULL)
         {
-            gctUINT16 tempIndex = output->tempIndex;
+            gctUINT32 tempIndex = output->tempIndex;
 
             /* If the temp reg index is larger than the max temp reg,
             ** then this output is no used.
@@ -19713,13 +19725,13 @@ gcLINKTREE_GenerateStates(
         }
     }
 
-    (*Hints)->useDSX = (codeInfo.codeCounter[gcSL_DSX] != 0);
-    (*Hints)->useDSY = (codeInfo.codeCounter[gcSL_DSY] != 0);
-    (*Hints)->yInvertAware = (*Hints)->useFragCoord[1]   ||
-                             (*Hints)->useSamplePosition    ||
-                             (*Hints)->useFrontFacing    ||
-                             (*Hints)->usePointCoord[1]  ||
-                             (*Hints)->useDSY;
+    hints->useDSX = (codeInfo.codeCounter[gcSL_DSX] != 0);
+    hints->useDSY = (codeInfo.codeCounter[gcSL_DSY] != 0);
+    hints->yInvertAware = hints->useFragCoord[1]   ||
+                          hints->useSamplePosition ||
+                          hints->useFrontFacing    ||
+                          hints->usePointCoord[1]  ||
+                          hints->useDSY;
 
     /* If uniforms are not mapped before generating states, map them here. */
     if (UniformUsage == gcvNULL)
@@ -19731,7 +19743,7 @@ gcLINKTREE_GenerateStates(
                                 codeGen.maxUniform,
                                 codeGen.uniformBase,
                                 0, /* start index */
-                                *Hints
+                                hints
                                 ));
     }
 
@@ -19782,34 +19794,34 @@ gcLINKTREE_GenerateStates(
 
     /* Allocate a new state buffer. */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                *StateBufferSize + size,
+                                stateBufferSize + size,
                                 &pointer));
     stateBuffer = pointer;
 
     /* Copy the old state buffer if there is any. */
-    if (*StateBufferSize > 0)
+    if (stateBufferSize > 0)
     {
-        gcmASSERT(*StateBuffer != gcvNULL);
+        gcmASSERT(ProgramState->stateBuffer != gcvNULL);
 
-        gcoOS_MemCopy(stateBuffer, *StateBuffer, *StateBufferSize);
+        gcoOS_MemCopy(stateBuffer, ProgramState->stateBuffer, stateBufferSize);
     }
 
     /* set program stage bits */
     if (codeGen.clShader)
     {
-        gcsHINT_SetProgramStageBit(*Hints, gcvPROGRAM_STAGE_OPENCL);
+        gcsHINT_SetProgramStageBit(hints, gcvPROGRAM_STAGE_OPENCL);
     }
     else if (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
     {
-        gcsHINT_SetProgramStageBit(*Hints, gcvPROGRAM_STAGE_VERTEX);
+        gcsHINT_SetProgramStageBit(hints, gcvPROGRAM_STAGE_VERTEX);
     }
     else if (codeGen.shaderType == gcSHADER_TYPE_FRAGMENT)
     {
-        gcsHINT_SetProgramStageBit(*Hints, gcvPROGRAM_STAGE_FRAGMENT);
+        gcsHINT_SetProgramStageBit(hints, gcvPROGRAM_STAGE_FRAGMENT);
     }
     else if (codeGen.shaderType == gcSHADER_TYPE_COMPUTE)
     {
-        gcsHINT_SetProgramStageBit(*Hints, gcvPROGRAM_STAGE_COMPUTE);
+        gcsHINT_SetProgramStageBit(hints, gcvPROGRAM_STAGE_COMPUTE);
     }
 
     {
@@ -19878,8 +19890,8 @@ gcLINKTREE_GenerateStates(
             gcmASSERT(codeGen.shaderType == gcSHADER_TYPE_CL);
             stageIndex = gcvPROGRAM_STAGE_OPENCL;
         }
-        (*Hints)->memoryAccessFlags[stageIndex] = memoryAccessFlag;
-        (*Hints)->threadGroupSync = threadGroupSync;
+        hints->memoryAccessFlags[stageIndex] = memoryAccessFlag;
+        hints->threadGroupSync = threadGroupSync;
         /* The shader invocation control function is only available in compute shaders for OGL,
             * or OCL */
         if (threadGroupSync)
@@ -19890,12 +19902,12 @@ gcLINKTREE_GenerateStates(
         }
 
         /* Set sample base offset. */
-        (*Hints)->samplerBaseOffset[stageIndex] = _GetDefaultSamplerBaseOffset(codeGen.shaderType);
+        hints->samplerBaseOffset[stageIndex] = _GetDefaultSamplerBaseOffset(codeGen.shaderType);
     }
 
     if (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
     {
-        (*Hints)->shaderMode = gcvSHADING_SMOOTH;
+        hints->shaderMode = gcvSHADING_SMOOTH;
     }
     else
     {
@@ -19909,7 +19921,7 @@ gcLINKTREE_GenerateStates(
                  || tree->shader->attributes[i]->componentShadeMode[2] == gcSHADER_SHADER_FLAT
                  || tree->shader->attributes[i]->componentShadeMode[3] == gcSHADER_SHADER_FLAT)
                 {
-                    (*Hints)->shaderMode = gcvSHADING_FLAT_OPENGL;
+                    hints->shaderMode = gcvSHADING_FLAT_OPENGL;
                     break;
                 }
             }
@@ -19919,25 +19931,26 @@ gcLINKTREE_GenerateStates(
     if (codeGen.clShader || codeGen.computeShader)
     {
         /* Get the order of attributes. */
-        gcmONERROR(gcSHADER_QueryValueOrder(shader, &((*Hints)->valueOrder)));
+        gcmONERROR(gcSHADER_QueryValueOrder(shader, &(hints->valueOrder)));
     }
 
     /* Fill the state buffer. */
     gcmONERROR(_GenerateStates(tree,
                                &codeGen,
-                               stateBuffer + *StateBufferSize,
+                               stateBuffer + stateBufferSize,
                                &size,
-                               *Hints));
+                               hints));
 
     /* Free any old state buffer. */
-    if (*StateBufferSize > 0)
+    if (stateBufferSize > 0)
     {
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, *StateBuffer));
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, ProgramState->stateBuffer));
     }
 
     /* Set new state buffer. */
-    *StateBuffer      = stateBuffer;
-    *StateBufferSize += size;
+    ProgramState->stateBuffer = stateBuffer;
+    ProgramState->stateBufferSize = stateBufferSize + size;
+    ProgramState->hints = hints;
     stateBuffer       = gcvNULL;
 
 OnError:

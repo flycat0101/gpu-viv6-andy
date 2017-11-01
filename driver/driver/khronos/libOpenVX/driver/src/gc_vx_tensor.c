@@ -175,18 +175,30 @@ vxoTensor_GetDataSizeByFormat(
 
 VX_PRIVATE_API vx_uint32
 vxoTensor_CalculateDimOffsetByStarts(
-    vx_tensor_buffer_s * dim,
+    vx_tensor tensor,
     vx_uint32 starts[]
     )
 {
     vx_uint32 i, offset = 0;
 
-    for (i = 0; i < dim->memory.dimCount; i++)
+    for (i = 0; i < TENSOR_DIM_NUM(tensor); i++)
     {
-        offset += starts[i] * dim->memory.strides[0][i];
+        offset += starts[i] * TENSOR_STRIDE_INDEX(tensor, i);
     }
 
     return offset;
+}
+
+VX_PRIVATE_API vx_uint32
+vxoTensor_CalculateMaxMemorySize(
+    vx_tensor tensor
+    )
+{
+    vx_uint32 dnum;
+
+    dnum = TENSOR_DIM_NUM(tensor);
+
+    return TENSOR_STRIDE_INDEX(tensor, dnum-1) * TENSOR_VIEW_SIZE_INDEX(tensor, dnum-1);
 }
 
 VX_PRIVATE_API void
@@ -238,15 +250,15 @@ vxoTensor_RectIsIn3DTensorRange(
 {
     vx_uint32 dimx, dimy, dimz;
 
-    dimz = tensor->viewRegion.viewEnds[2] - tensor->viewRegion.viewStarts[2];
+    dimz = TENSOR_VIEW_SIZE_INDEX(tensor, 2);
 
     if (array_size > dimz)
     {
         return vx_false_e;
     }
 
-    dimx = tensor->viewRegion.viewEnds[0] - tensor->viewRegion.viewStarts[0];
-    dimy = tensor->viewRegion.viewEnds[1] - tensor->viewRegion.viewStarts[1];
+    dimx = TENSOR_VIEW_SIZE_INDEX(tensor, 0);
+    dimy = TENSOR_VIEW_SIZE_INDEX(tensor, 1);
 
     if (rect.end_x > dimx ||
         rect.end_y > dimy)
@@ -271,10 +283,11 @@ VX_PRIVATE_API vx_tensor
 vxoTensor_Create(
     vx_context context,
     vx_uint32 numOfDims,
-    vx_uint32 *sizes,
+    vx_uint32 * sizes,
     vx_enum dataFormat,
     vx_view_region_s * viewRegion,
     vx_tensor_buffer_s * tensorBuffer,
+    vx_uint32 baseOffset,
     vx_enum tensorType
     )
 {
@@ -284,11 +297,11 @@ vxoTensor_Create(
     tensor = (vx_tensor)vxoReference_Create(context, VX_TYPE_TENSOR, VX_REF_EXTERNAL, &context->base);
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) goto OnError;
 
+    elementSize = vxoTensor_GetDataSizeByFormat(dataFormat);
+    if (!elementSize) goto OnError;
+
     if (tensorType != VX_TENSOR_SHARED)
     {
-        elementSize = vxoTensor_GetDataSizeByFormat(dataFormat);
-        if (!elementSize) goto OnError;
-
         tensor->tensorBuffer = vxAllocateAndZeroMemory(sizeof(vx_tensor_buffer_s));
         if (tensor->tensorBuffer == VX_NULL) goto OnError;
 
@@ -296,18 +309,27 @@ vxoTensor_Create(
         tensor->tensorBuffer->elementSize = elementSize;
 
         tensor->tensorBuffer->memory.planeCount = 1;
-        tensor->tensorBuffer->memory.dimCount = numOfDims;
+        tensor->tensorBuffer->memory.dimCount = tensor->dimCount = numOfDims;
 
         tensor->viewRegion.dimCount = numOfDims;
+        tensor->baseAddressOffset = 0;
 
         for (i = 0; i < numOfDims; i++)
         {
-            tensor->tensorBuffer->memory.dims[0][i] = sizes[i];
-            tensor->tensorBuffer->memory.strides[0][i] =
+            tensor->tensorBuffer->memory.dims[0][i] = tensor->dims[i] = sizes[i];
+            tensor->tensorBuffer->memory.strides[0][i] = tensor->strides[i] =
                 i ? sizes[i-1] * tensor->tensorBuffer->memory.strides[0][i-1]: elementSize;
 
             tensor->viewRegion.viewStarts[i] = 0;
             tensor->viewRegion.viewEnds[i] = sizes[i];
+        }
+
+        /* set the left dimensions to 1 */
+        for (; i< VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+        {
+            tensor->tensorBuffer->memory.dims[0][i] = tensor->dims[i] = 1;
+            tensor->viewRegion.viewStarts[i] = 0;
+            tensor->viewRegion.viewEnds[i] = 1;
         }
 
         if (tensorType == VX_TENSOR_VIRTUAL)
@@ -315,19 +337,71 @@ vxoTensor_Create(
             tensor->isVirtual = vx_true_e;
         }
     }
-    else if (tensorBuffer && viewRegion)
+    else if (tensorBuffer != VX_NULL)
     {
+        /* create from view or reshape */
+        tensor->dimCount = numOfDims;
+        tensor->viewRegion.dimCount = numOfDims;
+
+        for (i = 0; i < numOfDims; i++)
+        {
+            tensor->dims[i] = sizes[i];
+            tensor->strides[i] = i ? sizes[i-1] * tensor->strides[i-1] : elementSize;
+            tensor->viewRegion.viewStarts[i] = 0;
+            tensor->viewRegion.viewEnds[i] = sizes[i];
+        }
+
+        /* set the left dimensions to 1 */
+        for (; i< VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+        {
+            tensor->dims[i] = 1;
+            tensor->viewRegion.viewStarts[i] = 0;
+            tensor->viewRegion.viewEnds[i] = 1;
+        }
+
         tensor->tensorBuffer = tensorBuffer;
-        vxMemCopy(&tensor->viewRegion, viewRegion, sizeof(vx_view_region_s));
         tensor->isVirtual = vx_false_e;
-        tensor->isViewed = vx_true_e;
+        tensor->baseAddressOffset = baseOffset;
+
+        if (viewRegion != VX_NULL)
+        {
+            vxMemCopy(&tensor->viewRegion, viewRegion, sizeof(vx_view_region_s));
+            tensor->isViewed = vx_true_e;
+        }
     }
     else
     {
         goto OnError;
     }
 
+    if (tensorType == VX_TENSOR_SHARED) tensor->tensorBuffer->memRefCount++;
     tensor->tensorBuffer->bufRefCount++;
+
+    tensor->tensorBuffer->roundingMode = (tensor->tensorBuffer->dataFormat == VX_TYPE_INT8) ? VX_NN_ROUNDING_MODE_RTNE : VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
+
+    if (tensor->base.context->options.nnRoundingMode)
+    {
+        gctSTRING env = tensor->base.context->options.nnRoundingMode;
+        if (env)
+        {
+            if (gcoOS_StrCmp(env, "SIMPLE") == 0)
+            {
+                tensor->tensorBuffer->roundingMode = VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
+            }
+            else if (gcoOS_StrCmp(env, "RTNE") == 0)
+            {
+                tensor->tensorBuffer->roundingMode = VX_NN_ROUNDING_MODE_RTNE;
+            }
+            else if (gcoOS_StrCmp(env, "RTZ") == 0)
+            {
+                tensor->tensorBuffer->roundingMode = VX_NN_ROUNDING_MODE_RTZ;
+            }
+            else if (gcoOS_StrCmp(env, "RTNI") == 0)
+            {
+                tensor->tensorBuffer->roundingMode = VX_NN_ROUNDING_MODE_RTNI;
+            }
+        }
+    }
 
     return tensor;
 
@@ -358,7 +432,7 @@ vxoTensor_CheckValidTensorView(
     if (!vxoTensor_IsValidTensor(tensor)) return vx_false_e;
     if (!vxoTensor_IsValidView(view)) return vx_false_e;
 
-    if (TENSOR_DIM_NUM(tensor) != TENSOR_VIEW_DIM_NUM(tensor))
+    if (TENSOR_DIM_NUM(tensor) != view->viewRegion.dimCount)
     {
         vxError("The tensor dim %d is not equal to view dim %d",
                  TENSOR_DIM_NUM(tensor), TENSOR_VIEW_DIM_NUM(tensor));
@@ -420,7 +494,7 @@ vxoTensor_CheckValidTensorAddressing(
 
     for (i = 0; i < TENSOR_DIM_NUM(tensor); i++)
     {
-        if (addressing->dimSizesUser[i] < tensor->viewRegion.viewEnds[i])
+        if (addressing->dimSizesUser[i] > TENSOR_VIEW_SIZE_INDEX(tensor, i))
         {
             vxError("The %dth addressing dim size %d is beyond tensor orignal range %d",
                      i, addressing->dimSizesUser[i], tensor->viewRegion.viewEnds[i]);
@@ -450,7 +524,7 @@ vxoTensor_CheckValidViewAddressing(
 
     for (i = 0; i < view->viewRegion.dimCount; i++)
     {
-        if (view->viewRegion.viewStarts[i] - view->viewRegion.viewEnds[i] != addressing->dimSizesUser[i])
+        if (view->viewRegion.viewEnds[i] - view->viewRegion.viewStarts[i] != addressing->dimSizesUser[i])
         {
             vxError("The %dth addressing size %d is not equel to view range [%d - %d]",
                      i, addressing->dimSizesUser[i], view->viewRegion.viewStarts[i], view->viewRegion.viewEnds[i]);
@@ -520,30 +594,46 @@ vxoTensor_CopyTensorPatchEx(
     vx_enum dstType
     )
 {
-    vx_uint32 i;
+    vx_uint32 max = curDim, stack[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint8_ptr srcs[VX_CONTEXT_TENSOR_MAX_DIMENSION], dsts[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_bool back = vx_false_e;
 
-    if (!curDim)
+    for (;;)
     {
-        vxoTensor_LineCopyConvert(
-            src, dst,
-            srcType, dstType,
-            sizes[curDim]
-            );
-    }
-    else
-    {
-        for (i = 0; i < sizes[curDim]; i++)
+        srcs[curDim] = src;
+        dsts[curDim] = dst;
+
+        if (!curDim)
         {
-            vxoTensor_CopyTensorPatchEx(
+            vxoTensor_LineCopyConvert(
                 src, dst,
-                curDim - 1,
-                sizes,
-                srcStrides, dstStrides,
-                srcType, dstType
+                srcType, dstType,
+                sizes[curDim]
                 );
-
-            src += srcStrides[curDim];
-            dst += dstStrides[curDim];
+            stack[++curDim]++;
+            if (curDim > max) break;
+            back = vx_true_e;
+        }
+        else if (!back)
+        {
+            curDim--;
+        }
+        else
+        {
+            if (stack[curDim] < sizes[curDim])
+            {
+                src += srcStrides[curDim];
+                dst += dstStrides[curDim];
+                back = vx_false_e;
+            }
+            else
+            {
+                stack[curDim] = 0;
+                stack[++curDim]++;
+                if (curDim > max) break;
+                src = srcs[curDim];
+                dst = dsts[curDim];
+            }
         }
     }
 }
@@ -596,7 +686,7 @@ vxoTensor_CopyTensorPatch(
          *       Initialize it to tensor format if same size.
          *       Otherwise init it to float32 or float16 first.
          */
-        if (usrElemSize == dim->elementSize) usrDataFormat = dim->dataFormat;
+        if (usrElemSize == dim->elementSize) usrDataFormat = TENSOR_DATA_TYPE(tensor);
         else if (usrElemSize == 4) usrDataFormat = VX_TYPE_FLOAT32;
         else if (usrElemSize == 2) usrDataFormat = VX_TYPE_FLOAT16;
         else return VX_ERROR_NOT_SUPPORTED;
@@ -604,12 +694,12 @@ vxoTensor_CopyTensorPatch(
         if (view != VX_NULL)
         {
             vxoTensor_MergeTwoViews(&tensor->viewRegion, &view->viewRegion, &viewMerged.viewRegion);
-            offset = vxoTensor_CalculateDimOffsetByStarts(tensor->tensorBuffer, viewMerged.viewRegion.viewStarts);
+            offset = vxoTensor_CalculateDimOffsetByStarts(tensor, viewMerged.viewRegion.viewStarts);
             vxoTensor_CalculateSizesFromViewRegion(&viewMerged.viewRegion, sizes);
         }
         else
         {
-            offset = vxoTensor_CalculateDimOffsetByStarts(tensor->tensorBuffer, tensor->viewRegion.viewStarts);
+            offset = vxoTensor_CalculateDimOffsetByStarts(tensor, tensor->viewRegion.viewStarts);
             vxoTensor_CalculateSizesFromViewRegion(&tensor->viewRegion, sizes);
         }
 
@@ -624,7 +714,7 @@ vxoTensor_CopyTensorPatch(
                 sizes,
                 (vx_uint32*)TENSOR_STRIDES(tensor),
                 user_addr->dimStridesUser,
-                tensor->tensorBuffer->dataFormat,
+                TENSOR_DATA_TYPE(tensor),
                 usrDataFormat
                 );
         }
@@ -638,7 +728,7 @@ vxoTensor_CopyTensorPatch(
                 user_addr->dimStridesUser,
                 (vx_uint32*)TENSOR_STRIDES(tensor),
                 usrDataFormat,
-                tensor->tensorBuffer->dataFormat
+                TENSOR_DATA_TYPE(tensor)
                 );
         }
         else
@@ -685,7 +775,7 @@ vxoTensor_CreateImageArray(
     imageArray->base.scope = (vx_reference)tensor;
 
     if (vxoTensor_GetTensorBaseMemory(tensor, (gctPOINTER*)&logical, &physical) != VX_SUCCESS) goto exit;
-    offset = vxoTensor_CalculateDimOffsetByStarts(tensor->tensorBuffer, tensor->viewRegion.viewStarts);
+    offset = vxoTensor_CalculateDimOffsetByStarts(tensor, tensor->viewRegion.viewStarts);
     logical += offset;
     physical += offset;
 
@@ -743,7 +833,7 @@ vxoTensor_CreateImageFromTensor(
     if (vxoTensor_CheckAllocateMemory(tensor) != VX_SUCCESS) goto exit;
 
     if (vxoTensor_GetTensorBaseMemory(tensor, (gctPOINTER*)&logical, &physical) != VX_SUCCESS) goto exit;
-    offset = vxoTensor_CalculateDimOffsetByStarts(tensor->tensorBuffer, tensor->viewRegion.viewStarts);
+    offset = vxoTensor_CalculateDimOffsetByStarts(tensor, tensor->viewRegion.viewStarts);
     logical += offset;
     physical += offset;
 
@@ -760,11 +850,66 @@ vxoTensor_CreateImageFromTensor(
         if (vxoReference_GetStatus((vx_reference) image) != VX_SUCCESS) goto exit;
     }
 
-
     return image;
 
 exit:
     return VX_NULL;
+}
+
+VX_PRIVATE_API vx_bool
+vxoTensor_FillDimBuffer(
+    vx_tensor  tensor,
+    vx_int32*  dbuff,
+    vx_uint32  bufsize,
+    vx_uint32* dims
+    )
+{
+    vx_uint32 dsize, i;
+    vx_uint64 omul = 1;
+    vx_bool contiguous = vx_true_e;
+
+    dsize = TENSOR_DIM_NUM(tensor);
+
+    for (i = 0; i < dsize; i++)
+    {
+        omul *= TENSOR_VIEW_SIZE_INDEX(tensor, i);
+        if (i < dsize-1 && tensor->viewRegion.viewStarts[i]) contiguous = vx_false_e;
+    }
+
+    /* only support tensor with contiguous memory to reshape now */
+    if (!contiguous && dsize != bufsize)
+        return vx_false_e;
+
+    if (bufsize == 1 && dbuff[0] == -1)
+    {
+        dims[0] = (vx_uint32)omul;
+    }
+    else
+    {
+        vx_uint64 nmul = 1;
+        vx_int32 pos = -1;
+
+        for (i = 0; i < bufsize; i++)
+        {
+            if (dbuff[i] == -1)
+            {
+                if (pos >= 0) return vx_false_e;
+                pos = i;
+                continue;
+            }
+
+            dims[i] = dbuff[i];
+            nmul *=  dbuff[i];
+        }
+
+        if (pos >= 0)
+        {
+            if (omul % nmul) return vx_false_e;
+            else dims[pos] = (vx_uint32)(omul / nmul);
+        }
+    }
+
+    return vx_true_e;
 }
 
 /*****************************/
@@ -864,17 +1009,26 @@ vxCreateTensorFromView(
 {
     vx_tensor childTensor;
     vx_context context;
+    vx_uint32 offset = 0;
 
     if (!vxoTensor_CheckValidTensorView(tensor, view)) return VX_NULL;
 
     context = GET_CONTEXT(tensor);
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
+    if (tensor->isViewed)
+    {
+        offset = vxoTensor_CalculateDimOffsetByStarts(tensor, tensor->viewRegion.viewStarts);
+    }
+
     childTensor = vxoTensor_Create(
                     context,
-                    0, VX_NULL, 0,
+                    TENSOR_DIM_NUM(tensor),
+                    TENSOR_SIZES(tensor),
+                    TENSOR_DATA_TYPE(tensor),
                     &view->viewRegion,
                     tensor->tensorBuffer,
+                    tensor->baseAddressOffset + offset,
                     VX_TENSOR_SHARED
                     );
 
@@ -1037,6 +1191,40 @@ vxCreateImageObjectArrayFromTensor(
     return vxoTensor_CreateImageArray(tensor, rect, array_size, stride, image_format);
 }
 
+VX_API_ENTRY vx_tensor VX_API_CALL
+vxReshapeTensor(
+    vx_tensor    tensor,
+    vx_int32*    num_of_dims,
+    vx_uint32    sizes
+    )
+{
+    vx_uint32 newDims[VX_CONTEXT_TENSOR_MAX_DIMENSION], offset = 0;
+
+    vx_context context = GET_CONTEXT(tensor);
+    if (!vxoContext_IsValid(context)) return VX_NULL;
+
+    if (!vxoTensor_IsValidTensor(tensor)) return VX_NULL;
+
+    if (!vxoTensor_FillDimBuffer(tensor, num_of_dims, sizes, newDims))
+        return VX_NULL;
+
+    if (tensor->isViewed)
+    {
+        offset = vxoTensor_CalculateDimOffsetByStarts(tensor, tensor->viewRegion.viewStarts);
+    }
+
+    return vxoTensor_Create(
+                context,
+                sizes,
+                newDims,
+                TENSOR_DATA_TYPE(tensor),
+                VX_NULL,
+                tensor->tensorBuffer,
+                tensor->baseAddressOffset + offset,
+                VX_TENSOR_SHARED
+                );
+}
+
 VX_API_ENTRY vx_status VX_API_CALL
 vxQueryTensor(
     vx_tensor tensor,
@@ -1045,36 +1233,44 @@ vxQueryTensor(
     vx_size size
     )
 {
-    vx_tensor_buffer_s * buffer;
-
     if (!vxoTensor_IsValidTensor(tensor)) return VX_ERROR_INVALID_REFERENCE;
-
-    buffer = tensor->tensorBuffer;
 
     switch (attribute)
     {
         case VX_TENSOR_NUM_OF_DIMS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
-            *(vx_uint32 *)ptr = buffer->memory.dimCount;
+            *(vx_uint32 *)ptr = TENSOR_DIM_NUM(tensor);
             break;
 
         case VX_TENSOR_DIMS:
-            if (size < sizeof(vx_uint32) * buffer->memory.dimCount ||
+            if (size < sizeof(vx_uint32) * TENSOR_DIM_NUM(tensor) ||
                 size > sizeof(vx_uint32) * VX_CONTEXT_TENSOR_MAX_DIMENSION)
             {
                 return VX_ERROR_INVALID_PARAMETERS;
             }
-            vxMemCopy(ptr, buffer->memory.dims[0], size);
+            if (tensor->isViewed)
+            {
+                vx_uint32 i;
+
+                for (i = 0; i < TENSOR_DIM_NUM(tensor); i++)
+                {
+                    *((vx_uint32*)ptr + i) = TENSOR_VIEW_SIZE_INDEX(tensor, i);
+                }
+            }
+            else
+            {
+                vxMemCopy(ptr, TENSOR_SIZES(tensor), size);
+            }
             break;
 
         case VX_TENSOR_DATA_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
-            *(vx_uint32 *)ptr = buffer->dataFormat;
+            *(vx_uint32 *)ptr = TENSOR_DATA_TYPE(tensor);
             break;
 
         case VX_TENSOR_FIXED_POINT_POS:
             vxmVALIDATE_PARAMETERS_EX(ptr, size, vx_uint8);
-            *(vx_uint8 *)ptr = buffer->fixedPointPos;
+            *(vx_uint8 *)ptr = TENSOR_POS(tensor);
             break;
 
         default:
@@ -1183,8 +1379,8 @@ vxoTensor_GetTensorBaseMemory(
         return VX_ERROR_NOT_ALLOCATED;
     }
 
-    if (logical) *logical = TENSOR_LOGICAL_ADDR(tensor);
-    if (physical) *physical = TENSOR_PHYSICAL_ADDR(tensor);
+    if (logical) *logical = TENSOR_LOGICAL_ADDR(tensor) + tensor->baseAddressOffset;
+    if (physical) *physical = TENSOR_PHYSICAL_ADDR(tensor) + tensor->baseAddressOffset;
 
     return VX_SUCCESS;
 }
@@ -1202,9 +1398,9 @@ vxoTensor_GetTensorViewMemory(
     {
         vx_uint32 dimIndex = 0;
         vx_uint32 viewOffset = 0;
-        for (dimIndex = 0; dimIndex < tensor->viewRegion.dimCount; dimIndex++)
+        for (dimIndex = 0; dimIndex < TENSOR_VIEW_DIM_NUM(tensor); dimIndex++)
         {
-            viewOffset += tensor->viewRegion.viewStarts[dimIndex] * tensor->tensorBuffer->memory.strides[0][dimIndex];
+            viewOffset += tensor->viewRegion.viewStarts[dimIndex] * TENSOR_STRIDE_INDEX(tensor, dimIndex);;
         }
 
         if (logical) *logical = (vx_uint8_ptr)*logical + viewOffset;
@@ -1215,6 +1411,74 @@ vxoTensor_GetTensorViewMemory(
 }
 
 VX_INTERNAL_API vx_status
+vxoTensor_GetTensorSize(
+    vx_tensor tensor,
+    vx_uint32 *size
+    )
+{
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if (size != VX_NULL)
+    {
+        if (tensor->isViewed)
+        {
+            vx_uint32 index;
+            vx_uint32 elementCount = 1;
+
+            for (index = 0; index < TENSOR_VIEW_DIM_NUM(tensor); index++)
+            {
+                elementCount *= TENSOR_VIEW_SIZE_INDEX(tensor, index);
+            }
+
+            *size =  elementCount * vxoTensor_GetDataSizeByFormat(TENSOR_DATA_TYPE(tensor));
+        }
+        else
+        {
+            *size = (vx_uint32)vxoMemory_ComputeElementCount(&tensor->tensorBuffer->memory, 0) * vxoTensor_GetDataSizeByFormat(TENSOR_DATA_TYPE(tensor));
+        }
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status
+vxoTensor_GetTensorElementCount(
+    vx_tensor tensor,
+    vx_uint32 *count
+    )
+{
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if(count != NULL)
+    {
+        vx_uint32 elementCount = 1;
+        if(tensor->isViewed)
+        {
+            vx_uint32 index;
+
+            for(index = 0; index < TENSOR_VIEW_DIM_NUM(tensor); index++)
+            {
+                elementCount *= TENSOR_VIEW_SIZE_INDEX(tensor, index);
+            }
+        }
+        else
+        {
+            elementCount = (vx_uint32)vxoMemory_ComputeElementCount(&tensor->tensorBuffer->memory, 0);
+        }
+        *count = elementCount;
+    }
+
+    return VX_SUCCESS;
+}
+
+
+VX_INTERNAL_API vx_status
 vxoTensor_GetTensorDimStride(
     vx_tensor tensor,
     vx_uint32 * count,
@@ -1222,6 +1486,8 @@ vxoTensor_GetTensorDimStride(
     vx_uint32 * strides
     )
 {
+    vx_uint32 i;
+
     if (!vxoTensor_IsValidTensor(tensor))
     {
         return VX_ERROR_INVALID_REFERENCE;
@@ -1232,7 +1498,7 @@ vxoTensor_GetTensorDimStride(
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    if (*count && *count > TENSOR_DIM_NUM(tensor))
+    if (*count && *count > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         return VX_ERROR_INVALID_PARAMETERS;
     }
@@ -1244,10 +1510,20 @@ vxoTensor_GetTensorDimStride(
 
     if (sizes != VX_NULL)
     {
-        vxMemCopy(sizes, TENSOR_SIZES(tensor), *count * sizeof(vx_uint32));
+        if (tensor->isViewed)
+        {
+            for (i = 0; i < *count; i++)
+            {
+                sizes[i] = TENSOR_VIEW_SIZE_INDEX(tensor, i);
+            }
+        }
+        else
+        {
+            vxMemCopy(sizes, TENSOR_SIZES(tensor), *count * sizeof(vx_uint32));
+        }
     }
 
-    if (strides)
+    if (strides != VX_NULL)
     {
         vxMemCopy(strides, TENSOR_STRIDES(tensor), *count * sizeof(vx_uint32));
     }
@@ -1273,7 +1549,7 @@ vxoTensor_GetTensorViewRegion(
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    if (count > tensor->viewRegion.dimCount)
+    if (count > TENSOR_VIEW_DIM_NUM(tensor))
     {
         return VX_ERROR_INVALID_PARAMETERS;
     }
@@ -1306,6 +1582,7 @@ vxoTensor_CreateTensor(
                 data_format,
                 VX_NULL,
                 VX_NULL,
+                0,
                 is_virtual ? VX_TENSOR_VIRTUAL : VX_TENSOR_NORMAL
                 );
 }
@@ -1365,21 +1642,32 @@ vxoTensor_ReleaseMemory(
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_tensor_buffer_s* vxoTensor_LocateView(
-    vx_tensor tensor,
-    vx_view_region_s *viewRegion
+VX_INTERNAL_API vx_bool
+vxoTensor_IsOverlap(
+    vx_tensor tensor1,
+    vx_tensor tensor2
     )
 {
-    if (!vxoTensor_IsValidTensor(tensor))
+    vx_uint32 start1, end1, start2, end2;
+
+    if (!vxoTensor_IsValidTensor(tensor1) ||
+        !vxoTensor_IsValidTensor(tensor2))
     {
-        return VX_NULL;
+        return vx_false_e;
     }
 
-    if (viewRegion != VX_NULL)
+    if (tensor1->tensorBuffer == tensor2->tensorBuffer)
     {
-        vxMemCopy(viewRegion, &tensor->viewRegion, sizeof(vx_view_region_s));
+        start1 = tensor1->baseAddressOffset + vxoTensor_CalculateDimOffsetByStarts(tensor1, tensor1->viewRegion.viewStarts);
+        end1   = start1 + vxoTensor_CalculateMaxMemorySize(tensor1) - 1;
+        start2 = tensor2->baseAddressOffset + vxoTensor_CalculateDimOffsetByStarts(tensor2, tensor2->viewRegion.viewStarts);
+        end2   = start2 + vxoTensor_CalculateMaxMemorySize(tensor2) - 1;
+
+        if (end1 < start2 || end2 < start1) return vx_false_e;
+        else return vx_true_e;
     }
 
-    return tensor->tensorBuffer;
+    return vx_false_e;
 }
+
 

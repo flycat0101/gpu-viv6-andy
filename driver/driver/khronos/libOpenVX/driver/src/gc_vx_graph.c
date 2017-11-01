@@ -89,7 +89,7 @@ VX_PRIVATE_API vx_uint32 vxoGraph_GetNextNodeIndex(vx_graph graph, vx_uint32 nod
 VX_PRIVATE_API vx_bool vxoReference_HasWriteDependency(vx_reference ref1, vx_reference ref2)
 {
     if (ref1 == VX_NULL || ref2 == VX_NULL) return vx_false_e;
-    if ((ref1->type != VX_TYPE_TENSOR && ref2->type != VX_TYPE_TENSOR) && (ref1 == ref2)) return (((vx_array)ref1)->base.isStage)?vx_false_e:vx_true_e;/*if is staging reference, skip dependency checking*/
+    if (ref1 == ref2) return (((vx_array)ref1)->base.isStage)?vx_false_e:vx_true_e;/*if is staging reference, skip dependency checking*/
 
     if (ref1->type == VX_TYPE_PYRAMID && ref2->type == VX_TYPE_IMAGE)
     {
@@ -128,40 +128,7 @@ VX_PRIVATE_API vx_bool vxoReference_HasWriteDependency(vx_reference ref1, vx_ref
     }
     else if (ref1->type == VX_TYPE_TENSOR && ref2->type == VX_TYPE_TENSOR)
     {
-
-        vx_view_region_s viewRegion1, viewRegion2;
-        vx_tensor_buffer_s* tensorBuf1, *tensorBuf2;
-        tensorBuf1 = vxoTensor_LocateView((vx_tensor)ref1, &viewRegion1);
-        tensorBuf2 = vxoTensor_LocateView((vx_tensor)ref2, &viewRegion2);
-
-        if (tensorBuf1 == tensorBuf2)
-        {
-            if (viewRegion1.dimCount == viewRegion2.dimCount)
-            {
-                vx_uint32 dimIndex = viewRegion1.dimCount - 1;
-                vx_bool isInterCross = vx_false_e;
-
-                do
-                {
-                    vx_bool result = vx_false_e;
-                    if ((viewRegion1.viewStarts[dimIndex] < viewRegion2.viewEnds[dimIndex])
-                        && (viewRegion1.viewEnds[dimIndex] > viewRegion2.viewStarts[dimIndex]))
-                    {
-                        result = vx_true_e;
-                    }
-
-                    isInterCross = (vx_bool)(isInterCross && result);
-
-                    dimIndex--;
-                }while (dimIndex > 0);
-
-                if (isInterCross)
-                {
-                    return vx_true_e;
-                }
-
-            }
-        }
+        return vxoTensor_IsOverlap((vx_tensor)ref1, (vx_tensor)ref2);
     }
 
     return vx_false_e;
@@ -261,6 +228,9 @@ VX_PRIVATE_API vx_status vxoGraph_Traverse(
 
     currentNode = graph->nodeTable[currentNodeIndex];
     vxmASSERT(currentNode);
+
+    if (currentNode->visited)
+        return VX_SUCCESS;
 
     for (paramIndex = 0; paramIndex < currentNode->kernel->signature.paramCount; paramIndex++)
     {
@@ -440,6 +410,9 @@ VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTable(vx_graph graph)
                 vx_reference    possibleParamRef    = possibleNextNode->paramTable[possibleParamIndex];
                 vx_direction_e  paramDirTable[]     = {VX_OUTPUT, VX_BIDIRECTIONAL};
                 vx_uint32       index3;
+
+                if (possibleNextNode->kernel->signature.stateTable[possibleParamIndex] == VX_PARAMETER_STATE_OPTIONAL && possibleParamRef == VX_NULL)
+                    continue;
 
                 for (index3 = 0; index3 < vxmLENGTH_OF(paramDirTable); index3++)
                 {
@@ -778,17 +751,17 @@ VX_API_ENTRY vx_status VX_API_CALL vx_vivPeferGraph(vx_graph graph, vx_char* pat
 
         strcat(output, "        <node>\n");
 
-                sprintf(log, "            <name>%s</name>\n", node->kernel->name);
-                strcat(output, log);
+        sprintf(log, "            <name>%s</name>\n", node->kernel->name);
+        strcat(output, log);
 
-                sprintf(log, "            <start>%llu</start>\n", (unsigned long long)node->perf.beg);
-                strcat(output, log);
+        sprintf(log, "            <start>%llu</start>\n", (unsigned long long)node->perf.beg);
+        strcat(output, log);
 
-                sprintf(log, "            <end>%llu</end>\n", (unsigned long long)node->perf.end);
-                strcat(output, log);
+        sprintf(log, "            <end>%llu</end>\n", (unsigned long long)node->perf.end);
+        strcat(output, log);
 
-                sprintf(log, "            <interval>%llu</interval>\n\n", (unsigned long long)node->perf.tmp);
-                strcat(output, log);
+        sprintf(log, "            <interval>%llu</interval>\n\n", (unsigned long long)node->perf.tmp);
+        strcat(output, log);
 
         strcat(output, "        </node>\n");
 
@@ -814,11 +787,12 @@ VX_API_ENTRY vx_status VX_API_CALL vx_vivPeferGraph(vx_graph graph, vx_char* pat
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
 {
-    vx_char* path;
-    gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &path);
-    if (path)
-        vx_vivPeferGraph(*graph, path, vx_true_e, vx_true_e, NULL);
-
+    if (graph && *graph)
+    {
+        vx_char * path = (vx_char *)((*graph)->base.context->options.graphPerfLogFile);
+        if (path)
+            vx_vivPeferGraph(*graph, path, vx_true_e, vx_true_e, NULL);
+    }
 
     return vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 }
@@ -1834,7 +1808,6 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
             }
         }
 
-
         if (node->kernelAttributes.localDataSize > 0 && node->kernelAttributes.localDataPtr == VX_NULL)
         {
             node->kernelAttributes.localDataPtr = vxAllocate(node->kernelAttributes.localDataSize);
@@ -2243,7 +2216,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     vxoGraph_GenerateAllNodeIndexTable(graph);
 #endif
 
-
     vxReleaseMutex(graph->base.lock);
 
     if (status != VX_SUCCESS) goto ErrorExit;
@@ -2478,7 +2450,7 @@ VX_PRIVATE_API void vxoGraph_BeginProcess(
                         OUT nextNodeIndexTable, OUT nextNodeCountPtr);
 #endif
 
-    if (graph->base.context->perfEnable)
+    if (graph->base.context->options.enableCNNPerf)
         vxoPerf_Begin(&graph->perf);
 }
 
@@ -2514,12 +2486,15 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 
     graph->dirty = vx_false_e;
 
-    vxoPerf_End(&graph->perf);
-
-    vxoPerf_Dump(&graph->perf);
+    if (graph->base.context->options.enableCNNPerf)
+    {
+        vxoPerf_End(&graph->perf);
+        vxoPerf_Dump(&graph->perf);
+    }
 
     vxoGraph_ClearAllVisitedFlags(graph);
 }
+
 
 
 VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
@@ -2561,7 +2536,6 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
     {
 
 /*Restart:*/
-
         action = VX_ACTION_CONTINUE;
         graph->status = VX_GRAPH_STATE_RUNNING;
 
@@ -2579,7 +2553,6 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
             }
 
             vxoNode_EnableVirtualAccessible(node);
-
 
             if (graph->dirty)
             {

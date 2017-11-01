@@ -1691,18 +1691,46 @@ static inline void merge_visible_region_damage(__hwc2_display_t *dpy,
         split_area(dpy, 0, damage, region->rects[i], 1ull);
 }
 
+static inline void make_bounding_box(hwc_rect_t *box, hwc_rect_t rect)
+{
+    if (rect.left < box->left) box->left = rect.left;
+    if (rect.top  < box->top ) box->top  = rect.top;
+    if (rect.right  > box->right ) box->right  = rect.right;
+    if (rect.bottom > box->bottom) box->bottom = rect.bottom;
+}
+
+static inline void merge_visible_bounding_damage(__hwc2_display_t *dpy,
+                        __hwc2_list_t *damage, hwc_region_t *region0,
+                        hwc_region_t *region1)
+{
+    hwc_rect_t box = {(int)dpy->width, (int)dpy->height, 0, 0};
+
+    /* For visible region, numRects=0 means no rect. */
+    for (uint32_t i = 0; i < region0->numRects; i++)
+        make_bounding_box(&box, region0->rects[i]);
+
+    for (uint32_t i = 0; i < region1->numRects; i++)
+        make_bounding_box(&box, region1->rects[i]);
+
+    split_area(dpy, 0, damage, box, 1ull);
+}
+
 static inline void merge_layer_damage_region(__hwc2_display_t *dpy,
                         __hwc2_list_t *damage, __hwc2_layer_t *layer)
 {
     if (layer->geometryChanged || layer->blendChanged || layer->colorChanged) {
-        /*
-         * Geometry or content changed, treat all visibleRegion as damage
-         * region. And may include previous visibleRegion as well.
-         */
-        if (layer->visibleRegionChanged)
-            merge_visible_region_damage(dpy, damage, &layer->visibleRegionPrev);
+        if (likely(!layer->blt.topTiny)) {
+            /*
+             * Geometry or content changed, treat all visibleRegion as damage
+             * region. And may include previous visibleRegion as well.
+             */
+            if (layer->visibleRegionChanged)
+                merge_visible_region_damage(dpy, damage, &layer->visibleRegionPrev);
 
-        merge_visible_region_damage(dpy, damage, &layer->visibleRegion);
+            merge_visible_region_damage(dpy, damage, &layer->visibleRegion);
+        } else
+            merge_visible_bounding_damage(dpy, damage,
+                    &layer->visibleRegionPrev, &layer->visibleRegion);
     } else {
         /* Use surface damage as damage area. */
         if (!__hwc2_region_is_empty(layer->surfaceDamage))
@@ -2016,7 +2044,7 @@ static inline void revalidate_display(__hwc2_device_t *dev,
 }
 
 static inline void calculate_alignment_mask(__hwc2_device_t *dev,
-                        struct surface *sur, uint32_t is_target,
+                        struct surface *sur, uint32_t isTarget,
                         uint32_t *maskX, uint32_t *maskY)
 {
     if (dev->blt.multiBltSourceOffset) {
@@ -2036,7 +2064,7 @@ static inline void calculate_alignment_mask(__hwc2_device_t *dev,
         fy = sur->formatInfo->blockHeight - 1;
 
         /* Memory alignment limitation. */
-        if (dev->blt.multiBltByteAlignment && !is_target &&
+        if (dev->blt.multiBltByteAlignment && !isTarget &&
             sur->formatInfo->fmtClass == gcvFORMAT_CLASS_RGBA)
             mx = 0;
         else if (sur->formatInfo->fmtClass == gcvFORMAT_CLASS_YUV)
@@ -2093,38 +2121,12 @@ static inline void calculate_alignment_mask(__hwc2_device_t *dev,
     }
 }
 
-static inline void calculate_stride(gceSURF_FORMAT format, uint32_t stride,
-                            uint32_t outStride[3], uint32_t *numPlanes)
-{
-    switch (format) {
-        case gcvSURF_NV12:
-        case gcvSURF_NV21:
-        case gcvSURF_NV16:
-        case gcvSURF_NV61:
-            outStride[0] = outStride[1] = stride;
-            *numPlanes = 2;
-            break;
-        case gcvSURF_YV12:
-        case gcvSURF_I420:
-            outStride[0] = stride;
-            outStride[1] = outStride[2] =
-                ((stride / 2) + 0xf) & ~0xf;
-            *numPlanes = 3;
-            break;
-        default:
-            outStride[0] = stride;
-            outStride[1] = stride;
-            *numPlanes = 1;
-            break;
-    }
-}
-
 /*
  * lock_surface - Lock HAL surface and cache required information.
  * Requires corresponding unlock_surface later.
  */
 static int lock_surface(__hwc2_device_t *dev, gcoSURF surface,
-                    struct surface *sur, uint32_t is_target)
+                    struct surface *sur, uint32_t isTarget)
 {
     gceTILING tiling;
     gctINT stride;
@@ -2174,9 +2176,36 @@ static int lock_surface(__hwc2_device_t *dev, gcoSURF surface,
             break;
     }
 
-    calculate_stride(format, stride, sur->stride, &sur->numPlanes);
+    switch (format) {
+        case gcvSURF_NV12:
+        case gcvSURF_NV21:
+        case gcvSURF_NV16:
+        case gcvSURF_NV61:
+            sur->stride[0] = sur->stride[1] = stride;
+            sur->numPlanes = 2;
+            break;
+        case gcvSURF_YV12:
+        case gcvSURF_I420:
+            sur->stride[0] = stride;
+            sur->stride[1] = sur->stride[2] = ((stride / 2) + 0xf) & ~0xf;
+            sur->numPlanes = 3;
+            break;
+        default:
+            sur->stride[0] = stride;
+            sur->numPlanes = 1;
+            break;
+    }
 
-    calculate_alignment_mask(dev, sur, is_target,
+    if (tiling & gcvTILING_SPLIT_BUFFER) {
+        gctUINT32 offset = 0;
+        gcoSURF_GetBottomBufferOffset(surface, &offset);
+
+        sur->stride[1]  = sur->stride[0];
+        sur->address[1] = sur->address[0] + offset;
+        sur->numPlanes  = 2;
+    }
+
+    calculate_alignment_mask(dev, sur, isTarget,
             &sur->alignMaskX, &sur->alignMaskY);
 
     sur->surface = surface;
@@ -2432,7 +2461,7 @@ static void program_output_buffer(__hwc2_device_t *device,
     sur = obtain_output_surface(device, dpy);
 
     __hwc2_trace(2, "surface=%p size=%ux%u format=%d stride=%u"
-        " tiling=%d address=0x%08x",
+        " tiling=0x%x address=0x%08x",
         sur->surface, sur->width, sur->height, sur->format,
         sur->stride[0], sur->tiling, sur->address[0]);
 
@@ -3349,8 +3378,8 @@ static void inline program_fake_source(__hwc2_device_t *dev,
     gceSTATUS status;
     struct blitter_device *blt = &dev->blt;
 
-    if (!dx && !dx && !width && !height) {
-        __hwc2_trace(2, "format=%d tiling=%d stride=%u address=0x%08X",
+    if (!dx && !dy && !width && !height) {
+        __hwc2_trace(2, "format=%d tiling=0x%x stride=%u address=0x%08X",
             sur->format, sur->tiling, sur->stride[0], sur->address[0]);
 
         gcmONERROR(gcoSURF_Set2DSource(sur->surface, rotation));
@@ -3365,7 +3394,7 @@ static void inline program_fake_source(__hwc2_device_t *dev,
             uint32_t address[3];
             shift_coord_address(sur, dx, dy, address);
 
-            __hwc2_trace(2, "format=%d tiling=%d stride=%u shift=%d,%d "
+            __hwc2_trace(2, "format=%d tiling=0x%x stride=%u shift=%d,%d "
                     "address=0x%08X -> 0x%08X",
                     sur->format, sur->tiling, sur->stride[0], dx, dy,
                     sur->address[0], address[0]);
@@ -3377,7 +3406,7 @@ static void inline program_fake_source(__hwc2_device_t *dev,
             gcmONERROR(gco2D_SetSourceTileStatus(blt->engine,
                     gcv2D_TSC_DISABLE, gcvSURF_UNKNOWN, 0, ~0U));
         } else {
-            __hwc2_trace(2, "format=%d tiling=%d stride=%u address=0x%08X",
+            __hwc2_trace(2, "format=%d tiling=0x%x stride=%u address=0x%08X",
                     sur->format, sur->tiling, sur->stride[0], sur->address[0]);
 
             gcmONERROR(gco2D_SetGenericSource(blt->engine,
@@ -3408,7 +3437,7 @@ static void inline program_fake_target(__hwc2_device_t *dev,
     struct blitter_device *blt = &dev->blt;
 
     if (!dx && !dx && !width && !height) {
-        __hwc2_trace(2, "format=%d tiling=%d stride=%u address=0x%08X",
+        __hwc2_trace(2, "format=%d tiling=0x%x stride=%u address=0x%08X",
             sur->format, sur->tiling, sur->stride[0], sur->address[0]);
 
         gcmONERROR(gcoSURF_Set2DTarget(sur->surface, rotation));
@@ -3423,7 +3452,7 @@ static void inline program_fake_target(__hwc2_device_t *dev,
             uint32_t address[3];
             shift_coord_address(sur, dx, dy, address);
 
-            __hwc2_trace(2, "format=%d tiling=%d stride=%u shift=%d,%d "
+            __hwc2_trace(2, "format=%d tiling=0x%x stride=%u shift=%d,%d "
                     "address=0x%08X -> 0x%08X",
                     sur->format, sur->tiling, sur->stride[0], dx, dy,
                     sur->address[0], address[0]);
@@ -3435,7 +3464,7 @@ static void inline program_fake_target(__hwc2_device_t *dev,
             gcmONERROR(gco2D_SetTargetTileStatus(blt->engine,
                     gcv2D_TSC_DISABLE, gcvSURF_UNKNOWN, 0, ~0U));
         } else {
-            __hwc2_trace(2, "format=%d tiling=%d stride=%u address=0x%08X",
+            __hwc2_trace(2, "format=%d tiling=0x%x stride=%u address=0x%08X",
                     sur->format, sur->tiling, sur->stride[0], sur->address[0]);
 
             gcmONERROR(gco2D_SetGenericTarget(blt->engine,

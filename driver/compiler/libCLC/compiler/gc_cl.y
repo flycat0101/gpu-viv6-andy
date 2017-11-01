@@ -910,21 +910,21 @@ struct_or_union : T_STRUCT
 
 struct_union_specifier :
 	struct_or_union T_IDENTIFIER '{'
-		{ clParseStructDeclBegin(Compiler, &$2); }
+		{ clParseStructDeclBegin(Compiler, &$1,  &$2); }
 		struct_declaration_list '}' attribute_specifier_opt
-		{ $$ = clParseStructDeclEnd(Compiler, &$1, &$2, $7, $5); }
+		{ $$ = clParseStructDeclEnd(Compiler, &$2, $7, $5); }
 	| struct_or_union '{'
-		{ clParseStructDeclBegin(Compiler, gcvNULL); }
+		{ clParseStructDeclBegin(Compiler, &$1, gcvNULL); }
 		struct_declaration_list '}' attribute_specifier_opt
-		{ $$ = clParseStructDeclEnd(Compiler, &$1, gcvNULL, $6, $4); }
+		{ $$ = clParseStructDeclEnd(Compiler, gcvNULL, $6, $4); }
 	| struct_or_union attribute_specifier T_IDENTIFIER '{'
-		{ clParseStructDeclBegin(Compiler, &$3); }
+		{ clParseStructDeclBegin(Compiler, &$1, &$3); }
 		struct_declaration_list '}'
-		{ $$ = clParseStructDeclEnd(Compiler, &$1, &$3, $2, $6); }
+		{ $$ = clParseStructDeclEnd(Compiler, &$3, $2, $6); }
 	| struct_or_union attribute_specifier '{'
-		{ clParseStructDeclBegin(Compiler, gcvNULL); }
+		{ clParseStructDeclBegin(Compiler, &$1, gcvNULL); }
 		struct_declaration_list '}'
-		{ $$ = clParseStructDeclEnd(Compiler, &$1, gcvNULL, $2, $5); }
+		{ $$ = clParseStructDeclEnd(Compiler, gcvNULL, $2, $5); }
 	;
 
 struct_declaration_list :
@@ -959,7 +959,8 @@ struct_declarator_list :
 	;
 
 struct_declarator :
-	direct_declarator attribute_specifier_opt
+		{ $$ = clParseFieldDecl(Compiler, gcvNULL, gcvNULL, gcvNULL); }
+	| direct_declarator attribute_specifier_opt
 		{ $$ = clParseFieldDecl(Compiler, &$1, gcvNULL, $2); }
 	| direct_declarator array_declarator attribute_specifier_opt
 		{ $$ = clParseFieldDecl(Compiler, &$1, $2, $3); }
@@ -1098,7 +1099,7 @@ compound_statement :
 	| '{'
 		{ clParseCompoundStatementBegin(Compiler); }
 		statement_list '}'
-		{ $$ = clParseCompoundStatementEnd(Compiler, &$1, $3, $4); }
+		{ $$ = clParseCompoundStatementEnd(Compiler, &$1, $3, &$4); }
 	;
 
 statement_no_new_scope :
@@ -1114,7 +1115,7 @@ compound_statement_no_new_scope :
 	| '{'
 			{ clParseCompoundStatementNoNewScopeBegin(Compiler); }
 		statement_list '}'
-		{ $$ = clParseCompoundStatementNoNewScopeEnd(Compiler, &$1, $3, $4); }
+		{ $$ = clParseCompoundStatementNoNewScopeEnd(Compiler, &$1, $3, &$4); }
 	;
 
 statement_list :
@@ -1160,7 +1161,7 @@ switch_body :
 	| '{'
 		{ clParseSwitchBodyBegin(Compiler); }
 		switch_body_statement_list '}'
-		{ $$ = clParseSwitchBodyEnd(Compiler, &$1, $3, $4); }
+		{ $$ = clParseSwitchBodyEnd(Compiler, &$1, $3, &$4); }
 	;
 
 if_sub_statement :

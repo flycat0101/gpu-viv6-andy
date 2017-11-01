@@ -248,6 +248,12 @@ void  vgFinish(void)
     vgmGetApiStartTime();
     vgmPROFILE(context, VGFINISH, 0);
     finish(context);
+#if VIVANTE_PROFILER
+    if ((context != gcvNULL) && context->profiler.useVGfinish)
+    {
+        vgmPROFILE(context, VG_PROFILER_DRAW_END,  (gctUINTPTR_T)1);
+    }
+#endif
     vgmGetApiEndTime(context);
     gcmFOOTER_NO();
 }
@@ -854,7 +860,7 @@ void _VGContextDtor(gcoOS os, _VGContext *context)
     gcmVERIFY_OK(_DestroySharedData(context));
 
 #if VIVANTE_PROFILER
-    DestroyVGProfiler(context);
+    _vgshProfilerDestroy(context);
 #endif
     /* Uninitialize tessellation states. */
     _VGTessellationContextDtor(context);
@@ -1076,7 +1082,7 @@ static void setifv(_VGContext* context, VGParamType type, VGint count, const voi
                 if (preAA != setAA)
                 {
                     gcmVERIFY_OK(gco3D_SetAntiAlias(context->engine, setAA));
-                    context->hardware.core.states = gcvNULL;
+                    context->hardware.core.programState.stateBuffer = gcvNULL;
                 }
             }
         }

@@ -515,7 +515,7 @@ gcChipSetDepthMode(
         if (!gc->frameBuffer.drawFramebufObj->name &&
             (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
             chipCtx->drawDepthView.surf &&
-            (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES7) == gcvFALSE))
+            !chipCtx->chipFeature.hwFeature.hasBugFixes7)
         {
             chipCtx->depthMode = gcvDEPTH_Z;
         }

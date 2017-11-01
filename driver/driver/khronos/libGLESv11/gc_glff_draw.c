@@ -2082,7 +2082,7 @@ GL_API void GL_APIENTRY glDrawArrays(
     {
 
         glmPROFILE(context, GLES1_DRAWARRAYS, 0);
-        if (context->profiler.enable)
+        if (context->profiler.enable && context->profiler.perDrawMode)
         {
             _glffProfilerSet(context, GL1_PROFILER_DRAW_BEGIN, 0);
         }
@@ -2303,7 +2303,7 @@ GL_API void GL_APIENTRY glDrawArrays(
 #if VIVANTE_PROFILER
             glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)instantDraw.primMode);
 
-            if (context->profiler.enable)
+            if (context->profiler.enable && context->profiler.perDrawMode)
             {
                 _glffProfilerSet(context, GL1_PROFILER_DRAW_END, 0);
             }
@@ -2329,7 +2329,6 @@ _PatchIndex(
     gctBOOL  * newIndices
     )
 {
-#if gcdNULL_DRIVER < 3
     GLvoid  *  indices     = gcvNULL;
     GLubyte *  base        = gcvNULL;
     GLubyte    elementSize = 0;
@@ -2442,9 +2441,6 @@ _PatchIndex(
             return GL_FALSE;
         }
 
-        gcmVERIFY_OK(gcoINDEX_SetSharedLock(*targetIndex,
-                                            Context->bufferList->sharedLock));
-
         if (gcmIS_ERROR(gcoINDEX_Lock(boundIndex->index, gcvNULL, (GLvoid**)&base)))
         {
             return GL_FALSE;
@@ -2545,9 +2541,6 @@ _PatchIndex(
     }
 
     return GL_TRUE;
-#else
-    return GL_FALSE;
-#endif
 }
 
 gceSTATUS
@@ -2670,7 +2663,7 @@ GL_API void GL_APIENTRY glDrawElements(
     {
 
         glmPROFILE(context, GLES1_DRAWELEMENTS, 0);
-        if (context->profiler.enable)
+        if (context->profiler.enable && context->profiler.perDrawMode)
         {
             _glffProfilerSet(context, GL1_PROFILER_DRAW_BEGIN, 0);
         }
@@ -3006,7 +2999,7 @@ GL_API void GL_APIENTRY glDrawElements(
 #if VIVANTE_PROFILER
             glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)instantDraw.primMode);
 
-            if (context->profiler.enable)
+            if (context->profiler.enable && context->profiler.perDrawMode)
             {
                 _glffProfilerSet(context, GL1_PROFILER_DRAW_END, 0);
             }
@@ -3935,8 +3928,6 @@ gceSTATUS _BuildStream(
                     /* Construct stream wrapper. */
                     gcmERR_BREAK(gcoSTREAM_Construct(Context->hal, &stream));
                     Context->streams[Context->streamIndex] = stream;
-                    gcmVERIFY_OK(gcoSTREAM_SetSharedLock(stream,
-                                                         Context->bufferList->sharedLock));
                 }
                 else
                 {

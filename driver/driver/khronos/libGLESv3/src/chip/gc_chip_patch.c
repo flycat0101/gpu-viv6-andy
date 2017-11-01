@@ -16063,7 +16063,7 @@ gcChipPatch_Cube_tweak(
                                : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
 
     if ((chipCtx->patchId == gcvPATCH_GTFES30) &&
-         chipCtx->chipFeature.txLerpLessBit)
+         chipCtx->chipFeature.hwFeature.txLerpLessBit)
     {
         patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment20Shaders);
     }
@@ -29340,13 +29340,13 @@ gcChipGetPatchConditionTb(
         chipCtx->doPatchCondition[GC_CHIP_PATCH_GFXBENCH30_2] = GL_FALSE;
     }
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXES18) == gcvTRUE)
+    if (chipCtx->chipFeature.hwFeature.hasBugFixes18)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_GTF_DISCARDDRAW] = GL_FALSE;
     }
 
     if (!(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) ||
-        gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_TEX_CUBE_BORDER_LOD) == gcvTRUE)
+        chipCtx->chipFeature.hwFeature.hasCubeBorderLOD)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_USER_CUBE_LOD] = GL_FALSE;
         chipCtx->doPatchCondition[GC_CHIP_PATCH_USER_CUBE_LOD_BIAS] = GL_FALSE;
@@ -29361,21 +29361,21 @@ gcChipGetPatchConditionTb(
         chipCtx->doPatchCondition[GC_CHIP_PATCH_MAX_UBO_SIZE] = GL_FALSE;
     }
 
-    if (!gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_TX_FRAC_PRECISION_6BIT) ||
-        gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_TX_8bit_UVFrac))
+    if (!chipCtx->chipFeature.hwFeature.hasTxFrac6Bit ||
+        chipCtx->chipFeature.hwFeature.hasTxFrac8Bit)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_NETFLIX_1] = GL_FALSE;
     }
 
     if ((chipCtx->patchId != gcvPATCH_DEQP &&
         chipCtx->patchId != gcvPATCH_GTFES30) ||
-        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_OQ_FIX) == gcvTRUE)
+        chipCtx->chipFeature.hwFeature.hasMSAAOQFix)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_MSAA_OQ] = GL_FALSE;
     }
 
     if (!(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) ||
-        gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDELINE_HELPER_FIX) == gcvTRUE)
+        chipCtx->chipFeature.hwFeature.hasWideLineHelperFix)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDX] = GL_FALSE;
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDX] = GL_FALSE;
@@ -29383,7 +29383,7 @@ gcChipGetPatchConditionTb(
     }
 
     if (!(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) ||
-        gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDELINE_TRIANGLE_EMU) == gcvFALSE)
+        !chipCtx->chipFeature.hwFeature.needWideLineTriangleEMU)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_WIDELINE] = GL_FALSE;
     }
@@ -29934,7 +29934,7 @@ gcChipPatchDraw(
         }
 
         if (chipCtx->patchId == gcvPATCH_GTFES30 &&
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXES18) == gcvFALSE &&
+            !chipCtx->chipFeature.hwFeature.hasBugFixes18 &&
             gc->state.enables.scissorTest &&
             gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED])
         {

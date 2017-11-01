@@ -16,8 +16,9 @@
 /* TS may have issue that in different command buffer, use same surface, we need a way to work out.
    Disalbe for now
 */
+#if __VK_ENABLETS
 static VkBool32 g_dbgNoTS = VK_TRUE;
-
+#endif
 __vkFormatInfo g_vkFormatInfoTable[] =
 {
     /*      VK_FORMAT_UNDEFINED                 */
@@ -1281,8 +1282,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
         /* Vulkan need guarantee maximum alignment (256) for all usage. */
         dvm->align  = 256;
         dvm->size   = (size_t) pAllocateInfo->allocationSize;
+#if __VK_ENABLETS
         dvm->ts     = NULL;
-
+#endif
         gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
 
         switch (pImportInfo->type)
@@ -1376,13 +1378,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
     {
         __vkDevContext *devCtx = (__vkDevContext*)device;
         __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
-
+#if __VK_ENABLETS
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
+#endif
 #if __VK_NEW_DEVICE_QUEUE
         __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
         __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
+#if __VK_ENABLETS
         /* Free TS related information. */
         if (dvm->ts)
         {
@@ -1400,10 +1403,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
             __VK_FREE(dvm->ts->fcValueUpper);
             __VK_FREE(dvm->ts);
         }
+#endif
 #else
         gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->node));
-
+#if __VK_ENABLETS
         /* Free TS related information. */
         if (dvm->ts)
         {
@@ -1421,6 +1425,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
             __VK_FREE(dvm->ts->fcValueUpper);
             __VK_FREE(dvm->ts);
         }
+#endif
 #endif
         __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
     }
@@ -1495,7 +1500,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetDeviceMemoryCommitment(
     ** so always return error.
     */
 }
-
+#if __VK_ENABLETS
 VkResult __vki_AllocateTileStatus(
     __vkDevContext *devCtx,
     __vkImage *img
@@ -1746,6 +1751,7 @@ OnError:
     }
     return result;
 }
+#endif
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_BindBufferMemory(
     VkDevice device,
@@ -1771,18 +1777,24 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_BindImageMemory(
     )
 {
     VkResult result = VK_SUCCESS;
+#if __VK_ENABLETS
     __vkDevContext *devCtx = (__vkDevContext *)device;
+#endif
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
 
     img->memory = dvm;
     img->memOffset = memOffset;
-
+#if __VK_ENABLETS
     /* Allocate tileStatus for image. */
     __VK_ONERROR(__vki_AllocateTileStatus(devCtx, img));
-
+#endif
+#if __VK_ENABLETS
 OnError:
     return result;
+#else
+    return result;
+#endif
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_GetBufferMemoryRequirements(
@@ -2031,6 +2043,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyBufferView(
 }
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
+/* TODO: drm gralloc. */
 #include <gc_gralloc_priv.h>
 
 /* VK_ANDROID_native_buffer. */

@@ -762,6 +762,8 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
         gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
         __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+        gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+        __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
 
         if (gc->globalDirtyState[__GL_ALL_ATTRS])
         {
@@ -1123,6 +1125,8 @@ __GL_INLINE GLboolean __glComputeEnd(__GLcontext *gc)
     __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
     gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
     __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+    gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+    __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
 
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);

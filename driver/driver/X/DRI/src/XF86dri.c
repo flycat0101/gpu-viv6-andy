@@ -36,7 +36,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 /* THIS IS NOT AN X CONSORTIUM STANDARD */
-#ifdef EGL_API_DRI
 #define NEED_REPLIES
 #include <X11/Xlibint.h>
 #include "xf86dristr.h"
@@ -448,6 +447,11 @@ Bool XF86DRIGetDrawableInfo(Display* dpy, int screen, Drawable drawable,
     xXF86DRIGetDrawableInfoReply rep;
     xXF86DRIGetDrawableInfoReq *req;
     int total_rects;
+#ifdef DRI_PIXMAPRENDER_ASYNC
+    #define DRM_CLIPRECTS_CACHE_NUM 32
+    static drm_clip_rect_t xcliprects[DRM_CLIPRECTS_CACHE_NUM];
+    static drm_clip_rect_t ycliprects[DRM_CLIPRECTS_CACHE_NUM];
+#endif
 
     TRACE("GetDrawableInfo...");
     XF86DRICheckExtension (dpy, info, False);
@@ -481,6 +485,37 @@ Bool XF86DRIGetDrawableInfo(Display* dpy, int screen, Drawable drawable,
     total_rects += *numBackClipRects;
 
 
+#ifdef DRI_PIXMAPRENDER_ASYNC
+    *pClipRects = NULL;
+    if (*numClipRects) {
+        if (*numClipRects < DRM_CLIPRECTS_CACHE_NUM)
+        {
+           int len = sizeof(drm_clip_rect_t) * (*numClipRects);
+           _XRead(dpy, (char*)xcliprects, len);
+        } else {
+           int len = sizeof(drm_clip_rect_t) * (*numClipRects);
+
+           *pClipRects = (drm_clip_rect_t *)Xcalloc(len, 1);
+           if (*pClipRects)
+              _XRead(dpy, (char*)*pClipRects, len);
+        }
+    }
+
+    *pBackClipRects = NULL;
+    if (*numBackClipRects) {
+        if (*numBackClipRects < DRM_CLIPRECTS_CACHE_NUM)
+        {
+           int len = sizeof(drm_clip_rect_t) * (*numBackClipRects);
+           _XRead(dpy, (char*)ycliprects, len);
+        } else {
+           int len = sizeof(drm_clip_rect_t) * (*numBackClipRects);
+
+           *pBackClipRects = (drm_clip_rect_t *)Xcalloc(len, 1);
+           if (*pBackClipRects)
+               _XRead(dpy, (char*)*pBackClipRects, len);
+        }
+    }
+#else
     if (*numClipRects) {
        int len = sizeof(drm_clip_rect_t) * (*numClipRects);
 
@@ -500,6 +535,7 @@ Bool XF86DRIGetDrawableInfo(Display* dpy, int screen, Drawable drawable,
     } else {
         *pBackClipRects = NULL;
     }
+#endif
 
     UnlockDisplay(dpy);
     SyncHandle();
@@ -592,5 +628,3 @@ Bool XF86DRICloseFullScreen(dpy, screen, drawable)
     (void) drawable;
     return True;
 }
-#endif
-

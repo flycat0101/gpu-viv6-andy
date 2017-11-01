@@ -52,9 +52,7 @@ struct _VGProgram
     _VGShader   vertexShader;
     _VGShader   fragmentShader;
 
-    gctUINT32            statesSize;
-    gctPOINTER            states;
-    gcsHINT_PTR            hints;
+    gcsPROGRAM_STATE programState;
 };
 
 void _VGProgramCtor(gcoOS os, _VGProgram *program);

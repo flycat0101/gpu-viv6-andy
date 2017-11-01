@@ -2028,6 +2028,62 @@ EGLenum __glCheckEglImageTexArg(__GLcontext *gc,
     return EGL_SUCCESS;
 }
 
+GLboolean __glCheckTexLevel0Attrib(__GLcontext *gc, __GLtextureObject *texObj, GLint maxLevelUsed, GLint usedLevel)
+{
+    __GLmipMapLevel *mipmap;
+    GLint width, height, depth;
+    GLint baseLevel;
+    GLint face, level;
+    GLint requestedFormat;
+    GLint faces, arrays;
+
+    baseLevel = texObj->params.baseLevel;
+    width = texObj->faceMipmap[0][baseLevel].width;
+    height = texObj->faceMipmap[0][baseLevel].height;
+    depth = texObj->faceMipmap[0][baseLevel].depth;
+    requestedFormat = texObj->faceMipmap[0][baseLevel].requestedFormat;
+    arrays = texObj->faceMipmap[0][baseLevel].arrays;
+    faces = (texObj->targetIndex == __GL_TEXTURE_CUBEMAP_INDEX) ? 6 : 1;
+
+    if (usedLevel == 0)
+    {
+        for (face = 0; face < faces; ++ face)
+        {
+            mipmap = &texObj->faceMipmap[face][0];
+
+            if (mipmap->requestedFormat != requestedFormat ||
+                mipmap->width  != width ||
+                mipmap->height != height ||
+                mipmap->depth  != depth ||
+                mipmap->arrays != arrays)
+            {
+                return GL_FALSE;
+            }
+        }
+
+        if (maxLevelUsed > 0)
+        {
+            for (level = 1; level <= maxLevelUsed; ++level)
+            {
+                for (face = 0; face < faces; ++ face)
+                {
+                    mipmap = &texObj->faceMipmap[face][level];
+
+                    if (mipmap->width  != 0 ||
+                        mipmap->height != 0 ||
+                        mipmap->depth  != 0 ||
+                        mipmap->arrays != 0)
+                    {
+                        return GL_FALSE;
+                    }
+                }
+            }
+        }
+    }
+
+    return GL_TRUE;
+}
+
 EGLenum __glCreateEglImageTexture(__GLcontext* gc,
                                   EGLenum target,
                                   GLint texture,
@@ -2039,6 +2095,8 @@ EGLenum __glCreateEglImageTexture(__GLcontext* gc,
     GLint face = 0;
     EGLenum result;
     __GLtextureObject *texObj = gcvNULL;
+    __GLsamplerParamState *samplerParam;
+    GLint maxLevelUsed;
 
     if (gc->texture.shared == gcvNULL)
     {
@@ -2050,6 +2108,31 @@ EGLenum __glCreateEglImageTexture(__GLcontext* gc,
     if ((texObj == gcvNULL) || (texObj->privateData == gcvNULL))
     {
         return EGL_BAD_PARAMETER;
+    }
+
+    samplerParam = &texObj->params.sampler;
+    maxLevelUsed = __glCalcTexMaxLevelUsed(gc, texObj, samplerParam->minFilter);
+
+    /* According to extension EGL_KHR_gl_image:
+    ** If EGL_GL_TEXTURE_LEVEL_KHR is 0, <target> is
+    ** EGL_GL_TEXTURE_2D_KHR, EGL_GL_TEXTURE_CUBE_MAP_*_KHR or
+    ** EGL_GL_TEXTURE_3D_KHR, <buffer> is the name of an incomplete GL
+    ** texture object, and any mipmap levels other than mipmap level 0
+    ** are specified, the error EGL_BAD_PARAMETER is generated.
+    */
+    if (!__glIsTextureComplete(gc, texObj, samplerParam->minFilter, samplerParam->magFilter,
+                               samplerParam->compareMode, maxLevelUsed))
+    {
+        /*According to spec:
+        ** if EGL_GL_TEXTURE_LEVEL is 0, buffer is the name of an incomplete
+        ** GL texture object, and mipmap level 0 is not specified or any
+        ** mipmap levels other than mipmap level 0 are specified,
+        ** the error EGL_BAD_PARAMETER is generated.
+        */
+        if ((level !=0) || (!__glCheckTexLevel0Attrib(gc, texObj, maxLevelUsed, level)))
+        {
+            return EGL_BAD_PARAMETER;
+        }
     }
 
     result = __glCheckEglImageTexArg(gc, target, &type, &face);

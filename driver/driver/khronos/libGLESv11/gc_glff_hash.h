@@ -90,9 +90,7 @@ typedef struct _glsPROGRAMINFO
     glsSHADERCONTROL        fs;
 
     /* Shader program state buffer. */
-    gctUINT                   programSize;
-    gctPOINTER                programBuffer;
-    gcsHINT_PTR                hints;
+    gcsPROGRAM_STATE        programState;
 }
 glsPROGRAMINFO;
 

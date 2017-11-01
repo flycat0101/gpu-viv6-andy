@@ -29,9 +29,7 @@ OBJECTS = \
     $(OBJ_DIR)/gc_gl_napi.o \
     $(OBJ_DIR)/gc_gl_rapi.o \
     $(OBJ_DIR)/gc_gl_tapi.o \
-    $(OBJ_DIR)/gc_gl_vapi.o \
-    $(OBJ_DIR)/gl_constantname.o \
-    $(OBJ_DIR)/gl_debug.o
+    $(OBJ_DIR)/gc_gl_vapi.o
 
 
 ifeq ($(gcdSTATIC_LINK), 1)

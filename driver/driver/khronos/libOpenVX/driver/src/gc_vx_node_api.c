@@ -1114,6 +1114,105 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     return node;
 }
 
+VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    vx_weights_biases_parameter weights_biases,
+    const vx_nn_convolution_relu_pooling_params_t * convolution_relu_pooling_params,
+    vx_size                     size_of_convolution_relu_pooling_params,
+    vx_tensor                   outputs
+    )
+{
+    vx_context context;
+    vx_node    node;
+
+    vx_reference    parameters[] = {
+        (vx_reference)inputs,
+        (vx_reference)weights_biases,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        (vx_reference)outputs
+    };
+    vx_uint32 i = 0;
+
+    if (size_of_convolution_relu_pooling_params != sizeof(vx_nn_convolution_relu_pooling_params_t))
+    {
+        return NULL;
+    }
+
+    context = vxGetContext((vx_reference)graph);
+
+    parameters[2] = (vx_reference)vxCreateScalar(context, VX_TYPE_SIZE, &convolution_relu_pooling_params->dilation_x);
+    if (vxoReference_GetStatus((vx_reference)parameters[2]) != VX_SUCCESS) return (vx_node)parameters[2];
+
+    parameters[3] = (vx_reference)vxCreateScalar(context, VX_TYPE_SIZE, &convolution_relu_pooling_params->dilation_y);
+    if (vxoReference_GetStatus((vx_reference)parameters[3]) != VX_SUCCESS) return (vx_node)parameters[3];
+
+    parameters[4] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pad_x_left);
+    if (vxoReference_GetStatus((vx_reference)parameters[4]) != VX_SUCCESS) return (vx_node)parameters[4];
+
+    parameters[5] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pad_x_right);
+    if (vxoReference_GetStatus((vx_reference)parameters[5]) != VX_SUCCESS) return (vx_node)parameters[5];
+
+    parameters[6] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pad_y_top);
+    if (vxoReference_GetStatus((vx_reference)parameters[6]) != VX_SUCCESS) return (vx_node)parameters[6];
+
+    parameters[7] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pad_y_bottom);
+    if (vxoReference_GetStatus((vx_reference)parameters[7]) != VX_SUCCESS) return (vx_node)parameters[7];
+
+    parameters[8] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT8, &convolution_relu_pooling_params->accumulator_bits);
+    if (vxoReference_GetStatus((vx_reference)parameters[8]) != VX_SUCCESS) return (vx_node)parameters[8];
+
+    parameters[9] = (vx_reference)vxCreateScalar(context, VX_TYPE_ENUM, &convolution_relu_pooling_params->overflow_policy);
+    if (vxoReference_GetStatus((vx_reference)parameters[9]) != VX_SUCCESS) return (vx_node)parameters[9];
+
+    parameters[10] = (vx_reference)vxCreateScalar(context, VX_TYPE_ENUM, &convolution_relu_pooling_params->rounding_policy);
+    if (vxoReference_GetStatus((vx_reference)parameters[10]) != VX_SUCCESS) return (vx_node)parameters[10];
+
+    parameters[11] = (vx_reference)vxCreateScalar(context, VX_TYPE_ENUM, &convolution_relu_pooling_params->down_scale_size_rounding);
+    if (vxoReference_GetStatus((vx_reference)parameters[11]) != VX_SUCCESS) return (vx_node)parameters[11];
+
+    parameters[12] = (vx_reference)vxCreateScalar(context, VX_TYPE_BOOL, &convolution_relu_pooling_params->down_scale_size_rounding);
+    if (vxoReference_GetStatus((vx_reference)parameters[12]) != VX_SUCCESS) return (vx_node)parameters[12];
+
+    parameters[13] = (vx_reference)vxCreateScalar(context, VX_TYPE_ENUM, &convolution_relu_pooling_params->pool_type);
+    if (vxoReference_GetStatus((vx_reference)parameters[13]) != VX_SUCCESS) return (vx_node)parameters[13];
+
+    parameters[14] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pool_size_x);
+    if (vxoReference_GetStatus((vx_reference)parameters[14]) != VX_SUCCESS) return (vx_node)parameters[14];
+
+    parameters[15] = (vx_reference)vxCreateScalar(context, VX_TYPE_UINT32, &convolution_relu_pooling_params->pool_size_y);
+    if (vxoReference_GetStatus((vx_reference)parameters[15]) != VX_SUCCESS) return (vx_node)parameters[15];
+
+    parameters[16] = (vx_reference)vxCreateScalar(context, VX_TYPE_ENUM, &convolution_relu_pooling_params->pad_mode);
+    if (vxoReference_GetStatus((vx_reference)parameters[16]) != VX_SUCCESS) return (vx_node)parameters[16];
+
+    parameters[17] = (vx_reference)convolution_relu_pooling_params->pad_const;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2, parameters, vxmLENGTH_OF(parameters));
+
+    for (i = 2; i < (gcmCOUNTOF(parameters) - 2); i ++)
+    {
+        vxReleaseScalar((vx_scalar*)&parameters[i]);
+    }
+
+    return node;
+}
+
 VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(vx_graph graph,
                                                 vx_tensor inputs,
                                                 vx_enum pool_type,
@@ -1186,15 +1285,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(vx_graph graph,
 
 VX_API_ENTRY vx_node VX_API_CALL vxSoftmaxLayer(vx_graph graph, vx_tensor inputs, vx_tensor outputs)
 {
-    vx_context context;
     vx_node    node;
 
     vx_reference    parameters[] = {
     (vx_reference)inputs,
     (vx_reference)outputs,
     };
-
-    context = vxGetContext((vx_reference)graph);
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_SOFTMAX_LAYER, parameters, vxmLENGTH_OF(parameters));
 
@@ -1243,7 +1339,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizeImageLayer (vx_graph graph,
                                                        vx_tensor inputs,
                                                        vx_tensor outputs )
 {
-    vx_context context;
     vx_node    node;
 
     vx_reference    parameters[] = {
@@ -1251,7 +1346,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizeImageLayer (vx_graph graph,
          (vx_reference)outputs
     };
 
-    context = vxGetContext((vx_reference)graph);
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_NORMALIZE_IMAGE_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     return node;
@@ -1309,12 +1403,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     vx_tensor inputs,
     vx_tensor weights,
     vx_tensor biases,
-    vx_uint32 pad_x,
-    vx_uint32 pad_y,
-    vx_uint8 accumulator_bits,
-    vx_enum overflow_policy,
-    vx_enum rounding_policy,
-    vx_enum down_scale_size_rounding,
+    const vx_nn_convolution_params_t * convolution_params,
+    vx_size size_of_convolution_params,
     vx_tensor outputs)
 {
     vx_context context;
@@ -1322,9 +1412,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
 
     vx_scalar padXScalar                   = VX_NULL;
     vx_scalar padYScalar                   = VX_NULL;
-    vx_scalar accumulatorBitsScalar        = VX_NULL;
-    vx_scalar overflowPolicyScalar         = VX_NULL;
-    vx_scalar roundingPolicyScalar         = VX_NULL;
     vx_scalar downScaleSizeRoundingScalar  = VX_NULL;
 
     vx_reference    parameters[] = {
@@ -1334,46 +1421,28 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     VX_NULL,
     VX_NULL,
     VX_NULL,
-    VX_NULL,
-    VX_NULL,
-    VX_NULL,
     (vx_reference)outputs
     };
 
     context = vxGetContext((vx_reference)graph);
 
-    padXScalar = vxCreateScalar(context, VX_TYPE_ENUM, &pad_x);
+    padXScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->padding_x);
     if (vxoReference_GetStatus((vx_reference)padXScalar) != VX_SUCCESS) return (vx_node)padXScalar;
 
-    padYScalar = vxCreateScalar(context, VX_TYPE_INT32, &pad_y);
+    padYScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->padding_y);
     if (vxoReference_GetStatus((vx_reference)padYScalar) != VX_SUCCESS) return (vx_node)padYScalar;
 
-    accumulatorBitsScalar = vxCreateScalar(context, VX_TYPE_INT32, &accumulator_bits);
-    if (vxoReference_GetStatus((vx_reference)accumulatorBitsScalar) != VX_SUCCESS) return (vx_node)accumulatorBitsScalar;
-
-    overflowPolicyScalar = vxCreateScalar(context, VX_TYPE_INT32, &overflow_policy);
-    if (vxoReference_GetStatus((vx_reference)overflowPolicyScalar) != VX_SUCCESS) return (vx_node)overflowPolicyScalar;
-
-    roundingPolicyScalar = vxCreateScalar(context, VX_TYPE_INT32, &rounding_policy);
-    if (vxoReference_GetStatus((vx_reference)roundingPolicyScalar) != VX_SUCCESS) return (vx_node)roundingPolicyScalar;
-
-    downScaleSizeRoundingScalar = vxCreateScalar(context, VX_TYPE_INT32, &down_scale_size_rounding);
+    downScaleSizeRoundingScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->down_scale_size_rounding);
     if (vxoReference_GetStatus((vx_reference)downScaleSizeRoundingScalar) != VX_SUCCESS) return (vx_node)downScaleSizeRoundingScalar;
 
     parameters[3]  = (vx_reference)padXScalar;
     parameters[4]  = (vx_reference)padYScalar;
-    parameters[5]  = (vx_reference)accumulatorBitsScalar;
-    parameters[6]  = (vx_reference)overflowPolicyScalar;
-    parameters[7]  = (vx_reference)roundingPolicyScalar;
-    parameters[8]  = (vx_reference)downScaleSizeRoundingScalar;
+    parameters[5]  = (vx_reference)downScaleSizeRoundingScalar;
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&padXScalar);
     vxReleaseScalar(&padYScalar);
-    vxReleaseScalar(&accumulatorBitsScalar);
-    vxReleaseScalar(&overflowPolicyScalar);
-    vxReleaseScalar(&roundingPolicyScalar);
     vxReleaseScalar(&downScaleSizeRoundingScalar);
 
     return node;
@@ -1385,7 +1454,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConcat2Layer(
     vx_tensor in1,
     vx_tensor out)
 {
-    vx_context context;
     vx_node    node;
 
     vx_reference    parameters[] = {
@@ -1394,8 +1462,53 @@ VX_API_ENTRY vx_node VX_API_CALL vxConcat2Layer(
     (vx_reference)out
     };
 
-    context = vxGetContext((vx_reference)graph);
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONCAT2_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    return node;
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxConcatIndefiniteLayer(
+    vx_graph  graph,
+    vx_tensor *in,
+    vx_uint32 num,
+    vx_uint32 axis,
+    vx_tensor out)
+{
+    vx_context context;
+    vx_node    node;
+
+    vx_reference    parameters[] = {
+    NULL,
+    NULL,
+    NULL,
+    (vx_reference)out
+    };
+
+    vx_scalar inputScalar = VX_NULL;
+    vx_scalar numScalar = VX_NULL;
+    vx_scalar axisSclar = VX_NULL;
+
+    vx_uint32 input = (vx_uint32)gcmPTR2INT32(in);
+
+    context = vxGetContext((vx_reference)graph);
+
+    inputScalar = vxCreateScalar(context, VX_TYPE_UINT32, &input);
+    if (vxoReference_GetStatus((vx_reference)inputScalar) != VX_SUCCESS) return (vx_node)inputScalar;
+
+    numScalar = vxCreateScalar(context, VX_TYPE_UINT32, &num);
+    if (vxoReference_GetStatus((vx_reference)numScalar) != VX_SUCCESS) return (vx_node)numScalar;
+
+    axisSclar = vxCreateScalar(context, VX_TYPE_UINT32, &axis);
+    if (vxoReference_GetStatus((vx_reference)axisSclar) != VX_SUCCESS) return (vx_node)axisSclar;
+
+    parameters[0]  = (vx_reference)inputScalar;
+    parameters[1]  = (vx_reference)numScalar;
+    parameters[2]  = (vx_reference)axisSclar;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONCATINDEFINITE_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&numScalar);
+    vxReleaseScalar(&axisSclar);
 
     return node;
 }
@@ -1451,6 +1564,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorMultiplyNode(
     vx_reference    parameters[] = {
     (vx_reference)in1,
     (vx_reference)in2,
+    (vx_reference)scale,
     VX_NULL,
     VX_NULL,
     (vx_reference)out
@@ -1462,10 +1576,51 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorMultiplyNode(
     rounding_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &rounding_policy);
     if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS) return NULL;
 
-    parameters[2]  = (vx_reference)overflow_policy_s;
-    parameters[3]  = (vx_reference)rounding_policy_s;
+    parameters[3]  = (vx_reference)overflow_policy_s;
+    parameters[4]  = (vx_reference)rounding_policy_s;
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_MUL, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&overflow_policy_s);
+    vxReleaseScalar(&rounding_policy_s);
+
+    return node;
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxTensorDivideNode(
+    vx_graph graph,
+    vx_tensor in1,
+    vx_tensor in2,
+    vx_scalar scale,
+    vx_enum overflow_policy,
+    vx_enum rounding_policy,
+    vx_tensor out)
+{
+    vx_context context;
+    vx_node    node;
+
+    vx_scalar overflow_policy_s      = VX_NULL;
+    vx_scalar rounding_policy_s      = VX_NULL;
+
+    vx_reference    parameters[] = {
+    (vx_reference)in1,
+    (vx_reference)in2,
+    (vx_reference)scale,
+    VX_NULL,
+    VX_NULL,
+    (vx_reference)out
+    };
+
+    context = vxGetContext((vx_reference)graph);
+
+    overflow_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &overflow_policy);
+    rounding_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &rounding_policy);
+    if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS) return NULL;
+
+    parameters[3]  = (vx_reference)overflow_policy_s;
+    parameters[4]  = (vx_reference)rounding_policy_s;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_DIV, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&overflow_policy_s);
     vxReleaseScalar(&rounding_policy_s);
@@ -1519,13 +1674,132 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTableLookupNode(
 
 VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(
     vx_graph graph,
-    vx_tensor in,
-    vx_tensor out,
+    vx_tensor inputs,
+    vx_tensor outputs,
     vx_uint32 dim1,
     vx_uint32 dim2)
 {
-    /* to do */
-    return VX_NULL;
+    vx_context context;
+    vx_node    node;
+    vx_uint32  nt;
+    vx_uint32  indims[VX_CONTEXT_TENSOR_MAX_DIMENSION], outdims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    vx_array perm = VX_NULL;
+    vx_scalar pnum = VX_NULL;
+
+    vx_reference parameters[] = {
+    (vx_reference)inputs,
+    VX_NULL,
+    VX_NULL,
+    (vx_reference)outputs
+    };
+
+    context = vxGetContext((vx_reference)graph);
+
+    if (dim1 == dim2)
+        return VX_NULL;
+
+    vxQueryTensor(inputs, VX_TENSOR_NUM_OF_DIMS, &nt, sizeof(nt));
+    if (dim1 >= nt || dim2 >= nt) return VX_NULL;
+
+    vxoTensor_GetTensorDimStride(inputs, &nt, indims, VX_NULL);
+    vxoTensor_GetTensorDimStride(outputs, &nt, outdims, VX_NULL);
+    if (indims[dim1] != outdims[dim2] || indims[dim2] != outdims[dim1]) return VX_NULL;
+
+    perm = vxCreateArray(context, VX_TYPE_UINT32, nt);
+    if (!vxoArray_AllocateMemory(perm))
+    {
+        return VX_NULL;
+    }
+    else
+    {
+        vx_uint32 i;
+        vx_uint32* pos = (vx_uint32*)perm->memory.logicals[0];
+        for (i=0; i<nt; i++) pos[i] = i;
+        pos[dim1] = dim2;
+        pos[dim2] = dim1;
+    }
+
+    pnum = vxCreateScalar(context, VX_TYPE_UINT32, &nt);
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
+
+    parameters[1]  = (vx_reference)perm;
+    parameters[2]  = (vx_reference)pnum;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_TRANS, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseArray(&perm);
+    vxReleaseScalar(&pnum);
+
+    return node;
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxTensorPermuteNode(
+    vx_graph        graph,
+    vx_tensor       inputs,
+    vx_tensor       outputs,
+    vx_uint32*      perm,
+    vx_uint32       sizes_of_perm
+    )
+{
+    vx_context context;
+    vx_node    node;
+    vx_uint32  i, nt;
+    vx_uint32  indims[VX_CONTEXT_TENSOR_MAX_DIMENSION], outdims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    vx_array perma = VX_NULL;
+    vx_scalar pnum = VX_NULL;
+
+    vx_reference parameters[] = {
+    (vx_reference)inputs,
+    VX_NULL,
+    VX_NULL,
+    (vx_reference)outputs
+    };
+
+    context = vxGetContext((vx_reference)graph);
+
+    vxQueryTensor(inputs, VX_TENSOR_NUM_OF_DIMS, &nt, sizeof(nt));
+
+    if (perm == VX_NULL) sizes_of_perm = nt;
+    else if (sizes_of_perm > nt) return VX_NULL;
+
+    vxoTensor_GetTensorDimStride(inputs, &nt, indims, VX_NULL);
+    vxoTensor_GetTensorDimStride(outputs, &nt, outdims, VX_NULL);
+    for (i = 0; i < sizes_of_perm; i++)
+    {
+        if (indims[perm[i]] != outdims[i])
+            return VX_NULL;
+    }
+
+    perma = vxCreateArray(context, VX_TYPE_UINT32, nt);
+    if (!vxoArray_AllocateMemory(perma))
+    {
+        return VX_NULL;
+    }
+    else
+    {
+        vx_uint32 i;
+        vx_uint32* pos = (vx_uint32*)perma->memory.logicals[0];
+        for (i=0; i<nt; i++)
+        {
+            if (perm == VX_NULL) pos[i] = nt - i - 1;
+            else pos[i] = i < sizes_of_perm ? perm[i] : i;
+        }
+    }
+
+    pnum = vxCreateScalar(context, VX_TYPE_UINT32, &sizes_of_perm);
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
+
+    parameters[1]  = (vx_reference)perma;
+    parameters[2]  = (vx_reference)pnum;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_TRANS, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseArray(&perma);
+    vxReleaseScalar(&pnum);
+
+    return node;
 }
 
 VX_API_ENTRY vx_node VX_API_CALL vxLeakyReluLayer(
@@ -1557,53 +1831,39 @@ VX_API_ENTRY vx_node VX_API_CALL vxLeakyReluLayer(
 
 VX_API_ENTRY vx_node VX_API_CALL vxBatchNormalizationLayer(
     vx_graph                    graph,
-    vx_bool                     global,
-    vx_float32                  maf,
     vx_float32                  eps,
     vx_tensor                   mean,
     vx_tensor                   variance,
     vx_tensor                   gamma,
     vx_tensor                   beta,
-    vx_tensor                   outputs
+    vx_tensor                   input,
+    vx_tensor                   output
     )
 {
     vx_context context;
     vx_node    node;
 
-    vx_scalar global_s      = VX_NULL;
-    vx_scalar amf_s         = VX_NULL;
     vx_scalar eps_s         = VX_NULL;
 
     vx_reference parameters[] = {
-    VX_NULL,
-    VX_NULL,
     VX_NULL,
     (vx_reference)mean,
     (vx_reference)variance,
     (vx_reference)gamma,
     (vx_reference)beta,
-    (vx_reference)outputs
+    (vx_reference)input,
+    (vx_reference)output
     };
 
     context = vxGetContext((vx_reference)graph);
 
-    global_s = vxCreateScalar(context, VX_TYPE_BOOL, &global);
-    if (vxoReference_GetStatus((vx_reference)global_s) != VX_SUCCESS) return (vx_node)global_s;
-
-    amf_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &maf);
-    if (vxoReference_GetStatus((vx_reference)amf_s) != VX_SUCCESS) return (vx_node)amf_s;
-
     eps_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &eps);
     if (vxoReference_GetStatus((vx_reference)eps_s) != VX_SUCCESS) return (vx_node)eps_s;
 
-    parameters[0]  = (vx_reference)global_s;
-    parameters[1]  = (vx_reference)amf_s;
-    parameters[2]  = (vx_reference)eps_s;
+    parameters[0]  = (vx_reference)eps_s;
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_BATCH_NORM, parameters, vxmLENGTH_OF(parameters));
 
-    vxReleaseScalar(&global_s);
-    vxReleaseScalar(&amf_s);
     vxReleaseScalar(&eps_s);
 
     return node;
@@ -1613,44 +1873,234 @@ VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
     vx_graph                    graph,
     vx_tensor                   score,
     vx_tensor                   bbox,
-    vx_tensor                   outputs
+    vx_tensor                   anchors,
+    vx_tensor                   img_info,
+    const vx_nn_rpn_params_t *  rpn_params,
+    vx_size                     size_of_rpn_params,
+    vx_tensor                   roi_output,
+    vx_tensor                   score_output
     )
 {
+    vx_context  context;
+    vx_node     node;
+
+    vx_scalar   feature_stride_s    = VX_NULL;
+    vx_scalar   min_size_s          = VX_NULL;
+    vx_scalar   pre_nms_topn_s      = VX_NULL;
+    vx_scalar   post_nms_topn_s     = VX_NULL;
+    vx_scalar   nms_thresh_s        = VX_NULL;
+
     vx_reference parameters[] = {
         (vx_reference)score,
         (vx_reference)bbox,
-        (vx_reference)outputs
-    };
-
-    return vxoNode_CreateSpecific(graph, VX_KERNEL_NN_RPN, parameters, vxmLENGTH_OF(parameters));
-}
-
-VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
-    vx_graph                    graph,
-    vx_tensor                   input_data,
-    vx_tensor                   input_rois,
-    vx_enum                     pool_type,
-    vx_tensor                   output_arr
-    )
-{
-    vx_reference parameters[] = {
-        (vx_reference)input_data,
-        (vx_reference)input_rois,
+        (vx_reference)anchors,
+        (vx_reference)img_info,
         NULL,
-        (vx_reference)output_arr
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        (vx_reference)roi_output,
+        (vx_reference)score_output
     };
 
-    vx_context context = vxGetContext((vx_reference)graph);
-    vx_node node;
-    vx_scalar pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &pool_type);
-    if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) return (vx_node)pool_types;
+    context = vxGetContext((vx_reference)graph);
 
-    parameters[2]  = (vx_reference)pool_types;
-    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_ROIPOOL, parameters, vxmLENGTH_OF(parameters));
+    feature_stride_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->feature_stride);
+    if (vxoReference_GetStatus((vx_reference)feature_stride_s) != VX_SUCCESS) return (vx_node)feature_stride_s;
 
-    vxReleaseScalar(&pool_types);
+    min_size_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->min_size);
+    if (vxoReference_GetStatus((vx_reference)min_size_s) != VX_SUCCESS) return (vx_node)min_size_s;
+
+    pre_nms_topn_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->pre_nms_topn);
+    if (vxoReference_GetStatus((vx_reference)pre_nms_topn_s) != VX_SUCCESS) return (vx_node)pre_nms_topn_s;
+
+    post_nms_topn_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->post_nms_topn);
+    if (vxoReference_GetStatus((vx_reference)post_nms_topn_s) != VX_SUCCESS) return (vx_node)post_nms_topn_s;
+
+    nms_thresh_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &rpn_params->nms_thresh);
+    if (vxoReference_GetStatus((vx_reference)nms_thresh_s) != VX_SUCCESS) return (vx_node)nms_thresh_s;
+
+    parameters[4]  = (vx_reference)feature_stride_s;
+    parameters[5]  = (vx_reference)min_size_s;
+    parameters[6]  = (vx_reference)pre_nms_topn_s;
+    parameters[7]  = (vx_reference)post_nms_topn_s;
+    parameters[8]  = (vx_reference)nms_thresh_s;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_RPN, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&feature_stride_s);
+    vxReleaseScalar(&min_size_s);
+    vxReleaseScalar(&pre_nms_topn_s);
+    vxReleaseScalar(&post_nms_topn_s);
+    vxReleaseScalar(&nms_thresh_s);
 
     return node;
 }
 
+VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
+    vx_graph  graph,
+    vx_tensor input_data,
+    vx_tensor input_rois,
+    const vx_nn_roi_pool_params_t *roi_pool_params,
+    vx_size size_of_roi_params,
+    vx_tensor output_arr
+    )
+{
+    if (size_of_roi_params != sizeof(vx_nn_roi_pool_params_ext_t))
+    {
+        return VX_NULL;
+    }
+    else
+    {
+
+        vx_reference parameters[] = {
+            (vx_reference)input_data,
+            (vx_reference)input_rois,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            (vx_reference)output_arr
+        };
+
+        vx_context context = vxGetContext((vx_reference)graph);
+        vx_node node;
+
+        vx_scalar pool_types = NULL;
+        vx_scalar spatial_scales = NULL;
+        vx_scalar pooled_heights = NULL;
+        vx_scalar pooled_widths = NULL;
+
+        vx_nn_roi_pool_params_ext_t * roi_pool_params_ext = (vx_nn_roi_pool_params_ext_t *)roi_pool_params;
+
+        pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &roi_pool_params_ext->khr.pool_type);
+        if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) return (vx_node)pool_types;
+
+        spatial_scales = vxCreateScalar(context, VX_TYPE_FLOAT32, &roi_pool_params_ext->spatial_scale);
+        if (vxoReference_GetStatus((vx_reference)spatial_scales) != VX_SUCCESS) return (vx_node)spatial_scales;
+
+        pooled_heights = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_height);
+        if (vxoReference_GetStatus((vx_reference)pooled_heights) != VX_SUCCESS) return (vx_node)pooled_heights;
+
+        pooled_widths = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_width);
+        if (vxoReference_GetStatus((vx_reference)pooled_widths) != VX_SUCCESS) return (vx_node)pooled_widths;
+
+        parameters[2]  = (vx_reference)pool_types;
+        parameters[3]  = (vx_reference)spatial_scales;
+        parameters[4]  = (vx_reference)pooled_heights;
+        parameters[5]  = (vx_reference)pooled_widths;
+
+        node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_ROIPOOL, parameters, vxmLENGTH_OF(parameters));
+
+        vxReleaseScalar(&pool_types);
+        vxReleaseScalar(&spatial_scales);
+        vxReleaseScalar(&pooled_heights);
+        vxReleaseScalar(&pooled_widths);
+
+        return node;
+    }
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    vx_uint32                   stride,
+    vx_tensor                   outputs
+    )
+{
+    vx_reference parameters[] = {
+        (vx_reference)inputs,
+        VX_NULL,
+        (vx_reference)outputs
+    };
+
+    vx_node node = VX_NULL;
+
+    vx_scalar strides = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride);
+    if (vxoReference_GetStatus((vx_reference)strides) != VX_SUCCESS) return (vx_node)strides;
+
+    parameters[1]  = (vx_reference)strides;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_REORG_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&strides);
+
+    return node;
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    vx_tensor                   outputs
+    )
+{
+    vx_reference parameters[] = {
+        (vx_reference)inputs,
+        (vx_reference)outputs
+    };
+
+    vx_node node = VX_NULL;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_L2NORMALIZE_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    return node;
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
+    vx_graph graph,
+    vx_tensor inputs,
+    vx_tensor weights,
+    vx_tensor  biases,
+    const vx_nn_deconvolution_params_t *deconvolution_params,
+    vx_size size_of_deconv_params,
+    vx_tensor outputs)
+{
+    if (size_of_deconv_params != sizeof(vx_nn_deconvolution_params_ext_t))
+    {
+        return NULL;
+    }
+    else
+    {
+        vx_node node = VX_NULL;
+        vx_int32 i = 0;
+        vx_nn_deconvolution_params_ext_t *deconvolution_params_ext = (vx_nn_deconvolution_params_ext_t *)deconvolution_params;
+        vx_reference parameters[] = {
+            (vx_reference)inputs,
+            (vx_reference)weights,
+            (vx_reference)biases,
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->khr.padding_x),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->khr.padding_y),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &deconvolution_params_ext->khr.overflow_policy),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &deconvolution_params_ext->khr.rounding_policy),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &deconvolution_params_ext->khr.a_x),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &deconvolution_params_ext->khr.a_y),
+            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->channel_group),
+            (vx_reference)outputs,
+        };
+
+        node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_DECONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+        for (i = 3; i < (gcmCOUNTOF(parameters) - 1); i ++)
+            vxReleaseScalar((vx_scalar*)&parameters[i]);
+
+        return node;
+    }
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxTensorCopyNode(
+    vx_graph graph,
+    vx_tensor src,
+    vx_tensor dst)
+{
+    vx_node node = VX_NULL;
+    vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)dst
+    };
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_COPY, parameters, vxmLENGTH_OF(parameters));
+
+    return node;
+}
 

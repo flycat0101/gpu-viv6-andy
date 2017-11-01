@@ -13,16 +13,15 @@
 
 #include "gc_es_context.h"
 #include "gc_es_object_inline.c"
-#ifdef OPENGL40
-#include "gc_gl_debug.h"
-#endif
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
 
 extern GLvoid __glDrawPrimitive(__GLcontext *gc, GLenum mode);
 extern GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint name);
-
+#ifdef OPENGL40
+extern GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode);
+#endif
 
 
 __GL_INLINE GLvoid __glVertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
@@ -178,7 +177,7 @@ GLvoid APIENTRY __glim_VertexAttrib1s(__GLcontext *gc, GLuint index, GLshort x)
 
 GLvoid APIENTRY __glim_VertexAttrib1d(__GLcontext *gc, GLuint index, GLdouble x)
 {
-    __glVertexAttrib4f(gc, index, x, 0.0f, 0.0f, 1.0f);
+    __glVertexAttrib4f(gc, index, (GLfloat)x, 0.0f, 0.0f, 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib2s(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
@@ -189,7 +188,7 @@ GLvoid APIENTRY __glim_VertexAttrib2s(__GLcontext *gc, GLuint index, GLshort x, 
 
 GLvoid APIENTRY __glim_VertexAttrib2d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
 {
-    __glVertexAttrib4f(gc, index, x, y, 0.0f, 1.0f);
+    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, 0.0f, 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib3s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
@@ -200,7 +199,7 @@ GLvoid APIENTRY __glim_VertexAttrib3s(__GLcontext *gc, GLuint index, GLshort x, 
 
 GLvoid APIENTRY __glim_VertexAttrib3d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
 {
-    __glVertexAttrib4f(gc, index, x, y, z, 1.0f);
+    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
@@ -211,7 +210,7 @@ GLvoid APIENTRY __glim_VertexAttrib4s(__GLcontext *gc, GLuint index, GLshort x, 
 
 GLvoid APIENTRY __glim_VertexAttrib4d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
 {
-    __glVertexAttrib4f(gc, index, x, y, z, w);
+    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, (GLfloat)w);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib1sv(__GLcontext *gc, GLuint index, const GLshort *v)
@@ -222,7 +221,7 @@ GLvoid APIENTRY __glim_VertexAttrib1sv(__GLcontext *gc, GLuint index, const GLsh
 
 GLvoid APIENTRY __glim_VertexAttrib1dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], 0.0f, 0.0f, 1.0f);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], 0.0f, 0.0f, 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib2sv(__GLcontext *gc, GLuint index, const GLshort *v)
@@ -233,7 +232,7 @@ GLvoid APIENTRY __glim_VertexAttrib2sv(__GLcontext *gc, GLuint index, const GLsh
 
 GLvoid APIENTRY __glim_VertexAttrib2dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc,index, v[0], v[1], 0.0f, 1.0f);
+    __glVertexAttrib4f(gc,index, (GLfloat)v[0], (GLfloat)v[1], 0.0f, 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib3sv(__GLcontext *gc, GLuint index, const GLshort *v)
@@ -243,43 +242,43 @@ GLvoid APIENTRY __glim_VertexAttrib3sv(__GLcontext *gc, GLuint index, const GLsh
 
 GLvoid APIENTRY __glim_VertexAttrib3dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], 1.0f);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], 1.0f);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4usv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib4dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nub(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
@@ -324,12 +323,136 @@ GLvoid APIENTRY __glim_VertexAttrib4Nuiv(__GLcontext *gc, GLuint index, const GL
         __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]));
 }
 
+GLvoid GL_APIENTRY __glim_VertexAttribI1i(__GLcontext *gc, GLuint index, GLint x)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, 0, 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI2i(__GLcontext *gc, GLuint index, GLint x, GLint y)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, 0, 0);
+
+    __GL_FOOTER();
+}
+
+
+GLvoid GL_APIENTRY __glim_VertexAttribI3i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI1ui(__GLcontext *gc, GLuint index, GLuint x)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, 0, 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI2ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI3ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI1iv(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)v[0], 0, 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI2iv(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)v[0], (GLuint)v[1], 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI3iv(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, (GLuint)v[0], (GLuint)v[1], (GLuint)v[2], 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI1uiv(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, v[0], 0, 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI2uiv(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, v[0], v[1], 0, 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    __GL_HEADER();
+
+    __glVertexAttribI4ui(gc, index, v[0], v[1], v[2], 0);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI4sv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+}
+
+GLvoid GL_APIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+}
+
 GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
 {
     __GLvertexAttrib *pAttrib;
     __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
     GLuint bit;
-
 
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
@@ -2217,6 +2340,7 @@ GLboolean GL_APIENTRY __gles_IsVertexArray(__GLcontext *gc, GLuint array)
     return (gcvNULL != __glGetObject(gc, gc->vertexArray.noShare, array));
 }
 
+
 #if GL_EXT_multi_draw_arrays
 GLvoid GL_APIENTRY __gles_MultiDrawArraysEXT(__GLcontext *gc, GLenum mode, const GLint *first,
                                              const GLsizei *count, GLsizei primcount)
@@ -2557,11 +2681,6 @@ GLvoid APIENTRY __glim_VertexPointer(__GLcontext *gc, GLint size, GLenum type, G
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_VertexPointer", DT_GLint, size, DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
-
     if (stride < 0 || size < 2 || size > 4)
     {
         __glSetError(gc, GL_INVALID_VALUE);
@@ -2593,11 +2712,6 @@ GLvoid APIENTRY __glim_VertexPointer(__GLcontext *gc, GLint size, GLenum type, G
 GLvoid APIENTRY __glim_NormalPointer(__GLcontext *gc, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_NormalPointer", DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
 
     if (stride < 0)
     {
@@ -2632,11 +2746,6 @@ GLvoid APIENTRY __glim_NormalPointer(__GLcontext *gc, GLenum type, GLsizei strid
 GLvoid APIENTRY __glim_ColorPointer(__GLcontext *gc, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ColorPointer", DT_GLint, size, DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
 
     if (stride < 0 || size < 3 || size > 4)
     {
@@ -2675,11 +2784,6 @@ GLvoid APIENTRY __glim_SecondaryColorPointer(__GLcontext *gc, GLint size, GLenum
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_SecondaryColorPointer", DT_GLint, size, DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
-
     if (stride < 0 || size != 3)
     {
         __glSetError(gc, GL_INVALID_VALUE);
@@ -2717,11 +2821,6 @@ GLvoid APIENTRY __glim_FogCoordPointer(__GLcontext *gc, GLenum type, GLsizei str
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_FogCoordPointer", DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
-
     if (stride < 0)
     {
         __glSetError(gc, GL_INVALID_VALUE);
@@ -2753,11 +2852,6 @@ GLvoid APIENTRY __glim_EdgeFlagPointer(__GLcontext *gc,  GLsizei stride, const G
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_EdgeFlagPointer", DT_GLint, stride, DT_GLboolean_ptr, ptr, DT_GLnull);
-#endif
-
     if (stride < 0)
     {
         __glSetError(gc, GL_INVALID_VALUE);
@@ -2778,11 +2872,6 @@ GLvoid APIENTRY __glim_EdgeFlagPointer(__GLcontext *gc,  GLsizei stride, const G
 GLvoid APIENTRY __glim_IndexPointer(__GLcontext *gc, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_IndexPointer", DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
 
     if (stride < 0)
     {
@@ -2816,11 +2905,6 @@ GLvoid APIENTRY __glim_IndexPointer(__GLcontext *gc, GLenum type, GLsizei stride
 GLvoid APIENTRY __glim_TexCoordPointer(__GLcontext *gc, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_TexCoordPointer", DT_GLint, size, DT_GLenum, type, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
 
     if (stride < 0 || size < 1 || size > 4)
     {
@@ -2913,11 +2997,6 @@ GLvoid APIENTRY __glim_InterleavedArrays(__GLcontext *gc, GLenum format, GLsizei
     GLint c, f;
 
     __GL_SETUP_NOT_IN_BEGIN(gc);
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_InterleavedArrays", DT_GLenum, format, DT_GLsizei, stride, DT_GLvoid_ptr, pointer, DT_GLnull);
-#endif
 
     f = __GL_SIZE_F;
     c = __GL_SIZE_C;
@@ -3104,13 +3183,6 @@ GLvoid APIENTRY __glim_InterleavedArrays(__GLcontext *gc, GLenum format, GLsizei
 
 GLvoid APIENTRY __glim_DrawArrays_Validate(__GLcontext *gc, GLenum mode, GLint first, GLsizei count)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_DrawArrays_Validate", DT_GLenum, mode, DT_GLint, first, DT_GLsizei, count, DT_GLnull);
-#endif
-
     /* Compute the required primitive input mask */
     if (gc->input.inputMaskChanged)
     {
@@ -3128,13 +3200,6 @@ GLvoid APIENTRY __glim_DrawArrays_Validate(__GLcontext *gc, GLenum mode, GLint f
 
 GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
-//    __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_DrawElements_Validate", DT_GLenum, mode, DT_GLsizei, count, DT_GLenum, type, DT_GLvoid_ptr, indices, DT_GLnull);
-#endif
-
     /* Compute the required primitive input mask */
     if (gc->input.inputMaskChanged)
     {
@@ -3152,13 +3217,6 @@ GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsiz
 
 GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
 {
- //   __GL_SETUP();
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ArrayElement_Validate", DT_GLint, element, DT_GLnull);
-#endif
-
     /* Compute the required primitive input mask */
     if (gc->input.inputMaskChanged)
     {
@@ -3176,7 +3234,6 @@ GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
 
 GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
 {
-//    __GL_SETUP();
     GLfloat dataBuf[__GL_TOTAL_VERTEX_ATTRIBUTES * 4];
     GLuint tagBuf[__GL_TOTAL_VERTEX_ATTRIBUTES];
     GLboolean edgeflag;
@@ -3184,11 +3241,6 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
     GLubyte *edgeptr = (GLubyte *)&edgeflag;
     GLint i, index, loop;
     GLenum error;
-
-#if (defined(_DEBUG) || defined(DEBUG))
-    if(dbg_logAPIFilter)
-        dbgLogFullApi("__glim_ArrayElement", DT_GLint, element, DT_GLnull);
-#endif
 
     __GL_MEMZERO(tagBuf, __GL_TOTAL_VERTEX_ATTRIBUTES * sizeof(GLuint));
 
@@ -3322,5 +3374,46 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         }
         i++;
     }
+}
+GLvoid GL_APIENTRY __glim_MultiDrawArrays(__GLcontext *gc, GLenum mode, const GLint *first,
+                                             const GLsizei *count, GLsizei primcount)
+{
+    GLsizei i;
+
+    __GL_HEADER();
+
+    if (primcount < 0 || !first || !count)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    for (i = 0; i < primcount; ++i)
+    {
+        __gles_DrawArrays(gc, mode, first[i], count[i]);
+    }
+
+OnError:
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLsizei *count,
+                                               GLenum type, const GLvoid*const*indices, GLsizei primcount)
+{
+    GLsizei i;
+
+    __GL_HEADER();
+
+    if (primcount < 0 || !count || !indices)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    for (i = 0; i < primcount; ++i)
+    {
+        __gles_DrawElements(gc, mode, count[i], type, indices[i]);
+    }
+
+OnError:
+    __GL_FOOTER();
 }
 #endif

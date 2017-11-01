@@ -1696,6 +1696,12 @@ void  vgDrawImage(VGImage image)
     OVG_GET_CONTEXT(OVG_NO_RETVAL);
     vgmGetApiStartTime();
     vgmPROFILE(context, VGDRAWIMAGE, 0);
+
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_BEGIN, 0);
+    }
+
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_TYPE, (gctUINTPTR_T)VG_IMAGE);
     vgmPROFILE(context, VG_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)1);
 
@@ -1727,7 +1733,14 @@ void  vgDrawImage(VGImage image)
     {
         gcmVERIFY_OK(gco3D_SetAntiAlias(context->engine, gcvTRUE));
     }*/
+#if VIVANTE_PROFILER
+    vgmPROFILE(context, VG_PROFILER_PRIMITIVE_END, 0);
 
+    if (context->profiler.enable && context->profiler.perDrawMode)
+    {
+        _vgshProfilerSet(context, VG_PROFILER_DRAW_END, 0);
+    }
+#endif
 Error:
     vgmGetApiEndTime(context);
     gcmFOOTER_NO();

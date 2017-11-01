@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Vulkan
+Description: Vivante Vulkan library
+Version: 1.0.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -lvulkan

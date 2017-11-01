@@ -106,40 +106,43 @@ gcChipProcessPixelStore(
     gctSIZE_T skipImgs,
     gctSIZE_T *pRowStride,
     gctSIZE_T *pImgHeight,
-    const GLvoid** pBuf
+    gctSIZE_T *pSkipBytes
     )
 {
-
     gctSIZE_T bpp = 0;
     gctSIZE_T rowStride = 0;
-    gctSIZE_T imgStride = 0;
-    gctSIZE_T imgLength = packMode->lineLength ? (gctSIZE_T)packMode->lineLength : width;
+    gctSIZE_T imgLength = packMode->lineLength  ? (gctSIZE_T)packMode->lineLength  : width;
     gctSIZE_T imgHeight = packMode->imageHeight ? (gctSIZE_T)packMode->imageHeight : height;
-    const GLbyte* buf = *pBuf;
 
     gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u format=0x%04x type=0x%04x "
-                  "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pBuf=0x%x",
+                  "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pSkipBytes=0x%x",
                   gc, packMode, width, height, format, type, skipImgs,
-                  pRowStride, pImgHeight, pBuf);
+                  pRowStride, pImgHeight, pSkipBytes);
 
     /* pixel store unpack parameters */
     gcChipUtilGetImageFormat(format, type, gcvNULL, &bpp);
 
     rowStride = gcmALIGN(bpp * imgLength / 8, packMode->alignment);
-    imgStride = rowStride * imgHeight;
-    *pBuf = (GLbyte*)buf
-          + skipImgs * imgStride                /* skip images */
-          + packMode->skipLines * rowStride     /* skip lines */
-          + packMode->skipPixels * bpp / 8;     /* skip pixels */
 
     if (pRowStride)
     {
         *pRowStride = rowStride;
     }
+
     if (pImgHeight)
     {
         *pImgHeight = imgHeight;
     }
+
+    if (pSkipBytes)
+    {
+        gctSIZE_T imgStride = rowStride * imgHeight;
+
+        *pSkipBytes = skipImgs * imgStride                /* skip images */
+                    + packMode->skipLines * rowStride     /* skip lines */
+                    + packMode->skipPixels * bpp / 8;     /* skip pixels */
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -307,201 +310,6 @@ OnError:
     return GL_TRUE;
 #endif
 }
-
-GLboolean
-__glChipReadPixels(
-    __GLcontext *gc,
-    GLint x,
-    GLint y,
-    GLsizei width,
-    GLsizei height,
-    GLenum format,
-    GLenum type,
-    GLubyte *buf
-    )
-{
-    __GLclientPixelState *ps = &gc->clientState.pixel;
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
-    gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
-    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-    gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
-    GLint right, bottom;
-    gctUINT w, h;
-    GLint dx, dy, sx, sy, Width, Height;
-    gctUINT dstWidth, dstHeight;
-    __GLbufferObject *packBufObj = gcvNULL;
-    GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)width;
-    GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
-    __GLformatInfo *formatInfo;
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("gc=0x%x x=%d y=%d width=%d height=%d format=0x%04x type=0x%04x buf=%x",
-                   gc, x, y, width, height, format, type, buf);
-
-    /* If chipCtx->readRT is a shadow surface, we should sync it to master resource
-    ** And read pixels from master resource, as shadow resource may have different
-    ** meaning (format) with master surface, such as SRGB encoding.
-    ** Even for the same format between shadow and master, then we only sync once.
-    */
-
-    /* FIXME: Here we don't consider offset in surface for reading.
-    ** If we read a face of a cube or one of array texture, we should set surface offset
-    ** And all surface function should take offset into consideration
-    */
-    srcView = gcChipMasterSyncFromShadow(gc, &chipCtx->readRtView, GL_TRUE);
-
-    switch (type)
-    {
-    case GL_UNSIGNED_BYTE:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A8B8G8R8;
-        }
-        else if (format == GL_BGRA_EXT)
-        {
-            wrapformat = gcvSURF_A8R8G8B8;
-        }
-        break;
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A2B10G10R10;
-        }
-        break;
-    case GL_FLOAT:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A32B32G32R32F;
-        }
-        break;
-    case GL_UNSIGNED_INT:
-        if (format == GL_RGBA_INTEGER)
-        {
-            wrapformat = gcvSURF_A32B32G32R32UI;
-        }
-        break;
-    case GL_INT:
-        if (format == GL_RGBA_INTEGER)
-        {
-            wrapformat = gcvSURF_A32B32G32R32I;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
-        {
-            wrapformat = gcvSURF_A4R4G4B4;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
-        {
-            wrapformat = gcvSURF_A1R5G5B5;
-        }
-        break;
-    default:
-        break;
-    }
-
-    /* Check if framebuffer is complete */
-    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
-    {
-        formatInfo = gc->drawablePrivate->rtFormatInfo;
-    }
-    else
-    {
-        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-        formatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
-    }
-
-    if (formatInfo == gcvNULL)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
-    if (gcvSURF_UNKNOWN == wrapformat)
-    {
-        __GLchipFmtMapInfo *formatMapInfo = gcChipGetFormatMapInfo(gc, formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
-        wrapformat = formatMapInfo->requestFormat;
-    }
-
-    /* The image is from pack buffer object? */
-    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
-    if (packBufObj)
-    {
-        gcmONERROR(gcChipProcessPBO(gc, packBufObj, (const GLvoid**)&buf));
-    }
-    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
-                            format, type, 0, gcvNULL, gcvNULL, (const GLvoid**)&buf);
-
-    /* Create the wrapper surface. */
-    gcmONERROR(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
-                                 wrapformat, gcvPOOL_USER, &dstView.surf));
-    gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, width, height, lineLength, imageHeight, wrapformat));
-    gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, buf, gcvINVALID_ADDRESS));
-
-    gcmONERROR(gcoSURF_GetSize(srcView.surf, &w, &h, gcvNULL));
-    right  = gcmMIN(x + width,  (gctINT) w);
-    bottom = gcmMIN(y + height, (gctINT) h);
-    gcmONERROR(gcoSURF_GetSize(dstView.surf, &dstWidth, &dstHeight, gcvNULL));
-
-    /*
-    ** Set Non-Linear space for SRGB8_ALPHA8
-    */
-    if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
-    {
-        gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
-    }
-
-    sx = x;
-    sy = y;
-    dx = 0;
-    dy = 0;
-    Width = right - x;
-    Height = bottom - y;
-
-    if (!gcChipUtilCalculateArea(&dx, &dy, &sx, &sy, &Width, &Height, dstWidth, dstHeight, w, h))
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
-    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-    rlvArgs.uArgs.v2.yInverted   = chipCtx->readYInverted;
-    rlvArgs.uArgs.v2.srcOrigin.x = sx;
-    rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted ? (GLint)(h - (sy + Height)) : sy;
-    rlvArgs.uArgs.v2.dstOrigin.x = dx;
-    rlvArgs.uArgs.v2.dstOrigin.y = dy;
-    rlvArgs.uArgs.v2.rectSize.x  = Width;
-    rlvArgs.uArgs.v2.rectSize.y  = Height;
-    rlvArgs.uArgs.v2.numSlices   = 1;
-    rlvArgs.uArgs.v2.dump        = gcvTRUE;
-    gcmONERROR(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
-
-OnError:
-    if (packBufObj) /* The image is from pack buffer object */
-    {
-        /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.
-        ** Instead it will be flushed when unlock the packed buffer as non-user pool node.
-        */
-        gcmVERIFY_OK(gcChipPostProcessPBO(gc, packBufObj, GL_TRUE));
-    }
-
-    if (dstView.surf)
-    {
-        gcoSURF_Destroy(dstView.surf);
-    }
-
-    if (gcmIS_ERROR(status))
-    {
-        gcChipSetError(chipCtx, status);
-        gcmFOOTER_ARG("return=%d", GL_FALSE);
-        return GL_FALSE;
-    }
-    else
-    {
-        gcmFOOTER_ARG("return=%d", GL_TRUE);
-        return GL_TRUE;
-    }
-}
-
 #ifdef OPENGL40
 GLvoid  __glChipCreateAccumBufferInfo(__GLcontext* gc,
                               gcoSURF accumSurf,
@@ -521,6 +329,7 @@ GLvoid  __glChipCreateAccumBufferInfo(__GLcontext* gc,
     gcChipclearAccumBuffer(gc, chipAccumBuffer);
     glDrawable->accumBuffer.privateData = chipAccumBuffer;
 }
+
 GLvoid initAccumOperationPatch(__GLcontext* gc)
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -541,7 +350,7 @@ GLvoid initAccumOperationPatch(__GLcontext* gc)
         return;
     }
 
-    gcoSURF_GetFormat(((gcoSURF)(draw->rtHandle[0])), NULL, &format);
+    gcoSURF_GetFormat(((gcoSURF)(draw->rtHandles[0])), NULL, &format);
     textureInfo->imageFormat = textureInfo->residentFormat = format;
 
     textureInfo->residentLevels = 1;
@@ -987,15 +796,16 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
     __GLbitmask texmask;
     GLint drawtofront = 0;
     gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
-    gcoSURF  renderSurf;
+    gcoSURF renderSurf = gcvNULL;
 
     __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
 
-    __GLcoord vertex[4] = {
-        {{-1.0f,-1.0f,1.0f,1.0f}},
-        {{1.0f,-1.0f,1.0f,1.0f}},
-        {{1.0f, 1.0f,1.0f,1.0f}},
-        {{-1.0f, 1.0f,1.0f,1.0f}},
+    __GLcoord vertex[4] =
+    {
+        {{-1.0f, -1.0f, 1.0f, 1.0f}},
+        {{ 1.0f, -1.0f, 1.0f, 1.0f}},
+        {{ 1.0f,  1.0f, 1.0f, 1.0f}},
+        {{-1.0f,  1.0f, 1.0f, 1.0f}},
     };
 
     /* We evaluateAttribute to update states before we change our special states */
@@ -1008,24 +818,24 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
     resetAttributes(gc, chipCtx);
 
     /* Disable color mask for accum op which target on accum buffer */
-    switch(op)
+    switch (op)
     {
-        case GL_ACCUM:
-        case GL_LOAD:
-        case GL_MULT:
-        case GL_ADD:
-            /* When accum on accum buffer, it should not affected by color mask */
-            pDispatchTable->ColorMask(gc, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-            pDispatchTable->ClampColorARB(gc, GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
-            break;
+    case GL_ACCUM:
+    case GL_LOAD:
+    case GL_MULT:
+    case GL_ADD:
+        /* When accum on accum buffer, it should not affected by color mask */
+        pDispatchTable->ColorMask(gc, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        pDispatchTable->ClampColorARB(gc, GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+        break;
 
-        case GL_RETURN:
-            /* When return to color buffer, it should be affected by color mask */
-            break;
+    case GL_RETURN:
+        /* When return to color buffer, it should be affected by color mask */
+        break;
 
-        default:
-            GL_ASSERT(0);
-            break;
+    default:
+        GL_ASSERT(0);
+        break;
     }
 
     texmask = gc->texUnitAttrDirtyMask;
@@ -1043,52 +853,54 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
 
     if (gc->drawablePrivate->width != 0 && gc->drawablePrivate->height != 0)
     {
-
         accumBuffer = (glsCHIPACCUMBUFFER*)(gc->drawablePrivate->accumBuffer.privateData);
 
-        switch(op)
+        switch (op)
         {
-            case GL_ACCUM:
-            case GL_LOAD:
-            case GL_MULT:
-            case GL_ADD:
-                switch(gc->state.pixel.readBuffer)
-                {
-                    case GL_FRONT_LEFT:
-                    case GL_FRONT_RIGHT:
-                    case GL_FRONT:
-
-                        renderSurf = (gcoSURF)(gc->readablePrivate->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
-                        break;
-
-                   case GL_BACK_LEFT:
-                   case GL_BACK_RIGHT:
-                   case GL_LEFT:
-                   case GL_RIGHT:
-                   case GL_BACK:
-                       renderSurf = (gcoSURF)(gc->readablePrivate->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
-                       break;
-                }
+        case GL_ACCUM:
+        case GL_LOAD:
+        case GL_MULT:
+        case GL_ADD:
+            switch (gc->state.pixel.readBuffer)
+            {
+            case GL_FRONT_LEFT:
+            case GL_FRONT_RIGHT:
+            case GL_FRONT:
+                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
                 break;
 
-            case GL_RETURN:
-                switch(gc->state.raster.drawBuffers[0])
-                {
-                case GL_FRONT_LEFT:
-                case GL_FRONT_RIGHT:
-                case GL_FRONT:
-                    renderSurf = (gcoSURF)(gc->readablePrivate->rtHandle[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
-                    break;
-
-                case GL_BACK_LEFT:
-                case GL_BACK_RIGHT:
-                case GL_LEFT:
-                case GL_RIGHT:
-                case GL_BACK:
-                    renderSurf = (gcoSURF)(gc->readablePrivate->rtHandle[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
-                    break;
-                }
+            case GL_BACK_LEFT:
+            case GL_BACK_RIGHT:
+            case GL_LEFT:
+            case GL_RIGHT:
+            case GL_BACK:
+                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
                 break;
+            }
+            break;
+
+        case GL_RETURN:
+            switch (gc->state.raster.drawBuffers[0])
+            {
+            case GL_FRONT_LEFT:
+            case GL_FRONT_RIGHT:
+            case GL_FRONT:
+                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
+                break;
+
+            case GL_BACK_LEFT:
+            case GL_BACK_RIGHT:
+            case GL_LEFT:
+            case GL_RIGHT:
+            case GL_BACK:
+                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
+                break;
+            }
+            break;
+
+        default:
+            GL_ASSERT(0);
+            break;
         }
 
         chipCtx->texture.sampler[0] = accumBuffer->sampler[0];
@@ -1097,45 +909,10 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
         chipCtx->texture.halTexture[1] = accumBuffer->texture[1];
 
         /* Blt rtResource to texResource if needed */
-        switch(op)
-        {
-            case GL_ACCUM:
-            case GL_MULT:
-            case GL_ADD:
-            case GL_RETURN:
-                break;
-
-            case GL_LOAD:
-                break;
-
-            default:
-                GL_ASSERT(0);
-                break;
-        }
 
         chipCtx->hashKey.accumMode = op - GL_ACCUM + gccACCUM_ACCUM;
         /* Set new RT and textures */
-        switch(op)
-        {
-            case GL_ACCUM:
-                break;
-
-            case GL_LOAD:
-                break;
-
-            case GL_MULT:
-            case GL_ADD:
-                break;
-
-            case GL_RETURN:
-                break;
-
-            default:
-               GL_ASSERT(0);
-               break;
-        }
-
-        gcoSURF_GetSize(accumBuffer->renderTarget, (gctUINT *)&drawRTWidth, (gctUINT *)&drawRTHeight, gcvNULL);
+        gcoSURF_GetSize(accumBuffer->renderTarget, (gctUINT*)&drawRTWidth, (gctUINT*)&drawRTHeight, gcvNULL);
 
         surfView.surf = accumBuffer->renderTarget;
         status = gco3D_SetTarget(chipCtx->engine, 0, &surfView, 0);
@@ -1270,9 +1047,7 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
 
     chipCtx->hashKey.accumMode = gccACCUM_UNKNOWN;
 
-
     gc->texUnitAttrDirtyMask = texmask;
-
 
     pDispatchTable->MatrixMode(gc, GL_PROJECTION);
     pDispatchTable->PopMatrix(gc);
@@ -1686,6 +1461,27 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     case GL_DEPTH_COMPONENT:
         internalFormat = format;
         break;
+/*
+    case GL_RGBA_INTEGER_EXT:
+    case GL_BGRA_INTEGER_EXT:
+        internalFormat = GL_RGBA32UI_EXT;
+        break;
+    case GL_BLUE_INTEGER_EXT:
+    case GL_GREEN_INTEGER_EXT:
+    case GL_ALPHA_INTEGER_EXT:
+        internalFormat = GL_R32UI;
+        break;
+    case GL_RGB_INTEGER_EXT:
+    case GL_BGR_INTEGER_EXT:
+        internalFormat = GL_RGB32UI_EXT;
+        break;
+    case GL_LUMINANCE_INTEGER_EXT:
+        internalFormat = GL_LUMINANCE32UI_EXT;
+        break;
+    case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+        internalFormat = GL_LUMINANCE_ALPHA32UI_EXT;
+        break;
+*/
     default:
         if(gc->modes.rgbFloatMode)
         {
@@ -1709,7 +1505,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     {
         gctUINT8* mappedPixels = gcvNULL;
         gctUINT8 index, clampIndex;
-        gctUINT32 i;
+        GLsizei i;
 
         if ((format == GL_COLOR_INDEX) && (type == GL_UNSIGNED_BYTE))
         {
@@ -1726,19 +1522,19 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
             {
                 index = ((gctUINT8*)pixels)[i];
 
-                clampIndex = gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_R - GL_PIXEL_MAP_I_TO_I].size, index);
+                clampIndex =  (gctUINT8)gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_R - GL_PIXEL_MAP_I_TO_I].size, index);
                 mappedPixels[0 + i * 4] = \
                     (gctUINT8)(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_R - GL_PIXEL_MAP_I_TO_I].base.mapF[clampIndex] * 255);
 
-                clampIndex = gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_G - GL_PIXEL_MAP_I_TO_I].size, index);
+                clampIndex =  (gctUINT8)gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_G - GL_PIXEL_MAP_I_TO_I].size, index);
                 mappedPixels[1 + i * 4] = \
                     (gctUINT8)(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_G - GL_PIXEL_MAP_I_TO_I].base.mapF[clampIndex] * 255);
 
-                clampIndex = gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_B - GL_PIXEL_MAP_I_TO_I].size, index);
+                clampIndex =  (gctUINT8)gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_B - GL_PIXEL_MAP_I_TO_I].size, index);
                 mappedPixels[2 + i * 4] = \
                     (gctUINT8)(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_B - GL_PIXEL_MAP_I_TO_I].base.mapF[clampIndex] * 255);
 
-                clampIndex = gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_A - GL_PIXEL_MAP_I_TO_I].size, index);
+                clampIndex =  (gctUINT8)gcmMIN(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_A - GL_PIXEL_MAP_I_TO_I].size, index);
                 mappedPixels[3 + i * 4] = \
                     (gctUINT8)(gc->state.pixel.pixelMap[GL_PIXEL_MAP_I_TO_A - GL_PIXEL_MAP_I_TO_I].base.mapF[clampIndex] * 255);
             }
@@ -1960,4 +1756,524 @@ GLboolean __glChipDrawPixels(__GLcontext *gc, GLsizei width, GLsizei height, GLe
     return simulatePixelOperation(gc, 0, 0, width, height, format, type, pixels, GL_TRUE);
 }
 
+#define GET_SOURCE(s) \
+    ((*s >> (srcShift)) & srcMax) \
+
+#define CONVERT_FIXED_TO_FIXED(dstDataType, srcDataType) \
+    *d = (dstDataType)__GL_FLOORF((( GET_SOURCE(s) / (gctFLOAT)(srcMax)) * (dstMax)) + 0.5) \
+
+#define CONVERT_FIXED_TO_FLOAT(dstDataType, srcDataType) \
+    *d = (dstDataType)(GET_SOURCE(s) / (gctFLOAT)(srcMax)) \
+
+#define CONVERT_NONE(dstDataType, srcDataType) \
+    *d = (dstDataType) GET_SOURCE(s) \
+
+#define CONVERT_DEPTH_PIXELS(dstDataType, srcDataType, convertFunc) \
+    do \
+    { \
+        srcDataType* s;\
+        dstDataType* d;\
+        for (j = 0; j < h; j++) \
+        {\
+            for (i = 0; i < w; i++) \
+            {\
+                s = ((srcDataType*)((gctUINT8*)srcData[0] + (j + sy) * srcStride)) + (i + sx);\
+                d = ((dstDataType*)((gctUINT8*)dstData + (j + dy) * dstStride)) + (i + dx);\
+                convertFunc(dstDataType, srcDataType);\
+            }\
+        }\
+    } while(gcvFALSE) \
+
+
+gceSTATUS
+__glChipReadDepthStencilPixels(__GLcontext *gc,
+                       GLint x, GLint y,
+                       GLsizei width, GLsizei height,
+                       GLenum format, GLenum type, GLubyte *buf)
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSURF_FORMAT srcFormat;
+    gctUINT32 srcWidth, srcHeight;
+    GLint dx, dy, sx, sy, w, h, i, j;
+    gctINT srcStride, dstStride;
+    gctUINT32 srcShift, srcMax, dstMax;
+    gctPOINTER srcData[3] = {gcvNULL};
+    gctPOINTER dstData;
+    gcsSURF_VIEW srcView = chipCtx->readDepthView;
+    gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
+
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (srcView.surf == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    gcmONERROR(gcoSURF_GetSize(srcView.surf,
+                               &srcWidth,
+                               &srcHeight,
+                               gcvNULL));
+
+    sx = x; sy = y; dx = 0; dy = 0; w = width; h = height;
+
+    if (!calculateArea(&dx, &dy, &sx, &sy,
+                        &w, &h, width, height,
+                        srcWidth, srcHeight))
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    {
+        /* limitation : */
+        /* 1. Enable FC, can not use CopyPixels directly */
+        /* 2. can not resolve a depth surface to a user surface */
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        gcmONERROR(gcoSURF_GetFormat(srcView.surf, gcvNULL, &srcFormat));
+
+        gcmONERROR(gcoSURF_Construct(gcvNULL,
+                                     w, h, 1,
+                                     gcvSURF_BITMAP,
+                                     srcFormat,
+                                     gcvPOOL_DEFAULT,
+                                     &tmpView.surf));
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted = gcvTRUE;
+        rlvArgs.uArgs.v2.srcOrigin.x = sx;
+        rlvArgs.uArgs.v2.srcOrigin.y = sy;
+        rlvArgs.uArgs.v2.rectSize.x  = w;
+        rlvArgs.uArgs.v2.rectSize.y  = h;
+        rlvArgs.uArgs.v2.numSlices   = 1;
+        gcmONERROR(gcoSURF_ResolveRect(&srcView, &tmpView, &rlvArgs));
+
+        gcmONERROR(gcoSURF_Flush(tmpView.surf));
+
+        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
+    }
+
+    gcmONERROR(gcoSURF_GetAlignedSize(
+        tmpView.surf,
+        gcvNULL,
+        gcvNULL,
+        &srcStride));
+
+    gcmONERROR(gcoSURF_Lock(tmpView.surf, gcvNULL, srcData));
+
+    dstData = buf; sx = 0; sy = 0;
+
+    switch (srcFormat)
+    {
+    case gcvSURF_D16:
+        srcShift = 0;
+        srcMax = (1 << 16) - 1;
+
+        switch(type)
+        {
+        case GL_UNSIGNED_SHORT:
+            dstMax = 0;
+            dstStride = width * 2;
+            CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT16, CONVERT_NONE);
+            break;
+        case GL_UNSIGNED_BYTE:
+            dstMax = (1 << 8) - 1;
+            dstStride = width;
+            CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT16, CONVERT_FIXED_TO_FIXED);
+            break;
+        default : break;
+        }
+        break;
+
+    case gcvSURF_D24S8:
+        srcShift = (format == GL_DEPTH_COMPONENT) ? 8 : 0;
+        srcMax = (format == GL_DEPTH_COMPONENT) ? ((1 << 24) - 1) : ((1 << 8) - 1);
+
+        switch(type)
+        {
+        case GL_FLOAT:
+            dstMax = 0;
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT32, CONVERT_FIXED_TO_FLOAT);
+            break;
+        case GL_UNSIGNED_SHORT:
+            dstMax = (1 << 16) - 1;
+            dstStride = width * 2;
+            CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT32, CONVERT_FIXED_TO_FIXED);
+            break;
+        case GL_UNSIGNED_INT:
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+            break;
+        case GL_UNSIGNED_INT_24_8_EXT:
+            srcShift = 0;
+            srcMax = 0xFFFFFFFF;
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+            break;
+        case GL_UNSIGNED_BYTE:
+            dstStride = width;
+            if (format == GL_STENCIL_INDEX)
+            {
+                dstMax = 0;
+                CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_NONE);
+            }
+            else
+            {
+                dstMax = (1 << 8) - 1;
+                CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_FIXED_TO_FIXED);
+            }
+            break;
+        default : break;
+        }
+        break;
+
+    default :
+        break;
+    }
+
+    gcoSURF_Unlock(tmpView.surf, gcvNULL);
+
+OnError:
+
+    if (tmpView.surf != gcvNULL)
+    {
+        gcoSURF_Destroy(tmpView.surf);
+    }
+
+    return status;
+
+}
 #endif
+
+GLboolean
+__glChipReadPixels(
+    __GLcontext *gc,
+    GLint x,
+    GLint y,
+    GLsizei width,
+    GLsizei height,
+    GLenum format,
+    GLenum type,
+    GLubyte *buf
+    )
+{
+    __GLclientPixelState *ps = &gc->clientState.pixel;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
+    gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
+    gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
+    GLint right, bottom;
+    gctUINT w, h;
+    GLint dx, dy, sx, sy, Width, Height;
+    gctUINT dstWidth, dstHeight;
+    __GLbufferObject *packBufObj = gcvNULL;
+    __GLchipVertexBufferInfo *packBufInfo = gcvNULL;
+    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
+    gctPOINTER logicalAddress = buf;
+    gctSIZE_T skipOffset = 0;
+    GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)width;
+    GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
+    __GLformatInfo *formatInfo;
+#ifdef OPENGL40
+    GLboolean     RGBFloat = GL_FALSE;
+    gceSURF_FORMAT      floatFmt;
+    float  *bit = gcvNULL;
+    float  *temp = gcvNULL;
+    GLuint  i,j;
+#endif
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x x=%d y=%d width=%d height=%d format=0x%04x type=0x%04x buf=%x",
+                   gc, x, y, width, height, format, type, buf);
+
+    /* If chipCtx->readRT is a shadow surface, we should sync it to master resource
+    ** And read pixels from master resource, as shadow resource may have different
+    ** meaning (format) with master surface, such as SRGB encoding.
+    ** Even for the same format between shadow and master, then we only sync once.
+    */
+
+    /* FIXME: Here we don't consider offset in surface for reading.
+    ** If we read a face of a cube or one of array texture, we should set surface offset
+    ** And all surface function should take offset into consideration
+    */
+#ifdef OPENGL40
+    switch(format)
+    {
+    case GL_DEPTH_COMPONENT:
+    case GL_STENCIL_INDEX:
+    case GL_DEPTH_STENCIL_EXT:
+        status = __glChipReadDepthStencilPixels(gc, x, y,
+                                        width, height,
+                                        format, type, buf);
+        gcmFOOTER_ARG("return=%d", status);
+        return (status == gcvSTATUS_OK);
+    default:
+        break;
+    }
+
+#endif
+    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
+
+    /* When commands such as ReadPixels read from a layered framebuffer,
+    ** the image at layer zero of the selected attachment is always used to obtain pixel values
+    */
+    if (srcView.numSlices > 1)
+    {
+        srcView.firstSlice = 0;
+        srcView.numSlices = 1;
+    }
+
+    switch (type)
+    {
+    case GL_UNSIGNED_BYTE:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A8B8G8R8;
+        }
+        else if (format == GL_BGRA_EXT)
+        {
+            wrapformat = gcvSURF_A8R8G8B8;
+        }
+        break;
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A2B10G10R10;
+        }
+        break;
+    case GL_FLOAT:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A32B32G32R32F;
+        }
+#ifdef OPENGL40
+        else if (format == GL_RGB)
+        {
+            RGBFloat = GL_TRUE;
+            floatFmt = gcvSURF_A32B32G32R32F;
+        }
+#endif
+        break;
+    case GL_UNSIGNED_INT:
+        if (format == GL_RGBA_INTEGER)
+        {
+            wrapformat = gcvSURF_A32B32G32R32UI;
+        }
+        break;
+    case GL_INT:
+        if (format == GL_RGBA_INTEGER)
+        {
+            wrapformat = gcvSURF_A32B32G32R32I;
+        }
+        break;
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
+        {
+            wrapformat = gcvSURF_A4R4G4B4;
+        }
+        break;
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
+        {
+            wrapformat = gcvSURF_A1R5G5B5;
+        }
+        break;
+#ifdef OPENGL40
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
+        {
+             if (format == GL_RGBA)
+            {
+                wrapformat = gcvSURF_A8B8G8R8;
+            }
+            else if (format == GL_BGRA)
+            {
+                wrapformat = gcvSURF_A8R8G8B8;
+            }
+        }
+        break;
+     case GL_UNSIGNED_INT_8_8_8_8:
+        {
+             if (format == GL_BGRA)
+            {
+                wrapformat = gcvSURF_B8G8R8A8;
+            }
+            else if (format == GL_RGBA)
+            {
+                wrapformat = gcvSURF_R8G8B8A8;
+            }
+        }
+        break;
+#endif
+    default:
+        break;
+    }
+
+    /* Check if framebuffer is complete */
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        formatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        formatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    if (formatInfo == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (gcvSURF_UNKNOWN == wrapformat)
+    {
+        __GLchipFmtMapInfo *formatMapInfo = gcChipGetFormatMapInfo(gc, formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+        wrapformat = formatMapInfo->requestFormat;
+    }
+
+    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
+                            format, type, 0, gcvNULL, gcvNULL, &skipOffset);
+
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    if (packBufObj)
+    {
+        packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
+        GL_ASSERT(packBufInfo);
+        gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
+        gcmONERROR(gcoBUFOBJ_GetFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+
+        skipOffset += __GL_PTR2SIZE(buf);
+        physicalAddress += (gctUINT32)skipOffset;
+    }
+    logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
+
+#ifdef OPENGL40
+    if (RGBFloat)
+    {
+        /* Allocate a new surface. */
+        gcmONERROR(gcoSURF_Construct(
+            chipCtx->hal,
+            width, height, 1,
+            gcvSURF_BITMAP, floatFmt,
+            gcvPOOL_UNIFIED,
+            &dstView.surf
+            ));
+
+        /* Get the pointer to the bits. */
+        gcmONERROR(gcoSURF_Lock(
+            dstView.surf, gcvNULL,&bit
+            ));
+    }
+    else
+#endif
+    {
+        /* Create the wrapper surface. */
+        gcmONERROR(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
+                                     wrapformat, gcvPOOL_USER, &dstView.surf));
+        gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, width, height, lineLength, imageHeight, wrapformat));
+        gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, logicalAddress, physicalAddress));
+    }
+
+    gcmONERROR(gcoSURF_GetSize(srcView.surf, &w, &h, gcvNULL));
+    right  = gcmMIN(x + width,  (gctINT) w);
+    bottom = gcmMIN(y + height, (gctINT) h);
+    gcmONERROR(gcoSURF_GetSize(dstView.surf, &dstWidth, &dstHeight, gcvNULL));
+
+    /*
+    ** Set Non-Linear space for SRGB8_ALPHA8
+    */
+    if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+    {
+        gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
+    }
+
+    sx = x;
+    sy = y;
+    dx = 0;
+    dy = 0;
+    Width = right - x;
+    Height = bottom - y;
+
+    if (!gcChipUtilCalculateArea(&dx, &dy, &sx, &sy, &Width, &Height, dstWidth, dstHeight, w, h))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    do {
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted   = chipCtx->readYInverted;
+        rlvArgs.uArgs.v2.srcOrigin.x = sx;
+        rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted ? (GLint)(h - (sy + Height)) : sy;
+        rlvArgs.uArgs.v2.dstOrigin.x = dx;
+        rlvArgs.uArgs.v2.dstOrigin.y = dy;
+        rlvArgs.uArgs.v2.rectSize.x  = Width;
+        rlvArgs.uArgs.v2.rectSize.y  = Height;
+        rlvArgs.uArgs.v2.numSlices   = 1;
+        rlvArgs.uArgs.v2.dump        = gcvTRUE;
+
+        if (packBufObj)
+        {
+            if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+            {
+                break;
+            }
+        }
+        gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
+    }
+    while (gcvFALSE);
+
+#ifdef OPENGL40
+    if (RGBFloat)
+    {
+        temp = logicalAddress;
+        for (i = 0; i < height; i++)
+        {
+            for (j = 0; j < width; j++)
+            {
+                memcpy(temp, bit, 3 * sizeof(float));
+                temp += 3;
+                bit += 4;
+            }
+            temp += (lineLength - width) * 3;
+        }
+    }
+#endif
+
+OnError:
+    if (packBufInfo && gcvINVALID_ADDRESS != physicalAddress) /* The image is from pack buffer object */
+    {
+        /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.
+        ** Instead it will be flushed when unlock the packed buffer as non-user pool node.
+        */
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(packBufInfo->bufObj));
+        gcmVERIFY_OK(gcoBUFOBJ_CPUCacheOperation(packBufInfo->bufObj, gcvCACHE_CLEAN));
+    }
+
+#ifdef OPENGL40
+    if (bit)
+    {
+        gcoSURF_Unlock(dstView.surf, bit);
+    }
+#endif
+
+    if (dstView.surf)
+    {
+        gcoSURF_Destroy(dstView.surf);
+    }
+
+    if (gcmIS_ERROR(status))
+    {
+        gcChipSetError(chipCtx, status);
+        gcmFOOTER_ARG("return=%d", GL_FALSE);
+        return GL_FALSE;
+    }
+    else
+    {
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+}
+
+

@@ -29,6 +29,4 @@ SOURCES= \
 ../gc_gl_napi.c \
 ../gc_gl_rapi.c \
 ../gc_gl_tapi.c \
-../gc_gl_vapi.c \
-../gl_constantname.c \
-../gl_debug.c
+../gc_gl_vapi.c

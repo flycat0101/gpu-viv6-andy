@@ -104,6 +104,12 @@ extern _glthread_Mutex __glDrmMutex;
         vivDriMirror *dri = (vivDriMirror *)gc->imports.other;  \
         DEBUG_CHECK_LOCK();                                     \
         _glthread_LOCK_MUTEX(__glDrmMutex);        \
+        if (dri->screen->dri3)                           \
+        {                           \
+                 vivGetLock( gc, 0 );                           \
+                 DEBUG_LOCK();                                           \
+                 break;                                           \
+        }                           \
         if (dri->lockCnt++ == 0) {                              \
             if (!dri->bDrawableInitied) {                       \
                  vivGetLock( gc, 0 );                           \
@@ -121,6 +127,12 @@ extern _glthread_Mutex __glDrmMutex;
 #define LINUX_UNLOCK_FRAMEBUFFER( gc )                          \
     do {                                                        \
         vivDriMirror *dri = (vivDriMirror *)gc->imports.other;  \
+        if (dri->screen->dri3)                           \
+        {                           \
+             _glthread_UNLOCK_MUTEX(__glDrmMutex);   \
+             DEBUG_RESET();                                          \
+             break;                                           \
+        }                           \
         if (--dri->lockCnt == 0) {                              \
             DRMGL_UNLOCK( dri->fd,                                \
               dri->hwLock,                                      \
@@ -132,6 +144,7 @@ extern _glthread_Mutex __glDrmMutex;
 
 #define LINUX_LOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
+        if ( sPriv->dri3) break;    \
         if ( sPriv->dummyContextPriv.driScreenPriv && sPriv->dummyContextPriv.hHWContext) { \
             DRMGL_LOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext, 0); \
             DEBUG_LOCK(); \
@@ -140,6 +153,7 @@ extern _glthread_Mutex __glDrmMutex;
 
 #define LINUX_UNLOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
+        if ( sPriv->dri3) break;    \
         if ( sPriv->dummyContextPriv.driScreenPriv && sPriv->dummyContextPriv.hHWContext) { \
             DRMGL_UNLOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext); \
             DEBUG_RESET(); \

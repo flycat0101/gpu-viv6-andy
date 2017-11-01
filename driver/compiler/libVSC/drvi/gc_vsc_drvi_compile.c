@@ -31,6 +31,7 @@
 #include "vir/transform/gc_vsc_vir_fcp.h"
 #include "vir/transform/gc_vsc_vir_loop.h"
 #include "vir/transform/gc_vsc_vir_cfo.h"
+#include "vir/transform/gc_vsc_vir_param_opts.h"
 #include "vir/transform/gc_vsc_vir_uniform.h"
 #include "vir/transform/gc_vsc_vir_static_patch.h"
 #include "vir/transform/gc_vsc_vir_vectorization.h"
@@ -690,6 +691,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
     gctBOOL             bGlobalCPP = gcvTRUE;
+    gctBOOL             bCheckAlwaysInlineOnly = gcvFALSE;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
@@ -702,17 +704,20 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 
     /* Call (schedule) passes of LL by ourselves */
     CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
     CALL_SH_PASS(VSC_SCPP_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VIR_LoopOpts_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
-    CALL_SH_PASS(VSC_IL_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
     CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
-    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);
     CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &bGlobalCPP);
+    CALL_SH_PASS(VSC_PARAM_Optimization_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, 0, gcvNULL);
+    /* peep hole may delete no used jmp, cfo could help to delete no-used label */
+    CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
@@ -922,8 +927,26 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_ShLevel         libShLevel;
+    gctBOOL             bIsRecompiler = (pShPassMnger->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_RECOMPILER);
+    gctBOOL             bCheckAlwaysInlineOnly = gcvTRUE;
 
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_ML);
+
+    /* If this is from recompiler, we need to do these processes before linking external lib functions. */
+    if (bIsRecompiler)
+    {
+        /* Link intrinsic functions. */
+        CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
+
+        /* Do some preprocess works for inline. */
+        CALL_SH_PASS(vscVIR_PreprocessMLPostShader, 0, gcvNULL);
+
+        /* Inline some always inline functions. */
+        CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+
+        /* Do some postprocess works for inline. */
+        CALL_SH_PASS(vscVIR_PostprocessMLPostShader, 0, gcvNULL);
+    }
 
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
@@ -1303,4 +1326,42 @@ OnError:
     return vscERR_CastErrCode2GcStatus(errCode);
 }
 
+gcSHADER_KIND vscGetShaderKindFromShaderHandle(
+    SHADER_HANDLE hShader)
+{
+    VIR_Shader  *vShader = (VIR_Shader*)hShader;
+    gcSHADER_KIND shaderKind = gcSHADER_TYPE_UNKNOWN;
+
+    switch (VIR_Shader_GetKind(vShader))
+    {
+    case VIR_SHADER_VERTEX:
+        shaderKind = gcSHADER_TYPE_VERTEX;
+        break;
+    case VIR_SHADER_FRAGMENT:
+        shaderKind = gcSHADER_TYPE_FRAGMENT;
+        break;
+    case VIR_SHADER_COMPUTE:
+        shaderKind = gcSHADER_TYPE_COMPUTE;
+        break;
+    case VIR_SHADER_TESSELLATION_CONTROL:
+        shaderKind = gcSHADER_TYPE_TCS;
+        break;
+    case VIR_SHADER_TESSELLATION_EVALUATION:
+        shaderKind = gcSHADER_TYPE_TES;
+        break;
+    case VIR_SHADER_GEOMETRY:
+        shaderKind = gcSHADER_TYPE_GEOMETRY;
+        break;
+    case VIR_SHADER_PRECOMPILED:
+        shaderKind = gcSHADER_TYPE_PRECOMPILED;
+        break;
+    case VIR_SHADER_LIBRARY:
+        shaderKind = gcSHADER_TYPE_LIBRARY;
+        break;
+    default:
+        break;
+    }
+
+    return shaderKind;
+}
 
