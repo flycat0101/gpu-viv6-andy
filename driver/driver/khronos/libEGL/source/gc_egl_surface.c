@@ -2587,6 +2587,13 @@ eglCreatePbufferFromClientBuffer(
     /* Hardware relevant thread data initialization. */
     veglInitDeviceThreadData(thread);
 
+    /* Test for valid image buffer. */
+    if (buffer == (EGLClientBuffer)-1)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
     /* Test for valid config. */
     if (((EGLint)(intptr_t)Config <= __EGL_INVALID_CONFIG__)
     ||  ((EGLint)(intptr_t)Config > dpy->configCount)
