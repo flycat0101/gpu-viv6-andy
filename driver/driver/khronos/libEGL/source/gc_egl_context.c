@@ -1028,6 +1028,15 @@ eglCreateContext(
 
     eglConfig = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)config - 1]);
 
+    if (thread->api == EGL_OPENVG_API)
+    {
+        if (!(eglConfig->renderableType & EGL_OPENVG_BIT))
+        {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
+
     /* Get attribute. */
     if (attrib_list != gcvNULL)
     {
