@@ -99,6 +99,7 @@ arm64)
     export BUILD_HARD_VFP=1
     export CFLAGS="-D__ARM_PCS_VFP"
 
+    export BUILD_OPTION_MXC_FBDEV=1
     export BUILD_OPTION_EGL_API_GBM=0
     export BUILD_YOCTO_DRI_BUILD=1
     export BUILD_OPTION_USE_OPENCL=1
