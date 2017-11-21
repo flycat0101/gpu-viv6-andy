@@ -500,9 +500,6 @@ static void _createPixmapInfo(
     return;
 
 OnError:
-    if ( *pixWrapSurf )
-    gcoSURF_Destroy(*pixWrapSurf);
-
     if (!__glXDisplayIsClosed) {
         if ( (*backPixmap) && (directPix == 0) )
             XFreePixmap(display, *backPixmap);

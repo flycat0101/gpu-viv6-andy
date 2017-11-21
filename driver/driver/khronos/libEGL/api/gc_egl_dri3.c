@@ -2865,6 +2865,8 @@ _GetWindowBackBuffer(
             schanged = 0;
        }
     }
+    if(drawable->ascframe[index].pixmapfd < 0)
+        return EGL_FALSE;
 
     drawable->busyframe[index] = _FRAME_BUSY;
 
