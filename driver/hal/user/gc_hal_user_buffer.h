@@ -272,6 +272,7 @@ typedef struct _gcoWorkerInfo
 {
     gctBOOL                     commit;
     gctSIGNAL                   signal;
+    gcoBUFFER                   buffer;
 
     gceHARDWARE_TYPE            hardwareType;
     gctUINT32                   currentCoreIndex;
@@ -288,7 +289,6 @@ gcoWorkerInfo;
 
 gcoWorkerInfo*
 gcoGetWorker(
-    gcoOS Os,
     gcoQUEUE Queue,
     gcoBUFFER Buffer,
     gctBOOL EmptyBuffer

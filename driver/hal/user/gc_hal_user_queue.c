@@ -269,7 +269,7 @@ gcoQUEUE_Commit(
             gcoWorkerInfo* worker;
 
             /* Find an available worker. */
-            worker = gcoGetWorker(gcvNULL, Queue, Buffer, gcvTRUE);
+            worker = gcoGetWorker(Queue, Buffer, gcvTRUE);
 
             if (worker == gcvNULL)
             {

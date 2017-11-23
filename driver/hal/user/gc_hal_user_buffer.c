@@ -26,7 +26,7 @@
 
 #define gcmMAX_TEMPCMD_BUFFER_SIZE  0x20000
 
-#define gcmWORKER_FIFO_SIZE     16
+#define gcmWORKER_FIFO_SIZE     24
 /******************************************************************************\
 ********************************** Structures **********************************
 \******************************************************************************/
@@ -105,19 +105,22 @@ struct _gcoBUFFER
 
     }hwFeature;
 
-   /* Worker thread for copying data. */
+    gctHANDLE                   commitProcess;
+    gcoWorkerInfo               *deltaWorker;
+};
+
+typedef struct _gcoCommitWorker
+{
     gctHANDLE                   workerThread;
     gctSIGNAL                   startSignal;
     gctSIGNAL                   stopSignal;
 
-    /* Process handle. */
-    gctHANDLE                   process;
-    gctHANDLE                   ownerThread;
-
     gcoWorkerInfo*              workerFifo[gcmWORKER_FIFO_SIZE];
     gctUINT32                   workerHead;
     gctUINT32                   workerFree;
-};
+    gctUINT32                   workerRef;
+}
+gcoCommitWorker;
 
 /******************************************************************************\
 ******************************* Private Functions ******************************
@@ -744,7 +747,7 @@ gcoCreateWorkerDelta(
     gcoBUFFER Buffer,
     gcoWorkerInfo * Worker,
     gcsSTATE_DELTA_PTR *Delta,
-    gctBOOL  exchgDelta
+    gctBOOL  Exchange
     )
 {
     gcsSTATE_DELTA_PTR pDelta;
@@ -760,6 +763,12 @@ gcoCreateWorkerDelta(
     if (Worker->hardwareType != gcvHARDWARE_2D)
     {
         pDelta = *Delta;
+
+        if (Buffer != Worker->buffer && Worker->stateDelta)
+        {
+           gcoFreeWorkerDelta(Worker);
+           Worker->stateDelta = gcvNULL;
+        }
 
         if (!Worker->stateDelta)
         {
@@ -796,6 +805,7 @@ gcoCreateWorkerDelta(
                     gcvNULL, delta->mapEntryIDSize, &pointer
                     ));
 
+                gcoOS_ZeroMemory(pointer, delta->mapEntryIDSize);
                 delta->mapEntryIndex = gcmPTR_TO_UINT64(pointer);
             }
 
@@ -810,6 +820,7 @@ gcoCreateWorkerDelta(
                     &pointer
                     ));
 
+                gcoOS_ZeroMemory(pointer, delta->recordSize);
                 delta->recordArray = gcmPTR_TO_UINT64(pointer);
             }
         }
@@ -818,7 +829,7 @@ gcoCreateWorkerDelta(
 
         ResetStateDelta(Worker->stateDelta);
 
-        if (exchgDelta)
+        if (Exchange)
         {
             *Delta = Worker->stateDelta;
             Worker->stateDelta = pDelta;
@@ -844,8 +855,6 @@ gcoCreateWorker(
 
     gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&worker));
     gcoOS_ZeroMemory(worker, gcmSIZEOF(gcoWorkerInfo));
-
-    gcmGETCURRENTHARDWARE(worker->hardwareType);
 
     gcmONERROR(gcoOS_AllocateSharedMemory(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&worker->commandBuffer));
 
@@ -881,7 +890,6 @@ OnError:
 
 gcoWorkerInfo*
 gcoGetWorker(
-    gcoOS Os,
     gcoQUEUE Queue,
     gcoBUFFER Buffer,
     gctBOOL EmptyBuffer
@@ -890,6 +898,7 @@ gcoGetWorker(
     gcsTLS_PTR tls;
     gceSTATUS status;
     gcoWorkerInfo *worker = gcvNULL;
+    gcoCommitWorker *commitWorker = gcvNULL;
 
     if (Buffer == gcvNULL)
     {
@@ -902,7 +911,13 @@ gcoGetWorker(
         return gcvNULL;
     }
 
-    worker = Buffer->workerFifo[Buffer->workerFree];
+    commitWorker = tls->commitWorker;
+    if (!commitWorker)
+    {
+        return gcvNULL;
+    }
+
+    worker = commitWorker->workerFifo[commitWorker->workerFree];
     if (worker == gcvNULL)
     {
         return gcvNULL;
@@ -913,14 +928,12 @@ gcoGetWorker(
         return gcvNULL;
     }
 
-    Buffer->workerFree++;
-    if (Buffer->workerFree >= gcmCOUNTOF(Buffer->workerFifo))
-    {
-        Buffer->workerFree = 0;
-    }
+    commitWorker->workerFree = (commitWorker->workerFree + 1) % gcmCOUNTOF(commitWorker->workerFifo);
 
     worker->emptyBuffer = EmptyBuffer;
     worker->currentCoreIndex = tls->currentCoreIndex;
+
+    gcmGETCURRENTHARDWARE(worker->hardwareType);
 
     if (EmptyBuffer == gcvFALSE)
     {
@@ -1013,9 +1026,31 @@ gcoSubmitWorker(
     gcoWorkerInfo* Worker
     )
 {
+    gcsTLS_PTR tls;
+    gceSTATUS status;
+    gcoCommitWorker *commitWorker;
+
+    if (Worker == gcvNULL)
+    {
+        return gcvFALSE;
+    }
+
+    status = gcoOS_GetTLS(&tls);
+    if (gcmIS_ERROR(status))
+    {
+        return gcvFALSE;
+    }
+
+    commitWorker = tls->commitWorker;
+    if (!commitWorker)
+    {
+        return gcvFALSE;
+    }
+
+    Worker->buffer = Buffer;
     Worker->commit = gcvTRUE;
 
-    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->startSignal, gcvTRUE));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, commitWorker->startSignal, gcvTRUE));
 
     return gcvTRUE;
 }
@@ -1100,45 +1135,38 @@ gcoBUFFER_Commit_Worker(
 
 gctTHREAD_RETURN
 gcoBufferCommitWorker(
-    void* Buffer
+    void* ThreadData
     )
 {
-    gctUINT32 i;
-    gcoBUFFER buffer;
+    gctUINT32 i = 0;
     gctBOOL bStop = gcvFALSE;
-    gcoWorkerInfo *worker = gcvNULL;
     gcoWorkerInfo *currWorker = gcvNULL;
+    gcoWorkerInfo *deltaWorker = gcvNULL;
+    gcoCommitWorker *commitWorker = gcvNULL;
 
     gcmHEADER_ARG("ThreadData=0x%x", ThreadData);
 
-    buffer = (gcoBUFFER)Buffer;
-
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&worker)))
-    {
-        return (gctTHREAD_RETURN) -1;
-    }
-
-    gcoOS_ZeroMemory(worker, gcmSIZEOF(gcoWorkerInfo));
+    commitWorker = (gcoCommitWorker *)ThreadData;
 
     while (gcvTRUE)
     {
         /* Wait for the start signal. */
-        if gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, buffer->startSignal, gcvINFINITE))
+        if gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, commitWorker->startSignal, gcvINFINITE))
         {
             break;
         }
 
         /* Check the thread's stop signal. */
-        if (gcmIS_SUCCESS(gcoOS_WaitSignal(gcvNULL, buffer->stopSignal, 0)))
+        if (gcmIS_SUCCESS(gcoOS_WaitSignal(gcvNULL, commitWorker->stopSignal, 0)))
         {
             /* Stop had been signaled, exit. */
             bStop = gcvTRUE;
         }
 
-        currWorker = buffer->workerFifo[buffer->workerHead];
-
         for (;;)
         {
+            currWorker = commitWorker->workerFifo[commitWorker->workerHead];
+
             if (currWorker == gcvNULL)
             {
                 break;
@@ -1151,9 +1179,10 @@ gcoBufferCommitWorker(
 
             if (currWorker->queue->head)
             {
-                gcoWorkerInfo *nextWorker = buffer->workerFifo[(buffer->workerHead + 1) % gcmCOUNTOF(buffer->workerFifo)];
+                gcoWorkerInfo *nextWorker = commitWorker->workerFifo[(commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo)];
 
-                while (nextWorker->commit == gcvTRUE && nextWorker->emptyBuffer == gcvTRUE)
+                while (nextWorker != currWorker && nextWorker->buffer == currWorker->buffer &&
+                       nextWorker->commit == gcvTRUE && nextWorker->emptyBuffer == gcvTRUE)
                 {
                     /* Merge all queue events into current worker */
                     currWorker->queue->tail->next = gcmPTR_TO_UINT64(nextWorker->queue->head);
@@ -1164,49 +1193,40 @@ gcoBufferCommitWorker(
                     nextWorker->commit = gcvFALSE;
                     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, nextWorker->signal, gcvTRUE));
 
-                    buffer->workerHead++;
-                    if (buffer->workerHead >= gcmCOUNTOF(buffer->workerFifo))
-                    {
-                        buffer->workerHead = 0;
-                    }
+                    commitWorker->workerHead = (commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo);
 
-                    nextWorker = buffer->workerFifo[(buffer->workerHead + 1) % gcmCOUNTOF(buffer->workerFifo)];
+                    nextWorker = commitWorker->workerFifo[(commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo)];
                 }
             }
 
-            gcoBUFFER_Commit_Worker(buffer->hardware,
+            deltaWorker = currWorker->buffer->deltaWorker;
+            gcoBUFFER_Commit_Worker(currWorker->buffer->hardware,
                                     currWorker->emptyBuffer == gcvFALSE ?
                                     currWorker->commandBuffer : gcvNULL,
                                     currWorker->currentCoreIndex,
                                     currWorker->hardwareType,
                                     currWorker->stateDelta != gcvNULL ?
-                                    worker->stateDelta : gcvNULL,
+                                    deltaWorker->stateDelta : gcvNULL,
                                     currWorker->context,
                                     currWorker->contexts,
                                     currWorker->queue);
 
             if (currWorker->stateDelta && !currWorker->emptyBuffer)
             {
-                if (worker->stateDelta == gcvNULL)
+                if (deltaWorker->stateDelta == gcvNULL)
                 {
-                    worker->hardwareType = currWorker->hardwareType;
+                    deltaWorker->hardwareType = currWorker->hardwareType;
 
-                    gcoCreateWorkerDelta(Buffer, worker, &currWorker->stateDelta, gcvFALSE);
+                    gcoCreateWorkerDelta(currWorker->buffer, deltaWorker, &currWorker->stateDelta, gcvFALSE);
                 }
 
-                MergeStateDelta(worker->stateDelta, currWorker->stateDelta);
+                MergeStateDelta(deltaWorker->stateDelta, currWorker->stateDelta);
             }
 
             currWorker->commit = gcvFALSE;
             gcmVERIFY_OK(gcoOS_Signal(gcvNULL, currWorker->signal, gcvTRUE));
 
-            buffer->workerHead++;
-            if (buffer->workerHead >= gcmCOUNTOF(buffer->workerFifo))
-            {
-                buffer->workerHead = 0;
-            }
-
-            currWorker = buffer->workerFifo[buffer->workerHead];
+            commitWorker->workerHead = (commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo);
         }
 
         if (bStop)
@@ -1215,15 +1235,14 @@ gcoBufferCommitWorker(
         }
     }
 
-    for (i = 0; i < gcmCOUNTOF(buffer->workerFifo); i++)
+    for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
     {
-        if(buffer->workerFifo[i])
+        if(commitWorker->workerFifo[i])
         {
-            gcoFreeWorker(gcvNULL, buffer->workerFifo[i]);
+            gcoFreeWorker(gcvNULL, commitWorker->workerFifo[i]);
+            commitWorker->workerFifo[i] = gcvNULL;
         }
     }
-
-    gcoFreeWorker(gcvNULL, worker);
 
     gcmFOOTER_ARG("return=%ld", (gctTHREAD_RETURN) 0);
     /* Success. */
@@ -1276,6 +1295,8 @@ gcoBUFFER_Construct(
     gctPOINTER pointer = gcvNULL;
     gcoCMDBUF commandBuffer;
     gctUINT32 mGpuModeSwitchBytes = 0;
+    gcoCommitWorker *commitWorker = gcvNULL;
+    gcsTLS_PTR tls;
     gctUINT i = 0;
 
     gcmHEADER_ARG("Hal=0x%x Hardware=0x%x MaxSize=%lu",
@@ -1427,20 +1448,33 @@ gcoBUFFER_Construct(
     gcmONERROR(_GetCommandBuffer(buffer));
 #endif
 
-    buffer->process               = gcoOS_GetCurrentProcessID();
+    buffer->commitProcess = gcoOS_GetCurrentProcessID();
 
-    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &buffer->startSignal));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&buffer->deltaWorker));
+    gcoOS_ZeroMemory(buffer->deltaWorker, gcmSIZEOF(gcoWorkerInfo));
 
-    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &buffer->stopSignal));
+    gcmONERROR(gcoOS_GetTLS(&tls));
+    commitWorker = tls->commitWorker;
 
-    buffer->process = gcoOS_GetCurrentProcessID();
-
-    for (i = 0; i < gcmCOUNTOF(buffer->workerFifo); i++)
+    if (!commitWorker)
     {
-        buffer->workerFifo[i] = gcoCreateWorker(gcvNULL);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcoCommitWorker), (gctPOINTER *)&commitWorker));
+        gcoOS_ZeroMemory(commitWorker, gcmSIZEOF(gcoCommitWorker));
+
+        gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &commitWorker->startSignal));
+
+        gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &commitWorker->stopSignal));
+
+        for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
+        {
+            commitWorker->workerFifo[i] = gcoCreateWorker(gcvNULL);
+        }
+
+        gcmONERROR(gcoOS_CreateThread(gcvNULL, gcoBufferCommitWorker, commitWorker, &commitWorker->workerThread));
+        tls->commitWorker = commitWorker;
     }
 
-    gcmONERROR(gcoOS_CreateThread(gcvNULL, gcoBufferCommitWorker, buffer, &buffer->workerThread));
+    commitWorker->workerRef++;
 
     /* Return pointer to the gcoBUFFER object. */
     *Buffer = buffer;
@@ -1859,6 +1893,8 @@ gcoBUFFER_Destroy(
     gceSTATUS status;
     gcoCMDBUF commandBuffer;
     struct _gcsPATCH_LIST *patchList;
+    gcoCommitWorker *commitWorker;
+    gcsTLS_PTR tls;
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
@@ -1918,32 +1954,45 @@ gcoBUFFER_Destroy(
 
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer->tempCMDBUF.buffer));
 
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    commitWorker = tls->commitWorker;
+
     /* Stop the worker thread. */
-    if (Buffer->workerThread != gcvNULL)
+    if (commitWorker)
     {
-        /* Set thread's stop signal. */
-        gcmASSERT(Buffer->stopSignal != gcvNULL);
-        gcmVERIFY_OK(gcoOS_Signal(
-            gcvNULL,
-            Buffer->stopSignal,
-            gcvTRUE
+       commitWorker->workerRef--;
+
+        if (!commitWorker->workerRef)
+        {
+            /* Set thread's stop signal. */
+            gcmASSERT(commitWorker->stopSignal != gcvNULL);
+            gcmVERIFY_OK(gcoOS_Signal(
+                gcvNULL,
+                commitWorker->stopSignal,
+                gcvTRUE
+                ));
+
+            /* Set thread's start signal. */
+            gcmASSERT(commitWorker->startSignal != gcvNULL);
+            gcmVERIFY_OK(gcoOS_Signal(
+                gcvNULL,
+                commitWorker->startSignal,
+                gcvTRUE
+                ));
+
+            /* Wait until the thread is closed. */
+            gcmVERIFY_OK(gcoOS_CloseThread(
+            gcvNULL, commitWorker->workerThread
             ));
 
-        /* Set thread's start signal. */
-        gcmASSERT(Buffer->startSignal != gcvNULL);
-        gcmVERIFY_OK(gcoOS_Signal(
-            gcvNULL,
-            Buffer->startSignal,
-            gcvTRUE
-            ));
+            gcmVERIFY_OK(gcoOS_Free(gcvNULL, commitWorker));
 
-        /* Wait until the thread is closed. */
-        gcmVERIFY_OK(gcoOS_CloseThread(
-            gcvNULL, Buffer->workerThread
-            ));
-
-        Buffer->workerThread = gcvNULL;
+            tls->commitWorker = gcvNULL;
+        }
     }
+
+    gcoFreeWorker(gcvNULL, Buffer->deltaWorker);
 
     /* Free the object memory. */
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer));
@@ -2446,7 +2495,7 @@ gcoBUFFER_Commit(
                     iface.engine             = Buffer->info.engine;
                     iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
                     iface.u.Signal.auxSignal = 0;
-                    iface.u.Signal.process   = gcmPTR_TO_UINT64(Buffer->process);
+                    iface.u.Signal.process   = gcmPTR_TO_UINT64(Buffer->commitProcess);
                     iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
 
                     /* Append event to queue */
@@ -2489,7 +2538,7 @@ gcoBUFFER_Commit(
     }
 
     /* Find an available worker. */
-    worker = gcoGetWorker(gcvNULL, Queue, Buffer, emptyBuffer);
+    worker = gcoGetWorker(Queue, Buffer, emptyBuffer);
 
     if (worker == gcvNULL)
     {
