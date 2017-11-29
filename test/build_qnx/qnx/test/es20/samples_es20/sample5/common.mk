@@ -52,7 +52,7 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += $(STATIC_LIBS)
-LDOPTS += -lGAL -lVSC -lVDK -lEGL_viv -lGLESv2_viv
+LDOPTS += -lVDK -lGLESv2
 
 include $(qnx_build_dir)/math.mk
 

@@ -56,7 +56,7 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += screen $(STATIC_LIBS) GAL EGL_viv
+LIBS += screen $(STATIC_LIBS) EGL
 
 include $(qnx_build_dir)/math.mk
 

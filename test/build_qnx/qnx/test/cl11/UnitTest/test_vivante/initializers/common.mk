@@ -81,7 +81,8 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LDOPTS += -lGAL -lVSC -lLLVM_viv -lCLC -lOpenCL -lLLVM_viv
+LDOPTS += -lLLVM_viv -lCLC -lOpenCL
+CCOPTS += -Wno-narrowing
 
 include $(qnx_build_dir)/math.mk
 
