@@ -40,7 +40,7 @@ endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 25),1)
 ifneq ($(findstring x7.1.1,x$(PLATFORM_VERSION)), x7.1.1)
-LOCAL_C_INCLUDES += hardware/imx/include
+LOCAL_C_INCLUDES += $(IMX_PATH)/imx/include
 LOCAL_CFLAGS += -DFSL_YUV_EXT
 endif
 endif
