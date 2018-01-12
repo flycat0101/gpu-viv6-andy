@@ -2767,7 +2767,7 @@ _EmitSourceAttributeWithFormat(
             gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                           slvDUMP_CODE_EMITTER,
                                           "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, IndexRegister = r%d, format = %s, precision = %s);",
                                           gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
                                           _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
                                           Source->u.sourceReg.regIndex,
@@ -2855,7 +2855,7 @@ _EmitSourceAttribute(
             gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                           slvDUMP_CODE_EMITTER,
                                           "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, IndexRegister = r%d, format = %s, precision = %s);",
                                           gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
                                           _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
                                           Source->u.sourceReg.regIndex,
@@ -3135,7 +3135,7 @@ _EmitSourceOutput(
             gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                           slvDUMP_CODE_EMITTER,
                                           "gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(Shader,"
-                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, IndexRegister = r%d, format = %s, precision = %s);",
                                           _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
                                           Source->u.sourceReg.regIndex,
                                           _GetIndexModeName(gcSL_NOT_INDEXED),
