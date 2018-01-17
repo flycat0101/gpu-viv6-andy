@@ -274,6 +274,7 @@ endif
 CFLAGS              += -DgcdENABLE_3D=$(VIVANTE_ENABLE_3D)
 CFLAGS              += -DgcdENABLE_2D=$(VIVANTE_ENABLE_2D)
 CFLAGS              += -DgcdENABLE_VG=$(VIVANTE_ENABLE_VG)
+CFLAGS              += -DgcdANDROID_NATIVE_FENCE_SYNC=1
 
 ifeq ($(VIVANTE_NO_VG),1)
   CFLAGS            += -DVIVANTE_NO_VG

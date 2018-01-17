@@ -1163,7 +1163,7 @@ static veglLOOKUP _veglLookup[] =
     eglMAKE_LOOKUP(eglUnbindWaylandDisplayWL),
     eglMAKE_LOOKUP(eglQueryWaylandBufferWL),
 #endif
-#if defined(ANDROID) && gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdANDROID_NATIVE_FENCE_SYNC
     /* EGL_ANDROID_native_fence_sync. */
     eglMAKE_LOOKUP(eglDupNativeFenceFDANDROID),
 #endif
