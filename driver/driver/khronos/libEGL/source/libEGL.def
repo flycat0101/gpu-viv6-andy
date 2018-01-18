@@ -83,4 +83,5 @@ EXPORTS
 
     eglQueryDmaBufFormatsEXT            @59
     eglQueryDmaBufModifiersEXT          @60
+    eglDupNativeFenceFDANDROID          @61
 

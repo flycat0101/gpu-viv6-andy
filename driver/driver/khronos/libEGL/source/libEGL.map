@@ -63,7 +63,7 @@
         eglSignalSyncKHR;
 
         eglWaitSyncKHR;
-
+        eglDupNativeFenceFDANDROID;
         eglSwapBuffersRegionEXT;
 
         eglSetBlobCacheFuncsANDROID*;

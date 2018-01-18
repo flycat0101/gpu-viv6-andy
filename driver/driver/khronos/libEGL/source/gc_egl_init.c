@@ -113,11 +113,12 @@ _GenExtension(
         extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
+    }
+#endif
+
 #if gcdANDROID_NATIVE_FENCE_SYNC
         extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled   = EGL_TRUE;
 #  endif
-    }
-#endif
 
 #if defined(WL_EGL_PLATFORM)
     extensions[VEGL_EXTID_WL_bind_wayland_display].enabled             = EGL_TRUE;
