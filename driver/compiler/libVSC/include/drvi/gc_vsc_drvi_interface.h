@@ -143,6 +143,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          supportFullIntBranch   : 1;
         gctUINT          hasDynamicIdxDepFix    : 1;
         gctUINT          hasLODQFix             : 1;
+        gctUINT          hasImageLoadEnableFix  : 1;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -159,7 +160,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          newGPIPE               : 1;
         gctUINT          supportImgLDSTCLamp    : 1;
 
-        gctUINT          reserved               : 3;
+        gctUINT          reserved               : 2;
 
     } hwFeatureFlags;
 

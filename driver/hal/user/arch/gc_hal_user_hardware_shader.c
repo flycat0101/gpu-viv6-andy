@@ -280,6 +280,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.supportImgLDSTCLamp    = IS_HW_SUPPORT(gcvFEATURE_SH_IMG_LDST_CLAMP);
     /* LODQ doesn't return the correct raw LOD value, which can match the spec requirement. */
     pVscHwCfg->hwFeatureFlags.hasLODQFix             = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix  = IS_HW_SUPPORT(gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX);
 
 OnError:
     gcmFOOTER();
