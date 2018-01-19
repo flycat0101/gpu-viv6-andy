@@ -49,6 +49,13 @@ LOCAL_C_INCLUDES += \
 	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/inc
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/libs/nativewindow/include \
+	frameworks/native/libs/nativebase/include \
+	frameworks/native/libs/arect/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/libVDK.map \

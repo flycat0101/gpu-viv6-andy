@@ -2834,6 +2834,8 @@ _HasWindowBuffer(
     return EGL_FALSE;
 }
 
+#if ANDROID_SDK_VERSION < 26
+
 /******************************************************************************/
 /* Pixmap. */
 
@@ -2957,7 +2959,7 @@ _DoSyncToPixmap(
 OnError:
     return;
 }
-
+#endif
 
 static EGLBoolean
 _MatchPixmap(
@@ -2966,6 +2968,7 @@ _MatchPixmap(
     IN struct eglConfig * Config
     )
 {
+#if ANDROID_SDK_VERSION < 26
     gceSTATUS status;
     gceSURF_FORMAT pixmapFormat;
     EGLBoolean match = EGL_TRUE;
@@ -3013,6 +3016,9 @@ _MatchPixmap(
     }
 
     return match;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 static EGLBoolean
@@ -3023,6 +3029,7 @@ _ConnectPixmap(
     OUT gcoSURF * Surface
     )
 {
+#if ANDROID_SDK_VERSION < 26
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL needShadow = gcvFALSE;
     gcoSURF wrapper = gcvNULL;
@@ -3203,6 +3210,9 @@ OnError:
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
     return EGL_FALSE;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 static EGLBoolean
@@ -3212,6 +3222,7 @@ _DisconnectPixmap(
     IN VEGLPixmapInfo Info
     )
 {
+#if ANDROID_SDK_VERSION < 26
     /* Free pixmap wrapper. */
     LOGV("%s(%d): display=%p pixmap=%p", __func__, __LINE__, Display, Pixmap);
 
@@ -3232,6 +3243,9 @@ _DisconnectPixmap(
 
     gcmOS_SAFE_FREE(gcvNULL, Info);
     return EGL_TRUE;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 static EGLBoolean
@@ -3243,6 +3257,7 @@ _GetPixmapSize(
     OUT EGLint * Height
     )
 {
+#if ANDROID_SDK_VERSION < 26
     PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
     if (pixmap->version != sizeof (egl_native_pixmap_t))
     {
@@ -3253,6 +3268,9 @@ _GetPixmapSize(
     *Height = Info->height;
 
     return EGL_TRUE;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 static EGLBoolean
@@ -3261,6 +3279,7 @@ _SyncFromPixmap(
     IN VEGLPixmapInfo Info
     )
 {
+#if ANDROID_SDK_VERSION < 26
     PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
     LOGV("%s(%d): pixmap=%p", __func__, __LINE__, Pixmap);
 
@@ -3279,6 +3298,9 @@ _SyncFromPixmap(
     }
 
     return EGL_TRUE;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 static EGLBoolean
@@ -3287,6 +3309,7 @@ _SyncToPixmap(
     IN VEGLPixmapInfo Info
     )
 {
+#if ANDROID_SDK_VERSION < 26
     PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
     LOGV("%s(%d): pixmap=%p", __func__, __LINE__, Pixmap);
 
@@ -3297,6 +3320,9 @@ _SyncToPixmap(
     }
 
     return EGL_TRUE;
+#else
+    return EGL_FALSE;
+#endif
 }
 
 

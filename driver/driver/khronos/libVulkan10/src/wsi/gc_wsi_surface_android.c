@@ -317,8 +317,9 @@ static VkResult __GatherANativeWindowProperties(
     surf->currentExtent.height = buffer->height;
     surf->format               = __TranslateAndroidFormat(buffer->format);
 
-    ALOGV(" %s: surf=%p win=%p: %dx%d format=%d->%d usage=0x%08X:0x%08X", __func__,
-        surf, win, buffer->width, buffer->height, buffer->format, surf->format, buffer->usage, surf->consumerUsage);
+    ALOGV(" %s: surf=%p win=%p: %dx%d format=%d->%d usage=0x%08llX:0x%08X", __func__,
+        surf, win, buffer->width, buffer->height, buffer->format, surf->format,
+        (unsigned long long) buffer->usage, surf->consumerUsage);
 
     if (surf->consumerUsage == 0)
     {

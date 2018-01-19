@@ -42,6 +42,10 @@ LOCAL_CFLAGS := \
 	$(CFLAGS) \
 	-Wno-sign-compare
 
+LOCAL_CFLAGS += \
+	-DCL_USE_DEPRECATED_OPENCL_1_0_APIS \
+	-DCL_USE_DEPRECATED_OPENCL_1_1_APIS
+
 LOCAL_C_INCLUDES := \
 	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/inc \
@@ -50,13 +54,16 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
 	$(LOCAL_PATH)
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/libs/nativewindow/include \
+	frameworks/native/libs/nativebase/include \
+	frameworks/native/libs/arect/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/libOpenCL12.map
-
-CFLAGS         += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
-LOCAL_CFLAGS += \
-         $(CFLAGS)
 
 LOCAL_SHARED_LIBRARIES := \
 	liblog \

@@ -41,11 +41,6 @@ LOCAL_CFLAGS := \
 LOCAL_CFLAGS += \
     -DGPU_VENDOR=\"$(GPU_VENDOR)\"
 
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 20),1)
-LOCAL_C_INCLUDES += \
-	system/core/libsync/include
-endif
-
 ifneq ($(NUM_FRAMEBUFFER_SURFACE_BUFFERS),)
 LOCAL_CFLAGS += \
 	-DNUM_FRAMEBUFFER_SURFACE_BUFFERS=$(NUM_FRAMEBUFFER_SURFACE_BUFFERS)
@@ -76,6 +71,13 @@ LOCAL_SHARED_LIBRARIES := \
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
 LOCAL_SHARED_LIBRARIES += \
 	libsync
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/libs/nativewindow/include \
+	frameworks/native/libs/nativebase/include \
+	frameworks/native/libs/arect/include
 endif
 
 ifeq ($(DRM_GRALLOC),1)

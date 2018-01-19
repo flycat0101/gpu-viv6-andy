@@ -75,11 +75,6 @@ LOCAL_CFLAGS := \
 	-Werror \
 	-DLOG_TAG=\"vulkan\"
 
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 20),1)
-LOCAL_C_INCLUDES += \
-	system/core/libsync/include
-endif
-
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include \
 	$(AQROOT)/sdk/inc \
@@ -94,6 +89,13 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_C_INCLUDES += \
 	$(AQARCH)/cmodel/inc
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/libs/nativewindow/include \
+	frameworks/native/libs/nativebase/include \
+	frameworks/native/libs/arect/include
+endif
 
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \

@@ -126,6 +126,10 @@ ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 19),1)
 CFLAGS        += -DgcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC=0
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+CFLAGS        += -Wno-typedef-redefinition
+endif
+
 # For clang.
 ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
 CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
