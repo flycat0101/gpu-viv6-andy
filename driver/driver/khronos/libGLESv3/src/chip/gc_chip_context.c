@@ -461,7 +461,10 @@ gcChipInitExtension(
 
     if (chipCtx->chipFeature.hwFeature.hasTxAnisFilter)
     {
-        __glExtension[__GL_EXTID_EXT_texture_filter_anisotropic].bEnabled = GL_TRUE;
+        if (!(chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_DEQP))
+        {
+            __glExtension[__GL_EXTID_EXT_texture_filter_anisotropic].bEnabled = GL_TRUE;
+        }
     }
 
     if (!gcdPROC_IS_WEBGL(chipCtx->patchId))
