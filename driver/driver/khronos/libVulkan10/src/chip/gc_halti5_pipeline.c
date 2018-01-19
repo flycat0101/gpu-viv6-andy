@@ -3766,7 +3766,6 @@ static VkResult halti5_pip_build_gfxshaders(
     vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
-                                | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                 | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
     vscCompileParams.cfg.optFlags = (pip->flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT)
                                   ? 0
@@ -4358,7 +4357,6 @@ static VkResult halti5_pip_build_computeshader(
     vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
-                                | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                 | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
     vscCompileParams.cfg.optFlags = (pip->flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT)
                                   ? 0
