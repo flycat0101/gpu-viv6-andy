@@ -106,13 +106,14 @@ typedef va_list gctARGUMENTS;
 #endif
 
 #define gcmkOUTPUT_STRING(String) \
-    if(gckDEBUGFS_IsEnabled()) {\
-        while(-ERESTARTSYS == gckDEBUGFS_Print(String));\
-    }else{\
+    if (gckDEBUGFS_IsEnabled()) \
+    { \
+        while (-ERESTARTSYS == gckDEBUGFS_Print(String)); \
+    } \
+    else \
+    { \
         printk(String); \
-    }\
-    touch_softlockup_watchdog()
-
+    }
 
 #define gcmkSPRINTF(Destination, Size, Message, Value) \
     snprintf(Destination, Size, Message, Value)

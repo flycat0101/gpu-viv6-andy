@@ -56,6 +56,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
+#include <linux/uaccess.h>
 
 #include "gc_hal_kernel_linux.h"
 #include "gc_hal_driver.h"
