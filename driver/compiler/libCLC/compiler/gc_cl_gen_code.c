@@ -32985,20 +32985,8 @@ OUT cloCODE_GENERATOR * CodeGenerator
         codeGenerator->hasNEW_SIN_COS_LOG_DIV = gcGetHWCaps()->hwFeatureFlags.hasExtraInst2;
         codeGenerator->supportRTNE = gcGetHWCaps()->hwFeatureFlags.rtneRoundingEnabled;
         codeGenerator->supportAtomic = gcGetHWCaps()->hwFeatureFlags.hasAtomic;
-        /* Disable atomic support for gcv3000-v5450. */
-        if (codeGenerator->chipModel == gcv3000 && codeGenerator->chipRevision == 0x5450)
-        {
-            gctSTRING productName = gcvNULL;
 
-            gcmONERROR(gcoHAL_GetProductName(gcvNULL, &productName));
 
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
-            {
-                codeGenerator->supportAtomic = gcvFALSE;
-            }
-
-            gcmOS_SAFE_FREE(gcvNULL, productName);
-        }
         codeGenerator->fulllySupportIntegerBranch = gcGetHWCaps()->hwFeatureFlags.supportFullIntBranch;
         codeGenerator->fpConfig = cldFpCapsDefault;
         codeGenerator->fpConfig |= cloCOMPILER_GetFpConfig(Compiler);

@@ -285,14 +285,6 @@ clGetDeviceIDs(
                 gcoHAL_GetProductName(gcvNULL, &productName);
                 if(chipModel == gcv3000 && chipRevision == 0x5450)
                 {
-                    if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
-                    {
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
-                        clgDevices[i].extensions = skipCLGLSharingExtension ? extension_without_atomic_wo_glsharing : extension_without_atomic;
-#else
-                        clgDevices[i].extensions = extension_without_atomic;
-#endif
-                    }
                 }
 
                 offset = 0;
