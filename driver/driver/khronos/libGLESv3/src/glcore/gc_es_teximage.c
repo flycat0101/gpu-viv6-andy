@@ -545,6 +545,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_BGRA_EXT:
 
         case GL_SRGB8:
+        case GL_SRGB8_ALPHA8:
 
         case GL_LUMINANCE:
         case GL_LUMINANCE8_OES:
@@ -1128,6 +1129,13 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
     }
 
     tex->canonicalFormat = __glIsCanonicalFormat(internalFormat, format, type);
+
+    /* Some applications (Taiji) use DEPTH_COMPONENT24_OES or DEPTH_COMPONENT32_OES, even though it's not part of the spec. */
+    if (format == GL_DEPTH_COMPONENT &&
+        (type == GL_DEPTH_COMPONENT24_OES || type == GL_DEPTH_COMPONENT32_OES))
+    {
+        tex->canonicalFormat = GL_TRUE;
+    }
 
     return GL_TRUE;
 }
