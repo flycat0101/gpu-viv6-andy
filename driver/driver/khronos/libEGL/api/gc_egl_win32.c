@@ -138,28 +138,10 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
-    gceSTATUS status;
-
-    status = gcoOS_SetSwapInterval((HALNativeDisplayType) Display->hdc,
-                                   Interval);
-
-    if (status == gcvSTATUS_NOT_SUPPORTED)
-    {
-        /*
-         * return true to maintain legacy behavior. If the feature is not there
-         * we were ignoring it. And now we are ignoring it too.
-         */
-        return EGL_TRUE;
-    }
-    else if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
-    }
-
     return EGL_TRUE;
 }
 

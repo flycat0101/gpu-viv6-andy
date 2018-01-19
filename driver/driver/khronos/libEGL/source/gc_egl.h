@@ -284,6 +284,10 @@ struct eglDisplay
     /* Pointer to configurations. */
     VEGLConfig                  config;
 
+    /* What's the swap interval range supported */
+    EGLint                      minSwapInterval;
+    EGLint                      maxSwapInterval;
+
     /* access lock to access this display */
     gctPOINTER                  accessMutex;
 
@@ -347,6 +351,7 @@ struct eglConfig
     EGLint                      width;
     EGLint                      height;
     EGLint                      level;
+    EGLint                      minSwapInterval;
     EGLint                      maxSwapInterval;
     EGLenum                     transparentType;
     EGLint                      transparentRedValue;

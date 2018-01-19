@@ -1999,7 +1999,7 @@ dri_CancelDisplayBackbuffer(
 
 static gceSTATUS
 dri_SetSwapInterval(
-    IN PlatformDisplayType Display,
+    IN PlatformWindowType Window,
     IN gctINT Interval
 )
 {
@@ -4235,14 +4235,13 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
     gceSTATUS status;
 
-    status = dri_SetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Interval);
+    status = dri_SetSwapInterval((PlatformWindowType)Surface->hwnd, Interval);
 
     if (status == gcvSTATUS_NOT_SUPPORTED)
     {

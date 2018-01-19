@@ -28,6 +28,7 @@ eglSwapInterval(
 {
     VEGLThreadData thread;
     VEGLDisplay dpy;
+    VEGLSurface surface;
     gceSTATUS status;
 
     gcmHEADER_ARG("Dpy=0x%x Interval=%d", Dpy, Interval);
@@ -59,7 +60,6 @@ eglSwapInterval(
         return EGL_FALSE;
     }
 
-
     /* Test if EGLDisplay structure has been initialized. */
     if (!dpy->initialized)
     {
@@ -81,13 +81,14 @@ eglSwapInterval(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (thread->context->draw == EGL_NO_SURFACE)
+    surface = thread->context->draw;
+    if (surface == EGL_NO_SURFACE)
     {
         veglSetEGLerror(thread, EGL_BAD_SURFACE);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (!dpy->platform->setSwapInterval(dpy, Interval))
+    if (!dpy->platform->setSwapInterval(surface, Interval))
     {
         /* Not initialized. */
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);

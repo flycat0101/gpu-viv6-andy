@@ -74,7 +74,7 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {

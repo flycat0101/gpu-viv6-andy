@@ -391,7 +391,7 @@ x11_CancelDisplayBackbuffer(
 
 gceSTATUS
 x11_SetSwapInterval(
-    IN PlatformDisplayType Display,
+    IN PlatformWindowType Window,
     IN gctINT Interval
 )
 {
@@ -1295,14 +1295,13 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
     gceSTATUS status;
 
-    status = x11_SetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Interval);
+    status = x11_SetSwapInterval((PlatformWindowType)Surface->hwnd, Interval);
 
     if (status == gcvSTATUS_NOT_SUPPORTED)
     {

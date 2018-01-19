@@ -35,6 +35,9 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
+#define GC_WL_MAX_SWAP_INTERVAL     10
+#define GC_WL_MIN_SWAP_INTERVAL     0
+
 #define WL_EGL_NUM_BACKBUFFERS          3
 #define WL_EGL_MAX_NUM_BACKBUFFERS      8
 
@@ -45,7 +48,6 @@ struct wl_egl_display
     struct wl_registry * registry;
     struct wl_event_queue * wl_queue;
     struct wl_event_queue * commit_queue;
-    int swap_interval;
 };
 
 struct wl_egl_window
@@ -64,6 +66,7 @@ struct wl_egl_window
     int32_t dy;
     int32_t width;
     int32_t height;
+    int32_t swap_interval;
 
     gceSURF_FORMAT format;
     gceSURF_TYPE type;
@@ -855,7 +858,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         goto out;
     }
 
-    if (display->swap_interval > 0)
+    if (window->swap_interval > 0)
     {
         /*
          * This is to block read & dispatch events in other threads, so that the
@@ -1000,8 +1003,7 @@ _InitLocalDisplayInfo(
         return EGL_FALSE;
     }
 
-    display->swap_interval = 1;
-    Display->localInfo     = display;
+    Display->localInfo = display;
 
     return EGL_TRUE;
 }
@@ -1044,12 +1046,12 @@ _GetSwapInterval(
 {
     if (Min != NULL)
     {
-        *Min = 0;
+        *Min = GC_WL_MIN_SWAP_INTERVAL;
     }
 
     if (Max != NULL)
     {
-        *Max = 10;
+        *Max = GC_WL_MAX_SWAP_INTERVAL;
     }
 
     return EGL_TRUE;
@@ -1057,20 +1059,20 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
-    struct wl_egl_display *display = Display->localInfo;
+    struct wl_egl_window *window = Surface->hwnd;
 
-    if (!display)
+    if (!window)
     {
         return EGL_FALSE;
     }
 
     /* clamp to min and max */
-    display->swap_interval = Interval > 10 ? 10
-                           : Interval < 0 ? 0 : Interval;
+    window->swap_interval = gcmCLAMP(Interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
+
     return EGL_TRUE;
 }
 
@@ -1974,7 +1976,7 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     window->height = height;
     window->format = gcvSURF_A8R8G8B8;
     window->type   = gcvSURF_BITMAP;
-
+    window->swap_interval = 1;
     window->commit_signal = 1;
 
     pthread_mutex_init(&window->commit_mutex, NULL);

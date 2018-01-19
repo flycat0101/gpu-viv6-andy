@@ -79,7 +79,6 @@ struct _FBDisplay
     gctUINT                 blueOffset;
     gceSURF_FORMAT          format;
     gceTILING               tiling;
-    gctINT                  swapInterval;
     gctINT                  refCount;
     gctBOOL                 panVsync;
 
@@ -94,8 +93,9 @@ struct _FBWindow
     gctINT             x, y;
     gctINT             width;
     gctINT             height;
+    gctINT             swapInterval;
     /* Color format. */
-    gceSURF_FORMAT      format;
+    gceSURF_FORMAT     format;
 };
 
 /* Structure that defines a pixmap. */
@@ -459,9 +459,6 @@ fbdev_GetDisplayByIndex(
         display->blueLength  = display->varInfo.blue.length;
         display->blueOffset  = display->varInfo.blue.offset;
 
-        /* initialize swap interval, default value is 1 */
-        display->swapInterval = 1;
-
         display->refCount = 0;
 
         /* Find a way to detect if pan display is with vsync. */
@@ -736,11 +733,15 @@ fbdev_GetDisplayBackbuffer(
 {
     gceSTATUS status = gcvSTATUS_OK;
     struct _FBDisplay* display;
-    gcmHEADER_ARG("Display=0x%x", Display);
+    struct _FBWindow* window;
+
+    gcmHEADER_ARG("Display=%p Window=%p", Display, Window);
+
     display = (struct _FBDisplay*)Display;
-    if (display == gcvNULL)
+    window = (struct _FBWindow*)Window;
+    if (!display || !window)
     {
-        /* Invalid display pointer. */
+        /* Invalid display or window pointer. */
         status = gcvSTATUS_INVALID_ARGUMENT;
         gcmFOOTER();
         return status;
@@ -761,7 +762,7 @@ fbdev_GetDisplayBackbuffer(
     *Y = display->backBufferY;
 
     /* if swap interval is zero do not wait for the back buffer to change */
-    if (display->swapInterval != 0)
+    if (window->swapInterval != 0)
     {
         while (display->backBufferY == (volatile int) (display->varInfo.yoffset))
         {
@@ -796,9 +797,17 @@ fbdev_SetDisplayVirtual(
 {
     gceSTATUS status = gcvSTATUS_OK;
     struct _FBDisplay* display;
-    gctINT swapInterval;
+    struct _FBWindow* window;
 
-    gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
+    gcmHEADER_ARG("Display=%p Window=%p Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
+
+    window = (struct _FBWindow*)Window;
+    if (window == NULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
 
     /*
      * This section may be called in a different thread, while main thread is
@@ -827,7 +836,7 @@ fbdev_SetDisplayVirtual(
     if (display->multiBuffer > 1)
     {
         /* clamp swap interval to be safe */
-        swapInterval = display->swapInterval;
+        gctINT swapInterval = window->swapInterval;
 
         /* if swap interval is 0 skip this step */
         if (swapInterval != 0 || !display->panVsync)
@@ -952,50 +961,29 @@ fbdev_CancelDisplayBackbuffer(
 
 gceSTATUS
 fbdev_SetSwapInterval(
-    IN PlatformDisplayType Display,
+    IN PlatformWindowType Window,
     IN gctINT Interval
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    struct _FBDisplay* display;
-    gctINT interval;
+    struct _FBWindow * window;
 
-    gcmHEADER_ARG("Display=0x%x Interval=%d", Display, Interval);
+    gcmHEADER_ARG("Window=%p Interval=%d", Window, Interval);
 
-    display = (struct _FBDisplay*)Display;
-    if (display == gcvNULL)
+    window = (struct _FBWindow*)Window;
+    if (window == gcvNULL)
     {
-        /* Invalid display pointer. */
+        /* Invalid window pointer. */
         status = gcvSTATUS_INVALID_ARGUMENT;
         gcmFOOTER();
         return status;
     }
 
-    /* clamp to min and max */
-    interval = Interval;
-    if (interval > GC_FB_MAX_SWAP_INTERVAL)
-    {
-        interval = GC_FB_MAX_SWAP_INTERVAL;
-    }
-    else if (interval < GC_FB_MIN_SWAP_INTERVAL)
-    {
-        interval = GC_FB_MIN_SWAP_INTERVAL;
-    }
-    display->swapInterval = interval;
+    window->swapInterval = gcmCLAMP(Interval, GC_FB_MIN_SWAP_INTERVAL, GC_FB_MAX_SWAP_INTERVAL);
 
     /* Success. */
     gcmFOOTER_NO();
     return status;
-}
-
-gceSTATUS
-fbdev_SetSwapIntervalEx(
-    IN PlatformDisplayType Display,
-    IN gctINT Interval,
-    IN gctPOINTER localDisplay
-    )
-{
-    return fbdev_SetSwapInterval(Display, Interval);
 }
 
 gceSTATUS
@@ -1136,7 +1124,6 @@ fbdev_CreateWindow(
 {
     gceSTATUS           status = gcvSTATUS_OK;
     struct _FBDisplay * display;
-    struct _FBWindow *  window;
     gctINT              ignoreDisplaySize = 0;
     gctCHAR *           p;
 
@@ -1187,7 +1174,7 @@ fbdev_CreateWindow(
 
     do
     {
-        window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
+        struct _FBWindow *window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
         if (window == gcvNULL)
         {
             status = gcvSTATUS_OUT_OF_RESOURCES;
@@ -1203,7 +1190,8 @@ fbdev_CreateWindow(
 
         window->width  = Width;
         window->height = Height;
-        *Window = (PlatformWindowType) window;
+        window->swapInterval = 1;
+        *Window = (PlatformWindowType)window;
     }
     while (0);
 
@@ -2152,14 +2140,13 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
     gceSTATUS status;
 
-    status = fbdev_SetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Interval);
+    status = fbdev_SetSwapInterval((PlatformWindowType)Surface->hwnd, Interval);
 
     if (status == gcvSTATUS_NOT_SUPPORTED)
     {

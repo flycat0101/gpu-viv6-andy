@@ -69,6 +69,7 @@ veglParseAttributes(
     Configuration->matchNativePixmap = EGL_NONE;
     Configuration->recordableConfig  = (EGLBoolean) EGL_DONT_CARE;
     Configuration->level             = 0;
+    Configuration->minSwapInterval   = EGL_DONT_CARE;
     Configuration->maxSwapInterval   = EGL_DONT_CARE;
     Configuration->transparentType   = EGL_NONE;
     Configuration->transparentRedValue    = EGL_DONT_CARE;
@@ -311,19 +312,24 @@ veglParseAttributes(
             gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
                           "%s: EGL_MIN_SWAP_INTERVAL=%d",
                           __FUNCTION__, value);
-            if ((value != EGL_DONT_CARE) && (value > 1))
+            if ((value != EGL_DONT_CARE) &&
+                (value < Display->minSwapInterval || value > Display->maxSwapInterval)
+               )
             {
                 /* Bad attribute. */
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                 return EGL_FALSE;
             }
+            Configuration->minSwapInterval = value;
             break;
 
         case EGL_MAX_SWAP_INTERVAL:
             gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
                           "%s: EGL_MAX_SWAP_INTERVAL=%d",
                           __FUNCTION__, value);
-            if ((value != EGL_DONT_CARE) && (value > 10))
+            if ((value != EGL_DONT_CARE) &&
+                (value < Display->minSwapInterval || value > Display->maxSwapInterval)
+               )
             {
                 /* Bad attribute. */
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
@@ -1155,6 +1161,16 @@ eglChooseConfig(
             continue;
         }
 
+        if ((criteria.minSwapInterval != (EGLint) EGL_DONT_CARE)
+        &&  (criteria.minSwapInterval != configuration->minSwapInterval)
+        )
+        {
+            /* Criterium doesn't match. */
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
+                          "  rejected on minSwapInterval config.");
+            continue;
+        }
+
         if ((criteria.maxSwapInterval != (EGLint) EGL_DONT_CARE)
         &&  (criteria.maxSwapInterval != configuration->maxSwapInterval)
         )
@@ -1283,7 +1299,6 @@ eglGetConfigAttrib(
     VEGLDisplay dpy;
     VEGLConfig eglConfig;
     gceSTATUS status;
-    gctINT min, max;
 
     gcmHEADER_ARG("Dpy=0x%x Config=0x%x attribute=%d", Dpy, Config, attribute);
 
@@ -1448,25 +1463,11 @@ eglGetConfigAttrib(
         break;
 
     case EGL_MIN_SWAP_INTERVAL:
-        if (!dpy->platform->getSwapInterval(dpy, &min, &max))
-        {
-            *value = 1;
-        }
-        else
-        {
-            *value = (EGLint) min;
-        }
+        *value = eglConfig->minSwapInterval;
         break;
 
     case EGL_MAX_SWAP_INTERVAL:
-        if (!dpy->platform->getSwapInterval(dpy, &min, &max))
-        {
-            *value = 1;
-        }
-        else
-        {
-            *value = (EGLint) max;
-        }
+        *value = eglConfig->maxSwapInterval;
         break;
 
     case EGL_LUMINANCE_SIZE:

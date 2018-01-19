@@ -57,7 +57,6 @@ struct _GBMDisplay
     gceTILING tiling;
 
     int multiBuffer;
-    int swapInterval;
 
     /* Pointer to next. */
     struct _GBMDisplay * next;
@@ -242,7 +241,6 @@ _GetDisplayByIndex(
         display->index        = DisplayIndex;
         display->gbm          = NULL;
         display->tiling       = gcvLINEAR;
-        display->swapInterval = 1;
         display->next         = NULL;
 
         if (DisplayIndex == 0)
@@ -358,7 +356,6 @@ _GetDisplayByDevice(
 
         display->gbm          = Context;
         display->tiling       = gcvLINEAR;
-        display->swapInterval = 1;
         display->next         = NULL;
 
 
@@ -488,36 +485,11 @@ gbm_CancelDisplayBackbuffer(
 
 gceSTATUS
 gbm_SetSwapInterval(
-    IN PlatformDisplayType Display,
+    IN PlatformWindowType Window,
     IN gctINT Interval
     )
 {
-    struct _GBMDisplay * display;
-
-    /* Lock display stack. */
-    pthread_mutex_lock(&displayMutex);
-
-    display = _FindDisplayLocked(Display);
-
-    if (display)
-    {
-        display->swapInterval = Interval;
-    }
-
-    /* Lock display stack. */
-    pthread_mutex_unlock(&displayMutex);
-
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gbm_SetSwapIntervalEx(
-    IN PlatformDisplayType Display,
-    IN gctINT Interval,
-    IN gctPOINTER localDisplay
-    )
-{
-    return gbm_SetSwapInterval(Display, Interval);
+    return gcvSTATUS_NOT_SUPPORTED;
 }
 
 gceSTATUS
@@ -1197,14 +1169,13 @@ _GetSwapInterval(
 
 static EGLBoolean
 _SetSwapInterval(
-    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
     IN EGLint Interval
     )
 {
     gceSTATUS status;
 
-    status = gbm_SetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Interval);
+    status = gbm_SetSwapInterval((PlatformWindowType)Surface->hwnd, Interval);
 
     if (status == gcvSTATUS_NOT_SUPPORTED)
     {

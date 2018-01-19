@@ -333,7 +333,7 @@ _ValidateMode(
 
 static void
 _FillIn(
-    VEGLConfig Config,
+    IN VEGLDisplay Display,
     EGLint * Index,
     VEGLConfigColor Color,
     VEGLConfigDepth Depth,
@@ -342,10 +342,6 @@ _FillIn(
 {
     VEGLConfig config;
     VEGLThreadData thread = veglGetThreadData();
-#if defined(ANDROID)
-    gctSTRING esVersion = gcvNULL;
-    gcePATCH_ID patchId   = gcvPATCH_INVALID;
-#endif
 
     if (thread == gcvNULL)
     {
@@ -359,7 +355,7 @@ _FillIn(
     }
 
     /* Get a shortcut to the current configuration. */
-    config = &Config[*Index];
+    config = &Display->config[*Index];
 
     config->bufferSize  = Color->bufferSize;
     config->configBufferSize = Color->configBufferSize;
@@ -372,8 +368,10 @@ _FillIn(
 
     config->configCaveat = EGL_NONE;
 
+    config->minSwapInterval = Display->minSwapInterval;
+    config->maxSwapInterval = Display->maxSwapInterval;;
+
     config->level                 = 0;
-    config->maxSwapInterval       = 10;
     config->transparentType       = EGL_NONE;
     config->transparentRedValue   = EGL_DONT_CARE;
     config->transparentGreenValue = EGL_DONT_CARE;
@@ -479,13 +477,18 @@ _FillIn(
 #endif
 
 #if defined(ANDROID)
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
-        && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
-        esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
     {
-        config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
-        config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
+        gctSTRING esVersion = gcvNULL;
+        gcePATCH_ID patchId   = gcvPATCH_INVALID;
+
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+            && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+            esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
+        {
+            config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
+            config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
+        }
     }
 #endif
 
@@ -965,6 +968,13 @@ veglGetPlatformDisplay(
         display->blobCacheGet  = gcvNULL;
         display->blobCacheSet  = gcvNULL;
 
+        if (!eglPlatform->getSwapInterval ||
+            !eglPlatform->getSwapInterval(display, &display->minSwapInterval, &display->maxSwapInterval))
+        {
+            display->minSwapInterval = 1;
+            display->maxSwapInterval = 1;
+        }
+
         /* create access mutext to lock display */
         gcmVERIFY_OK(gcoOS_CreateMutex(gcvNULL, &display->accessMutex));
         /* create access mutext to lock resouce stack */
@@ -1384,7 +1394,7 @@ veglInitilizeDisplay(
                 }
 
                 _FillIn(
-                    Display->config,
+                    Display,
                     &index,
                     &eglConfigColor[color],
                     &eglConfigDepth[depth],
@@ -1404,7 +1414,7 @@ veglInitilizeDisplay(
                 if ((!fastMSAA) && (maxMultiSample >= 2) && (enableMSAAx2 == gcvTRUE))
                 {
                     _FillIn(
-                        Display->config,
+                        Display,
                         &index,
                         &eglConfigColor[color],
                         &eglConfigDepth[depth],
@@ -1414,7 +1424,7 @@ veglInitilizeDisplay(
                 if (maxMultiSample >= 4)
                 {
                     _FillIn(
-                        Display->config,
+                        Display,
                         &index,
                         &eglConfigColor[color],
                         &eglConfigDepth[depth],

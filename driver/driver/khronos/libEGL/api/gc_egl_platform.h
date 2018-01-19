@@ -67,7 +67,7 @@ struct eglPlatform
     /*
      * Set swap interval.
      */
-    EGLBoolean (* setSwapInterval)(VEGLDisplay Display,
+    EGLBoolean (* setSwapInterval)(VEGLSurface Surface,
                                    EGLint Interval);
 
     /* Window. */
