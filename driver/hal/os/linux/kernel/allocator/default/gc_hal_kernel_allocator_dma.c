@@ -243,7 +243,12 @@ _DmaGetSGT(
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
+#if CONFIG_ARM && LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+    page = pfn_to_page (dma_to_pfn (&Allocator->os->device->platform->device->dev, mdlPriv->dmaHandle));
+#else
     page = phys_to_page(dma_to_phys(&Allocator->os->device->platform->device->dev, mdlPriv->dmaHandle));
+#endif
+
     for (i = 0; i < numPages; ++i)
     {
         pages[i] = nth_page(page, i + skipPages);
