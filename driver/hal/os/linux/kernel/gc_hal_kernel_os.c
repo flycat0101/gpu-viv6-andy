@@ -169,7 +169,7 @@ FindMdlMap(
     IN gctINT ProcessID
     )
 {
-    PLINUX_MDL_MAP  mdlMap;
+    PLINUX_MDL_MAP mdlMap;
 
     gcmkHEADER_ARG("Mdl=0x%X ProcessID=%d", Mdl, ProcessID);
 
@@ -242,10 +242,12 @@ _DestroyMdl(
             allocator->ops->Free(allocator, Mdl);
         }
 
+        mutex_lock(&Mdl->mapsMutex);
         list_for_each_entry_safe(mdlMap, next, &Mdl->mapsHead, link)
         {
             gcmkVERIFY_OK(_DestroyMdlMap(Mdl, mdlMap));
         }
+        mutex_unlock(&Mdl->mapsMutex);
 
         if (Mdl->link.next)
         {
