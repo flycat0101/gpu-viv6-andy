@@ -89,7 +89,6 @@ _GenExtension(
     char * str;
     gctSIZE_T len = 0;
     struct eglExtension * ext;
-    gcePATCH_ID patchId   = gcvPATCH_INVALID;
 
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
@@ -129,14 +128,20 @@ _GenExtension(
     }
 #endif
 
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (patchId == gcvPATCH_DEQP ||
-        patchId == gcvPATCH_GTFES30 ||
-        (!gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_ROBUSTNESS) &&
-        !gcdPROC_IS_WEBGL(patchId)))
+#if gcdENABLE_3D
     {
-        extensions[VEGL_EXTID_EXT_create_context_robustness].enabled = EGL_FALSE;
+        gcePATCH_ID patchId   = gcvPATCH_INVALID;
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        if (patchId == gcvPATCH_DEQP ||
+            patchId == gcvPATCH_GTFES30 ||
+            (!gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_ROBUSTNESS)
+          && !gcdPROC_IS_WEBGL(patchId)
+            ))
+        {
+            extensions[VEGL_EXTID_EXT_create_context_robustness].enabled = EGL_FALSE;
+        }
     }
+#endif
 
     if (Thread->security)
     {
