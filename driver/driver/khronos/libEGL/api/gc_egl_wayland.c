@@ -698,7 +698,7 @@ static int wl_egl_window_set_format(struct wl_egl_window *window,
         return -EINVAL;
     }
 
-    window->type   = Type;
+    window->type   = Type | gcvSURF_DMABUF_EXPORTABLE;
     window->format = Format;
     return 0;
 }
