@@ -50,7 +50,6 @@
 #include <X11/Xlib-xcb.h>
 
 #include <linux/dma-buf.h>
-#include <xf86drm.h>
 #include "vivante_bo.h"
 
 

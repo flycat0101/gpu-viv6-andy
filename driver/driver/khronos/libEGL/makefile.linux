@@ -65,8 +65,7 @@ ifeq ($(X11_DRI3),1)
   INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
              -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
-             -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante \
-             -I$(AQROOT)/driver/X/DRI/src
+             -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante 
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -208,7 +207,6 @@ endif
 
 ifeq ($(X11_DRI3),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_dri3.o
-  OBJECTS += $(OBJ_DIR)/XF86dri.o
 endif
 
 ifeq ($(EGL_API_WL),1)
@@ -279,11 +277,6 @@ vpath %.c source
 ifeq ($(EGL_API_DRI),1)
   vpath %.c ../../X/DRI/src
 endif
-
-ifeq ($(X11_DRI3),1)
-  vpath %.c ../../X/DRI/src
-endif
-
 
 ifeq ($(EGL_API_WL),1)
   vpath %.c ../../wayland
