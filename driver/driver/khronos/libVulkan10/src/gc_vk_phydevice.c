@@ -910,7 +910,8 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[0]                     = 65535;
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[1]                     = 65535;
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[2]                     = 65535;
-    phyDev->phyDevProp.limits.maxComputeWorkGroupInvocations                  = 128;
+    /*modify the max WorkGroupInvocation from 128 to 2048 when do barrier in cs, the max value should be 128*/
+    phyDev->phyDevProp.limits.maxComputeWorkGroupInvocations                  = 2048;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[0]                      = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[1]                      = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[2]                      = 64;
