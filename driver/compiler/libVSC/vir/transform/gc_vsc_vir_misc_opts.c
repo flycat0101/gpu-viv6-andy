@@ -4376,6 +4376,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     gctBOOL                 hasHalfDepFix = compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalfDepFix;
     gctUINT                 i = 0;
     VIR_Symbol              *pSym = gcvNULL;
+    gctBOOL                 isAppConformance = (compCfg->ctx.appNameId == gcvPATCH_GTFES30 || compCfg->ctx.appNameId == gcvPATCH_DEQP);
 
     VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
 
@@ -4493,7 +4494,9 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 }
 
                 /* check dest */
-                if (VIR_Inst_Dual16NotSupported(pInst))
+                if (VIR_Inst_Dual16NotSupported(pInst)  ||
+                    /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
+                    (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                     {

@@ -4228,11 +4228,6 @@ GLvoid GL_APIENTRY __gles_DispatchComputeIndirect(__GLcontext *gc, GLintptr indi
 
     __GL_HEADER();
 
-    if (!indirectObj || indirectObj->bufferMapped)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
     if (indirect < 0 || (indirect & 0x3))
     {
         /* ES_SPEC 3.1 Chapter 17 Compute Shaders
@@ -4240,6 +4235,11 @@ GLvoid GL_APIENTRY __gles_DispatchComputeIndirect(__GLcontext *gc, GLintptr indi
          * is not a multiple of the size, in basic machine units, of uint.
          */
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if (!indirectObj || indirectObj->bufferMapped)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     if (indirect >= indirectObj->size ||
