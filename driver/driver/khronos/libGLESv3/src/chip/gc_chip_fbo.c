@@ -2050,13 +2050,6 @@ __glChipRenderbufferStorage(
         patchCase = __GL_CHIP_FMT_PATCH_8BIT_MSAA;
     }
 
-    if (drvFormat == __GL_FMT_RGBA4 &&
-        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
-        !chipCtx->chipFeature.hwFeature.hasPEDitherFix2)
-    {
-        drvFormat = __GL_FMT_RGBA8;
-    }
-
     formatMapInfo = gcChipGetFormatMapInfo(gc, drvFormat, patchCase);
 
     chipRBO->formatMapInfo = formatMapInfo;
