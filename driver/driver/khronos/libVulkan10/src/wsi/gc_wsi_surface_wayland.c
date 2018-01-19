@@ -1033,7 +1033,7 @@ static VkResult waylandCreateSwapchain(
                     continue;
                 }
 
-                __DestroyImageBuffer(sc, imageBuffer);
+                __DestroyImageBuffer(oldSc, imageBuffer);
             }
 
             if (!acquired)
