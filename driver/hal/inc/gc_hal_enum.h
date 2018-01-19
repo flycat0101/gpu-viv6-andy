@@ -106,7 +106,6 @@ typedef enum _gceFEATURE
     gcvFEATURE_VG_FILTER,
     gcvFEATURE_VG21,
     gcvFEATURE_VG_DOUBLE_BUFFER,
-    gcvFEATURE_VG_RESOLUTION_8K,
     gcvFEATURE_MC20,
     gcvFEATURE_SUPER_TILED,
     gcvFEATURE_FAST_CLEAR_FLUSH,
@@ -471,6 +470,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_WIDELINE_TRIANGLE_EMU,
     gcvFEATURE_FENCE,
     gcvFEATURE_PE_DEPTH_ONLY_OQFIX,
+    gcvFEATURE_VG_RESOLUTION_8K,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
