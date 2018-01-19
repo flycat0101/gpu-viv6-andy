@@ -1447,6 +1447,7 @@ _ValidateRenderMode(
     EGLint * OutRenderMode
     )
 {
+    *OutRenderMode = RenderMode;
     return EGL_TRUE;
 }
 #endif
