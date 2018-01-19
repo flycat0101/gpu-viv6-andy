@@ -18185,9 +18185,31 @@ _checkComputeShaderSanity(
         status = gcvSTATUS_CS_NO_WORKGROUP_SIZE;
         gcmONERROR(status);
     }
-    else
+
+    /* Link error is generated if compute shader exceeds GL_MAX_COMPUTE_SHARED_MEMORY_SIZE. */
     {
+        gctUINT i;
+
+        for (i = 0; i < ComputeShader->storageBlockCount; i++)
+        {
+            gcsSTORAGE_BLOCK ssbo = ComputeShader->storageBlocks[i];
+
+            if (ssbo == gcvNULL || !HasIBIFlag(GetSBInterfaceBlockInfo(ssbo), gceIB_FLAG_FOR_SHARED_VARIABLE))
+            {
+                continue;
+            }
+
+            if (GetIBIBlockSize(GetSBInterfaceBlockInfo(ssbo)) > GetGLMaxSharedMemorySize())
+            {
+                status = gcvSTATUS_TOO_MANY_UNIFORMS;
+                gcmONERROR(status);
+            }
+
+            break;
+        }
     }
+
+
 OnError:
     /* Return the status. */
     return status;
