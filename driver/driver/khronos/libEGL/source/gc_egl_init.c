@@ -93,7 +93,7 @@ _GenExtension(
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
 
-    if (Display->platform->platform == EGL_PLATFORM_FBDEV_VIV ||
+    if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
         Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV ||
         Display->platform->platform == EGL_PLATFORM_GBM_VIV)
     {

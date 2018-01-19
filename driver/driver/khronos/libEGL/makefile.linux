@@ -68,6 +68,10 @@ ifeq ($(X11_DRI3),1)
              -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante 
 endif
 
+ifeq ($(EGL_API_FB),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include/libdrm
+endif
+
 ifeq ($(EGL_API_GBM),1)
   ifneq ($(GBM_LIBS),)
     INCLUDE += $(GBM_CFLAGS)
@@ -89,8 +93,7 @@ ifeq ($(EGL_API_DFB),1)
              -I$(DFB_DIR)/include/directfb
 endif
 
-CFLAGS  += $(INCLUDE)
-
+CFLAGS  += $(INCLUDE) -DgcdUSE_KMS=$(USE_KMS)
 
 ################################################################################
 # Add extra flags for object files.
@@ -161,6 +164,8 @@ ifeq ($(X11_DRI3),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
+  LDLIBS += -ldrm
+
   ifneq ($(GBM_LIBS),)
     LDLIBS += $(GBM_LIBS)
   else
@@ -220,7 +225,12 @@ ifeq ($(EGL_API_GBM),1)
 endif
 
 ifeq ($(EGL_API_FB),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_fb.o
   OBJECTS += $(OBJ_DIR)/gc_egl_fbdev.o
+  ifeq ($(USE_KMS),1)
+    OBJECTS += $(OBJ_DIR)/gc_egl_fbdrm.o
+    LDLIBS += -L$(X11_ARM_DIR)/lib -ldrm
+  endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
