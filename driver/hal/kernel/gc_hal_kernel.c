@@ -1032,6 +1032,17 @@ gckKERNEL_AllocateLinearMemory(
         *Pool = gcvPOOL_VIRTUAL;
     }
 
+    if (Flag & gcvALLOC_FLAG_DMABUF_EXPORTABLE)
+    {
+        gctSIZE_T pageSize = 0;
+        gckOS_GetPageSize(Kernel->os, &pageSize);
+
+        /* Usually, the exported dmabuf might be later imported to DRM,
+        ** while DRM requires input size to be page aligned.
+        */
+        Bytes = gcmALIGN(Bytes, pageSize);
+    }
+
 AllocateMemory:
 
     /* Get initial pool. */
@@ -4246,7 +4257,7 @@ gckKERNEL_AllocateVirtualCommandBuffer(
 {
     gceSTATUS                       status;
     gckOS                           os = Kernel->os;
-    gckVIRTUAL_COMMAND_BUFFER_PTR    buffer;
+    gckVIRTUAL_COMMAND_BUFFER_PTR   buffer;
 
     gcmkHEADER_ARG("Os=0x%X InUserSpace=%d *Bytes=%lu",
         os, InUserSpace, gcmOPT_VALUE(Bytes));

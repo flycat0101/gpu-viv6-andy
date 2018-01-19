@@ -58,8 +58,13 @@
 #include <drm/drmP.h>
 #include <drm/drm_gem.h>
 #include <linux/dma-buf.h>
+#include <linux/component.h>
 #include "gc_hal_kernel_linux.h"
 #include "gc_hal_drm.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+#error "Vivante DRM is NOT supportted on linux kernel early than 3.8.0"
+#endif
 
 #define _GC_OBJ_ZONE    gcvZONE_KERNEL
 
@@ -748,20 +753,43 @@ static struct drm_driver viv_drm_driver = {
     .minor              = 0,
 };
 
-int viv_drm_probe(struct device *dev)
+#if USE_LINUX_PCIE
+int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
+void gpu_remove(struct pci_dev *pdev);
+#else
+int gpu_probe(struct platform_device *pdev);
+int gpu_remove(struct platform_device *pdev);
+#endif
+
+static int viv_drm_bind(struct device *dev)
 {
-    int ret = 0;
+    int ret;
     gceSTATUS status = gcvSTATUS_OK;
     gckGALDEVICE gal_dev = gcvNULL;
     struct drm_device *drm = gcvNULL;
 
-    gal_dev = (gckGALDEVICE)dev_get_drvdata(dev);
+    ret = component_bind_all(dev, 0);
+    if (ret)
+    {
+        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+    }
+
+#if USE_LINUX_PCIE
+    ret = gpu_probe(to_pci_dev(dev), gcvNULL);
+#else
+    ret = gpu_probe(to_platform_device(dev));
+#endif
+    if (ret)
+    {
+        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+    }
+
+    gal_dev = (gckGALDEVICE)platform_get_drvdata(to_platform_device(dev));
     if (!gal_dev)
     {
         ret = -ENODEV;
         gcmkONERROR(gcvSTATUS_INVALID_OBJECT);
     }
-
     drm = drm_dev_alloc(&viv_drm_driver, dev);
     if (IS_ERR(drm))
     {
@@ -785,12 +813,13 @@ OnError:
         {
             drm_dev_unref(drm);
         }
+        component_unbind_all(dev, 0);
         printk(KERN_ERR "galcore: Failed to setup drm device.\n");
     }
     return ret;
 }
 
-int viv_drm_remove(struct device *dev)
+static void viv_drm_unbind(struct device *dev)
 {
     gckGALDEVICE gal_dev = (gckGALDEVICE)dev_get_drvdata(dev);
 
@@ -802,7 +831,66 @@ int viv_drm_remove(struct device *dev)
         drm_dev_unref(drm);
     }
 
+#if USE_LINUX_PCIE
+    gpu_remove(to_pci_dev(dev));
+#else
+    gpu_remove(to_platform_device(dev));
+#endif
+
+    component_unbind_all(dev, 0);
+}
+
+static const struct component_master_ops viv_master_ops =
+{
+    .bind   = viv_drm_bind,
+    .unbind = viv_drm_unbind,
+};
+
+static int viv_compare_of(struct device *dev, void *data)
+{
+    struct device_node *np = data;
+
+    return dev->of_node == np;
+}
+
+int viv_drm_probe (
+#if USE_LINUX_PCIE
+    struct pci_dev *pdev,
+    const struct pci_device_id *ent
+#else
+    struct platform_device *pdev
+#endif
+    )
+{
+    int i = 0;
+    struct component_match *match = NULL;
+    struct device_node * node = pdev->dev.of_node;
+    struct device_node *core_node;
+
+    /* Below code snippet shall be moved to gc_hal_kernel_platform_imx6.c */
+    while ((core_node = of_parse_phandle(node, "cores", i++)) != NULL) {
+        if (of_device_is_available(core_node)) {
+            component_match_add(&pdev->dev, &match, viv_compare_of, core_node);
+        }
+
+        of_node_put(core_node);
+    }
+    /* Above code snippet shall be moved to gc_hal_kernel_platform_imx6.c */
+
+    return component_master_add_with_match(&pdev->dev, &viv_master_ops, match);
+}
+
+#if USE_LINUX_PCIE
+void viv_drm_remove(struct pci_dev *pdev)
+#else
+int  viv_drm_remove(struct platform_device *pdev)
+#endif
+{
+    component_master_del(&pdev->dev, &viv_master_ops);
+
+#if !USE_LINUX_PCIE
     return 0;
+#endif
 }
 
 #endif

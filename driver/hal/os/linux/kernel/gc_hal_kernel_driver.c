@@ -864,18 +864,14 @@ static void drv_exit(void)
     gcmkFOOTER_NO();
 }
 
-#if gcdENABLE_DRM
-int viv_drm_probe(struct device *dev);
-int viv_drm_remove(struct device *dev);
-#endif
 
 #if USE_LINUX_PCIE
-static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #else /* USE_LINUX_PCIE */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
-    static int gpu_probe(struct platform_device *pdev)
+int gpu_probe(struct platform_device *pdev)
 #else
-    static int __devinit gpu_probe(struct platform_device *pdev)
+int __devinit gpu_probe(struct platform_device *pdev)
 #endif
 #endif /* USE_LINUX_PCIE */
 {
@@ -966,10 +962,6 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #else
         platform_set_drvdata(pdev, galDevice);
 #endif
-
-#if gcdENABLE_DRM
-        ret = viv_drm_probe(&pdev->dev);
-#endif
     }
 
     if (ret < 0)
@@ -984,20 +976,16 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 }
 
 #if USE_LINUX_PCIE
-static void gpu_remove(struct pci_dev *pdev)
+void gpu_remove(struct pci_dev *pdev)
 #else /* USE_LINUX_PCIE */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
-    static int gpu_remove(struct platform_device *pdev)
+int gpu_remove(struct platform_device *pdev)
 #else
-    static int __devexit gpu_remove(struct platform_device *pdev)
+int __devexit gpu_remove(struct platform_device *pdev)
 #endif
 #endif /* USE_LINUX_PCIE */
 {
     gcmkHEADER();
-
-#if gcdENABLE_DRM
-    viv_drm_remove(&pdev->dev);
-#endif
 
     drv_exit();
 
@@ -1209,7 +1197,7 @@ static struct platform_driver gpu_driver = {
     .resume     = gpu_resume,
 
     .driver     = {
-        .owner = THIS_MODULE,
+        .owner  = THIS_MODULE,
         .name   = DEVICE_NAME,
 #if defined(CONFIG_PM) && LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30)
         .pm     = &gpu_pm_ops,
@@ -1218,9 +1206,24 @@ static struct platform_driver gpu_driver = {
 };
 #endif /* USE_LINUX_PCIE */
 
+#if gcdENABLE_DRM
+#if USE_LINUX_PCIE
+int viv_drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
+void viv_drm_remove(struct pci_dev *pdev);
+#else
+int viv_drm_probe(struct platform_device *pdev);
+int viv_drm_remove(struct platform_device *pdev);
+#endif
+#endif
+
 static int __init gpu_init(void)
 {
     int ret = 0;
+
+#if gcdENABLE_DRM
+    gpu_driver.probe = viv_drm_probe;
+    gpu_driver.remove = viv_drm_remove;
+#endif
 
     ret = soc_platform_init(&gpu_driver, &platform);
 
