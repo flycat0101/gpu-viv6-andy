@@ -232,12 +232,6 @@ static void waylandDestroySurface(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&inst->memCb);
 
-    wl_surface_attach(surf->surface, NULL, 0, 0);
-    wl_surface_damage(surf->surface, 0, 0, 1, 1);
-    wl_surface_commit(surf->surface);
-
-    roundtrip_queue(surf->display, NULL);
-
     __VK_FREE(surf);
 }
 
