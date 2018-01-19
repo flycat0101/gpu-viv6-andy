@@ -191,10 +191,6 @@ struct _gckHARDWARE
     gctBOOL                     powerState;
     gctPOINTER                  globalSemaphore;
 
-    gctISRMANAGERFUNC           startIsr;
-    gctISRMANAGERFUNC           stopIsr;
-    gctPOINTER                  isrContext;
-
     gctUINT32                   mmuVersion;
 
     /* Type */

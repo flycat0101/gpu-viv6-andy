@@ -94,9 +94,6 @@ struct _gckVGHARDWARE
     gctUINT32                   powerThread;
     gceCHIPPOWERSTATE           chipPowerState;
     gceCHIPPOWERSTATE           chipPowerStateGlobal;
-    gctISRMANAGERFUNC           startIsr;
-    gctISRMANAGERFUNC           stopIsr;
-    gctPOINTER                  isrContext;
     gctPOINTER                  pageTableDirty;
 #if gcdPOWEROFF_TIMEOUT
     gctUINT32                   powerOffTime;

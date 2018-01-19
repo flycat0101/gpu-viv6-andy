@@ -1813,8 +1813,6 @@ gckHARDWARE_Construct(
 
     gcmkONERROR(gckOS_CreateMutex(Os, &hardware->powerMutex));
     gcmkONERROR(gckOS_CreateSemaphore(Os, &hardware->globalSemaphore));
-    hardware->startIsr = gcvNULL;
-    hardware->stopIsr = gcvNULL;
 
 #if gcdPOWEROFF_TIMEOUT
     hardware->powerOffTimeout = gcdPOWEROFF_TIMEOUT;
@@ -7412,7 +7410,6 @@ gckHARDWARE_SetPowerManagementState(
 #endif
     gctUINT32 process, thread;
     gctBOOL commandStarted = gcvFALSE;
-    gctBOOL isrStarted = gcvFALSE;
 
 #if gcdENABLE_PROFILING
     gctUINT64 time, freq, mutexTime, onTime, stallTime, stopTime, delayTime,
@@ -8007,12 +8004,6 @@ gckHARDWARE_SetPowerManagementState(
     {
         /* Stop the command parser. */
         gcmkONERROR(gckCOMMAND_Stop(command));
-
-        /* Stop the Isr. */
-        if (Hardware->stopIsr)
-        {
-            gcmkONERROR(Hardware->stopIsr(Hardware->isrContext));
-        }
     }
 
     /* Flush Cache before Power Off. */
@@ -8162,13 +8153,6 @@ gckHARDWARE_SetPowerManagementState(
         /* Start the command processor. */
         gcmkONERROR(gckCOMMAND_Start(command));
         commandStarted = gcvTRUE;
-
-        if (Hardware->startIsr)
-        {
-            /* Start the Isr. */
-            gcmkONERROR(Hardware->startIsr(Hardware->isrContext));
-            isrStarted = gcvTRUE;
-        }
     }
 
     /* Get time until started. */
@@ -8256,11 +8240,6 @@ OnError:
     if (commandStarted)
     {
         gcmkVERIFY_OK(gckCOMMAND_Stop(command));
-    }
-
-    if (isrStarted)
-    {
-        gcmkVERIFY_OK(Hardware->stopIsr(Hardware->isrContext));
     }
 
     if (acquired)
@@ -10507,41 +10486,6 @@ gckHARDWARE_NeedBaseAddress(
     /* Success. */
     gcmkFOOTER_ARG("*NeedBase=%d", *NeedBase);
     return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gckHARDWARE_SetIsrManager(
-   IN gckHARDWARE Hardware,
-   IN gctISRMANAGERFUNC StartIsr,
-   IN gctISRMANAGERFUNC StopIsr,
-   IN gctPOINTER Context
-   )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmkHEADER_ARG("Hardware=0x%x, StartIsr=0x%x, StopIsr=0x%x, Context=0x%x",
-                   Hardware, StartIsr, StopIsr, Context);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    if (StartIsr == gcvNULL ||
-        StopIsr == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-
-        gcmkFOOTER();
-        return status;
-    }
-
-    Hardware->startIsr = StartIsr;
-    Hardware->stopIsr = StopIsr;
-    Hardware->isrContext = Context;
-
-    /* Success. */
-    gcmkFOOTER();
-
-    return status;
 }
 
 /*******************************************************************************

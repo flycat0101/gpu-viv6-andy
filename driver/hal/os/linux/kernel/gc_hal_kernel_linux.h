@@ -224,7 +224,7 @@ struct _gckOS
     gcsDEBUGFS_DIR              allocatorDebugfsDir;
 
     /* Lock for register access check. */
-    struct mutex                registerAccessLocks[gcdMAX_GPU_COUNT];
+    spinlock_t                  registerAccessLock;
 
     /* External power states. */
     gctBOOL                     powerStates[gcdMAX_GPU_COUNT];

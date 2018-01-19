@@ -562,38 +562,6 @@ OnError:
 }
 #endif
 
-static inline gceSTATUS
-_AllowAccess(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 Address
-    )
-{
-    gctUINT32 data;
-
-    /* Check external clock state. */
-    if (Os->clockStates[Core] == gcvFALSE)
-    {
-        gcmkPRINT("[galcore]: %s(%d) GPU[%d] External clock off", __FUNCTION__, __LINE__, Core);
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
-    /* Check internal clock state. */
-    if (Address == 0)
-    {
-        return gcvSTATUS_OK;
-    }
-
-    data = readl((gctUINT8 *)Os->device->registerBases[Core] + 0x0);
-
-    if ((data & 0x3) == 0x3)
-    {
-        gcmkPRINT("[galcore]: %s(%d) GPU[%d] Internal clock off", __FUNCTION__, __LINE__, Core);
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
-    return gcvSTATUS_OK;
-}
 
 static gceSTATUS
 _ShrinkMemory(
@@ -646,7 +614,6 @@ gckOS_Construct(
 {
     gckOS os;
     gceSTATUS status;
-    gctINT i;
 
     gcmkHEADER_ARG("Context=0x%X", Context);
 
@@ -716,10 +683,7 @@ gckOS_Construct(
         SetPageReserved(os->paddingPage);
     }
 
-    for (i = 0; i < gcdMAX_GPU_COUNT; i++)
-    {
-        mutex_init(&os->registerAccessLocks[i]);
-    }
+    spin_lock_init(&os->registerAccessLock);
 
     gckOS_ImportAllocators(os);
 
@@ -1715,28 +1679,32 @@ gckOS_ReadRegisterEx(
     OUT gctUINT32 * Data
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%X", Os, Core, Address);
+    unsigned long flags;
 
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
+    spin_lock_irqsave(&Os->registerAccessLock, flags);
 
-    gcmkVERIFY_ARGUMENT(Address < Os->device->requestedRegisterMemSizes[Core]);
-
-    gcmkVERIFY_ARGUMENT(Data != gcvNULL);
-
-    if (!in_irq())
+    if (unlikely(Os->clockStates[Core] == gcvFALSE))
     {
-        mutex_lock(&Os->registerAccessLocks[Core]);
-    }
+        spin_unlock_irqrestore(&Os->registerAccessLock, flags);
 
-    gcmkBUG_ON(gcvSTATUS_OK != _AllowAccess(Os, Core, Address));
+        /*
+         * Read register when power off:
+         * 1. In shared IRQ, read register may be called and that's not our irq.
+         * 2. In non-irq context, register access should not be called,
+         *    otherwise it's driver bug.
+         */
+        if (!in_irq())
+        {
+            gcmkPRINT("[galcore]: %s(%d) GPU[%d] external clock off",
+                      __func__, __LINE__, Core);
+            gcmkBUG_ON(1);
+        }
+
+        return gcvSTATUS_GENERIC_IO;
+    }
 
     *Data = readl((gctUINT8 *)Os->device->registerBases[Core] + Address);
-
-    if (!in_irq())
-    {
-        mutex_unlock(&Os->registerAccessLocks[Core]);
-    }
+    spin_unlock_irqrestore(&Os->registerAccessLock, flags);
 
 #if gcdDUMP_AHB_ACCESS
     if (!in_irq())
@@ -1747,7 +1715,6 @@ gckOS_ReadRegisterEx(
 #endif
 
     /* Success. */
-    gcmkFOOTER_ARG("*Data=0x%08x", *Data);
     return gcvSTATUS_OK;
 }
 
@@ -1790,26 +1757,27 @@ gckOS_WriteRegisterEx(
     IN gctUINT32 Data
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%X Data=0x%08x", Os, Core, Address, Data);
+    unsigned long flags;
 
-    gcmkVERIFY_ARGUMENT(Address < Os->device->requestedRegisterMemSizes[Core]);
+    spin_lock_irqsave(&Os->registerAccessLock, flags);
 
-    if (!in_interrupt())
+    if (unlikely(Os->clockStates[Core] == gcvFALSE))
     {
-        mutex_lock(&Os->registerAccessLocks[Core]);
-    }
+        spin_unlock_irqrestore(&Os->registerAccessLock, flags);
 
-    gcmkBUG_ON(gcvSTATUS_OK != _AllowAccess(Os, Core, Address));
+        gcmkPRINT("[galcore]: %s(%d) GPU[%d] external clock off",
+                  __func__, __LINE__, Core);
+
+        /* Driver bug: register write when clock off. */
+        gcmkBUG_ON(1);
+        return gcvSTATUS_GENERIC_IO;
+    }
 
     writel(Data, (gctUINT8 *)Os->device->registerBases[Core] + Address);
-
-    if (!in_interrupt())
-    {
-        mutex_unlock(&Os->registerAccessLocks[Core]);
-    }
+    spin_unlock_irqrestore(&Os->registerAccessLock, flags);
 
 #if gcdDUMP_AHB_ACCESS
-    if (!in_interrupt())
+    if (!in_irq())
     {
         /* Dangerous to print in interrupt context, skip. */
         gcmkPRINT("@[WR %d] %08x %08x", Core, Address, Data);
@@ -1817,7 +1785,6 @@ gckOS_WriteRegisterEx(
 #endif
 
     /* Success. */
-    gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
 
@@ -5404,6 +5371,18 @@ gckOS_SetGPUPower(
 
     clockChange = (Clock != Os->clockStates[Core]);
 
+    if (clockChange)
+    {
+        unsigned long flags;
+
+        spin_lock_irqsave(&Os->registerAccessLock, flags);
+
+        /* Record clock states, ahead. */
+        Os->clockStates[Core] = Clock;
+
+        spin_unlock_irqrestore(&Os->registerAccessLock, flags);
+    }
+
     if (powerChange && (Power == gcvTRUE))
     {
         if (platform && platform->ops->setPower)
@@ -5416,16 +5395,10 @@ gckOS_SetGPUPower(
 
     if (clockChange)
     {
-        mutex_lock(&Os->registerAccessLocks[Core]);
-
         if (platform && platform->ops->setClock)
         {
             gcmkVERIFY_OK(platform->ops->setClock(platform, Core, Clock));
         }
-
-        Os->clockStates[Core] = Clock;
-
-        mutex_unlock(&Os->registerAccessLocks[Core]);
     }
 
     if (powerChange && (Power == gcvFALSE))

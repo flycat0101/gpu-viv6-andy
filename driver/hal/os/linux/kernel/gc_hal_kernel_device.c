@@ -958,17 +958,16 @@ static irqreturn_t isrRoutine(int irq, void *ctxt)
 {
     gceSTATUS status;
     gckGALDEVICE device;
-    gceCORE Core = (gceCORE) gcmPTR2INT32(ctxt);
+    gceCORE core = (gceCORE)gcmPTR2INT32(ctxt) - 1;
 
     device = galDevice;
 
     /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[Core], gcvNOTIFY_INTERRUPT, gcvTRUE);
+    status = gckKERNEL_Notify(device->kernels[core], gcvNOTIFY_INTERRUPT, gcvTRUE);
 
     if (gcmIS_SUCCESS(status))
     {
-        up(&device->semas[Core]);
-
+        up(&device->semas[core]);
         return IRQ_HANDLED;
     }
 
@@ -1330,14 +1329,6 @@ gckGALDEVICE_Construct(
 
         gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, Args->chipIDs[gcvCORE_MAJOR], device, &device->kernels[gcvCORE_MAJOR]));
 
-        /* Setup the ISR manager. */
-        gcmkONERROR(gckHARDWARE_SetIsrManager(
-            device->kernels[gcvCORE_MAJOR]->hardware,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Setup_ISR,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Release_ISR,
-            (gctPOINTER)gcvCORE_MAJOR
-            ));
-
         gcmkONERROR(gckHARDWARE_SetFastClear(
             device->kernels[gcvCORE_MAJOR]->hardware, FastClear, Compression
             ));
@@ -1380,14 +1371,6 @@ gckGALDEVICE_Construct(
             gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        /* Setup the ISR manager. */
-        gcmkONERROR(gckHARDWARE_SetIsrManager(
-            device->kernels[gcvCORE_2D]->hardware,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Setup_ISR,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Release_ISR,
-            (gctPOINTER)gcvCORE_2D
-            ));
-
         gcmkONERROR(gckHARDWARE_SetPowerManagement(
             device->kernels[gcvCORE_2D]->hardware, PowerManagement
             ));
@@ -1420,7 +1403,7 @@ gckGALDEVICE_Construct(
     }
 
     /* Add core for multiple core. */
-    for (i = gcvCORE_3D1; i <= gcvCORE_3D3; i++)
+    for (i = gcvCORE_3D1; i <= gcvCORE_3D_MAX; i++)
     {
         if (Args->irqs[i] != -1)
         {
@@ -1847,7 +1830,7 @@ gckGALDEVICE_Setup_ISR(
     /* Hook up the isr based on the irq line. */
     ret = request_irq(
         Device->irqLines[Core], isrRoutine, gcdIRQF_FLAG,
-        isrNames[Core], (gctPOINTER)Core
+        isrNames[Core], (void *)(uintptr_t)(Core + 1)
         );
 
     if (ret != 0)
@@ -1951,7 +1934,7 @@ gckGALDEVICE_Release_ISR(
     /* release the irq */
     if (Device->isrInitializeds[Core])
     {
-        free_irq(Device->irqLines[Core], (gctPOINTER)Core);
+        free_irq(Device->irqLines[Core], (void *)(uintptr_t)(Core + 1));
         Device->isrInitializeds[Core] = gcvFALSE;
     }
 
@@ -2007,6 +1990,7 @@ gckGALDEVICE_Start_Threads(
     )
 {
     gceSTATUS status;
+    gctUINT i;
 
     gcmkHEADER_ARG("Device=0x%x", Device);
 
@@ -2017,13 +2001,9 @@ gckGALDEVICE_Start_Threads(
 
     gcmkONERROR(_StartThread(threadRoutine, gcvCORE_VG));
 
+    for (i = gcvCORE_3D1; i <= gcvCORE_3D_MAX; i++)
     {
-        gctUINTPTR_T i = gcvCORE_3D1;
-
-        for (; i <= gcvCORE_3D3; i++)
-        {
-            gcmkONERROR(_StartThread(threadRoutine, i));
-        }
+        gcmkONERROR(_StartThread(threadRoutine, i));
     }
 
     gcmkFOOTER_NO();
