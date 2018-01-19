@@ -371,17 +371,27 @@ static GLvoid driDestroyDisplay(Display *dpy, GLvoid *private)
 typedef GLvoid (*TDESDISP)(__DRInativeDisplay *dpy, GLvoid *displayPrivate);
 
 #ifdef X11_DRI3
-static GLboolean check_dri3(xcb_connection_t *con) {
+static GLboolean check_dri3(xcb_connection_t *con) 
+{
     const xcb_query_extension_reply_t *ext;
+
+    if (!con)
+    {
+        return GL_FALSE;
+    }
 
     xcb_prefetch_extension_data (con, &xcb_dri3_id);
     xcb_prefetch_extension_data (con, &xcb_present_id);
     ext = xcb_get_extension_data(con, &xcb_dri3_id);
     if (!(ext && ext->present))
+    {
         return GL_FALSE;
+    }
     ext = xcb_get_extension_data(con, &xcb_present_id);
     if (!(ext && ext->present))
+    {
         return GL_FALSE;
+    }
     return GL_TRUE;
 }
 #endif

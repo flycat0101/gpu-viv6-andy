@@ -69,7 +69,7 @@ typedef struct __DRIDisplayRec  __DRIDisplay;
 
 static xcb_connection_t *dri_GetXCB(void *dpy)
 {
-    return XGetXCBConnection(dpy);
+    return dpy ? XGetXCBConnection(dpy) : gcvNULL;
 }
 
 static int
@@ -3673,17 +3673,29 @@ _veglGetDRIPlatform(
     void * NativeDisplay
     );
 
-static int check_dri3(xcb_connection_t *con) {
+static int check_dri3(xcb_connection_t *con)
+{
     const xcb_query_extension_reply_t *ext;
+
+    if (!con)
+    {
+        return 0;
+    }
 
     xcb_prefetch_extension_data (con, &xcb_dri3_id);
     xcb_prefetch_extension_data (con, &xcb_present_id);
     ext = xcb_get_extension_data(con, &xcb_dri3_id);
     if (!(ext && ext->present))
+    {
         return 0;
+    }
+
     ext = xcb_get_extension_data(con, &xcb_present_id);
     if (!(ext && ext->present))
+    {
         return 0;
+    }
+
     return 1;
 }
 
