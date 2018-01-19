@@ -73,8 +73,8 @@ static int gralloc_vivante_get_bpp(int format)
         bpp = 3;
         break;
     case HAL_PIXEL_FORMAT_RGB_565:
-    case HAL_PIXEL_FORMAT_YCbCr_422_I:
     case HAL_PIXEL_FORMAT_YCbCr_422_888: /* YUY2 */
+    case HAL_PIXEL_FORMAT_YCbCr_422_I:
         bpp = 2;
         break;
     /* planar; only Y is considered */
@@ -583,6 +583,7 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
 {
     int err;
     struct gralloc_vivante_bo_t *bo;
+    int stride, vstride;
     void *ptr;
 
     gralloc_trace(0, "drv=%p handle=%p usage=0x%x rect=[%d,%d,%d,%d]",
@@ -598,7 +599,10 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
             bo, bo->lock_count, bo->locked_for);
 
     switch (gralloc_handle_format(handle)) {
+    case HAL_PIXEL_FORMAT_YV12:
     case HAL_PIXEL_FORMAT_YCbCr_420_888:
+    case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         break;
     default:
         gralloc_trace_error(1, "not supported format=%x",
@@ -612,16 +616,41 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
         return err;
     }
 
+    stride = gralloc_handle_stride(handle);
+    vstride = ALIGN(gralloc_handle_height(handle), 4);
+
     switch (gralloc_handle_format(handle)) {
+    case HAL_PIXEL_FORMAT_YV12:
+        ycbcr->y = ptr;
+        ycbcr->cr = (uint8_t *)ptr + stride * vstride;
+        ycbcr->cb = (uint8_t *)ycbcr->cr + ALIGN(stride / 2, 16) * vstride / 2;
+        ycbcr->ystride = stride;
+        ycbcr->cstride = ALIGN(stride / 2, 16);
+        ycbcr->chroma_step = 1;
+        break;
     case HAL_PIXEL_FORMAT_YCbCr_420_888:
         ycbcr->y = ptr;
-        ycbcr->cb = (uint8_t *)ptr +
-            gralloc_handle_stride(handle) * gralloc_handle_height(handle);
+        ycbcr->cb = (uint8_t *)ptr + stride * vstride;
         ycbcr->cr = (uint8_t *)ycbcr->cb + 1;
-        ycbcr->ystride = gralloc_handle_stride(handle);
-        ycbcr->cstride = gralloc_handle_stride(handle);
+        ycbcr->ystride = stride;
+        ycbcr->cstride = stride;
         ycbcr->chroma_step = 2;
         break;
+    case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+        ycbcr->y = ptr;
+        ycbcr->cb = (uint8_t *)ptr + stride * vstride;
+        ycbcr->cr = (uint8_t *)ycbcr->cb + 1;
+        ycbcr->ystride = stride;
+        ycbcr->cstride = stride;
+        ycbcr->chroma_step = 2;
+        break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        ycbcr->y = ptr;
+        ycbcr->cr = (uint8_t *)ptr + stride * vstride;
+        ycbcr->cb = (uint8_t *)ycbcr->cb + 1;
+        ycbcr->ystride = stride;
+        ycbcr->cstride = stride;
+        ycbcr->chroma_step = 2;
     default:
         break;
     }
