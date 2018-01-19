@@ -3911,7 +3911,7 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
         func = func_node->function;
-
+        VIR_Shader_SetCurrentFunction(pShader, func);
         errCode = _DoVectorizationOnFunc(&vectorizerInfo, pShader, func, pDuInfo,
                                          ovCallbacks, pPassWorker->basePassWorker.pMM);
         ON_ERROR(errCode, "Do vectorization on func");
