@@ -940,6 +940,8 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
 
     gctBOOL pasting = gcvFALSE;
 
+    gctBOOL supportPasting = gcvFALSE;
+
     gcmTRACE(gcvLEVEL_VERBOSE, "ME : begin to expand replacement-list.");
 
     ppoTOKEN_ColonTokenList(
@@ -1093,19 +1095,22 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
                 replacement_list = (ppoTOKEN)replacement_list->inputStream.base.node.prev;
                 continue;
             }
-            else if(replacement_list->poolString == PP->keyword->sharp &&
-                (ppoTOKEN)replacement_list->inputStream.base.node.prev != gcvNULL)
+            else if (supportPasting)
             {
-                ppoTOKEN tmprplst = replacement_list;
-                tmprplst = (ppoTOKEN)tmprplst->inputStream.base.node.prev;
-
-                /* ## */
-                if(tmprplst->poolString == PP->keyword->sharp &&
-                    tmprplst->inputStream.base.node.prev != gcvNULL)
+                if (replacement_list->poolString == PP->keyword->sharp &&
+                    (ppoTOKEN)replacement_list->inputStream.base.node.prev != gcvNULL)
                 {
-                    replacement_list = (ppoTOKEN)tmprplst->inputStream.base.node.prev;
-                    pasting = gcvTRUE;
-                    continue;
+                    ppoTOKEN tmprplst = replacement_list;
+                    tmprplst = (ppoTOKEN)tmprplst->inputStream.base.node.prev;
+
+                    /* ## */
+                    if (tmprplst->poolString == PP->keyword->sharp &&
+                        tmprplst->inputStream.base.node.prev != gcvNULL)
+                    {
+                        replacement_list = (ppoTOKEN)tmprplst->inputStream.base.node.prev;
+                        pasting = gcvTRUE;
+                        continue;
+                    }
                 }
             }
         }
