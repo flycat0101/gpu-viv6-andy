@@ -194,7 +194,19 @@ ifeq ($(VIVANTE_ENABLE_3D),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_statistics.h $(SDK_DIR)/include/HAL
 endif
-	@-cd $(SDK_DIR)/include/HAL; echo "#include \"HAL/gc_hal.h\"" >aqHal.h; cd -
+	@echo "/****************************************************************************" >$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved." >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    The material in this file is confidential and contains trade secrets" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    of Vivante Corporation. This is proprietary information owned by" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    Vivante Corporation. No part of this work may be disclosed," >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    reproduced, copied, transmitted, or used in any way for any purpose," >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*    without the express written permission of Vivante Corporation." >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "*****************************************************************************/" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "" >>$(SDK_DIR)/include/HAL/aqHal.h
+	@echo "#include \"HAL/gc_hal.h\"" >$(SDK_DIR)/include/HAL/aqHal.h
 
 ################################################################################
 # Module rules.
