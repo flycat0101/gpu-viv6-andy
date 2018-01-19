@@ -334,7 +334,7 @@ static VkResult __ValidateFbdevDisplayPlane(
     plane->imageCount    = plane->varInfo.yres_virtual / plane->varInfo.yres;
 
     /* Align to page size. */
-    plane->userLength = (plane->fixInfo.smem_len + 1) & ~((uint32_t) sysconf(_SC_PAGESIZE) - 1);
+    plane->userLength = __VK_ALIGN(plane->fixInfo.smem_len, ((uint32_t) sysconf(_SC_PAGESIZE)));
     plane->userPtr    = mmap(0, plane->userLength, PROT_READ | PROT_WRITE, MAP_SHARED, plane->fd, 0);
 
     if (plane->userPtr == MAP_FAILED)
@@ -525,8 +525,7 @@ static VkResult __SetFbdevDisplayPlaneImageCount(
 
     if (plane->imageCount != imageCount)
     {
-        /* Failed to set image count. */
-        result = VK_ERROR_OUT_OF_DATE_KHR;
+        /* result = VK_ERROR_OUT_OF_DATE_KHR; */
     }
 
     return result;
@@ -796,6 +795,9 @@ static VkResult __WrapFbdevBufferMemory(
 
     size_t bufferSize;
     uint32_t bufferOffset;
+
+    if (plane->imageCount == 1)
+        bufferIndex = 0;
 
     bufferSize      = plane->fixInfo.line_length * plane->alignedHeight;
     bufferOffset    = bufferSize * bufferIndex;
