@@ -33,7 +33,6 @@
 #include <dlfcn.h>
 #include <string.h>
 #include <pthread.h>
-#include <signal.h>
 
 #include <poll.h>
 #include <errno.h>
@@ -138,9 +137,8 @@ struct drm_fb
     uint32_t size;
     uint32_t bpp;
     uint32_t handle;
+    int32_t fd;
     uint8_t *map;
-    gctUINT32 physical;
-    gcoSURF surface;
 };
 
 typedef struct _FBDisplay * PlatformDisplayType;
@@ -153,7 +151,6 @@ struct _FBDisplay
     uint32_t                signature;
     gctINT                  index;
     gctINT                  file;
-    gctSIZE_T               physical;
     gctINT                  stride;
     gctINT                  width;
     gctINT                  height;
@@ -354,97 +351,6 @@ pageflip(
 static struct _FBDisplay *displayStack = gcvNULL;
 static pthread_mutex_t displayMutex;
 
-static void
-destroyDisplays(
-    void
-    )
-{
-    pthread_mutex_lock(&displayMutex);
-
-    while (displayStack != NULL)
-    {
-        int i = 0;
-        struct _FBDisplay* display = displayStack;
-        displayStack = display->next;
-
-        for (i = 0; i < display->multiBuffer; ++i)
-        {
-            if (display->drmfbs[i].fb_id > 0)
-            {
-                struct drm_mode_destroy_dumb dreq;
-
-                if (display->drmfbs[i].map)
-                {
-                    munmap(display->drmfbs[i].map, display->drmfbs[i].size);
-                }
-
-                drmModeRmFB(display->drm.fd, display->drmfbs[i].fb_id);
-                display->drmfbs[i].fb_id = 0;
-
-                memset(&dreq, 0, sizeof(dreq));
-                dreq.handle = display->drmfbs[i].handle;
-                drmIoctl(display->drm.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
-            }
-
-            if (display->drm.fd >= 0)
-            {
-                drmClose(display->drm.fd);
-                display->drm.fd = -1;
-            }
-        }
-
-        if (display->memory != NULL)
-        {
-            munmap(display->memory, display->size);
-            display->memory = NULL;
-        }
-
-        if (display->file >= 0)
-        {
-            close(display->file);
-            display->file = -1;
-        }
-
-        /*
-        pthread_mutex_destroy(&(display->condMutex));
-        pthread_cond_destroy(&(display->cond));
-         */
-        free(display);
-    }
-
-    pthread_mutex_unlock(&displayMutex);
-}
-
-static void sig_handler(gctINT signo)
-{
-    static int hookSEGV = 0;
-
-    if (hookSEGV == 0)
-    {
-        signal(SIGSEGV, sig_handler);
-        hookSEGV = 1;
-    }
-
-    destroyDisplays();
-
-    signal(SIGINT,  SIG_DFL);
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGTERM, SIG_DFL);
-    raise(signo);
-}
-
-static void
-halOnExit(
-    void
-    )
-{
-    signal(SIGINT,  SIG_DFL);
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGTERM, SIG_DFL);
-
-    destroyDisplays();
-}
-
 static pthread_once_t onceControl = PTHREAD_ONCE_INIT;
 
 static void
@@ -453,14 +359,6 @@ onceInit(
     )
 {
     pthread_mutexattr_t mta;
-
-    /* Register atexit callback. */
-    atexit(halOnExit);
-
-    /* Register signal handler. */
-    signal(SIGINT,  sig_handler);
-    signal(SIGQUIT, sig_handler);
-    signal(SIGTERM, sig_handler);
 
     /* Init mutex attribute. */
     pthread_mutexattr_init(&mta);
@@ -640,6 +538,42 @@ drm_initdisplay(
     return 0;
 }
 
+static void
+drm_destroy_fb(
+    int drmfd,
+    struct drm_fb * drmfb
+    )
+{
+    if (drmfb)
+    {
+        if (drmfb->map)
+        {
+            munmap(drmfb->map, drmfb->size);
+            drmfb->map = gcvNULL;
+        }
+
+        if (drmfb->fd >= 0)
+        {
+            close(drmfb->fd);
+            drmfb->fd = -1;
+        }
+
+        if (drmfb->fb_id)
+        {
+            drmModeRmFB(drmfd, drmfb->fb_id);
+            drmfb->fb_id = 0;
+        }
+
+        if (drmfb->handle)
+        {
+            struct drm_mode_destroy_dumb dreq = {
+                .handle = drmfb->handle
+            };
+            drmIoctl(drmfd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+        }
+    }
+}
+
 static int
 drm_create_fb(
     int drmfd,
@@ -650,151 +584,174 @@ drm_create_fb(
     struct drm_fb * drmfb
     )
 {
-    struct drm_mode_create_dumb creq;
-    struct drm_mode_destroy_dumb dreq;
-    struct drm_mode_map_dumb mreq;
     int ret = -1;
-    uint32_t strides[4] = {0}, handles[4] = {0},
-        offsets[4] = {0}, flags = 0;
-    uint32_t format;
-    gceSTATUS status;
-    gctUINT32 physicals[3];
-    gctPOINTER va = 0;
+    uint32_t format = (bpp == 16) ? DRM_FORMAT_RGB565 : DRM_FORMAT_XRGB8888;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    memset(&creq, 0, sizeof(creq));
 #if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
     if (*fbPrefetch)
     {
+        uint32_t handles[4] = {0};
+        uint32_t strides[4] = {0};
+        uint32_t offsets[4] = {0};
         uint64_t modifiers[4] = {0};
 
         /* For DRM_FORMAT_MOD_VIVANTE_SUPER_TILED need to have 64 pixels aligned*/
-        creq.width = gcmALIGN(width,64);
-        creq.height = gcmALIGN(height,64);
-
-        modifiers[0] = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
-        creq.bpp = bpp;
+        struct drm_mode_create_dumb creq = {
+            .width  = gcmALIGN(width,  64),
+            .height = gcmALIGN(height, 64),
+            .bpp    = bpp
+        };
 
         ret = drmIoctl(drmfd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
         if (ret < 0)
         {
             fprintf(stderr, "cannot create dumb buffer (%d): %m\n", errno);
-            return -errno;
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
-        flags = DRM_MODE_FB_MODIFIERS;
+        drmfb->handle = creq.handle;
+        drmfb->width = creq.width;
+        drmfb->height = creq.height;
+        drmfb->stride = creq.pitch;
+        drmfb->size = creq.size;
+        drmfb->bpp = creq.bpp;
 
-        strides[0] = creq.pitch;
         handles[0] = creq.handle;
-        format = (bpp == 16) ? DRM_FORMAT_RGB565 : DRM_FORMAT_XRGB8888;
+        strides[0] = creq.pitch;
+        modifiers[0] = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
 
         ret = drmModeAddFB2WithModifiers(drmfd, creq.width, creq.height,
                                          format, handles, strides, offsets,
-                                         modifiers, &drmfb->fb_id, flags);
+                                         modifiers, &drmfb->fb_id, DRM_MODE_FB_MODIFIERS);
+        if (ret < 0)
+        {
+            struct drm_mode_destroy_dumb dreq = {
+                .handle = drmfb->handle
+            };
+
+            fprintf(stderr, "FB Modifier not supported. Falling back to Linear FB\n");
+            drmIoctl(drmfd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+            drmfb->handle = 0;
+        }
     }
 #endif
 
     if (ret < 0)
     {
-        if (flags == DRM_MODE_FB_MODIFIERS)
-        {
-            fprintf(stderr, "FB Modifier not supported. Falling back to Linear FB\n");
-            memset(&dreq, 0, sizeof(dreq));
-            dreq.handle = creq.handle;
-            drmIoctl(drmfd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
-        }
+        uint32_t handles[4] = {0};
+        uint32_t strides[4] = {0};
+        uint32_t offsets[4] = {0};
 
-        creq.width = width;
-        creq.height = height;
-        creq.bpp = bpp;
+        struct drm_mode_create_dumb creq = {
+            .width  = width,
+            .height = height,
+            .bpp    = bpp
+        };
+
         ret = drmIoctl(drmfd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
         if (ret < 0)
         {
             fprintf(stderr, "cannot create dumb buffer (%d): %m\n", errno);
-            return -errno;
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
+        drmfb->handle = creq.handle;
+        drmfb->width = creq.width;
+        drmfb->height = creq.height;
+        drmfb->stride = creq.pitch;
+        drmfb->size = creq.size;
+        drmfb->bpp = creq.bpp;
 
-        strides[0] = creq.pitch;
         handles[0] = creq.handle;
-        format = (bpp == 16) ? DRM_FORMAT_RGB565 : DRM_FORMAT_XRGB8888;
+        strides[0] = creq.pitch;
 
         ret = drmModeAddFB2(drmfd, creq.width, creq.height, format,
                             handles, strides, offsets, &drmfb->fb_id, 0);
+        if (ret)
+        {
+            ret = -errno;
+            fprintf(stderr, "cannot create framebuffer (%d): %m\n", errno);
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
+        }
         *fbPrefetch = gcvFALSE;
     }
 
-    if (ret)
+    if (drmPrimeHandleToFD(drmfd, drmfb->handle, O_RDWR, &drmfb->fd))
     {
-        fprintf(stderr, "cannot create framebuffer (%d): %m\n", errno);
+        fprintf(stderr, "cannot export dumb buffer as dma-buf fd (%d): %m\n", errno);
         ret = -errno;
-        goto err_destroy;
+        gcmONERROR(gcvSTATUS_GENERIC_IO);
     }
-
-    drmfb->width = creq.width;
-    drmfb->height = creq.height;
-    drmfb->stride = creq.pitch;
-    drmfb->size = creq.size;
-    drmfb->handle = creq.handle;
-    drmfb->bpp = creq.bpp;
-
-    /* prepare buffer for memory mapping */
-    memset(&mreq, 0, sizeof(mreq));
-    mreq.handle = drmfb->handle;
-    ret = drmIoctl(drmfd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
-    if (ret)
+    else
     {
-        fprintf(stderr, "cannot map dumb buffer (%d): %m\n", errno);
-        ret = -errno;
-        goto err_fb;
+        struct drm_mode_map_dumb mreq = {
+            .handle = drmfb->handle
+        };
+
+        /* prepare buffer for memory mapping */
+        ret = drmIoctl(drmfd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
+        if (ret)
+        {
+            ret = -errno;
+            fprintf(stderr, "cannot map dumb buffer (%d): %m\n", errno);
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
+        }
+
+        /* perform actual memory mapping */
+        drmfb->map = mmap(0, drmfb->size, PROT_READ | PROT_WRITE, MAP_SHARED, drmfd, mreq.offset);
+        if (drmfb->map == MAP_FAILED)
+        {
+            ret = -errno;
+            fprintf(stderr, "cannot mmap dumb buffer (%d): %m\n", errno);
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
     }
-
-    /* perform actual memory mapping */
-    drmfb->map = mmap(0, drmfb->size, PROT_READ | PROT_WRITE, MAP_SHARED, drmfd, mreq.offset);
-    if (drmfb->map == MAP_FAILED)
-    {
-        fprintf(stderr, "cannot mmap dumb buffer (%d): %m\n", errno);
-        ret = -errno;
-        goto err_fb;
-    }
-
-    gcmONERROR(gcoSURF_Construct(0,
-                                 drmfb->width,
-                                 drmfb->height,
-                                 1,
-                                 gcvSURF_BITMAP,
-                                 gcvSURF_R5G6B5,
-                                 gcvPOOL_USER,
-                                 &drmfb->surface));
-
-    gcmONERROR(gcoSURF_MapUserSurface(drmfb->surface,
-                                      0,
-                                      drmfb->map,
-                                      gcvINVALID_ADDRESS));
-
-    gcmONERROR(gcoSURF_Lock(drmfb->surface, &physicals[0], (gctPOINTER *)&va));
-    drmfb->physical = physicals[0];
-
-    return 0;
 
 OnError:
-    if (drmfb->surface)
+    if (gcmIS_ERROR(status))
     {
-        gcoSURF_Unlock(drmfb->surface, (gctPOINTER)drmfb->map);
-        gcoSURF_Destroy(drmfb->surface);
+        drm_destroy_fb(drmfd, drmfb);
     }
-
-    if (drmfb->map)
-    {
-        munmap(drmfb->map, drmfb->size);
-    }
-
-err_fb:
-    ret = -errno;
-    drmModeRmFB(drmfd, drmfb->fb_id);
-err_destroy:
-    memset(&dreq, 0, sizeof(dreq));
-    dreq.handle = drmfb->handle;
-    drmIoctl(drmfd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
 
     return ret;
+}
+
+static void
+_destroy_display(
+    struct _FBDisplay* display
+    )
+{
+    if (display)
+    {
+        int i = 0;
+
+        for (i = 0; i< display->multiBuffer; ++i)
+        {
+            drm_destroy_fb(display->drm.fd, &display->drmfbs[i]);
+        }
+
+        if (display->drm.fd >= 0)
+        {
+            drmClose(display->drm.fd);
+            display->drm.fd = -1;
+        }
+
+        if (display->file >= 0)
+        {
+            close(display->file);
+            display->file = -1;
+        }
+
+        pthread_mutex_destroy(&(display->condMutex));
+        pthread_cond_destroy(&(display->cond));
+
+        if (display->drmfbs)
+        {
+            free(display->drmfbs);
+        }
+
+        free(display);
+        display = gcvNULL;
+    }
 }
 
 gceSTATUS
@@ -804,13 +761,9 @@ drmfb_GetDisplayByIndex(
     IN gctPOINTER Context
     )
 {
-    char *p;
-    int i;
-    char fbDevName[256];
     struct _FBDisplay* display = NULL;
-    gceSTATUS status = gcvSTATUS_OUT_OF_RESOURCES;
-    struct drm_fb *drmfb = NULL;
-    int connectorIndex = 0;
+    gceSTATUS status = gcvSTATUS_OK;
+
     gcmHEADER();
 
     /* Init global variables. */
@@ -819,12 +772,17 @@ drmfb_GetDisplayByIndex(
     /* Lock display stack. */
     pthread_mutex_lock(&displayMutex);
 
-    do
     {
+        char *p;
+        int i;
+        char fbDevName[256];
+        struct drm_fb *drmfb = NULL;
+        int connectorIndex = 0;
+        gctBOOL defaultMultiBuffer = gcvTRUE;
+
         if (DisplayIndex < 0)
         {
-            status = gcvSTATUS_INVALID_ARGUMENT;
-            break;
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
         for (display = displayStack; display != NULL; display = display->next)
@@ -833,28 +791,17 @@ drmfb_GetDisplayByIndex(
             {
                 /* Find display.*/
                 display->refCount++;
-                break;
+                goto OnExit;
             }
         }
 
-        if (display != NULL)
-        {
-            *Display = (PlatformDisplayType)display;
-            pthread_mutex_unlock(&displayMutex);
-
-            gcmFOOTER_ARG("*Display=0x%x", *Display);
-            return gcvSTATUS_OK;
-        }
-
-        display = (struct _FBDisplay*) malloc(sizeof(struct _FBDisplay));
-
+        display = (struct _FBDisplay*)malloc(sizeof(struct _FBDisplay));
         if (display == gcvNULL)
         {
-            break;
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
 
         display->signature = gcmCC('F', 'B', 'D', 'V');
-
         display->index    = DisplayIndex;
         display->memory   = gcvNULL;
         display->file     = -1;
@@ -886,6 +833,7 @@ drmfb_GetDisplayByIndex(
             {
                 display->multiBuffer = 8;
             }
+            defaultMultiBuffer = gcvFALSE;
         }
 
         if (display->file < 0)
@@ -909,13 +857,13 @@ drmfb_GetDisplayByIndex(
 
         if (display->file < 0)
         {
-            break;
+            gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
         }
 
         /* Get variable framebuffer information. */
         if (ioctl(display->file, FBIOGET_VSCREENINFO, &display->varInfo) < 0)
         {
-            break;
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
 
         sprintf(fbDevName,"FB_FRAMEBUFFER_%d", DisplayIndex);
@@ -932,35 +880,34 @@ drmfb_GetDisplayByIndex(
 
         if (drm_initdisplay(&display->drm, connectorIndex) < 0)
         {
-            break;
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
 
-        status = gcvSTATUS_OK;
-        p = getenv("FB_MULTI_BUFFER");
         display->drmfbs = malloc(display->multiBuffer * sizeof(struct drm_fb));
+        if (!display->drmfbs)
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+
         for (i = 0; i < display->multiBuffer; ++i)
         {
+            display->drmfbs[i].fd = -1;
+
             if (drm_create_fb(display->drm.fd, &display->fbPrefetch, display->drm.width,
                               display->drm.height, display->varInfo.bits_per_pixel,
                               &display->drmfbs[i]) < 0)
             {
-                status = gcvSTATUS_INVALID_ARGUMENT;
-                break;
+                gcmONERROR(gcvSTATUS_GENERIC_IO);
             }
             drmfb = &display->drmfbs[i];
 
-            /*Enable FB_MULTI_BUFFER default only when fbPrefetch enabled, otherwise fallback single buffer for benchmarks*/
-            if (p == NULL && !display->fbPrefetch)
+            /* Enable FB_MULTI_BUFFER default only when fbPrefetch enabled,
+            ** otherwise fallback single buffer for benchmarks
+            */
+            if (defaultMultiBuffer && !display->fbPrefetch)
             {
                 display->multiBuffer = 1;
-                break;
             }
-        }
-
-        /*Check for error to exit the loop*/
-        if (gcmIS_ERROR(status))
-        {
-            break;
         }
 
         if (display->multiBuffer == 1)
@@ -970,7 +917,7 @@ drmfb_GetDisplayByIndex(
                                 0, 0, display->drm.width << 16, display->drm.height << 16))
             {
                 fprintf(stderr, "failed to enable plane: %s\n", strerror(errno));
-                return -1;
+                gcmONERROR(gcvSTATUS_GENERIC_IO);
             }
             drmDropMaster(display->drm.fd);
         }
@@ -981,14 +928,15 @@ drmfb_GetDisplayByIndex(
         /* Get current virtual screen size. */
         if (ioctl(display->file, FBIOGET_VSCREENINFO, &(display->varInfo)) < 0)
         {
-            break;
+            gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
-        display->physical = drmfb->physical;
-        display->stride   = drmfb->stride;
-        display->size     = drmfb->size;
+        display->stride = drmfb->stride;
+        display->size   = drmfb->size;
         display->width  = drmfb->width;
         display->height = drmfb->height;
         display->bpp    = drmfb->bpp;
+        display->memory = drmfb->map;
+
         /*display->format = gcvSURF_X8R8G8B8*/
         display->varInfo.yres_virtual *= display->multiBuffer;
         if (display->multiBuffer > 1)
@@ -1062,14 +1010,10 @@ drmfb_GetDisplayByIndex(
 
         default:
             display->format = gcvSURF_UNKNOWN;
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
             break;
         }
 
-        if (display->format == gcvSURF_UNKNOWN)
-        {
-            status = gcvSTATUS_NOT_SUPPORTED;
-            break;
-        }
         display->tiling = gcvLINEAR;
 
         /* Get the color info. */
@@ -1094,46 +1038,27 @@ drmfb_GetDisplayByIndex(
         display->panVsync = gcvFALSE;
 #endif
 
-        display->memory = drmfb->map;
-
-        if (display->memory == MAP_FAILED)
-        {
-            break;
-        }
         pthread_cond_init(&(display->cond), gcvNULL);
         pthread_mutex_init(&(display->condMutex), gcvNULL);
-        *Display = (PlatformDisplayType)display;
 
         /* Add display into stack. */
         display->next = displayStack;
         displayStack = display;
         display->refCount++;
-        pthread_mutex_unlock(&displayMutex);
-
-        gcmFOOTER_ARG("*Display=0x%x", *Display);
-        return gcvSTATUS_OK;
     }
-    while (0);
 
+OnExit:
+OnError:
     pthread_mutex_unlock(&displayMutex);
 
-    if (display != gcvNULL)
+    if (gcmIS_ERROR(status) && display)
     {
-        if (display->memory != gcvNULL)
-        {
-            munmap(display->memory, display->size);
-        }
-
-        if (display->file >= 0)
-        {
-            close(display->file);
-        }
-
-        free(display);
+        _destroy_display(display);
         display = gcvNULL;
     }
 
-    *Display = gcvNULL;
+    *Display = (PlatformDisplayType)display;
+
     gcmFOOTER();
     return status;
 }
@@ -1180,7 +1105,7 @@ drmfb_GetDisplayInfo(
 
     if (Physical != gcvNULL)
     {
-        *Physical = display->physical;
+        *Physical = 0;
     }
 
     if (Stride != gcvNULL)
@@ -1209,14 +1134,6 @@ typedef struct _fbdevDISPLAY_INFO
 
     /* The color depth of the display in bits per pixel. */
     int                         bitsPerPixel;
-
-    /* The logical pointer to the display memory buffer. NULL is returned
-    ** if the pointer is not known for the specified display. */
-    void *                      logical;
-
-    /* The physical address of the display memory buffer. ~0 is returned
-    ** if the address is not known for the specified display. */
-    unsigned long               physical;
 
     /* Can be wraped as surface. */
     int                         wrapFB;
@@ -1249,20 +1166,26 @@ gceSTATUS
 drmfb_GetDisplayInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
+    IN gctPOINTER  localDisplay,
     IN gctUINT DisplayInfoSize,
     OUT fbdevDISPLAY_INFO * DisplayInfo
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    struct _FBDisplay* display;
+    struct _FBDisplay* display = (struct _FBDisplay*)Display;
+
     gcmHEADER_ARG("Display=0x%x Window=0x%x DisplayInfoSize=%u", Display, Window, DisplayInfoSize);
-    display = (struct _FBDisplay*)Display;
+
     /* Valid display? and structure size? */
     if ((display == gcvNULL) || (DisplayInfoSize != sizeof(fbdevDISPLAY_INFO)))
     {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (display->memory == gcvNULL)
+    {
+        /* No offset. */
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
     /* Return the size of the display. */
@@ -1274,12 +1197,6 @@ drmfb_GetDisplayInfoEx(
 
     /* Return the color depth of the display. */
     DisplayInfo->bitsPerPixel = display->bpp;
-
-    /* Return the logical pointer to the display. */
-    DisplayInfo->logical = display->memory;
-
-    /* Return the physical address of the display. */
-    DisplayInfo->physical = display->physical;
 
     /* Return the color info. */
     DisplayInfo->alphaLength = display->alphaLength;
@@ -1300,8 +1217,8 @@ drmfb_GetDisplayInfoEx(
 
     DisplayInfo->wrapFB = gcvTRUE;
 
-    /* Success. */
-    gcmFOOTER_ARG("*DisplayInfo=0x%x", *DisplayInfo);
+OnError:
+    gcmFOOTER();
     return status;
 }
 
@@ -1685,7 +1602,7 @@ drmfb_DestroyDisplay(
     IN PlatformDisplayType Display
     )
 {
-    struct _FBDisplay* display;
+    struct _FBDisplay* display = gcvNULL;
 
     pthread_mutex_lock(&displayMutex);
 
@@ -1698,15 +1615,8 @@ drmfb_DestroyDisplay(
         }
     }
 
-    if (display != NULL)
+    if (display && (--display->refCount) == 0)
     {
-        display->refCount--;
-
-        if (display->refCount > 0)
-        {
-            pthread_mutex_unlock(&displayMutex);
-            return gcvSTATUS_OK;
-        }
         /* Unlink form display stack. */
         if (display == displayStack)
         {
@@ -1725,70 +1635,18 @@ drmfb_DestroyDisplay(
             prev->next = display->next;
         }
     }
+    else
+    {
+        display = gcvNULL;
+    }
 
     pthread_mutex_unlock(&displayMutex);
 
-    if (display != NULL)
+    if (display)
     {
-        int i = 0;
-        for (i = 0; i < display->multiBuffer; ++i)
-        {
-            if (display->drmfbs[i].fb_id > 0)
-            {
-                if (display->drmfbs[i].surface)
-                {
-                    gcoSURF_Unlock(display->drmfbs[i].surface, (gctPOINTER)display->drmfbs[i].map);
-                    gcoSURF_Destroy(display->drmfbs[i].surface);
-                }
-            }
-        }
-        gcoHAL_Commit(gcvNULL, gcvTRUE);
-
-        for (i = 0; i< display->multiBuffer; ++i)
-        {
-            if (display->drmfbs[i].fb_id > 0)
-            {
-                struct drm_mode_destroy_dumb dreq;
-
-                if (display->drmfbs[i].map)
-                {
-                    munmap(display->drmfbs[i].map, display->drmfbs[i].size);
-                }
-
-                drmModeRmFB(display->drm.fd, display->drmfbs[i].fb_id);
-                display->drmfbs[i].fb_id = 0;
-
-                memset(&dreq, 0, sizeof(dreq));
-                dreq.handle = display->drmfbs[i].handle;
-                drmIoctl(display->drm.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
-            }
-
-            if (display->drm.fd >= 0)
-            {
-                drmClose(display->drm.fd);
-                display->drm.fd = -1;
-            }
-        }
-
-        if (display->memory != NULL)
-        {
-            munmap(display->memory, display->size);
-            display->memory = NULL;
-        }
-
-        if (display->file >= 0)
-        {
-            close(display->file);
-            display->file = -1;
-        }
-
-        pthread_mutex_destroy(&(display->condMutex));
-        pthread_cond_destroy(&(display->cond));
-
-        free(display);
-        display = gcvNULL;
-        Display = gcvNULL;
+        _destroy_display(display);
     }
+
     return gcvSTATUS_OK;
 }
 
@@ -1952,12 +1810,12 @@ drmfb_GetWindowInfo(
 
     if (X != gcvNULL)
     {
-            *X = window->x;
+        *X = window->x;
     }
 
     if (Y != gcvNULL)
     {
-            *Y = window->y;
+        *Y = window->y;
     }
 
     if (Width != gcvNULL)
@@ -2384,31 +2242,6 @@ drmfb_DeinitLocalDisplayInfo(
     )
 {
     return gcvSTATUS_OK;
-}
-
-gceSTATUS
-drmfb_GetDisplayInfoEx2(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctPOINTER  localDisplay,
-    IN gctUINT DisplayInfoSize,
-    OUT fbdevDISPLAY_INFO * DisplayInfo
-    )
-{
-    gceSTATUS status = drmfb_GetDisplayInfoEx(Display, Window, DisplayInfoSize, DisplayInfo);
-    if (gcmIS_SUCCESS(status))
-    {
-        if ((DisplayInfo->logical == gcvNULL) || (DisplayInfo->physical == ~0U))
-        {
-            /* No offset. */
-            status = gcvSTATUS_NOT_SUPPORTED;
-        }
-        else
-        {
-            status = gcvSTATUS_OK;
-        }
-    }
-    return status;
 }
 
 gceSTATUS
@@ -3083,9 +2916,7 @@ struct eglWindowInfo
     VEGLNativeBuffer    bufferList;
     gctPOINTER          bufferListMutex;
 
-    /* Information obtained by drmfb_GetDisplayInfoEx2. */
-    gctPOINTER          logical;
-    unsigned long       physical;
+    /* Information obtained by drmfb_GetDisplayInfoEx. */
     gctINT              stride;
     gctUINT             width;
     gctUINT             height;
@@ -3120,11 +2951,11 @@ _CreateWindowBuffers(
 
     if (Info->fbDirect)
     {
-        if (display->drmfbs != 0)
+        if (display->drmfbs)
         {
+            gctUINT i;
             gctPOINTER pointer;
             gctUINT alignedHeight;
-            gctUINT i;
             gctSTRING disableClear = gcvNULL;
 
             gcoOS_GetEnv(gcvNULL, "GPU_VIV_DISABLE_CLEAR_FB", &disableClear);
@@ -3136,9 +2967,6 @@ _CreateWindowBuffers(
 
             for (i = 0; i < Info->multiBuffer; ++i)
             {
-                gctPOINTER logical;
-                gctUINT    physical;
-
                 /* Allocate native buffer object. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           sizeof(struct eglNativeBuffer),
@@ -3164,144 +2992,35 @@ _CreateWindowBuffers(
                     Info->bufferList = buffer;
                 }
 
-                /* Calculate buffer addresses. */
-                logical  = (gctUINT8_PTR)  display->drmfbs[i].map;
-                physical = display->drmfbs[i].physical;
-
-                /* Construct the wrapper. */
-                gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                             Info->width,
-                                             Info->height, 1,
-                                             Info->type,
-                                             Info->format,
-                                             gcvPOOL_USER,
-                                             &buffer->surface));
-
-                /* Set the underlying framebuffer surface. */
-                gcmONERROR(gcoSURF_SetBuffer(buffer->surface,
-                                             Info->type,
-                                             Info->format,
-                                             Info->stride,
-                                             logical,
-                                             physical));
+                gcmONERROR(gcoSURF_WrapUserMemory(
+                    gcvNULL,
+                    Info->width,
+                    Info->height,
+                    Info->stride,
+                    1,
+                    Info->type,
+                    Info->format,
+                    display->drmfbs[i].fd,
+                    gcvALLOC_FLAG_DMABUF,
+                    &buffer->surface
+                ));
 
                 if (disableClear != gcvNULL)
                 {
-                    /* For a new surface, clear it to get rid of noises. */
-                    gcoOS_ZeroMemory(logical, alignedHeight * Info->stride);
-                }
+                    gctPOINTER logical[3] = {gcvNULL};
 
-                gcmONERROR(gcoSURF_SetWindow(buffer->surface,
-                                             0, 0,
-                                             Info->width, Info->height));
+                    do {
+                        gcmERR_BREAK(gcoSURF_Lock(buffer->surface, gcvNULL, &logical[0]));
 
-#if gcdENABLE_3D
-                if ((gceSURF_TYPE)((gctUINT32)Info->type & 0xFF) == gcvSURF_RENDER_TARGET)
-                {
-                    /* Render target surface orientation is different. */
-                    gcmVERIFY_OK(
-                        gcoSURF_SetFlags(buffer->surface,
-                                         gcvSURF_FLAG_CONTENT_YINVERTED,
-                                         gcvTRUE));
+                        /* For a new surface, clear it to get rid of noises. */
+                        gcoOS_ZeroMemory(logical[0], alignedHeight * Info->stride);
+                    } while (gcvFALSE);
 
-                    if (!(Info->type & gcvSURF_NO_TILE_STATUS))
+                    if (logical[0])
                     {
-                        /* Append tile status to this user-pool rt. */
-                        gcmVERIFY_OK(gcoSURF_AppendTileStatus(buffer->surface));
+                        gcmONERROR(gcoSURF_Unlock(buffer->surface, logical[0]));
                     }
                 }
-#endif
-
-                buffer->context  = gcvNULL;
-                buffer->origin.x = 0;
-                buffer->origin.y = alignedHeight * i;
-
-                gcmTRACE(gcvLEVEL_INFO,
-                         "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
-                         __FUNCTION__, __LINE__,
-                         i, alignedHeight * i, physical);
-            }
-
-            gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
-        }
-        else if (Info->wrapFB)
-        {
-            gctPOINTER pointer;
-            gctUINT alignedHeight;
-            gctUINT i;
-            gctSTRING disableClear = gcvNULL;
-
-            gcoOS_GetEnv(gcvNULL, "GPU_VIV_DISABLE_CLEAR_FB", &disableClear);
-
-            /* Lock. */
-            gcoOS_AcquireMutex(gcvNULL, Info->bufferListMutex, gcvINFINITE);
-
-            alignedHeight = Info->yresVirtual / Info->multiBuffer;
-
-            for (i = 0; i < Info->multiBuffer; i++)
-            {
-                gctUINT    offset;
-                gctPOINTER logical;
-                gctUINT    physical;
-
-                /* Allocate native buffer object. */
-                gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                          sizeof (struct eglNativeBuffer),
-                                          &pointer));
-
-                gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
-                buffer = pointer;
-
-                /* Add into buffer list. */
-                if (Info->bufferList != gcvNULL)
-                {
-                    VEGLNativeBuffer prev = Info->bufferList->prev;
-
-                    buffer->prev = prev;
-                    buffer->next = Info->bufferList;
-
-                    prev->next = buffer;
-                    Info->bufferList->prev = buffer;
-                }
-                else
-                {
-                    buffer->prev = buffer->next = buffer;
-                    Info->bufferList = buffer;
-                }
-
-                /* Bytes offset to the buffer. */
-                offset = (gctUINT) (Info->stride * alignedHeight * i);
-
-                /* Calculate buffer addresses. */
-                logical  = (gctUINT8_PTR) Info->logical + offset;
-                physical = Info->physical + offset;
-
-                /* Construct the wrapper. */
-                gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                             Info->width,
-                                             Info->height, 1,
-                                             Info->type,
-                                             Info->format,
-                                             gcvPOOL_USER,
-                                             &buffer->surface));
-
-                /* Set the underlying framebuffer surface. */
-                gcmONERROR(gcoSURF_SetBuffer(buffer->surface,
-                                             Info->type,
-                                             Info->format,
-                                             Info->stride,
-                                             logical,
-                                             physical));
-
-                if (disableClear != gcvNULL)
-                {
-                    /* For a new surface, clear it to get rid of noises. */
-                    gcoOS_ZeroMemory(logical, alignedHeight * Info->stride);
-                }
-
-                gcmONERROR(gcoSURF_SetWindow(buffer->surface,
-                                             0, 0,
-                                             Info->width, Info->height));
 
 #if gcdENABLE_3D
                 if ((gceSURF_TYPE)((gctUINT32)Info->type & 0xFF) == gcvSURF_RENDER_TARGET)
@@ -3540,17 +3259,15 @@ _QueryWindowInfo(
     /* Get display information. */
     gcoOS_ZeroMemory(&dInfo, sizeof (fbdevDISPLAY_INFO));
 
-    status = drmfb_GetDisplayInfoEx2((PlatformDisplayType) Display->hdc,
-                                     (PlatformWindowType) Window,
-                                     Display->localInfo,
-                                     sizeof (fbdevDISPLAY_INFO),
-                                     &dInfo);
+    status = drmfb_GetDisplayInfoEx((PlatformDisplayType) Display->hdc,
+                                    (PlatformWindowType) Window,
+                                    Display->localInfo,
+                                    sizeof (fbdevDISPLAY_INFO),
+                                    &dInfo);
 
     if (gcmIS_ERROR(status))
     {
         Info->fbDirect     = EGL_FALSE;
-        Info->logical      = gcvNULL;
-        Info->physical     = gcvINVALID_ADDRESS;
         Info->stride       = 0;
         Info->wrapFB       = gcvFALSE;
         Info->multiBuffer  = 1;
@@ -3558,8 +3275,6 @@ _QueryWindowInfo(
     else
     {
         Info->fbDirect     = EGL_TRUE;
-        Info->logical      = dInfo.logical;
-        Info->physical     = dInfo.physical;
         Info->stride       = dInfo.stride;
         Info->wrapFB       = dInfo.wrapFB;
         Info->multiBuffer  = dInfo.multiBuffer > 1 ? dInfo.multiBuffer : 1;
