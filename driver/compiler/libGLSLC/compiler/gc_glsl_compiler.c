@@ -1260,6 +1260,12 @@ sloCOMPILER_Compile(
         SetShaderNeedPatchForCentroid(binary,
                                       slsCOMPILER_HasPatchForCentroidVarying(Compiler->context.compilerFlags));
 
+        /* Set force all invariant. */
+        if (sloCOMPILER_GetOutputInvariant(Compiler))
+        {
+            gcShaderSetAllOutputInvariant(binary);
+        }
+
         /* Generate the code */
         gcmERR_BREAK(sloCOMPILER_GenCode(Compiler));
 
@@ -3747,6 +3753,17 @@ sloCOMPILER_SetOutputInvariant(
    Compiler->context.outputInvariant = Invariant;
    gcmFOOTER_NO();
    return gcvSTATUS_OK;
+}
+
+gctBOOL
+sloCOMPILER_GetOutputInvariant(
+    IN sloCOMPILER Compiler
+    )
+{
+   gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+   gcmFOOTER_NO();
+   return Compiler->context.outputInvariant;
 }
 
 gceSTATUS

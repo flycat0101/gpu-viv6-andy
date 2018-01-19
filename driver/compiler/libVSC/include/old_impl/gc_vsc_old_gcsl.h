@@ -3996,6 +3996,7 @@ typedef enum _gcSHADER_FLAGS
     gcSHADER_FLAG_AFTER_LINK                = 0x80000, /* the shader is linked(gcLinkProgram/gcLinkShaders/gcLinkKernel). */
     gcSHADER_FLAG_VP_TWO_SIDE_ENABLE        = 0x100000, /* the shader use two side, for fragment shader only. */
     gcSHADER_FLAG_CLAMP_OUTPUT_COLOR        = 0x200000, /* Clamp the output color, for GL shader only. */
+    gcSHADER_FLAG_FORCE_ALL_OUTPUT_INVARIANT= 0x400000, /* Force all outputs to be invariant. */
 
 } gcSHADER_FLAGS;
 
@@ -4021,7 +4022,7 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderAfterLink(Shader)               (((Shader)->flags & gcSHADER_FLAG_AFTER_LINK) != 0)
 #define gcShaderVPTwoSideEnable(Shader)         (((Shader)->flags & gcSHADER_FLAG_VP_TWO_SIDE_ENABLE) != 0)
 #define gcShaderClampOutputColor(Shader)        (((Shader)->flags & gcSHADER_FLAG_CLAMP_OUTPUT_COLOR) != 0)
-
+#define gcShaderForceAllOutputInvariant(Shader) (((Shader)->flags & gcSHADER_FLAG_FORCE_ALL_OUTPUT_INVARIANT) != 0)
 
 #define gcShaderGetFlag(Shader)                 (Shader)->flags)
 
@@ -4061,6 +4062,8 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderClrVPTwoSideEnable(Shader)      do { (Shader)->flags &= ~gcSHADER_FLAG_VP_TWO_SIDE_ENABLE; } while (0)
 #define gcShaderSetClampOutputColor(Shader)     do { (Shader)->flags |= gcSHADER_FLAG_CLAMP_OUTPUT_COLOR; } while (0)
 #define gcShaderClrClampOutputColor(Shader)     do { (Shader)->flags &= ~gcSHADER_FLAG_CLAMP_OUTPUT_COLOR; } while (0)
+#define gcShaderSetAllOutputInvariant(Shader)   do { (Shader)->flags |= gcSHADER_FLAG_FORCE_ALL_OUTPUT_INVARIANT; } while (0)
+#define gcShaderClrAllOutputInvariant(Shader)   do { (Shader)->flags &= ~gcSHADER_FLAG_FORCE_ALL_OUTPUT_INVARIANT; } while (0)
 
 typedef struct _gcLibraryList gcLibraryList;
 

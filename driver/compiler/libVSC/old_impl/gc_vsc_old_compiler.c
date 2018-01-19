@@ -19881,7 +19881,17 @@ _AddOutputEx(
         output->flags_                = 0;
         /* TODO: refine the code, there is size=1 arrays */
         gcmOUTPUT_SetIsArray(output, IsArray);
-        gcmOUTPUT_SetIsInvariant(output, IsInvariant);
+
+        /* Check if we need to force all outputs to be invariant. */
+        if (gcShaderForceAllOutputInvariant(Shader))
+        {
+            gcmOUTPUT_SetIsInvariant(output, gcvTRUE);
+        }
+        else
+        {
+            gcmOUTPUT_SetIsInvariant(output, IsInvariant);
+        }
+
         gcmOUTPUT_SetIsPrecise(output, IsInvariant);
         output->arraySize             = Length;
         output->arrayIndex            = i;

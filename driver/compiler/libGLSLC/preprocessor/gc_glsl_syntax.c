@@ -2072,7 +2072,7 @@ gceSTATUS ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
         ppoPREPROCESSOR_ToEOL(PP);
     }
     else if (ntoken->poolString == PP->keyword->debug ||
-        ntoken->poolString == PP->keyword->optimize)
+             ntoken->poolString == PP->keyword->optimize)
     {
         gctBOOL isDebug = gcvFALSE;
         gctBOOL isOn = gcvFALSE;
@@ -2160,7 +2160,7 @@ gceSTATUS ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
 
         gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
         if (ntoken->type == ppvTokenType_ID &&
-           gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "invariant")))
+            gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "invariant")))
         {
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
             ntoken = gcvNULL;
@@ -2216,6 +2216,12 @@ gceSTATUS ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
 
             gcmONERROR(sloCOMPILER_SetOutputInvariant(PP->compiler, gcvTRUE));
        }
+    }
+    else
+    {
+        gcmONERROR(
+            ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), ntoken)
+            );
     }
 
     /* Reset invalid area. */
