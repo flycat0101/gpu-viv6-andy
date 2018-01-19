@@ -2358,7 +2358,7 @@ veglCreateWaylandBufferFromImage(
     struct wl_buffer *wl_buf = NULL;
     struct wl_egl_display *display;
     struct wl_egl_buffer *buffer;
-    gctINT32 fd;
+    gctINT32 fd = -1;
 
     VEGL_LOCK_DISPLAY_RESOURCE(Dpy);
 
@@ -2382,7 +2382,7 @@ veglCreateWaylandBufferFromImage(
                                &buffer->info.pool,
                                &buffer->info.size));
 
-    buffer->info.fd = -1;
+    buffer->info.fd = fd;
 
     gcmONERROR(
         gcoSURF_GetFormat(Image->image.surface,
