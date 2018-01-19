@@ -2985,6 +2985,7 @@ clCreateBuffer(
     gctINT       status;
 #if MAP_TO_DEVICE
     gceCHIPMODEL  chipModel;
+    gctUINT32 chipRevision;
 #endif
     gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
                    Context, Size, HostPtr, Flags);
@@ -3048,9 +3049,11 @@ clCreateBuffer(
      * We always allocate from host-accessible memory
      */
     chipModel = Context->devices[0]->deviceInfo.chipModel;
+    chipRevision = Context->devices[0]->deviceInfo.chipRevision;
+
     if ((Flags & CL_MEM_USE_HOST_PTR)
          && !(gcmPTR2INT(HostPtr) & 0x3F)
-         && !(chipModel == gcv3000 || chipModel == gcv5000))
+         && !((chipModel == gcv3000 && chipRevision != 0x5514) || chipModel == gcv5000))
     {
         gctUINT32 physical;
 
