@@ -39,15 +39,14 @@ static inline buffer_handle_t gralloc_handle_create(int width, int height,
                                     int format, int usage)
 {
     gralloc_handle_t *hnd;
+    const int numFds = GRALLOC_PRIVATE_HANDLE_NUM_FDS;
+    const int numInts = GRALLOC_PRIVATE_HANDLE_NUM_INTS;
 
-    hnd = (gralloc_handle_t *)calloc(1, sizeof(*hnd));
+    hnd = (gralloc_handle_t *)native_handle_create(numFds, numInts);
     if (!hnd)
         return NULL;
 
-    hnd->nativeHandle.version = sizeof(hnd->nativeHandle);
-    hnd->nativeHandle.numInts = GRALLOC_PRIVATE_HANDLE_NUM_INTS;
-    hnd->nativeHandle.numFds  = GRALLOC_PRIVATE_HANDLE_NUM_FDS;
-
+    memset(hnd->nativeHandle.data, 0, (numFds + numInts) * sizeof(int));
     hnd->fd = -1;
     hnd->magic = GRALLOC_PRIVATE_HANDLE_MAGIC;
 
@@ -66,13 +65,11 @@ static inline buffer_handle_t gralloc_handle_create(int width, int height,
 static inline void gralloc_handle_free(buffer_handle_t handle)
 {
     gralloc_handle_t *hnd = (gralloc_handle_t *)handle;
-
-    hnd->nativeHandle.version = 0;
     hnd->magic = 0;
 #ifdef __GNUC__
     asm volatile("":::"memory");
 #endif
-    free(hnd);
+    native_handle_delete(&hnd->nativeHandle);
 }
 
 /* validate, returns error code. */

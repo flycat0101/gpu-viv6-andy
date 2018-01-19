@@ -67,7 +67,7 @@ struct private_handle_t {
     int width;
     int height;
     int format;
-    int stride; /* the stride in bytes */
+    int stride; /* the stride in pixels. */
 
     int usage;
     int pid;    /* owner of data (for validation) */
