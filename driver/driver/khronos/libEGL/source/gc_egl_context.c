@@ -1814,13 +1814,9 @@ veglMakeCurrent(
             {
 #if defined(ANDROID)
                 veglSuspendSwapWorker(dpy);
-                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL,gcvTRUE));
-#else
-                if (dpy->workerThread == gcvNULL)
-                {
-                    gcmVERIFY_OK(gcoHAL_Commit(gcvNULL,gcvTRUE));
-                }
 #endif
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+
                 if (thread->api == EGL_OPENVG_API)
                 {
                     _ProfilerCallback(thread, 10, 0);

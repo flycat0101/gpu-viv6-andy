@@ -174,6 +174,7 @@ gcChipProfilerInitialize(
     if ((env != gcvNULL) && (env[0] == '1'))
     {
         profiler->useGlfinish = gcvTRUE;
+        chipCtx->profiler->bufferCount = NumOfPerDrawBuf;
     }
 
     profiler->perDrawMode = gcvFALSE;
@@ -182,6 +183,7 @@ gcChipProfilerInitialize(
     {
         profiler->perDrawMode =
         chipCtx->profiler->perDrawMode = gcvTRUE;
+        chipCtx->profiler->bufferCount = NumOfPerDrawBuf;
     }
 
     chipCtx->profiler->profilerClient = gcvCLIENT_OPENGL;
@@ -2753,6 +2755,39 @@ __glChipProfile_BlendBarrier(
 
 }
 
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+GLvoid
+__glChipProfile_NotifyChangeBufferSize(
+__GLcontext * gc
+)
+{
+    __GLCHIP_PROFILER_HEADER();
+    __glChipNotifyChangeBufferSize(gc);
+    __GLCHIP_PROFILER_FOOTER();
+    return;
+}
+GLvoid
+__glChipProfile_NotifyDrawableSwitch(
+__GLcontext *gc
+)
+{
+    __GLCHIP_PROFILER_HEADER();
+    __glChipNotifyDrawableSwitch(gc);
+    __GLCHIP_PROFILER_FOOTER();
+    return;
+}
+
+GLvoid
+__glChipProfile_NotifyDestroyBuffers(
+__GLcontext *gc
+)
+{
+    __GLCHIP_PROFILER_HEADER();
+    __glChipNotifyDestroyBuffers(gc);
+    __GLCHIP_PROFILER_FOOTER();
+    return;
+}
+#endif
 
 /* Init DP interface to chip specific function */
 GLvoid
@@ -2948,6 +2983,13 @@ gcChipInitProfileDevicePipeline(
     gc->dp.memoryBarrier = __glChipProfile_MemoryBarrier;
 
     gc->dp.blendBarrier = __glChipProfile_BlendBarrier;
+
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+    /* Initialize dp.ctx drawable notification functions*/
+    gc->dp.ctx.notifyChangeBufferSize = __glChipProfile_NotifyChangeBufferSize;
+    gc->dp.ctx.notifyDrawableSwitch = __glChipProfile_NotifyDrawableSwitch;
+    gc->dp.ctx.notifyDestroyBuffers = __glChipProfile_NotifyDestroyBuffers;
+#endif
 
     gcmFOOTER_NO();
 }

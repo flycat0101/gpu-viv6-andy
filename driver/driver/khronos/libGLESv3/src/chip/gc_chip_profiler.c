@@ -174,6 +174,7 @@ gcChipProfilerInitialize(
     if ((env != gcvNULL) && (env[0] == '1'))
     {
         profiler->useGlfinish = gcvTRUE;
+        chipCtx->profiler->bufferCount = NumOfPerDrawBuf;
     }
 
     profiler->perDrawMode = gcvFALSE;
@@ -182,6 +183,7 @@ gcChipProfilerInitialize(
     {
         profiler->perDrawMode =
         chipCtx->profiler->perDrawMode = gcvTRUE;
+        chipCtx->profiler->bufferCount = NumOfPerDrawBuf;
     }
 
     chipCtx->profiler->profilerClient = gcvCLIENT_OPENGLES;

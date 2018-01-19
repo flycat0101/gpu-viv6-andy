@@ -115,6 +115,7 @@ _glffProfilerInitialize(
     if ((env != gcvNULL) && (env[0] == '1'))
     {
         profiler->useGlfinish = gcvTRUE;
+        Context->profilerObj->bufferCount = NumOfPerDrawBuf;
     }
 
     profiler->perDrawMode = gcvFALSE;
@@ -123,6 +124,7 @@ _glffProfilerInitialize(
     {
         profiler->perDrawMode =
         Context->profilerObj->perDrawMode = gcvTRUE;
+        Context->profilerObj->bufferCount = NumOfPerDrawBuf;
     }
 
     Context->profilerObj->profilerClient = gcvCLIENT_OPENGLES11;
