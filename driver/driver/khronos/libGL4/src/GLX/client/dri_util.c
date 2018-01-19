@@ -81,9 +81,7 @@ extern __GLcontext *__glxNopContext;
 #include <X11/Xlibint.h>
 #include <X11/extensions/Xext.h>
 #include <X11/extensions/extutil.h>
-#ifdef X11_DRI3
-#include "vivante_bo.h"
-#endif
+
 
 #define X_VIVEXTQueryVersion        0
 #define X_VIVEXTPixmapPhysaddr      1
@@ -1682,9 +1680,6 @@ __driUtilCreateNewScreen(__DRInativeDisplay *dpy, int scrn, __DRIscreen *psc,
 
     if (psp->dri3)
     {
-#ifdef X11_DRI3
-        drm_vivante_create(psp->fd, (struct drm_vivante **)&psp->drm);
-#endif
         psc->destroyScreen     = (TDESSCN)dri3DestroyScreen;
         psc->createNewDrawable = (TNEWDRAWABLE)dri3CreateNewDrawable;
         psc->getDrawable       = (TGETDRAWABLE)dri3GetDrawable;

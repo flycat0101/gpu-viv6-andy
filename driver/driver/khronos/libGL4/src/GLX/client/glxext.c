@@ -146,41 +146,6 @@ extern GLvoid _glapi_set_dispatch(GLvoid *dispatch);
 extern GLvoid _glapi_check_multithread(GLvoid);
 
 /************************************************************************/
-
-/* UINX signal handling utility function  */
-static GLvoid setSigFunc(int sig, GLvoid (*func)())
-{
-    sighandler_t handler = signal(sig, SIG_IGN);
-
-    if (handler == SIG_ERR) {
-        fprintf(stderr, "libGL error: UNIX signal setting error!\n");
-        return;
-    }
-    else if (handler == SIG_IGN) {
-        return;
-    }
-
-#if DEBUG
-    if (handler != SIG_DFL) {
-        fprintf(stderr, "libGL error: UNIX signal already caught!");
-    }
-#endif
-
-    if (signal(sig, func) == SIG_ERR) {
-        fprintf(stderr, "libGL error: UNIX signal setting error!\n");
-    }
-
-}
-
-static GLvoid setSignalHandlingFunc(GLvoid (*func)())
-{
-    setSigFunc(SIGTERM, func);
-    setSigFunc(SIGQUIT, func);
-    setSigFunc(SIGINT, func);
-    setSigFunc(SIGHUP, func);
-}
-
-/************************************************************************/
 /*
 ** We setup some dummy structures here so that the API can be used
 ** even if no context is current.
@@ -255,11 +220,6 @@ __GLXcontext *__glXcurrentContext = &dummyContext;
 #endif
 
 
-/*
-** Point to GLX's indirect GL API dispatch table initialized by __glXNewIndirectAPI().
-** All indirect rendering contexts will share the same indirect dispatch table.
-*/
-static __GLesDispatchTable *__glIndirectDispatchTab = NULL;
 /*
 ** Point to glcore's global __glNopDispatchFuncTable.dispatch table.
 */
@@ -545,9 +505,29 @@ static GLvoid FreeScreenConfigs(__GLXdisplayPrivate *priv)
 static int __glXFreeDisplayPrivate(XExtData *extension)
 {
     __GLXdisplayPrivate *priv = (__GLXdisplayPrivate*) extension->private_data;
+    __GLXscreenConfigs *psc = priv->screenConfigs;
     __GLXcontext *ctx;
+    int i;
 
-//  printf("Execute __glXFreeDisplayPrivate!\n");
+    for (i = 0; i < ScreenCount(priv->dpy); i++, psc++) {
+        if (psc->driScreen.private) {
+            __DRIscreenPrivate *psp = (__DRIscreenPrivate *)(psc->driScreen.private);
+
+            if (psp->dri3) {
+                continue;
+            }
+
+#if USE_DRM_MAP
+            (GLvoid)drmUnmap(psp->pLogicalAddr, psp->fbSize);
+#else
+            munmap(psp->pLogicalAddr, psp->fbSize);
+#endif
+
+            (GLvoid)drmUnmap((drmAddress)psp->pSAREA, SAREA_MAX);
+            (GLvoid)drmClose(psp->fd);
+            break;
+        }
+    }
 
     __glXDisplayIsClosed = GL_TRUE;
 
@@ -1115,7 +1095,7 @@ CallCreateNewScreen_dri1(Display *dpy, int scrn, __DRIscreen *psc,
 #include <xcb/xcb.h>
 #include <xcb/dri3.h>
 #include <xcb/present.h>
-#include "vivante_bo.h"
+
 
 static int
 dri3_open(Display *dpy,
@@ -1417,45 +1397,6 @@ GLvoid __attribute__((destructor)) __glXFinalCleanUp(GLvoid)
     }
 }
 
-GLvoid __glXInteruptHandler(GLvoid)
-{
-    __GLXdisplayPrivate *priv;
-    __GLXscreenConfigs *psc;
-    __DRIscreenPrivate *psp;
-    int i, screens;
-
-    gcmASSERT(__glXExtensionPrivate);
-
-    priv = (__GLXdisplayPrivate*)__glXExtensionPrivate->private_data;
-    psc = priv->screenConfigs;
-    screens = ScreenCount(priv->dpy);
-    for (i = 0; i < screens; i++, psc++) {
-        if (psc->driScreen.private) {
-            psp = (__DRIscreenPrivate *)(psc->driScreen.private);
-            if (psp->dri3) continue;
-#if USE_DRM_MAP
-            (GLvoid)drmUnmap(psp->pLogicalAddr, psp->fbSize);
-#else
-            munmap(psp->pLogicalAddr, psp->fbSize);
-#endif
-
-#ifdef X11_DRI3
-            if (psp->dri3)
-            {
-                drm_vivante_close(psp->drm);
-            }
-#endif
-            (GLvoid)drmUnmap((drmAddress)psp->pSAREA, SAREA_MAX);
-            (GLvoid)drmClose(psp->fd);
-            break;
-        }
-    }
-
-    printf("Process termination by interupt!\n");
-
-    exit(1);
-}
-
 /*
 ** Initialize the client side extension code.
 */
@@ -1499,11 +1440,6 @@ __GLXdisplayPrivate *__glXInitialize(Display* dpy)
         printf("The X server does not have Xdamage extensions!\n");
         return 0;
     }
-
-    /*
-    ** Set UNIX process termination signal handling function which does final cleanup.
-    */
-    setSignalHandlingFunc( __glXInteruptHandler );
 
     /*
     ** Allocate memory for all the pieces needed for this buffer.
@@ -1624,8 +1560,8 @@ GLubyte *__glXFlushRenderBuffer(__GLXcontext *ctx, GLubyte *pc)
     Display *dpy;
 #if defined(INDIRECT_SUPPORT)
     xGLXRenderReq *req;
-#endif
     GLint size;
+#endif
 
     if (!(dpy = ctx->currentDpy)) {
         /* Using the dummy context */
@@ -1633,8 +1569,8 @@ GLubyte *__glXFlushRenderBuffer(__GLXcontext *ctx, GLubyte *pc)
         return ctx->pc;
     }
 
-    size = pc - ctx->buf;
 #if defined(INDIRECT_SUPPORT)
+    size = pc - ctx->buf;
     if (size) {
         /* Send the entire buffer as an X request */
         LockDisplay(dpy);
@@ -2054,7 +1990,7 @@ static Bool MakeContextCurrent(Display *dpy,
             __glXSetCurrentContext(gc);
             if (!gc->isDirect) {
                 /* For indirect mode, set table as empty function */
-            _glapi_set_context((GLvoid *)__glxNopContext);
+                _glapi_set_context((GLvoid *)__glxNopContext);
             }
 
             gc->currentDpy = dpy;

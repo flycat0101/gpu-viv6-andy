@@ -80,8 +80,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <xcb/xcb.h>
 #include <xcb/dri3.h>
 #include <xcb/present.h>
-#include <linux/dma-buf.h>
-#include "vivante_bo.h"
 #endif
 
 #include <gc_hal_types.h>
@@ -92,7 +90,7 @@ extern __GLcontext *__glxNopContext;
 extern __GLesDispatchTable *__glNopDispatchTab;
 extern Bool __glXDisplayIsClosed;
 
-#ifdef X11_DRI3
+#if defined(X11_DRI3) && defined(DRI_PIXMAPRENDER_GL)
 
 extern GLvoid __glContextModesDestroy( __GLcontextModes * modes );
 
@@ -430,8 +428,6 @@ static Bool dri3BindContext3(Display *dpy, int scrn,
                             (__DRIscreenPrivate *)pDRIScreen->private );
 }
 
-#if defined(DRI_PIXMAPRENDER_GL)
-
 typedef struct _wrapPixData{
     Pixmap backPixmap;
     GC xgc;
@@ -439,7 +435,6 @@ typedef struct _wrapPixData{
     gceSURF_TYPE surftype;
     gceSURF_FORMAT surfformat;
     gctUINT32 directPix;
-    struct drm_vivante_bo *bo;
 } wPixData;
 
 static void _createPixmapInfo(
@@ -450,8 +445,7 @@ static void _createPixmapInfo(
         GC *xgc,
         gcoSURF *pixWrapSurf,
         gceSURF_TYPE surftype,
-        gceSURF_FORMAT surfformat,
-        struct drm_vivante_bo **pbo
+        gceSURF_FORMAT surfformat
         )
 {
     int xx, yy;
@@ -463,18 +457,14 @@ static void _createPixmapInfo(
     Pixmap pixmap = 0;
     gcoSURF surface;
     gceSTATUS status = gcvSTATUS_OK;
-#if SURF_WRAPSURFMBUFFER
+
     gctUINT32 fdhandle = 0;
     gctUINT bufferoffset = 0;
-#else
-    gctPOINTER cpu_va;
-#endif
+
 
     __DRInativeDisplay * display;
-    __DRIscreenPrivate *priscreen = NULL;
 
     display = dridrawable->display;
-    priscreen = dridrawable->driScreenPriv;
 
     *xgc = XCreateGC(display, Drawable, 0, NULL);
 
@@ -496,62 +486,25 @@ static void _createPixmapInfo(
         goto OnError;
     }
 
-    *pbo = 0;
-#if SURF_WRAPSURFMBUFFER
-
+    fdhandle = (gctUINT32)pixmapfd;
     gcmONERROR(gcoSURF_WrapUserMultiBuffer(
         gcvNULL,
         ww,
         hh,
         surftype,
         surfformat,
-        (gctUINT *)&stride,
-        &pixmapfd,
+        (gctUINT *)&pixmapStride,
+        &fdhandle,
         &bufferoffset,
         gcvALLOC_FLAG_DMABUF,
         &surface
     ));
-
-#else
-
-    if (drm_vivante_bo_import_from_fd(priscreen->drm, pixmapfd, pbo))
-    {
-        goto OnError;
-    }
-
-    drm_vivante_bo_mmap(*pbo, &cpu_va);
-
-    /* Construct a wrapper around the pixmap.  */
-    gcmONERROR(gcoSURF_ConstructWrapper(
-    gcvNULL,
-    &surface
-    ));
-
-
-    gcmONERROR(gcoSURF_SetBuffer(
-    surface,
-    surftype,
-    surfformat,
-    pixmapStride,
-    cpu_va,
-    gcvINVALID_ADDRESS
-    ));
-
-    /* Set the window. */
-    gcmONERROR(gcoSURF_SetWindow(
-    surface,
-    0,
-    0,
-    ww,
-    hh
-    ));
-
-#endif
+    close(fdhandle);
 
     *pixWrapSurf = surface;
     *backPixmap = pixmap;
-    /**fd=pixmapfd;*/
     return;
+
 OnError:
     if ( *pixWrapSurf )
     gcoSURF_Destroy(*pixWrapSurf);
@@ -568,7 +521,6 @@ OnError:
     *pixWrapSurf = (gcoSURF)0;
 
     fprintf(stderr, "Warning::Backpixmap can't be created for the current Drawable\n");
-
 }
 
 static void _destroyPixmapInfo(
@@ -576,18 +528,11 @@ static void _destroyPixmapInfo(
     Pixmap backPixmap,
     gctUINT32 directPix,
     GC xgc,
-    gcoSURF pixWrapSurf,
-    struct drm_vivante_bo *bo
+    gcoSURF pixWrapSurf
     )
 {
     if ( pixWrapSurf )
         gcoSURF_Destroy(pixWrapSurf);
-
-    if (bo)
-    {
-        drm_vivante_bo_munmap(bo);
-        drm_vivante_bo_destroy(bo);
-    }
 
     if (!__glXDisplayIsClosed) {
         if ( (gctUINT32)backPixmap && (directPix == 0) )
@@ -616,9 +561,6 @@ static GLvoid _CopyToDrawable(__DRIdrawablePrivate * drawable)
         }
     }
 }
-
-#endif
-
 
 /*****************************************************************/
 
@@ -687,12 +629,10 @@ GLvoid __dri3UtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
     int xx, yy;
     unsigned int ww, hh, bb;
 
-
-#if defined(DRI_PIXMAPRENDER_GL)
     wPixData *pPixdata = NULL;
     gceSURF_FORMAT hwFormat;
     vvtDeviceInfo *pDevInfo;
-#endif
+
 
     if (!pcp || (pdp != pcp->driDrawablePriv)) {
         /* ERROR!!! */
@@ -734,12 +674,12 @@ GLvoid __dri3UtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
     pdp->h = hh;
 
 
-#if defined(DRI_PIXMAPRENDER_GL)
+
     pPixdata= (wPixData *)pdp->wrapPixData;
     if (pPixdata && pPixdata->backPixmap )
     {
         _destroyPixmapInfo(pdp->display, pPixdata->backPixmap, pPixdata->directPix,
-            pPixdata->xgc, pPixdata->pixWrapSurf, pPixdata->bo);
+            pPixdata->xgc, pPixdata->pixWrapSurf);
     }
 
     if (pPixdata)
@@ -764,9 +704,9 @@ GLvoid __dri3UtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
         hwFormat = gcvSURF_A8R8G8B8;
     pPixdata->surfformat = hwFormat;
     _createPixmapInfo(pdp, pdp->draw, &pPixdata->backPixmap, directPix,
-        &pPixdata->xgc, &pPixdata->pixWrapSurf, pPixdata->surftype, pPixdata->surfformat, &pPixdata->bo);
+        &pPixdata->xgc, &pPixdata->pixWrapSurf, pPixdata->surftype, pPixdata->surfformat);
     pdp->wrapSurface = pPixdata->pixWrapSurf;
-#endif
+
 }
 
 /*****************************************************************/
@@ -859,14 +799,13 @@ GLvoid *dri3CreateNewDrawable(Display *dpy,
         pdraw->private = NULL;
     }
 
-#if defined(DRI_PIXMAPRENDER_GL)
     if (pdp)
     {
         pdp->wrapPixData = NULL;
         pdp->doCPYToSCR = _CopyToDrawable;
         pdp->wrapSurface = NULL;
     }
-#endif
+
    return (GLvoid *) pdp;
 }
 
@@ -887,23 +826,22 @@ static GLvoid dri3DestroyDrawable(Display *dpy, GLvoid *drawablePrivate)
     __DRIdrawablePrivate *pdp = (__DRIdrawablePrivate *) drawablePrivate;
     __DRIscreenPrivate *psp = pdp->driScreenPriv;
 
-#if defined(DRI_PIXMAPRENDER_GL)
     wPixData *pPixdata = NULL;
-#endif
+
 
     if (pdp) {
-#if defined(DRI_PIXMAPRENDER_GL)
+
         pPixdata = (wPixData *)pdp->wrapPixData;
 
         if (pPixdata && pPixdata->backPixmap )
-        _destroyPixmapInfo(dpy, pPixdata->backPixmap,pPixdata->directPix, pPixdata->xgc, pPixdata->pixWrapSurf, pPixdata->bo);
+        _destroyPixmapInfo(dpy, pPixdata->backPixmap,pPixdata->directPix, pPixdata->xgc, pPixdata->pixWrapSurf);
 
         if (pPixdata)
             Xfree(pPixdata);
 
         pdp->wrapPixData = NULL;
         pdp->wrapSurface = NULL;
-#endif
+
         (*psp->DriverAPI.DestroyBuffer)(pdp);
         if (!__glXDisplayIsClosed && __driWindowExists(dpy, pdp->draw)) {
             ;
@@ -1065,8 +1003,6 @@ GLvoid dri3DestroyScreen(Display *dpy, int scrn, GLvoid *screenPrivate)
 
         if (psp->DriverAPI.DestroyScreen)
             (*psp->DriverAPI.DestroyScreen)(psp);
-
-        drm_vivante_close(psp->drm);
 
         Xfree(psp->pDevPriv);
         if ( psp->modes != NULL ) {

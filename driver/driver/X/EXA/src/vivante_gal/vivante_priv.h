@@ -46,7 +46,7 @@ extern "C" {
     typedef struct {
         gctUINT64 mNode;
         gcePOOL mPool;
-        gctUINT mSizeInBytes;
+        gctUINT mBytes;
         gctUINT32 mPhysicalAddr;
         gctPOINTER mLogicalAddr;
     } VideoNode, *VideoNodePtr;
@@ -109,12 +109,11 @@ extern "C" {
     } VIVGPU, *VIVGPUPtr;
 
 gceSTATUS AllocVideoNode(
-        IN gcoHAL Hal,
-        IN OUT gctUINT_PTR Size,
-        IN OUT gcePOOL *Pool,
-        IN gctBOOL cacheable,
-        IN gceSURF_TYPE surftype,
-        OUT gctUINT32 *Node);
+    IN gcoHAL Hal,
+    IN gctBOOL cacheable,
+    IN gceSURF_TYPE surftype,
+    IN OUT GenericSurfacePtr Surf
+    );
 
 gceSTATUS FreeVideoNode(
         IN gcoHAL Hal,

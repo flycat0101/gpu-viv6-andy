@@ -144,7 +144,7 @@ static int vivante_dri3_fd_from_pixmap(ScreenPtr pScreen, PixmapPtr pPixmap,
         return BadMatch;
     }
     *stride = (CARD16)surf->mStride;
-    *size = surf->mVideoNode.mSizeInBytes;
+    *size = surf->mVideoNode.mBytes;
     return fd;
 }
 
@@ -182,5 +182,17 @@ Bool vivanteDRI3ScreenInit(ScreenPtr pScreen){
 
     return dri3_screen_init(pScreen, &vivante_dri3_info);
 }
+
+void vivanteDRI3ScreenDeInit(ScreenPtr pScreen){
+    ScrnInfoPtr pScrn = GET_PSCR(pScreen);
+    VivPtr fPtr = GET_VIV_PTR(pScrn);
+    VIVGPUPtr gpuctx = (VIVGPUPtr)fPtr->mGrCtx.mGpu;
+
+    if (gpuctx->mDriver->drm)
+        drm_vivante_close(gpuctx->mDriver->drm);
+
+    gpuctx->mDriver->drm = (struct drm_vivante *)NULL;
+}
+
 
 #endif

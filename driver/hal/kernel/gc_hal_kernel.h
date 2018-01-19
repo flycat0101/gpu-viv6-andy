@@ -1132,6 +1132,7 @@ typedef struct _gcsVIDMEM_NODE
     gcsFENCE_SYNC               sync[gcvENGINE_GPU_ENGINE_COUNT];
 
     /* For DRM usage */
+    gctUINT64                   timeStamp;
     gckVIDMEM_NODE              tsNode;
     gctUINT32                   tilingMode;
     gctUINT32                   tsMode;

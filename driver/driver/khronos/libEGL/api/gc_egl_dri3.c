@@ -150,7 +150,6 @@ typedef struct _asyncFrame {
     int h;
     xcb_sync_fence_t sync_fence;
     struct xshmfence *shm_fence;
-    struct drm_vivante_bo *bo;
     int fence_fd;
     int pixmapfd;
     EGLint age;
@@ -302,13 +301,18 @@ static void _cleanAsyncFrame(asyncFrame *frame)
     if (!frame)
         return;
 
-    if(frame->dridrawable->display->dpy)
+    if (frame->pixmapfd)
+    {
+        close(frame->pixmapfd);
+    }
+
+    if (frame->dridrawable->display->dpy)
         xcb_sync_destroy_fence(dri_GetXCB(frame->dridrawable->display->dpy), frame->sync_fence);
 
-    if(frame->shm_fence)
+    if (frame->shm_fence)
         xshmfence_unmap_shm(frame->shm_fence);
 
-    if(frame->fence_fd >= 0)
+    if (frame->fence_fd >= 0)
         close(frame->fence_fd);
 
     if ( frame->pixWrapSurf )
@@ -316,13 +320,6 @@ static void _cleanAsyncFrame(asyncFrame *frame)
 
     if (frame->backPixmap)
         XFreePixmap(frame->dridrawable->display->dpy, frame->backPixmap);
-
-    if (frame->bo)
-    {
-        drm_vivante_bo_munmap(frame->bo);
-        drm_vivante_bo_destroy(frame->bo);
-        frame->bo = gcvNULL;
-    }
 
     frame->fence_fd = -1;
     frame->shm_fence = (struct xshmfence *)gcvNULL;
@@ -340,12 +337,9 @@ static void _setupAsyncFrame(asyncFrame *frame)
     gceSTATUS status = gcvSTATUS_OK;
     __DRIDisplay * display;
 
-#if SURF_WRAPSURFMBUFFER
+
     gctUINT32 fdhandle = 0;
     gctUINT bufferoffset = 0;
-#else
-    gctPOINTER cpu_va;
-#endif
 
 
     if(frame == NULL)
@@ -390,12 +384,7 @@ static void _setupAsyncFrame(asyncFrame *frame)
     }
     xcb_flush(dri_GetXCB(display->dpy));
 
-
-
-#if SURF_WRAPSURFMBUFFER
-
     fdhandle = frame->pixmapfd;
-    frame->bo = gcvNULL;
 
     gcmONERROR(gcoSURF_WrapUserMultiBuffer(
         gcvNULL,
@@ -410,40 +399,6 @@ static void _setupAsyncFrame(asyncFrame *frame)
         &frame->pixWrapSurf
     ));
 
-#else
-
-    if (drm_vivante_bo_import_from_fd(display->drmVIV, frame->pixmapfd, &frame->bo))
-        goto OnError;
-
-    if (drm_vivante_bo_mmap(frame->bo, &cpu_va))
-        goto OnError;
-
-    /* Construct a wrapper around the pixmap.  */
-    gcmONERROR(gcoSURF_ConstructWrapper(
-    gcvNULL,
-    &frame->pixWrapSurf
-    ));
-
-
-    gcmONERROR(gcoSURF_SetBuffer(
-    frame->pixWrapSurf,
-    frame->surftype,
-    frame->surfformat,
-    stride,
-    cpu_va,
-    gcvINVALID_ADDRESS
-    ));
-
-    /* Set the window. */
-    gcmONERROR(gcoSURF_SetWindow(
-    frame->pixWrapSurf,
-    0,
-    0,
-    frame->w,
-    frame->h
-    ));
-
-#endif
 
     xshmfence_reset(frame->shm_fence);
     xshmfence_trigger(frame->shm_fence);
@@ -456,155 +411,6 @@ OnError:
 #if (defined(DEBUG) || defined(_DEBUG))
     fprintf(stderr, "Warning::Backpixmap can't be created for the current Drawable\n");
 #endif
-}
-
-typedef struct _M_Pixmap
-{
-    Display *dpy;
-    Drawable pixmap;
-    gctINT mapped;
-    gctPOINTER destLogicalAddr;
-    gctPOINTER phyAddr;
-    gctINT stride;
-    struct drm_vivante_bo *bo;
-    int pixmapfd;
-    gctPOINTER next;
-}MPIXMAP,*PMPIXMAP;
-
-static PMPIXMAP _vpixmaphead = gcvNULL;
-static MPIXMAP _cachepixmap = {gcvNULL, (Drawable)0, 0, gcvNULL, gcvNULL, 0, 0, -1, gcvNULL};
-
-static gctBOOL _pixmapMapped(Drawable pixmap, gctPOINTER *destLogicalAddr, gctPOINTER *phyAddr, Display **dpy, gctINT *stride, struct drm_vivante_bo **pbo, int *pixmapfd)
-{
-    PMPIXMAP pixmapnode = gcvNULL;
-    if ( _vpixmaphead == gcvNULL )
-        return gcvFALSE;
-
-    if ( _cachepixmap.pixmap == pixmap)
-    {
-        *destLogicalAddr = _cachepixmap.destLogicalAddr;
-        *phyAddr = _cachepixmap.phyAddr;
-        *dpy = _cachepixmap.dpy;
-        *stride = _cachepixmap.stride;
-        *pbo = _cachepixmap.bo;
-        *pixmapfd = _cachepixmap.pixmapfd;
-        return gcvTRUE;
-    }
-
-    pixmapnode = _vpixmaphead;
-    while( pixmapnode )
-    {
-        if ( pixmapnode->pixmap == pixmap )
-        {
-            if ( pixmapnode->mapped)
-            {
-                *destLogicalAddr = pixmapnode->destLogicalAddr;
-                *phyAddr = pixmapnode->phyAddr;
-                *dpy = pixmapnode->dpy;
-                *stride = pixmapnode->stride;
-                *pbo = pixmapnode->bo;
-                *pixmapfd = pixmapnode->pixmapfd;
-                return gcvTRUE;
-            }
-            else
-                return gcvFALSE;
-        }
-        pixmapnode = (PMPIXMAP)pixmapnode->next;
-    }
-
-    return gcvFALSE;
-
-}
-
-static gctBOOL _setPixmapMapped(Drawable pixmap, gctPOINTER destLogicalAddr, gctPOINTER phyAddr, Display *dpy, gctINT stride, struct drm_vivante_bo *bo, int pixmapfd)
-{
-    PMPIXMAP pixmapnode = gcvNULL;
-    PMPIXMAP prepixmapnode = gcvNULL;
-
-    _cachepixmap.destLogicalAddr = destLogicalAddr;
-    _cachepixmap.phyAddr = phyAddr;
-    _cachepixmap.dpy = dpy;
-    _cachepixmap.pixmap = pixmap;
-    _cachepixmap.mapped = 1;
-    _cachepixmap.stride = stride;
-    _cachepixmap.bo = bo;
-    _cachepixmap.pixmapfd = pixmapfd;
-
-    if ( _vpixmaphead == gcvNULL )
-    {
-        _vpixmaphead = (PMPIXMAP)malloc(sizeof(MPIXMAP));
-        _vpixmaphead->mapped = 1;
-        _vpixmaphead->pixmap = pixmap;
-        _vpixmaphead->dpy= dpy;
-        _vpixmaphead->destLogicalAddr = destLogicalAddr;
-        _vpixmaphead->phyAddr = phyAddr;
-        _vpixmaphead->stride = stride;
-        _vpixmaphead->next = gcvNULL;
-        _vpixmaphead->bo = bo;
-        _vpixmaphead->pixmapfd = pixmapfd;
-        return gcvTRUE;
-    }
-
-    pixmapnode = _vpixmaphead;
-    while( pixmapnode )
-    {
-        prepixmapnode = pixmapnode;
-        if ( pixmapnode->pixmap == pixmap )
-        {
-            pixmapnode->mapped = 1;
-            pixmapnode->destLogicalAddr = destLogicalAddr;
-            pixmapnode->phyAddr = phyAddr;
-            pixmapnode->stride = stride;
-            pixmapnode->bo = bo;
-            pixmapnode->pixmapfd = pixmapfd;
-            return gcvTRUE;
-        }
-        pixmapnode = (PMPIXMAP)pixmapnode->next;
-    }
-    pixmapnode = (PMPIXMAP)malloc(sizeof(MPIXMAP));
-    pixmapnode->mapped = 1;
-    pixmapnode->pixmap = pixmap;
-    pixmapnode->dpy= dpy;
-    pixmapnode->destLogicalAddr = destLogicalAddr;
-    pixmapnode->phyAddr = phyAddr;
-    pixmapnode->stride = stride;
-    pixmapnode->next = gcvNULL;
-    pixmapnode->bo = bo;
-    pixmapnode->pixmapfd = pixmapfd;
-
-    prepixmapnode->next = pixmapnode;
-    return gcvTRUE;
-}
-
-static gctBOOL _unSetPixmapMapped(Drawable pixmap)
-{
-    PMPIXMAP pixmapnode = gcvNULL;
-    PMPIXMAP prepixmapnode = gcvNULL;
-
-    _cachepixmap.pixmap = (Drawable)0;
-    _cachepixmap.mapped = 0;
-
-    if ( _vpixmaphead == gcvNULL )
-        return gcvFALSE;
-
-    pixmapnode = _vpixmaphead;
-    while( pixmapnode )
-    {
-        if ( pixmapnode->pixmap == pixmap )
-        {
-            pixmapnode->mapped = 0;
-            if ( pixmapnode == _vpixmaphead)
-            _vpixmaphead = pixmapnode->next;
-            else
-            prepixmapnode->next = pixmapnode->next;
-            free(pixmapnode);
-            return gcvTRUE;
-        }
-        prepixmapnode = pixmapnode;
-        pixmapnode = (PMPIXMAP)pixmapnode->next;
-    }
-
-    return gcvTRUE;
 }
 
 static void
@@ -1273,146 +1079,6 @@ dri_GetWindowInfo(
 */
 
 static gceSTATUS
-dri_GetPixmapInfo(
-    IN PlatformDisplayType Display,
-    IN PlatformPixmapType Pixmap,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctINT * BitsPerPixel,
-    OUT gctINT * Stride,
-    OUT gctPOINTER * Bits
-    )
-{
-    Window rootWindow = 0;
-    gctINT x = 0, y = 0;
-    gctUINT width = 0, height = 0, borderWidth = 0, bitsPerPixel = 0;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctPOINTER  destLogicalAddr = gcvNULL;
-    gctPOINTER  phyAddr = gcvNULL;
-    PlatformDisplayType tmpDisplay;
-    gctBOOL mapped = gcvFALSE;
-    int tStride = 0;
-    VEGLThreadData thread;
-    __DRIDisplay *driDisplay;
-    int pixmapfd;
-    struct drm_vivante_bo *bo = gcvNULL;
-
-    gcmHEADER_ARG("Display=0x%x Pixmap=0x%x", Display, Pixmap);
-
-    if (Pixmap == 0)
-    {
-        /* Pixmap is not a valid pixmap data structure pointer. */
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-
-    thread = veglGetThreadData();
-
-    if (thread->context->display == gcvNULL) return gcvSTATUS_INVALID_ARGUMENT;
-
-    driDisplay = (__DRIDisplay*)thread->context->display->localInfo;
-
-    if ( Width == NULL && Height == NULL
-          && BitsPerPixel == NULL && Stride == NULL
-          && Bits == NULL )
-    {
-        /*UnLock lokced videonode */
-        if (_pixmapMapped(Pixmap, &destLogicalAddr, &phyAddr, &tmpDisplay, (gctINT *)&tStride, &bo, &pixmapfd) == gcvFALSE)
-        {
-            gcmFOOTER();
-            status = gcvSTATUS_OK;
-            return status;
-        }
-        if (Display == (PlatformDisplayType)gcvNULL)
-        {
-            Display = tmpDisplay;
-        }
-
-        status = gcvSTATUS_INVALID_OBJECT;
-        if (pixmapfd >= 0)
-        {
-            drm_vivante_bo_unlock(bo);
-            drm_vivante_bo_munmap(bo);
-            drm_vivante_bo_destroy(bo);
-            status = gcvSTATUS_OK;
-            _unSetPixmapMapped(Pixmap);
-        }
-        gcmFOOTER();
-        return status;
-    }
-
-    /* Query pixmap parameters. */
-    if (XGetGeometry(Display,
-        Pixmap,
-        &rootWindow,
-        &x, &y, &width, &height,
-        &borderWidth,
-        &bitsPerPixel) == False)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-
-    /* Set back values. */
-    if (Width != NULL)
-    {
-        *Width = width;
-    }
-
-    if (Height != NULL)
-    {
-        *Height = height;
-    }
-
-    mapped = _pixmapMapped(Pixmap, &destLogicalAddr, &phyAddr, &tmpDisplay, (gctINT *)&tStride, &bo, &pixmapfd);
-    /* 1st pass: Get Logical & Physical address and stride through DRI */
-    if ((Bits != NULL) && (Stride != NULL))
-    {
-        uint32_t gpu_va;
-        gctPOINTER cpu_va = destLogicalAddr;
-        if ( mapped == gcvFALSE )
-        {
-                pixmapfd = create_fd_from_pixmap(dri_GetXCB(Display), Pixmap, Stride);
-                xcb_flush(dri_GetXCB(Display));
-
-                if (pixmapfd >= 0)
-                {
-                    if (drm_vivante_bo_import_from_fd(driDisplay->drmVIV, pixmapfd, &bo))
-                    {
-                        status = gcvSTATUS_INVALID_ARGUMENT;
-                        goto OnError;
-                    }
-
-                    drm_vivante_bo_mmap(bo, &cpu_va);
-                    drm_vivante_bo_lock(bo, &gpu_va);
-
-                    _setPixmapMapped(Pixmap, cpu_va, gcmINT2PTR(gpu_va), Display, *Stride, bo, pixmapfd);
-                    phyAddr = gcmINT2PTR(gpu_va);
-                    tStride = *Stride;
-                }
-        }
-        *Bits = phyAddr;
-        destLogicalAddr = cpu_va;
-    }
-
-    /* 2nd pass: Get the locally stored Logical address */
-    if ((BitsPerPixel != NULL) && (Bits != NULL))
-    {
-        *BitsPerPixel = bitsPerPixel;
-        *Bits = destLogicalAddr;
-    }
-
-    if ( Stride != NULL )
-        *Stride = tStride;
-
-OnError:
-    gcmFOOTER_NO();
-    return status;
-}
-
-static gceSTATUS
 dri_DrawPixmap(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -1736,65 +1402,91 @@ dri_GetPixmapInfoEx(
     OUT gctINT * Height,
     OUT gctINT * BitsPerPixel,
     OUT gctINT * Stride,
-    OUT gctPOINTER * Bits,
+    OUT gctINT * FD,
     OUT gceSURF_FORMAT * Format
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
+    Window rootWindow = 0;
+    gctINT x = 0, y = 0;
+    gctUINT width = 0, height = 0, borderWidth = 0, bitsPerPixel = 0;
+    int pixmapfd = -1, stride = 0;
 
-    gctPOINTER logicalAddress = 0;
-    gctINT XStride;
-    gctPOINTER XBits;
+    gcmHEADER_ARG("Display=0x%x Pixmap=0x%x", Display, Pixmap);
 
-/* The first calling dri_GetPixmapInfo makes pixmap cache-pool work */
-    if (gcmIS_ERROR(dri_GetPixmapInfo(
-                        Display,
-                        Pixmap,
-                        gcvNULL,
-                        gcvNULL,
-                        gcvNULL,
-                        &XStride,
-                        &XBits)))
+    if (Pixmap == 0)
     {
-        return gcvFALSE;
+        /* Pixmap is not a valid pixmap data structure pointer. */
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (gcmIS_ERROR(dri_GetPixmapInfo(
-                        Display,
-                        Pixmap,
-                        (gctINT_PTR) Width, (gctINT_PTR) Height,
-                        (gctINT_PTR) BitsPerPixel,
-                        gcvNULL,
-                        &logicalAddress)))
+    /* Query pixmap parameters. */
+    if (XGetGeometry(Display, Pixmap, &rootWindow,
+                     &x, &y, &width, &height,
+                     &borderWidth, &bitsPerPixel) == False)
     {
-        return gcvSTATUS_INVALID_ARGUMENT;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Return format for pixmap depth. */
-    switch (*BitsPerPixel)
+    if (Stride || FD)
     {
-    case 16:
-        *Format = gcvSURF_R5G6B5;
-        *BitsPerPixel = 16;
-        break;
-
-    case 24:
-        *Format = gcvSURF_X8R8G8B8;
-        *BitsPerPixel = 24;
-        break;
-    case 32:
-        *Format = gcvSURF_A8R8G8B8;
-        *BitsPerPixel = 32;
-        break;
-
-    default:
-        return gcvSTATUS_INVALID_ARGUMENT;
+        pixmapfd = create_fd_from_pixmap(dri_GetXCB(Display), Pixmap, &stride);
+        xcb_flush(dri_GetXCB(Display));
+        if (pixmapfd < 0)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
-    if ( Bits != gcvNULL )
-        *Bits = logicalAddress;
+    /* Set back values. */
+    if (Width)
+    {
+        *Width = width;
+    }
 
-    /* Success. */
-    return gcvSTATUS_OK;
+    if (Height)
+    {
+        *Height = height;
+    }
+
+    if (BitsPerPixel)
+    {
+        *BitsPerPixel = bitsPerPixel;
+    }
+
+    if (Stride)
+    {
+        *Stride = stride;
+    }
+
+    if (FD)
+    {
+        *FD = pixmapfd;
+    }
+
+    if (Format)
+    {
+        /* Return format for pixmap depth. */
+        switch (bitsPerPixel)
+        {
+        case 16:
+            *Format = gcvSURF_R5G6B5;
+            break;
+        case 24:
+            *Format = gcvSURF_X8R8G8B8;
+            break;
+        case 32:
+            *Format = gcvSURF_A8R8G8B8;
+            break;
+
+        default:
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
 }
 
 static gceSTATUS
@@ -1824,7 +1516,7 @@ dri_CopyPixmapBits(
         break;
 
     default:
-       printf("dri_GetPixmapInfo error format\n");
+       printf("dri_CopyPixmapBits error format\n");
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
@@ -1835,7 +1527,7 @@ dri_CopyPixmapBits(
         &borderWidth,
         &bitsPerPixel) == False)
     {
-        printf("dri_GetPixmapInfo error\n");
+        printf("dri_CopyPixmapBits error\n");
         status = gcvSTATUS_INVALID_ARGUMENT;
         return status;
     }
@@ -3559,16 +3251,13 @@ _MatchPixmap(
     )
 {
     gceSTATUS status;
-    gctINT width, height, bitsPerPixel;
     gceSURF_FORMAT pixmapFormat;
     EGLBoolean match = EGL_TRUE;
 
-    status = dri_GetPixmapInfoEx((PlatformDisplayType) Display->hdc,
-                                   (PlatformPixmapType) Pixmap,
-                                   &width,
-                                   &height,
-                                   &bitsPerPixel,
-                                   gcvNULL, gcvNULL, &pixmapFormat);
+    status = dri_GetPixmapInfoEx((PlatformDisplayType)Display->hdc,
+                                 (PlatformPixmapType)Pixmap,
+                                 gcvNULL, gcvNULL, gcvNULL,
+                                 gcvNULL, gcvNULL, &pixmapFormat);
 
     if (gcmIS_ERROR(status))
     {
@@ -3613,162 +3302,91 @@ _ConnectPixmap(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctBOOL needShadow = gcvFALSE;
+    gctBOOL needShadow = gcvTRUE;
     gctINT pixmapWidth;
     gctINT pixmapHeight;
     gctINT pixmapStride = 0;
     gceSURF_FORMAT pixmapFormat;
     gctINT pixmapBpp;
-    gctPOINTER pixmapBits = gcvNULL;
-    gctUINT32 pixmapPhysical = gcvINVALID_ADDRESS;
+    gctINT pixmapFD = 0;
+    gctUINT bufferoffset = 0;
+    gctUINT32 physical[3] = {0};
+    gctPOINTER logical[3] = {0};
     gcoSURF wrapper = gcvNULL;
     gcoSURF shadow = gcvNULL;
-    gctPOINTER pointer;
     VEGLPixmapInfo info = gcvNULL;
 
     /* Query pixmap geometry info. */
-    gcmONERROR(dri_GetPixmapInfoEx((PlatformDisplayType) Display->hdc,
-                                     (PlatformPixmapType) Pixmap,
-                                     &pixmapWidth,
-                                     &pixmapHeight,
-                                     &pixmapBpp,
-                                     gcvNULL,
-                                     gcvNULL,
-                                     &pixmapFormat));
+    gcmONERROR(dri_GetPixmapInfoEx((PlatformDisplayType)Display->hdc,
+                                   (PlatformPixmapType)Pixmap,
+                                   &pixmapWidth,
+                                   &pixmapHeight,
+                                   &pixmapBpp,
+                                   &pixmapStride,
+                                   &pixmapFD,
+                                   &pixmapFormat));
 
-    /* Query pixmap bits. */
-    status = dri_GetPixmapInfo((PlatformDisplayType) Display->hdc,
-                                 (PlatformPixmapType) Pixmap,
-                                 gcvNULL,
-                                 gcvNULL,
-                                 gcvNULL,
-                                 &pixmapStride,
-                                 &pixmapBits);
+    /* Check pixmap format. */
+    switch (pixmapFormat)
+    {
+    case gcvSURF_A8R8G8B8:
+    case gcvSURF_A8B8G8R8:
+    case gcvSURF_X8R8G8B8:
+    case gcvSURF_X8B8G8R8:
+    case gcvSURF_R5G6B5:
+    case gcvSURF_A4R4G4B4:
+    case gcvSURF_A4B4G4R4:
+    case gcvSURF_X4R4G4B4:
+    case gcvSURF_X4B4G4R4:
+        break;
+
+    default:
+        /* Resolve can not support such format. */
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    gcmONERROR(gcoSURF_WrapUserMultiBuffer(
+            gcvNULL,
+            pixmapWidth,
+            pixmapHeight,
+            gcvSURF_BITMAP,
+            pixmapFormat,
+            (gctUINT*)&pixmapStride,
+            (gctUINT32*)&pixmapFD,
+            &bufferoffset,
+            gcvALLOC_FLAG_DMABUF,
+            &wrapper
+        ));
+    close(pixmapFD);
+    gcmONERROR(gcoSURF_Lock(wrapper, physical, logical));
 
     do
     {
-        if (gcmIS_ERROR(status) || !pixmapBits)
-        {
-            /* Can not wrap as surface object. */
-            needShadow = gcvTRUE;
-            break;
-        }
-
-        pixmapPhysical = (gctUINT32) pixmapBits;
-        pixmapBits     = gcvNULL;
-
-        /* Query pixmap bits. */
-        status = dri_GetPixmapInfo((PlatformDisplayType) Display->hdc,
-                                     (PlatformPixmapType) Pixmap,
-                                     gcvNULL,
-                                     gcvNULL,
-                                     &pixmapBpp,
-                                     gcvNULL,
-                                     &pixmapBits);
-
-        if (gcmIS_ERROR(status))
-        {
-            needShadow = gcvTRUE;
-            break;
-        }
-
-        if (((gctUINTPTR_T) pixmapBits) & 0x3F)
-        {
-            needShadow = gcvTRUE;
-            break;
-        }
 
         if ((pixmapStride * 8 / pixmapBpp) < 16)
         {
             /* Too small in width. */
-            needShadow = gcvTRUE;
             break;
         }
-
 
         /* Height needs to be 4 aligned or vstride is large enough. */
         if (pixmapHeight & 3)
         {
-            /*
-             * Not enough memory in height.
-             * Resolve may exceeds the buffer and overwrite other memory.
-             */
-            needShadow = gcvTRUE;
+            /* No enough memory in height.
+            ** Resolve may exceeds the buffer and overwrite other memory.
+            */
             break;
         }
 
-        /* Check pixmap format. */
-        switch (pixmapFormat)
+        if (physical[0] & 0x3F)
         {
-        case gcvSURF_A8R8G8B8:
-        case gcvSURF_A8B8G8R8:
-        case gcvSURF_X8R8G8B8:
-        case gcvSURF_X8B8G8R8:
-        case gcvSURF_R5G6B5:
-        case gcvSURF_A4R4G4B4:
-        case gcvSURF_A4B4G4R4:
-        case gcvSURF_X4R4G4B4:
-        case gcvSURF_X4B4G4R4:
+            /* Not 64 byte aligned. */
             break;
-
-        default:
-            /* Resolve can not support such format. */
-            return EGL_FALSE;
         }
+
+        needShadow = gcvFALSE;
     }
     while (gcvFALSE);
-
-    do
-    {
-        if (needShadow)
-        {
-            /* No pixmap wrapper. */
-            status = gcvSTATUS_OK;
-            break;
-        }
-
-        /* Construct pixmap wrapper. */
-        gcmONERROR(
-            gcoSURF_Construct(gcvNULL,
-                              pixmapWidth,
-                              pixmapHeight,
-                              1,
-                              gcvSURF_BITMAP,
-                              pixmapFormat,
-                              gcvPOOL_USER,
-                              &wrapper));
-
-        /* Set pixels. */
-        status = gcoSURF_SetBuffer(wrapper,
-                                   gcvSURF_BITMAP,
-                                   pixmapFormat,
-                                   pixmapStride,
-                                   pixmapBits,
-                                   pixmapPhysical);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Failed to wrap. */
-            break;
-        }
-
-        /* Do the wrap. */
-        status = gcoSURF_SetWindow(wrapper,
-                                   0, 0,
-                                   pixmapWidth,
-                                   pixmapHeight);
-    }
-    while (gcvFALSE);
-
-    if (gcmIS_ERROR(status) && (wrapper != gcvNULL))
-    {
-        /* Failed to wrap as surface object. */
-        gcmVERIFY_OK(gcoSURF_Destroy(wrapper));
-        wrapper = gcvFALSE;
-
-        /* Shadow required and format must be supported. */
-        needShadow = gcvTRUE;
-    }
 
     if (needShadow)
     {
@@ -3785,21 +3403,17 @@ _ConnectPixmap(
     }
 
     /* Allocate memory. */
-    gcmONERROR(gcoOS_Allocate(gcvNULL,
-                              sizeof (struct eglPixmapInfo),
-                              &pointer));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct eglPixmapInfo), (gctPOINTER*)&info));
 
-    gcoOS_ZeroMemory(pointer, sizeof (struct eglPixmapInfo));
-    info = pointer;
-
+    gcoOS_ZeroMemory(info, sizeof(struct eglPixmapInfo));
     /* Save pixmap info. */
     info->width        = pixmapWidth;
     info->height       = pixmapHeight;
     info->format       = pixmapFormat;
     info->stride       = pixmapStride;
     info->bitsPerPixel = pixmapBpp;
-    info->data         = pixmapBits;
-    info->hdc          = (PlatformDisplayType) Display->hdc;
+    info->data         = logical[0];
+    info->hdc          = (PlatformDisplayType)Display->hdc;
     info->wrapper      = wrapper;
     info->shadow       = shadow;
 
@@ -3809,22 +3423,27 @@ _ConnectPixmap(
 
     /* Output. */
     *Info    = info;
-    *Surface = (shadow != gcvNULL) ? shadow : wrapper;
+    *Surface = shadow ? shadow : wrapper;
 
     return EGL_TRUE;
 
 OnError:
-    if (wrapper != gcvNULL)
+    if (wrapper)
     {
+        if (logical[0])
+        {
+            gcmVERIFY_OK(gcoSURF_Unlock(wrapper, gcvNULL));
+        }
+
         gcmVERIFY_OK(gcoSURF_Destroy(wrapper));
     }
 
-    if (shadow != gcvNULL)
+    if (shadow)
     {
         gcmVERIFY_OK(gcoSURF_Destroy(shadow));
     }
 
-    if (info != gcvNULL)
+    if (info)
     {
         gcmOS_SAFE_FREE(gcvNULL, info);
     }
@@ -3849,6 +3468,7 @@ _DisconnectPixmap(
 
     if (Info->wrapper != gcvNULL)
     {
+        gcmVERIFY_OK(gcoSURF_Unlock(Info->wrapper, gcvNULL));
         gcmVERIFY_OK(gcoSURF_Destroy(Info->wrapper));
         Info->wrapper = gcvNULL;
     }
@@ -3876,23 +3496,18 @@ _GetPixmapSize(
     )
 {
     gceSTATUS status;
-    gctINT bitsPerPixel;
-    gceSURF_FORMAT format;
     gctINT width, height;
 
     /* Query pixmap info again. */
     gcmONERROR(
-        dri_GetPixmapInfoEx((PlatformDisplayType) Display->hdc,
-                              (PlatformPixmapType) Pixmap,
-                              &width,
-                              &height,
-                              &bitsPerPixel,
-                              gcvNULL,
-                              gcvNULL,
-                              &format));
-
-    (void) bitsPerPixel;
-    (void) format;
+        dri_GetPixmapInfoEx((PlatformDisplayType)Display->hdc,
+                            (PlatformPixmapType)Pixmap,
+                            &width,
+                            &height,
+                            gcvNULL,
+                            gcvNULL,
+                            gcvNULL,
+                            gcvNULL));
 
     gcmASSERT(width  == Info->width);
     gcmASSERT(height == Info->height);

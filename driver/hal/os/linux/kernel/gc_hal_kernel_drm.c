@@ -248,8 +248,7 @@ static int viv_ioctl_gem_lock(struct drm_device *drm, void *data,
     iface.u.LockVideoMemory.cacheable = args->cacheable;
     gcmkONERROR(gckDEVICE_Dispatch(gal_dev->device, &iface));
 
-    args->cpu_va = iface.u.LockVideoMemory.memory;
-    args->gpu_va = iface.u.LockVideoMemory.address;
+    args->logical = iface.u.LockVideoMemory.memory;
 
 OnError:
     return gcmIS_ERROR(status) ? -ENOTTY : 0;
@@ -394,6 +393,37 @@ OnError:
     return gcmIS_ERROR(status) ? -ENOTTY : 0;
 }
 
+static int viv_ioctl_gem_timestamp(struct drm_device *drm, void *data,
+                                       struct drm_file *file)
+{
+    struct drm_viv_gem_timestamp *args = (struct drm_viv_gem_timestamp *)data;
+    struct drm_gem_object *gem_obj;
+    struct viv_gem_object *viv_obj;
+
+    gceSTATUS status = gcvSTATUS_OK;
+    gckGALDEVICE gal_dev = gcvNULL;
+
+    gal_dev = (gckGALDEVICE)drm->dev_private;
+    if (!gal_dev)
+    {
+        gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gem_obj = drm_gem_object_lookup(file, args->handle);
+    if (!gem_obj)
+    {
+        gcmkONERROR(gcvSTATUS_NOT_FOUND);
+    }
+    viv_obj = container_of(gem_obj, struct viv_gem_object, base);
+
+    viv_obj->node_object->timeStamp += args->inc;
+    args->timestamp = viv_obj->node_object->timeStamp;
+    drm_gem_object_unreference_unlocked(gem_obj);
+
+OnError:
+    return gcmIS_ERROR(status) ? -ENOTTY : 0;
+}
+
 static int viv_ioctl_gem_set_tiling(struct drm_device *drm, void *data,
                                     struct drm_file *file)
 {
@@ -522,6 +552,7 @@ static int viv_ioctl_gem_ref_node(struct drm_device *drm, void *data,
     gceSTATUS status = gcvSTATUS_OK;
     gckGALDEVICE gal_dev = gcvNULL;
     gckKERNEL kernel = gcvNULL;
+    gctUINT32 processID;
     gckVIDMEM_NODE nodeObj;
     gctUINT32 nodeHandle = 0, tsNodeHandle = 0;
     gctBOOL refered = gcvFALSE;
@@ -539,16 +570,30 @@ static int viv_ioctl_gem_ref_node(struct drm_device *drm, void *data,
     {
         gcmkONERROR(gcvSTATUS_NOT_FOUND);
     }
+    drm_gem_object_unreference_unlocked(gem_obj);
     viv_obj = container_of(gem_obj, struct viv_gem_object, base);
     nodeObj = viv_obj->node_object;
 
+    gcmkONERROR(gckOS_GetProcessID(&processID));
     gcmkONERROR(gckVIDMEM_HANDLE_Allocate(kernel, nodeObj, &nodeHandle));
+    gcmkONERROR(
+        gckKERNEL_AddProcessDB(kernel,
+                               processID, gcvDB_VIDEO_MEMORY,
+                               gcmINT2PTR(nodeHandle),
+                               gcvNULL,
+                               0));
     gcmkONERROR(gckVIDMEM_NODE_Reference(kernel, nodeObj));
     refered = gcvTRUE;
 
     if (nodeObj->tsNode)
     {
         gcmkONERROR(gckVIDMEM_HANDLE_Allocate(kernel, nodeObj->tsNode, &tsNodeHandle));
+        gcmkONERROR(
+            gckKERNEL_AddProcessDB(kernel,
+                                   processID, gcvDB_VIDEO_MEMORY,
+                                   gcmINT2PTR(tsNodeHandle),
+                                   gcvNULL,
+                                   0));
         gcmkONERROR(gckVIDMEM_NODE_Reference(kernel, nodeObj->tsNode));
     }
     args->node = nodeHandle;
@@ -592,6 +637,7 @@ static const struct drm_ioctl_desc viv_ioctls[] =
     DRM_IOCTL_DEF_DRV(VIV_GEM_UNLOCK,        viv_ioctl_gem_unlock,     DRM_AUTH | DRM_RENDER_ALLOW),
     DRM_IOCTL_DEF_DRV(VIV_GEM_CACHE,         viv_ioctl_gem_cache,      DRM_AUTH | DRM_RENDER_ALLOW),
     DRM_IOCTL_DEF_DRV(VIV_GEM_QUERY,         viv_ioctl_gem_query,      DRM_AUTH | DRM_RENDER_ALLOW),
+    DRM_IOCTL_DEF_DRV(VIV_GEM_TIMESTAMP,     viv_ioctl_gem_timestamp,  DRM_AUTH | DRM_RENDER_ALLOW),
     DRM_IOCTL_DEF_DRV(VIV_GEM_SET_TILING,    viv_ioctl_gem_set_tiling, DRM_AUTH | DRM_RENDER_ALLOW),
     DRM_IOCTL_DEF_DRV(VIV_GEM_GET_TILING,    viv_ioctl_gem_get_tiling, DRM_AUTH | DRM_RENDER_ALLOW),
     DRM_IOCTL_DEF_DRV(VIV_GEM_ATTACH_AUX,    viv_ioctl_gem_attach_aux, DRM_AUTH | DRM_RENDER_ALLOW),
