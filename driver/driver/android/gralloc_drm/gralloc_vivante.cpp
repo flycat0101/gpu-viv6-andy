@@ -508,12 +508,6 @@ int gralloc_vivante_lock(struct gralloc_vivante_t *drv, buffer_handle_t handle,
         }
     }
 
-    /* allow multiple locks with compatible usages */
-    if (bo->lock_count && (bo->locked_for & usage) != usage) {
-        gralloc_trace_error(1, "usage not compatible: 0x%08X/0x%08X",
-                gralloc_handle_usage(handle), usage);
-        return -EINVAL;
-    }
 
     usage |= bo->locked_for;
 
@@ -558,7 +552,7 @@ int gralloc_vivante_unlock(struct gralloc_vivante_t *drv,
             bo, bo->lock_count, bo->locked_for);
 
     if (!bo->lock_count) {
-        gralloc_trace(1, "not locked, skip");
+        gralloc_trace(1, "still locked, skip");
         return 0;
     }
 
