@@ -2316,7 +2316,7 @@ _FillInFeatureTable(
                                  (Hardware->config->resolvePipes > 0);
 
     Features[gcvFEATURE_PE_DEPTH_ONLY_OQFIX] = database->PE_DEPTH_ONLY_OQFIX;
-    Features[gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX] = gcvFALSE;
+    Features[gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX] = database->SH_IMAGE_ENABLE_FIX;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);

@@ -323,7 +323,7 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->hwFeatureFlags.multiCluster = database->MULTI_CLUSTER;
     /* Now LODQ can't return the correct raw LOD value as spec require. */
     pVscHwCfg->hwFeatureFlags.hasLODQFix = gcvFALSE;
-    pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix = database->SH_IMAGE_ENABLE_FIX;
 
     return;
 }
