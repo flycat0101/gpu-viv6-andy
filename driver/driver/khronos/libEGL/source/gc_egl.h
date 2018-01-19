@@ -944,14 +944,15 @@ veglSwapWorker(
     void * Display
     );
 
-
 gctHANDLE
 veglGetModule(
     IN gcoOS           Os,
     IN veglAPIINDEX    Index,
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+    IN gctCONST_STRING Name,
+#endif
     IN veglDISPATCH ** Dispatch
     );
-
 
 /*******************************************************************************
 ** Bridge functions.

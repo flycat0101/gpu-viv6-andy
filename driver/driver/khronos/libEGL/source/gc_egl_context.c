@@ -55,6 +55,7 @@ static const char * _dlls[] =
 #endif
 };
 
+#if !defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__)
 static const char * _dispatchNames[] =
 {
     "",                                 /* EGL */
@@ -64,11 +65,15 @@ static const char * _dispatchNames[] =
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
+#endif
 
 gctHANDLE
 veglGetModule(
     IN gcoOS Os,
     IN veglAPIINDEX Index,
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+    IN gctCONST_STRING Name,
+#endif
     IN veglDISPATCH **Dispatch
     )
 {
@@ -120,7 +125,11 @@ veglGetModule(
 
         if (Dispatch && library)
         {
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+            gcoOS_GetProcAddress(Os, library, Name, (gctPOINTER*)Dispatch);
+#else
             gcoOS_GetProcAddress(Os, library, _dispatchNames[Index], (gctPOINTER*)Dispatch);
+#endif
         }
     }
 
