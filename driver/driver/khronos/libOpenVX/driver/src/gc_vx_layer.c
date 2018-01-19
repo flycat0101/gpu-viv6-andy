@@ -16,6 +16,88 @@
 
 #define IMG_MAX_WIDTH 65536
 
+char VXC_VertMax3_Evis1[] =
+{"\n\
+#define VXC_VertMax3_Integer(dst, src0, src1, src2, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        dst = max(src0, src1);\\\n\
+        dst = max(src2, dst);\\\n\
+    } while (0)\n\
+#define VXC_VertMax3_Half(dst, src0, src1, src2, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        vxc_short8 val0, val1, val2, minVal, maxVal;\\\n\
+        _viv_asm(COPY, val0, src0, 16);\\\n\
+        _viv_asm(COPY, val1, src1, 16);\\\n\
+        _viv_asm(COPY, val2, src2, 16);\\\n\
+        maxVal = max(val0, val1);\\\n\
+        maxVal = max(val2, maxVal);\\\n\
+        minVal = min(val0, val1);\\\n\
+        minVal = min(val2, minVal);\\\n\
+        maxVal = maxVal >= 0 ? maxVal : minVal;\\\n\
+        _viv_asm(COPY, dst, maxVal, 16); \\\n\
+    } while (0)\n"
+};
+
+char VXC_VertMax3_Evis2[] =
+{"\n\
+#define VXC_VertMax3_Integer(dst, src0, src1, src2, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        VXC_VertMax3(dst, src0, src1, src2, info);\\\n\
+    } while (0)\n\
+#define VXC_VertMax3_Half(dst, src0, src1, src2, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        VXC_VertMax3(dst, src0, src1, src2, info);\\\n\
+    } while (0)\n"
+};
+
+char VXC_HorzMax3_Evis1[] =
+{" \n\
+#define VXC_HorzMax3_Integer(dst, src0, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        int startBin     = (info & VXC_START_BIN_BITMASK) >> 12;\\\n\
+        int endBin         = (info & VXC_END_BIN_BITMASK) >> 8;\\\n\
+        int sourceBin     = (info & VXC_SOURCE_BIN_BITMASK) >> 4;\\\n\
+        int clamp         = (info & VXC_CLAMP_BITMASK) >> 22;\\\n\
+        int mod1 = VXC_MODIFIER_FILTER(startBin, endBin, sourceBin, VXC_FM_Max, clamp);\\\n\
+        VXC_OP4(filter, dst, src0, src0, src0, mod1);\\\n\
+    } while (0)\n\
+#define VXC_HorzMax3_Half(dst, src0, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        int startBin     = (info & VXC_START_BIN_BITMASK) >> 12;\\\n\
+        int endBin         = (info & VXC_END_BIN_BITMASK) >> 8;\\\n\
+        int sourceBin     = (info & VXC_SOURCE_BIN_BITMASK) >> 4;\\\n\
+        int clamp         = (info & VXC_CLAMP_BITMASK) >> 22;\\\n\
+        int mod1 = VXC_MODIFIER_FILTER(startBin, endBin, sourceBin, VXC_FM_Max, clamp);\\\n\
+        int mod2 = VXC_MODIFIER_FILTER(startBin, endBin, sourceBin, VXC_FM_Min, clamp);\\\n\
+        vxc_short8 val0, minVal, maxVal;\\\n\
+        _viv_asm(COPY, val0, src0, 16);\\\n\
+        VXC_OP4(filter, maxVal, val0, val0, val0, mod1);\\\n\
+        VXC_OP4(filter, minVal, val0, val0, val0, mod2);\\\n\
+        maxVal = maxVal >= 0 ? maxVal : minVal;\\\n\
+        _viv_asm(COPY, dst, maxVal, 16);\\\n\
+    } while (0)\n"
+};
+
+char VXC_HorzMax3_Evis2[] =
+{" \n\
+#define VXC_HorzMax3_Integer(dst, src0, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        VXC_HorzMax3(dst, src0, info);\\\n\
+    } while (0)\n\
+#define VXC_HorzMax3_Half(dst, src0, info)\\\r\n\
+    do\\\n\
+    {\\\n\
+        VXC_HorzMax3(dst, src0, info);\\\n\
+    } while (0)\n"
+};
+
 static vx_uint16 Fp32toFp16(vx_float32 in)
 {
     vx_uint32 fp32 = *((vx_uint32 *) &in);
@@ -5429,7 +5511,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     vx_scalar               rounding,
     vx_tensor               output)
 {
-    vx_size    programLength[3] = {0};
+    vx_size    programLength[5] = {0};
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -5522,7 +5604,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     if (!kernel)
     {
         /* register an shader kernel */
-        char *programSources_MaxPool[3] = {NULL, NULL, NULL};
+        char *programSources_MaxPool[5] = {NULL, NULL, NULL, NULL, NULL};
         char programSources1_MaxPoolFp16In[] =
         {"\n\
             #include \"cl_viv_vx_ext.h\" \n\
@@ -5563,10 +5645,10 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 vxc_short8 val_min = {0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff}; \n\
                 _viv_asm(CONV, out_scale_fp16, out_scale); \n\
                 \n\
-                VXC_VertMax3(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_VertMax3(fp16_val2, img_reg5, img_reg6, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(fp16_val2, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(fp16_val2, img_reg5, img_reg6, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val2, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(fp16_val1, fp16_val1, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), UniPackMaxPool2x8_fp16); \n\
                 if (outputFormat1 == 15) \n\
                 {\n\
@@ -5589,12 +5671,12 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     VXC_ReadImage2DArray(img_reg5, input, posin, VXC_5BITOFFSET_XY(6,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg6, input, posin, VXC_5BITOFFSET_XY(6,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     posout.y += 1; \n\
-                    VXC_VertMax3(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(fp16_val2, img_reg4, img_reg5, img_reg6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(fp16_val2, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val2, img_reg4, img_reg5, img_reg6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Half(fp16_val2, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_DP2x8(fp16_val1, fp16_val1, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), UniPackMaxPool2x8_fp16); \n\
-                    VXC_VertMax3(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat1 == 15) \n\
                     {\n\
                         _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -5608,10 +5690,10 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 } \n\
                 //the last 1 row \n\
                 posout.y += 1; \n\
-                VXC_HorzMax3(fp16_val1, img_reg3, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(fp16_val2, img_reg6, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val1, img_reg3, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val2, img_reg6, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(fp16_val1, fp16_val1, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), UniPackMaxPool2x8_fp16); \n\
-                VXC_VertMax3(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat1 == 15) \n\
                 {\n\
                     _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -5656,15 +5738,15 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 for (int i = 0; i < out_height; i++) \n\
                 {\n\
                     posin.y += 2; \n\
-                    VXC_VertMax3(fp16_val1, img_reg1, img_reg2, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(fp16_val2, img_reg3, img_reg4, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, img_reg1, img_reg2, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val2, img_reg3, img_reg4, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg1, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg2, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg3, input, posin, VXC_5BITOFFSET_XY(8,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg4, input, posin, VXC_5BITOFFSET_XY(8,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_DP2x8(fp16_val3, fp16_val1, fp16_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackFP16even_2x8); \n\
                     VXC_DP2x8(fp16_val1, fp16_val1, fp16_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackFP16odd_2x8); \n\
-                    VXC_VertMax3(fp16_val1, fp16_val1, fp16_val1, fp16_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, fp16_val1, fp16_val1, fp16_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat1 == 15) \n\
                     {\n\
                         _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -5714,8 +5796,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 \n\
                 for (int i = 0; i < out_height; i++) \n\
                 {\n\
-                    VXC_VertMax3(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(fp16_val2, img_reg4, img_reg5, img_reg6, VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val2, img_reg4, img_reg5, img_reg6, VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
                     img_reg1 = img_reg3; \n\
                     img_reg4 = img_reg6; \n\
                     posin.y += 2; \n\
@@ -5724,10 +5806,10 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     VXC_ReadImage2DArray(img_reg5, input, posin, VXC_5BITOFFSET_XY(6,1), VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg6, input, posin, VXC_5BITOFFSET_XY(6,2), VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0)); \n\
                     \n\
-                    VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(fp16_val2, fp16_val2, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Half(fp16_val2, fp16_val2, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_DP2x8(fp16_val1, fp16_val1, fp16_val2, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), UniPackMaxPool2x8_fp16); \n\
-                    VXC_VertMax3(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat1 == 15) \n\
                     {\n\
                         _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -5782,7 +5864,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 for (int i = 0; i < out_height; i++) \n\
                 {\n\
                     posin.y += 2; \n\
-                    VXC_VertMax3(s8_val1, img_reg1, img_reg2, val_min, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, img_reg1, img_reg2, val_min, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg1, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg2, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));\n\
                     \n\
@@ -5790,7 +5872,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     {\n\
                         VXC_DP2x8(val1_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16Packeven_dp2x8); \n\
                         VXC_DP2x8(val2_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16Packodd_dp2x8); \n\
-                        VXC_VertMax3(val1_fp16, val1_fp16, val2_fp16, val1_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                        VXC_VertMax3_Half(val1_fp16, val1_fp16, val2_fp16, val1_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                         _viv_asm(COPY, val_s16, val1_fp16, 16); \n\
                         VXC_WriteImage2DArray(output, posout, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     }\n\
@@ -5836,14 +5918,14 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 \n\
                 for (int i = 0; i < out_height; i++) \n\
                 {\n\
-                    VXC_VertMax3(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
                     img_reg1 = img_reg3; \n\
                     posin.y += 2; \n\
                     VXC_ReadImage2DArray(img_reg2, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg3, input, posin, VXC_5BITOFFSET_XY(0,2), VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
                     \n\
-                    VXC_VertMax3(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat2 == 15) \n\
                     {\n\
                         VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniMaxPoolS8xFp16_dp2x8); \n\
@@ -5885,8 +5967,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 _viv_asm(CONV, div_scale_fp16, div_scale); \n\
                 vxc_char16 val_min = {0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80}; \n\
                 \n\
-                VXC_VertMax3(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat2 == 15) \n\
                 {\n\
                     VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniMaxPoolS8xFp16_dp2x8); \n\
@@ -5907,9 +5989,9 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     VXC_ReadImage2DArray(img_reg2, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
                     VXC_ReadImage2DArray(img_reg3, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
                     posout.y += 1; \n\
-                    VXC_VertMax3(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat2 == 15) \n\
                     {\n\
                         VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniMaxPoolS8xFp16_dp2x8); \n\
@@ -5924,8 +6006,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 }\n\
                 //the last 1 row \n\
                 posout.y += 1; \n\
-                VXC_VertMax3(s8_val1, img_reg3, val_min, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(s8_val1, img_reg3, val_min, img_reg3, VXC_MODIFIER(0, 12, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 10, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat2 == 15) \n\
                 {\n\
                     VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniMaxPoolS8xFp16_dp2x8); \n\
@@ -5975,8 +6057,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 int4 posout = (int4)(coord_in.x, coord_in.y, coord_in.z, 0); \n\
                 vxc_short8 val_min = {0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff}; \n\
                 _viv_asm(CONV, out_scale_fp16, outSrc3_scale); \n\
-                VXC_VertMax3(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat3 == 15) \n\
                 {\n\
                     _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -5995,9 +6077,9 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     posin.y += 1; \n\
                     VXC_ReadImage2DArray(img_reg3, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     posout.y += 1; \n\
-                    VXC_VertMax3(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Half(fp16_val1, fp16_val1, fp16_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat3 == 15)\n\
                     {\n\
                         _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -6011,8 +6093,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 }\n\
                 //the last 1 row \n\
                 posout.y += 1; \n\
-                VXC_VertMax3(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(fp16_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(fp16_val1, fp16_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat3 == 15) \n\
                 {\n\
                     _viv_asm(COPY, s16_val0, fp16_val1, 16); \n\
@@ -6051,8 +6133,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 _viv_asm(CONV, div_scale_fp16, divSrc3_scale); \n\
                 vxc_char8 val_min = {0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80}; \n\
                 \n\
-                VXC_VertMax3(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat3 == 15)\n\
                 {\n\
                     VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniS8xFp16_dp2x8); \n\
@@ -6072,9 +6154,9 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                     posin.y += 1; \n\
                     VXC_ReadImage2DArray(img_reg3, input, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                     posout.y += 1; \n\
-                    VXC_VertMax3(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                    VXC_VertMax3(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, img_reg1, img_reg2, img_reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                    VXC_VertMax3_Integer(s8_val1, s8_val1, s8_val1, val_min, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                     if (outputFormat3 == 15)\n\
                     {\n\
                         VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniS8xFp16_dp2x8); \n\
@@ -6089,8 +6171,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
                 }\n\
                 //the last 1 row \n\
                 posout.y += 1; \n\
-                VXC_VertMax3(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(s8_val1, img_reg2, img_reg3, val_min, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(s8_val1, s8_val1, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 if (outputFormat3 == 15)\n\
                 {\n\
                     VXC_DP2x8(val_fp16, s8_val1, div_scale_fp16, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 1), UniS8xFp16_dp2x8); \n\
@@ -6105,13 +6187,36 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             }\n"
         };
 
-        programSources_MaxPool[0] = programSources1_MaxPoolFp16In;
-        programSources_MaxPool[1] = programSources2_MaxPoolInt8In;
-        programSources_MaxPool[2] = programSources3_MaxPool;
-        programLength[0]          = strlen(programSources1_MaxPoolFp16In);
-        programLength[1]          = strlen(programSources2_MaxPoolInt8In);
-        programLength[2]          = strlen(programSources3_MaxPool);
-        program = vxCreateProgramWithSource(context, 3, (const vx_char**)programSources_MaxPool, programLength);
+        if (context->evisNoInst.isVX2)
+        {
+            programSources_MaxPool[0] = VXC_VertMax3_Evis2;
+            programSources_MaxPool[1] = VXC_HorzMax3_Evis2;
+            programSources_MaxPool[2] = programSources1_MaxPoolFp16In;
+            programSources_MaxPool[3] = programSources2_MaxPoolInt8In;
+            programSources_MaxPool[4] = programSources3_MaxPool;
+
+            programLength[0]          = strlen(VXC_VertMax3_Evis2);
+            programLength[1]          = strlen(VXC_HorzMax3_Evis2);
+            programLength[2]          = strlen(programSources1_MaxPoolFp16In);
+            programLength[3]          = strlen(programSources2_MaxPoolInt8In);
+            programLength[4]          = strlen(programSources3_MaxPool);
+        }
+        else
+        {
+            programSources_MaxPool[0] = VXC_VertMax3_Evis1;
+            programSources_MaxPool[1] = VXC_HorzMax3_Evis1;
+            programSources_MaxPool[2] = programSources1_MaxPoolFp16In;
+            programSources_MaxPool[3] = programSources2_MaxPoolInt8In;
+            programSources_MaxPool[4] = programSources3_MaxPool;
+
+            programLength[0]          = strlen(VXC_VertMax3_Evis1);
+            programLength[1]          = strlen(VXC_HorzMax3_Evis1);
+            programLength[2]          = strlen(programSources1_MaxPoolFp16In);
+            programLength[3]          = strlen(programSources2_MaxPoolInt8In);
+            programLength[4]          = strlen(programSources3_MaxPool);
+        }
+        program = vxCreateProgramWithSource(context, 5, (const vx_char**)programSources_MaxPool, programLength);
+
         status  = vxGetStatus((vx_reference)program);
         if (status != VX_SUCCESS) goto error;
 
@@ -7141,7 +7246,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_tensor               input,
     vx_tensor               output)
 {
-    vx_size    programLength[2] = {0};
+    vx_size    programLength[5] = {0};
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -7155,6 +7260,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_uint32    height            = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth             = TENSOR_VIEW_SIZE_INDEX(input, 2);
     vx_uint32    batch             = TENSOR_VIEW_SIZE_INDEX(input, 3);
+	vx_uint32    dims              = TENSOR_DIM_NUM(input);
     vx_image     imgInput          = NULL;
     vx_image     imgOutput         = NULL;
     vx_int8      srcFixPointPos    = input->tensorBuffer->fixedPointPos;
@@ -7165,6 +7271,8 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_uint32    inputWidthRemain4 = depth % 4;
     vx_uint32    itemCount         = 0;
     vx_uint32    itemDepth         = 0;
+    vx_int32     int8_isFp16       = 0;
+    vx_int32     fp16_isFp16       = 0;
 
     if(batch == 0)
         batch = 1;
@@ -7202,7 +7310,11 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_FLOAT16)
     {
-        if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
+        if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && width == 2 && dims == 2)
+        {
+            imgInput = vxoTensor_CreateImageFromTensor(input, itemCount, 1, VX_DF_IMAGE_S16);
+        }
+        else if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
         {
             imgInput = vxoTensor_CreateImageFromTensor(input, itemCount, itemDepth, VX_DF_IMAGE_S16);
         }
@@ -7222,7 +7334,11 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     }
     else if (outputFormat == VX_TYPE_FLOAT16)
     {
-        if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
+        if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && width == 2 && dims == 2)
+        {
+            imgOutput = vxoTensor_CreateImageFromTensor(output, itemCount, itemDepth, VX_DF_IMAGE_S16);
+        }
+        else if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
         {
             imgOutput = vxoTensor_CreateImageFromTensor(output, itemCount, itemDepth, VX_DF_IMAGE_S16);
         }
@@ -7254,21 +7370,22 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     if (!kernel)
     {
         /* register an shader kernel */
-        char *programSources[2] = {NULL, NULL};
+        char *programSources[5] = {NULL, NULL, NULL, NULL, NULL};
 
         char programSources_Softmax_0[] =
         {"\n\
          #include \"cl_viv_vx_ext.h\" \n\
-         _viv_uniform VXC_512Bits uniPackMaxData_2x8; \n\
-         _viv_uniform VXC_512Bits uniPackMaxAndScale_2x8; \n\
-         _viv_uniform VXC_512Bits uniGetSubData0to3_4x4; \n\
-         _viv_uniform VXC_512Bits uniExtractHalf4_4x4; \n\
-        _viv_uniform float scaleIn; \n\
-        _viv_uniform int inputSize; \n\
-        _viv_uniform int inputWidth; \n\
-        _viv_uniform int inputWidthRemain4; \n\
+         _viv_uniform VXC_512Bits int8_uniPackMaxData_2x8; \n\
+         _viv_uniform VXC_512Bits int8_uniPackMaxAndScale_2x8; \n\
+         _viv_uniform VXC_512Bits int8_uniGetSubData0to3_4x4; \n\
+         _viv_uniform VXC_512Bits int8_uniExtractHalf4_4x4; \n\
+        _viv_uniform float int8_scaleIn; \n\
+        _viv_uniform int int8_inputSize; \n\
+        _viv_uniform int int8_inputWidth; \n\
+        _viv_uniform int int8_inputWidthRemain4; \n\
+        _viv_uniform int int8_isFp16; \n\
          \n\
-         __kernel void vxcSoftmax_Int8toFp32(\n\
+         __kernel void vxcSoftmax_Int8(\n\
          __read_only image2d_t   input, \n\
          __write_only image2d_t  output) \n\
          { \n\
@@ -7285,19 +7402,19 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 VXC_ReadImage(img_val1, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
                 coord.x += 32; \n\
                 \n\
-                VXC_VertMax3(val, img_val0, img_val1, val, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 13, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_DP2x8(val, val, img_val0, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(val, img_val0, img_val1, val, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 13, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_DP2x8(val, val, img_val0, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), int8_uniPackMaxData_2x8); \n\
+                VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
             } \n\
-            while(coord.x < inputSize); \n\
+            while(coord.x < int8_inputSize); \n\
             \n\
             half scaleIn_half; \n\
-            _viv_asm(CONV, scaleIn_half, scaleIn); \n\
+            _viv_asm(CONV, scaleIn_half, int8_scaleIn); \n\
             \n\
-            VXC_DP2x8(scale, val, scaleIn_half, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0), uniPackMaxAndScale_2x8); \n\
+            VXC_DP2x8(scale, val, scaleIn_half, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0), int8_uniPackMaxAndScale_2x8); \n\
             \n\
             vxc_float4 prob; \n\
             float fProbSum = 0; \n\
@@ -7306,10 +7423,10 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             coord.xyz = 0; \n\
             \n\
             int idx = 0; \n\
-            for (coord.x = 0; coord.x < inputWidth; idx ++) \n\
+            for (coord.x = 0; coord.x < int8_inputWidth; idx ++) \n\
             { \n\
                 VXC_ReadImage(img_val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
+                VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), int8_uniGetSubData0to3_4x4); \n\
                 prob.x = exp(prob.x); \n\
                 prob.y = exp(prob.y); \n\
                 prob.z = exp(prob.z); \n\
@@ -7320,15 +7437,15 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 coord.x += 4; \n\
             } \n\
             VXC_ReadImage(img_val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-            VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
-            if(inputWidthRemain4 == 1) \n\
+            VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), int8_uniGetSubData0to3_4x4); \n\
+            if(int8_inputWidthRemain4 == 1) \n\
             { \n\
                 prob.x = exp(prob.x); \n\
                 prob.yzw = 0; \n\
                 fProbSum += dot(prob, one4); \n\
                 vstore4(prob, idx, ProbFP32); \n\
             } \n\
-            else if(inputWidthRemain4 == 2) \n\
+            else if(int8_inputWidthRemain4 == 2) \n\
             { \n\
                 prob.x = exp(prob.x); \n\
                 prob.y = exp(prob.y); \n\
@@ -7336,7 +7453,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 fProbSum += dot(prob, one4); \n\
                 vstore4(prob, idx, ProbFP32); \n\
             } \n\
-            else if(inputWidthRemain4 == 3) \n\
+            else if(int8_inputWidthRemain4 == 3) \n\
             { \n\
                 prob.x = exp(prob.x); \n\
                 prob.y = exp(prob.y); \n\
@@ -7349,112 +7466,36 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             vxc_float4 probSum_rcp; \n\
             probSum_rcp.x = 1 / fProbSum; \n\
             idx = 0; \n\
-            for (coord.x = 0; coord.x < inputSize; idx ++) \n\
-            { \n\
-                prob = vload4(idx, ProbFP32); \n\
-                \n\
-                prob = prob.xyzw * probSum_rcp.xxxx; \n\
-                write_imagef(output, coord.xw, prob); \n\
-                coord.x += 4; \n\
-            } \n\
-         }\n\
-        __kernel void vxcSoftmax_Int8toFp16(\n\
-            __read_only image2d_t   input, \n\
-            __write_only image2d_t  output) \n\
-        { \n\
-            int4 coord = (int4)(16, 0, 0, 0); \n\
-            vxc_half8 scale; \n\
-            float ProbFP32[4096]; \n\
-             \n\
-            vxc_char16 img_val0, img_val1; \n\
-            vxc_char16 val = (vxc_char16)(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); \n\
-             \n\
-            do \n\
-            { \n\
-                VXC_ReadImage(img_val0, input, coord.xw, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_ReadImage(img_val1, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
-                coord.x += 32; \n\
-                 \n\
-                VXC_VertMax3(val, img_val0, img_val1, val, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 13, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_DP2x8(val, val, img_val0, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
-            } \n\
-            while(coord.x < inputSize); \n\
-             \n\
-            half scaleIn_half; \n\
-            _viv_asm(CONV, scaleIn_half, scaleIn); \n\
-             \n\
-            VXC_DP2x8(scale, val, scaleIn_half, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0), uniPackMaxAndScale_2x8); \n\
-             \n\
-            vxc_float4 prob; \n\
-            float fProbSum = 0; \n\
-            const float4 one4 = (float4)(1.0, 1.0, 1.0, 1.0); \n\
-             \n\
-            coord.xyz = 0; \n\
-             \n\
-            int idx = 0; \n\
-            for (coord.x = 0; coord.x < inputWidth; idx ++) \n\
-            { \n\
-                VXC_ReadImage(img_val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.z = exp(prob.z); \n\
-                prob.w = exp(prob.w); \n\
-                fProbSum += dot(prob, one4); \n\
-                 \n\
-                vstore4(prob, idx, ProbFP32); \n\
-                coord.x += 4; \n\
-            } \n\
-            VXC_ReadImage(img_val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-            VXC_DP4x4(prob, img_val0, scale, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
-            if(inputWidthRemain4 == 1) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.yzw = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-            else if(inputWidthRemain4 == 2) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.zw = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-            else if(inputWidthRemain4 == 3) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.z = exp(prob.z); \n\
-                prob.w = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-             \n\
-            vxc_float4 probSum_rcp; \n\
-            probSum_rcp.x = 1 / fProbSum; \n\
-            idx = 0; \n\
-            for (coord.x = 0; coord.x < inputSize; idx ++) \n\
-            { \n\
-                prob = vload4(idx, ProbFP32); \n\
-                 \n\
-                prob = prob.xyzw * probSum_rcp.xxxx; \n\
-                half4 vec; \n\
-                vxc_half4 tmp; \n\
-                vxc_short4 dst; \n\
-                _viv_asm(CONV, vec, prob); \n\
-                VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniExtractHalf4_4x4); \n\
-                _viv_asm(COPY, dst, tmp, 8); \n\
-                VXC_WriteImage(output, coord.xw, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                 \n\
-                coord.x += 4; \n\
-            } \n\
-        }\n"
+             if(int8_isFp16)\n\
+             {\n\
+                for (coord.x = 0; coord.x < int8_inputSize; idx ++) \n\
+                { \n\
+                    prob = vload4(idx, ProbFP32); \n\
+                     \n\
+                    prob = prob.xyzw * probSum_rcp.xxxx; \n\
+                    half4 vec; \n\
+                    vxc_half4 tmp; \n\
+                    vxc_short4 dst; \n\
+                    _viv_asm(CONV, vec, prob); \n\
+                    VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), int8_uniExtractHalf4_4x4); \n\
+                    _viv_asm(COPY, dst, tmp, 8); \n\
+                    VXC_WriteImage(output, coord.xw, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
+                     \n\
+                    coord.x += 4; \n\
+                } \n\
+             }\n\
+             else\n\
+             {\n\
+                for (coord.x = 0; coord.x < int8_inputSize; idx ++) \n\
+                { \n\
+                    prob = vload4(idx, ProbFP32); \n\
+                    \n\
+                    prob = prob.xyzw * probSum_rcp.xxxx; \n\
+                    write_imagef(output, coord.xw, prob); \n\
+                    coord.x += 4; \n\
+                } \n\
+             }\n\
+         }\n"
         };
 
         char programSources_Softmax_1[] =
@@ -7466,7 +7507,8 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
          _viv_uniform int inputSize; \n\
          _viv_uniform int inputWidth; \n\
          _viv_uniform int inputWidthRemain4; \n\
-         __kernel void vxcSoftmax_Fp16toFp16(\n\
+         _viv_uniform int fp16_isFp16; \n\
+         __kernel void vxcSoftmax_Fp16(\n\
          __read_only image2d_t   input, \n\
          __write_only image2d_t  output) \n\
         { \n\
@@ -7489,11 +7531,11 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 _viv_asm(COPY, img_val3, val3, 16); \n\
                 coord.x += 32; \n\
                  \n\
-                VXC_VertMax3(val, img_val0, img_val1, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_VertMax3(val, img_val2, img_val3, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(val, img_val0, img_val1, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Half(val, img_val2, img_val3, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(val, val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Half(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
             } \n\
             while(coord.x < inputSize); \n\
              \n\
@@ -7548,112 +7590,35 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             vxc_float4 probSum_rcp; \n\
             probSum_rcp.x = 1 / fProbSum; \n\
             idx = 0; \n\
-            for (coord.x = 0; coord.x < inputSize; idx ++) \n\
-            { \n\
-                prob = vload4(idx, ProbFP32); \n\
-                 \n\
-                prob = prob.xyzw * probSum_rcp.xxxx; \n\
-                half4 vec; \n\
-                vxc_half4 tmp; \n\
-                vxc_short4 dst; \n\
-                _viv_asm(CONV, vec, prob); \n\
-                VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniExtractHalf4_4x4); \n\
-                _viv_asm(COPY, dst, tmp, 8); \n\
-                VXC_WriteImage(output, coord.xw, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                 \n\
-                coord.x += 4; \n\
-            } \n\
-        }\n\
-        __kernel void vxcSoftmax_Fp16toFp32(\n\
-        __read_only image2d_t   input, \n\
-        __write_only image2d_t  output) \n\
-        { \n\
-            int4 coord = (int4)(16, 0, 0, 0); \n\
-            float ProbFP32[4096]; \n\
-            \n\
-            vxc_half8 img_val0, img_val1, img_val2, img_val3; \n\
-            vxc_short8 val0, val1, val2, val3 = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \n\
-            vxc_half8 val; \n\
-            _viv_asm(COPY, val, val3, 16); \n\
-            do \n\
-            { \n\
-                VXC_ReadImage(val0, input, coord.xw, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                _viv_asm(COPY, img_val0, val0, 16); \n\
-                VXC_ReadImage(val1, input, coord.xw, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                _viv_asm(COPY, img_val1, val1, 16); \n\
-                VXC_ReadImage(val2, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                _viv_asm(COPY, img_val2, val2, 16); \n\
-                VXC_ReadImage(val3, input, coord.xw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                _viv_asm(COPY, img_val3, val3, 16); \n\
-                coord.x += 32; \n\
-                \n\
-                VXC_VertMax3(val, img_val0, img_val1, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_VertMax3(val, img_val2, img_val3, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
-                VXC_DP2x8(val, val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8); \n\
-                VXC_HorzMax3(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \n\
-            } \n\
-            while(coord.x < inputSize); \n\
-            \n\
-            vxc_float4 prob; \n\
-            float fProbSum = 0; \n\
-            const float4 one4 = (float4)(1.0, 1.0, 1.0, 1.0); \n\
-            coord.xyzw = 0; \n\
-            \n\
-            int idx = 0; \n\
-            for (coord.x = 0; coord.x < inputWidth; idx ++) \n\
-            { \n\
-                VXC_ReadImage(val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-                _viv_asm(COPY, img_val0, val0, 16); \n\
-                VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.z = exp(prob.z); \n\
-                prob.w = exp(prob.w); \n\
-                fProbSum += dot(prob, one4); \n\
-                \n\
-                vstore4(prob, idx, ProbFP32); \n\
-                coord.x += 4; \n\
-            } \n\
-            VXC_ReadImage(val0, input, coord.xw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
-            _viv_asm(COPY, img_val0, val0, 16); \n\
-            VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \n\
-            if(inputWidthRemain4 == 1) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.yzw = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-            else if(inputWidthRemain4 == 2) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.zw = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-            else if(inputWidthRemain4 == 3) \n\
-            { \n\
-                prob.x = exp(prob.x); \n\
-                prob.y = exp(prob.y); \n\
-                prob.z = exp(prob.z); \n\
-                prob.w = 0; \n\
-                fProbSum += dot(prob, one4); \n\
-                vstore4(prob, idx, ProbFP32); \n\
-            } \n\
-            \n\
-            vxc_float4 probSum_rcp; \n\
-            probSum_rcp.x = 1 / fProbSum; \n\
-            idx = 0; \n\
-            for (coord.x = 0; coord.x < inputSize; idx ++) \n\
-            { \n\
-                prob = vload4(idx, ProbFP32); \n\
-                \n\
-                prob = prob.xyzw * probSum_rcp.xxxx; \n\
-                write_imagef(output, coord.xw, prob); \n\
-                coord.x += 4; \n\
-            } \n\
+            if(fp16_isFp16)\n\
+            {\n\
+                for (coord.x = 0; coord.x < inputSize; idx ++) \n\
+                { \n\
+                    prob = vload4(idx, ProbFP32); \n\
+                     \n\
+                    prob = prob.xyzw * probSum_rcp.xxxx; \n\
+                    half4 vec; \n\
+                    vxc_half4 tmp; \n\
+                    vxc_short4 dst; \n\
+                    _viv_asm(CONV, vec, prob); \n\
+                    VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniExtractHalf4_4x4); \n\
+                    _viv_asm(COPY, dst, tmp, 8); \n\
+                    VXC_WriteImage(output, coord.xw, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
+                     \n\
+                    coord.x += 4; \n\
+                } \n\
+            }\n\
+            else\n\
+            {\n\
+                for (coord.x = 0; coord.x < inputSize; idx ++) \n\
+                { \n\
+                    prob = vload4(idx, ProbFP32); \n\
+                    \n\
+                    prob = prob.xyzw * probSum_rcp.xxxx; \n\
+                    write_imagef(output, coord.xw, prob); \n\
+                    coord.x += 4; \n\
+                } \n\
+            }\n\
         }\n"
         };
 
@@ -7678,7 +7643,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             _viv_asm(COPY, vec1, in1, 16); \n\
              \n\
             coord.zw += (int2)(4, 1); \n\
-            VXC_VertMax3(max, vec0, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+            VXC_VertMax3_Half(max, vec0, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
             VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniSubMax2FP32_Lo); \n\
             VXC_DP4x4(data1, vec1, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniSubMax2FP32_Lo); \n\
             data0.x = exp(data0.x); \n\
@@ -7727,29 +7692,112 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             _viv_asm(COPY, dst, tmp, 16); \n\
             VXC_WriteImage(output, coord.zy, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
             VXC_WriteImage(output, coord.zw, dst, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0)); \n\
+        }\n\
+        _viv_uniform VXC_512Bits uniExtract2Half_2x8; \n\
+        _viv_uniform VXC_512Bits uniPackedEvenData_2x8; \n\
+        _viv_uniform VXC_512Bits uniPackedOddData_2x8; \n\
+        _viv_uniform VXC_512Bits uniDataLoSubMaxLo_4x4; \n\
+        _viv_uniform VXC_512Bits uniDataHiSubMaxLo_4x4; \n\
+        _viv_uniform VXC_512Bits uniDataLoSubMaxHi_4x4; \n\
+        _viv_uniform VXC_512Bits uniDataHiSubMaxHi_4x4; \n\
+        __kernel void vxcSoftmax_Fp16toFp16_D2C2(\n\
+            __read_only image2d_t   input, \n\
+            __write_only image2d_t  output) \n\
+        { \n\
+            int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1)); \n\
+            vxc_short8 in0, in1; \n\
+            vxc_half8 vec0, vec1, vec2, vec3, max; \n\
+            vxc_float4 data0, data1, fProbSum; \n\
+             \n\
+            VXC_ReadImage(in0, input, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+            _viv_asm(COPY, vec0, in0, 16); \n\
+            VXC_ReadImage(in1, input, coord.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+            _viv_asm(COPY, vec1, in1, 16); \n\
+             \n\
+            coord.zw += (int2)(8, 0); \n\
+            VXC_DP2x8(vec2, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedEvenData_2x8); \n\
+            VXC_DP2x8(vec3, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedOddData_2x8); \n\
+            VXC_VertMax3_Half(max, vec2, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+             \n\
+            VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataLoSubMaxLo_4x4); \n\
+            VXC_DP4x4(data1, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataHiSubMaxLo_4x4); \n\
+            data0.x = exp(data0.x); \n\
+            data0.y = exp(data0.y); \n\
+            data0.z = exp(data0.z); \n\
+            data0.w = exp(data0.w); \n\
+            data1.x = exp(data1.x); \n\
+            data1.y = exp(data1.y); \n\
+            data1.z = exp(data1.z); \n\
+            data1.w = exp(data1.w); \n\
+            fProbSum.xy = data0.xz + data0.yw; \n\
+            fProbSum.zw = data1.xz + data1.yw; \n\
+            fProbSum = 1 / fProbSum; \n\
+            data0 *= fProbSum.xxyy; \n\
+            data1 *= fProbSum.zzww; \n\
+             \n\
+            half4 vect0, vect1; \n\
+            vxc_half8 tmp; \n\
+            vxc_short8 dst; \n\
+            _viv_asm(CONV, vect0, data0); \n\
+            _viv_asm(CONV, vect1, data1); \n\
+             \n\
+            VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtract2Half_2x8); \n\
+            _viv_asm(COPY, dst, tmp, 16); \n\
+            VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
+             \n\
+            VXC_DP4x4(data0, vec1, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataLoSubMaxHi_4x4); \n\
+            VXC_DP4x4(data1, vec1, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataHiSubMaxHi_4x4); \n\
+            data0.x = exp(data0.x); \n\
+            data0.y = exp(data0.y); \n\
+            data0.z = exp(data0.z); \n\
+            data0.w = exp(data0.w); \n\
+            data1.x = exp(data1.x); \n\
+            data1.y = exp(data1.y); \n\
+            data1.z = exp(data1.z); \n\
+            data1.w = exp(data1.w); \n\
+            fProbSum.xy = data0.xz + data0.yw; \n\
+            fProbSum.zw = data1.xz + data1.yw; \n\
+            fProbSum = 1 / fProbSum; \n\
+            data0 *= fProbSum.xxyy; \n\
+            data1 *= fProbSum.zzww; \n\
+             \n\
+            _viv_asm(CONV, vect0, data0); \n\
+            _viv_asm(CONV, vect1, data1); \n\
+            VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtract2Half_2x8); \n\
+            _viv_asm(COPY, dst, tmp, 16); \n\
+            VXC_WriteImage(output, coord.zy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
         }\n"
         };
 
-        if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
+        if (context->evisNoInst.isVX2)
         {
-            programSources[0] = programSources_Softmax_2;
-            programLength[0] = strlen(programSources_Softmax_2);
+            programSources[0] = VXC_VertMax3_Evis2;
+            programLength[0] = strlen(VXC_VertMax3_Evis2);
+            programSources[1] = VXC_HorzMax3_Evis2;
+            programLength[1] = strlen(VXC_HorzMax3_Evis2);
+            programSources[2] = programSources_Softmax_0;
+            programLength[2] = strlen(programSources_Softmax_0);
+            programSources[3] = programSources_Softmax_1;
+            programLength[3] = strlen(programSources_Softmax_1);
+            programSources[4] = programSources_Softmax_2;
+            programLength[4] = strlen(programSources_Softmax_2);
         }
-        else if(itemCount == 1)
+        else
         {
-            if(inputFormat == VX_TYPE_INT8)
-            {
-                programSources[0] = programSources_Softmax_0;
-                programLength[0] = strlen(programSources_Softmax_0);
-            }
-            else if(inputFormat == VX_TYPE_FLOAT16)
-            {
-                programSources[0] = programSources_Softmax_1;
-                programLength[0] = strlen(programSources_Softmax_1);
-            }
+            programSources[0] = VXC_VertMax3_Evis1;
+            programLength[0] = strlen(VXC_VertMax3_Evis1);
+            programSources[1] = VXC_HorzMax3_Evis1;
+            programLength[1] = strlen(VXC_HorzMax3_Evis1);
+            programSources[2] = programSources_Softmax_0;
+            programLength[2] = strlen(programSources_Softmax_0);
+            programSources[3] = programSources_Softmax_1;
+            programLength[3] = strlen(programSources_Softmax_1);
+            programSources[4] = programSources_Softmax_2;
+            programLength[4] = strlen(programSources_Softmax_2);
         }
 
-        program = vxCreateProgramWithSource(context, 1, (const vx_char**)programSources, programLength);
+        program = vxCreateProgramWithSource(context, 5, (const vx_char**)programSources, programLength);
+
 
         status = vxGetStatus((vx_reference)program);
         if (status != VX_SUCCESS) goto error;
@@ -7763,7 +7811,95 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
+    if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && width == 2 && dims == 2)
+    {
+        vx_uint32 uniExtract2Half_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000400, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniPackedEvenData_2x8[16] = {
+            0x11112111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 uniPackedOddData_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 uniDataLoSubMaxLo_4x4[16] = {
+            0x09090909, // TCfg
+            0x04040404, // ASelt
+            0x00010000, 0x00130012, // ABin
+            0x0a0a0a0a, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniDataHiSubMaxLo_4x4[16] = {
+            0x09090909, // TCfg
+            0x04040404, // ASelt
+            0x00250024, 0x00370036, // ABin
+            0x0a0a0a0a, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniDataLoSubMaxHi_4x4[16] = {
+            0x09090909, // TCfg
+            0x04040404, // ASelt
+            0x00410040, 0x00530052, // ABin
+            0x0a0a0a0a, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniDataHiSubMaxHi_4x4[16] = {
+            0x09090909, // TCfg
+            0x04040404, // ASelt
+            0x00650064, 0x00770076, // ABin
+            0x0a0a0a0a, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000 // Constant
+        };
+
+        if(outputFormat == VX_TYPE_FLOAT16)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16_D2C2", borderMode);
+            if (!shaderExecutable) goto error;
+        }
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedOddData_2x8", 1, uniPackedOddData_2x8);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataLoSubMaxLo_4x4", 1, uniDataLoSubMaxLo_4x4);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataHiSubMaxLo_4x4", 1, uniDataHiSubMaxLo_4x4);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataLoSubMaxHi_4x4", 1, uniDataLoSubMaxHi_4x4);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataHiSubMaxHi_4x4", 1, uniDataHiSubMaxHi_4x4);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedEvenData_2x8", 1, uniPackedEvenData_2x8);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract2Half_2x8", 1, uniExtract2Half_2x8);
+        if (status != VX_SUCCESS) goto error;
+
+        execution_parameters.globalWorkScale[0]  = 8;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.localWorkSize[0]    = 8;
+        execution_parameters.localWorkSize[1]    = 1;
+        execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
+        execution_parameters.globalWorkSize[1]   = 1;
+    }
+    else if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && depth == 2)
     {
         if(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
@@ -7855,26 +7991,23 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000 // Constant
             };
 
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8", borderMode);
+            if (!shaderExecutable) goto error;
             if(outputFormat == VX_TYPE_FLOAT16)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp16", borderMode);
-                if (!shaderExecutable) goto error;
-            }
+                int8_isFp16 = 1;
             else if(outputFormat == VX_TYPE_FLOAT32)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp32", borderMode);
-                if (!shaderExecutable) goto error;
-            }
-            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractHalf4_4x4", 1, uniExtractHalf4_4x4);
-            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackMaxAndScale_2x8", 1, uniPackMaxAndScale_2x8);
-            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubData0to3_4x4", 1, uniGetSubData0to3_4x4);
-            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackMaxData_2x8", 1, uniPackMaxData_2x8);
+                int8_isFp16 = 0;
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_isFp16", 1, &int8_isFp16);
+            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_uniExtractHalf4_4x4", 1, uniExtractHalf4_4x4);
+            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_uniPackMaxAndScale_2x8", 1, uniPackMaxAndScale_2x8);
+            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_uniGetSubData0to3_4x4", 1, uniGetSubData0to3_4x4);
+            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_uniPackMaxData_2x8", 1, uniPackMaxData_2x8);
             if (status != VX_SUCCESS) goto error;
 
-            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleIn", 1, &scaleIn);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputWidth", 1, &inputWidth);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputWidthRemain4", 1, &inputWidthRemain4);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize", 1, &depth);
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_scaleIn", 1, &scaleIn);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_inputWidth", 1, &inputWidth);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_inputWidthRemain4", 1, &inputWidthRemain4);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "int8_inputSize", 1, &depth);
             if (status != VX_SUCCESS) goto error;
         }
         else if(inputFormat == VX_TYPE_FLOAT16 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
@@ -7907,17 +8040,14 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
                 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000 // Constant
             };
 
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16", borderMode);
+            if (!shaderExecutable) goto error;
             if(outputFormat == VX_TYPE_FLOAT16)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16", borderMode);
-                if (!shaderExecutable) goto error;
-            }
+                fp16_isFp16 = 1;
             else if(outputFormat == VX_TYPE_FLOAT32)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp32", borderMode);
-                if (!shaderExecutable) goto error;
-            }
-            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractHalf4_4x4", 1, uniExtractHalf4_4x4);
+                fp16_isFp16 = 0;
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "fp16_isFp16", 1, &fp16_isFp16);
+            status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractHalf4_4x4", 1, uniExtractHalf4_4x4);
             status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubData0to3_4x4", 1, uniGetSubData0to3_4x4);
             status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackMaxData_2x8", 1, uniPackMaxData_2x8);
             if (status != VX_SUCCESS) goto error;
@@ -7966,7 +8096,7 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
     vx_uint32                pool_height,
     vx_tensor               output)
 {
-    vx_size    programLength[2] = {0};
+    vx_size    programLength[3] = {0};
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -8023,7 +8153,7 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
     if (!kernel)
     {
         /* register an shader kernel */
-        char *programSources[2] = {NULL, NULL};
+        char *programSources[3] = {NULL, NULL, NULL};
 
         char programSources_vertMaxPool[] =
         {"\n\
@@ -8064,14 +8194,14 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
                 //0 \n\
                 VXC_WriteImage(output, coord_out.xy, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 //1 \n\
-                VXC_VertMax3(maxLine, lineA, lineB, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(maxLine, lineA, lineB, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_WriteImage(output, coord_out.xz, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 coord_out.yz += 2; \n\
                 //2 \n\
-                VXC_VertMax3(maxLine, maxLine, maxLine, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(maxLine, maxLine, maxLine, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_WriteImage(output, coord_out.xy, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 //3 \n\
-                VXC_VertMax3(maxLine, maxLine, maxLine, lineD, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(maxLine, maxLine, maxLine, lineD, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_WriteImage(output, coord_out.xz, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
                  \n\
                 lineA = lineB; \n\
@@ -8088,10 +8218,10 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
             //1 \n\
             VXC_WriteImage(output, coord_out.xy, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             //2 \n\
-            VXC_VertMax3(maxLine, lineA, lineB, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+            VXC_VertMax3_Integer(maxLine, lineA, lineB, lineA, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             VXC_WriteImage(output, coord_out.xz, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             coord_out.yz += 2; \n\
-            VXC_VertMax3(maxLine, maxLine, maxLine, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+            VXC_VertMax3_Integer(maxLine, maxLine, maxLine, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             //3 \n\
             VXC_WriteImage(output, coord_out.xy, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             VXC_WriteImage(output, coord_out.xz, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
@@ -8101,7 +8231,7 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
             //1 \n\
             VXC_WriteImage(output, coord_out.xy, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             //2 \n\
-            VXC_VertMax3(maxLine, lineB, lineC, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
+            VXC_VertMax3_Integer(maxLine, lineB, lineC, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             VXC_WriteImage(output, coord_out.xz, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
             coord_out.yz += 2; \n\
             VXC_WriteImage(output, coord_out.xy, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0)); \n\
@@ -8120,10 +8250,29 @@ vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
 
         if(inputFormat == VX_TYPE_FLOAT16)
         {
-            programSources[0] = programSources_vertMaxPool;
-            programLength[0] = strlen(programSources_vertMaxPool);
+            if (context->evisNoInst.isVX2)
+            {
+                programSources[0] = VXC_VertMax3_Evis2;
+                programSources[1] = VXC_HorzMax3_Evis2;
+                programSources[2] = programSources_vertMaxPool;
+
+                programLength[0]  = strlen(VXC_VertMax3_Evis2);
+                programLength[1]  = strlen(VXC_HorzMax3_Evis2);
+                programLength[2]  = strlen(programSources_vertMaxPool);
+            }
+            else
+            {
+                programSources[0] = VXC_VertMax3_Evis1;
+                programSources[1] = VXC_HorzMax3_Evis1;
+                programSources[2] = programSources_vertMaxPool;
+
+                programLength[0]  = strlen(VXC_VertMax3_Evis1);
+                programLength[1]  = strlen(VXC_HorzMax3_Evis1);
+                programLength[2]  = strlen(programSources_vertMaxPool);
+            }
         }
-        program = vxCreateProgramWithSource(context, 1, (const vx_char**)programSources, programLength);
+        program = vxCreateProgramWithSource(context, 3, (const vx_char**)programSources, programLength);
+
 
         status = vxGetStatus((vx_reference)program);
         if (status != VX_SUCCESS) goto error;
@@ -8464,7 +8613,7 @@ vxnne_shader_executable vxnneHorzMaxPoolShaderExecutable(
     vx_tensor               output
     )
 {
-    vx_size    programLength[2] = {0};
+    vx_size    programLength[4] = {0};
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -8516,7 +8665,7 @@ vxnne_shader_executable vxnneHorzMaxPoolShaderExecutable(
     if (!kernel)
     {
         /* register an shader kernel */
-        char *programSources[2] = {NULL, NULL};
+        char *programSources[4] = {NULL, NULL, NULL, NULL};
 
         char programSources_0[] =
         {"\n\
@@ -8577,19 +8726,19 @@ vxnne_shader_executable vxnneHorzMaxPoolShaderExecutable(
                 vxc_uint4 config0 = (vxc_uint4)(0x03020100, 0x13121110, 0x01010101, 0x01010101); \n\
                 VXC_BitExtract(mask, mask0to5, mask0to5, config0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(vect0, vect0, mask, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniMaskData); \n\
-                VXC_HorzMax3(vect0, vect0, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(vect0, vect0, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(dst, vect0, vect0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData1); \n\
                 VXC_DP2x8(vect0, vect0, vect0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData0); \n\
-                VXC_VertMax3(dst, vect0, dst, dst, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(dst, vect0, dst, dst, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0)); \n\
                  \n\
                 // 2 3 \n\
                 vxc_uint4 config2 = (vxc_uint4)(0x23222120, 0x33323130, 0x01010101, 0x01010101); \n\
                 VXC_BitExtract(mask, mask0to5, mask0to5, config2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(vect1, vect1, mask, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniMaskData); \n\
-                VXC_HorzMax3(vect1, vect1, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(vect1, vect1, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(vect0, vect1, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData1); \n\
                 VXC_DP2x8(vect1, vect1, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData0); \n\
-                VXC_VertMax3(dst, vect1, vect0, vect0, VXC_MODIFIER(2, 3, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(dst, vect1, vect0, vect0, VXC_MODIFIER(2, 3, 0, VXC_RM_TowardZero, 0)); \n\
                  \n\
                 VXC_DP4x4(coord_in, pos01, channelNum, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetMaxPoolPos); \n\
                 VXC_ReadImage(vect0, input, coord_in.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \n\
@@ -8599,10 +8748,10 @@ vxnne_shader_executable vxnneHorzMaxPoolShaderExecutable(
                 vxc_uint4 config4 = (vxc_uint4)(0x43424140, 0x53525150, 0x01010101, 0x01010101); \n\
                 VXC_BitExtract(mask, mask0to5, mask0to5, config4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(vect2, vect2, mask, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniMaskData); \n\
-                VXC_HorzMax3(vect2, vect2, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
+                VXC_HorzMax3_Integer(vect2, vect2, VXC_MODIFIER(0, 5, 0,VXC_RM_TowardZero, 0)); \n\
                 VXC_DP2x8(vect1, vect2, vect2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData1); \n\
                 VXC_DP2x8(vect2, vect2, vect2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniRePackData0); \n\
-                VXC_VertMax3(dst, vect2, vect1, vect1, VXC_MODIFIER(4, 5, 0, VXC_RM_TowardZero, 0)); \n\
+                VXC_VertMax3_Integer(dst, vect2, vect1, vect1, VXC_MODIFIER(4, 5, 0, VXC_RM_TowardZero, 0)); \n\
                  \n\
                 VXC_WriteImage2DArray(output, coord_out, dst, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \n\
                  \n\
@@ -8615,10 +8764,29 @@ vxnne_shader_executable vxnneHorzMaxPoolShaderExecutable(
 
         if(inputFormat == VX_TYPE_FLOAT16)
         {
-            programSources[0] = programSources_0;
-            programLength[0] = strlen(programSources_0);
+            if (context->evisNoInst.isVX2)
+            {
+                programSources[0] = VXC_VertMax3_Evis2;
+                programSources[1] = VXC_HorzMax3_Evis2;
+                programSources[2] = programSources_0;
+
+                programLength[0]  = strlen(VXC_VertMax3_Evis2);
+                programLength[1]  = strlen(VXC_HorzMax3_Evis2);
+                programLength[2]  = strlen(programSources_0);
+            }
+            else
+            {
+                programSources[0] = VXC_VertMax3_Evis1;
+                programSources[1] = VXC_HorzMax3_Evis1;
+                programSources[2] = programSources_0;
+
+                programLength[0]  = strlen(VXC_VertMax3_Evis1);
+                programLength[1]  = strlen(VXC_HorzMax3_Evis1);
+                programLength[2]  = strlen(programSources_0);
+            }
         }
-        program = vxCreateProgramWithSource(context, 1, (const vx_char**)programSources, programLength);
+        program = vxCreateProgramWithSource(context, 3, (const vx_char**)programSources, programLength);
+
 
         status = vxGetStatus((vx_reference)program);
         if (status != VX_SUCCESS) goto error;
