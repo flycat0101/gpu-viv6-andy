@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -216,7 +216,7 @@ install: all
 	@-cp -f  ../inc/gc_vdk_types.h $(SDK_DIR)/include
 	@echo "/****************************************************************************" >$(SDK_DIR)/include/vdk.h
 	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California." >>$(SDK_DIR)/include/vdk.h
+	@echo "*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California." >>$(SDK_DIR)/include/vdk.h
 	@echo "*    All Rights Reserved." >>$(SDK_DIR)/include/vdk.h
 	@echo "*" >>$(SDK_DIR)/include/vdk.h
 	@echo "*    Permission is hereby granted, free of charge, to any person obtaining" >>$(SDK_DIR)/include/vdk.h
