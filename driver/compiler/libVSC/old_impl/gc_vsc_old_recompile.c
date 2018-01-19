@@ -2131,11 +2131,11 @@ _createSwizzleConvertStubFunction(
         /* Insert the value of TEXLD. */
         if (TexldStatusInst)
         {
-            gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, 1, gcSL_ENABLE_X, valueType, gcSL_PRECISION_DEFAULT, 0));
+            gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, 1, gcSL_ENABLE_X, valueType, gcSHADER_PRECISION_DEFAULT, 0));
             currentCode = Shader->code + Shader->lastInstruction;
             gcoOS_MemCopy(currentCode, TexldStatusInst, sizeof(struct _gcSL_INSTRUCTION));
         }
-        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, 1, gcSL_ENABLE_X, valueType, gcSL_PRECISION_DEFAULT, 0));
+        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, 1, gcSL_ENABLE_X, valueType, gcSHADER_PRECISION_DEFAULT, 0));
         currentCode = Shader->code + Shader->lastInstruction;
         gcoOS_MemCopy(currentCode, Code, sizeof(struct _gcSL_INSTRUCTION));
         /* Reset the enable. */
