@@ -971,7 +971,7 @@ veglGetPlatformDisplay(
         if (!eglPlatform->getSwapInterval ||
             !eglPlatform->getSwapInterval(display, &display->minSwapInterval, &display->maxSwapInterval))
         {
-            display->minSwapInterval = 1;
+            display->minSwapInterval = 0;
             display->maxSwapInterval = 1;
         }
 

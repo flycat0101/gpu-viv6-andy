@@ -312,9 +312,7 @@ veglParseAttributes(
             gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
                           "%s: EGL_MIN_SWAP_INTERVAL=%d",
                           __FUNCTION__, value);
-            if ((value != EGL_DONT_CARE) &&
-                (value < Display->minSwapInterval || value > Display->maxSwapInterval)
-               )
+            if ((value != EGL_DONT_CARE) && (value < 0))
             {
                 /* Bad attribute. */
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
@@ -327,9 +325,7 @@ veglParseAttributes(
             gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
                           "%s: EGL_MAX_SWAP_INTERVAL=%d",
                           __FUNCTION__, value);
-            if ((value != EGL_DONT_CARE) &&
-                (value < Display->minSwapInterval || value > Display->maxSwapInterval)
-               )
+            if ((value != EGL_DONT_CARE) && (value < 0))
             {
                 /* Bad attribute. */
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
