@@ -782,6 +782,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyPipelineLayout(
         {
             __VK_FREE(plt->dynamic_index);
         }
+        if (plt->pushConstantRanges)
+        {
+            __VK_FREE(plt->pushConstantRanges);
+        }
         __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE_LAYOUT, (__vkObject *)plt);
     }
 }

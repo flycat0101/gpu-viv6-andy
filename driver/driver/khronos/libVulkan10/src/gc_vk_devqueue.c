@@ -103,6 +103,7 @@ static VkResult __vki_QueueDestroyCMDBUF(
                 {
                     __vki_QueueDestroyCMDBUF(devQueue, commandBuffer->mirrors[i]);
                 }
+                gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, commandBuffer->mirrors);
             }
         }
         /* Destroy signal. */
