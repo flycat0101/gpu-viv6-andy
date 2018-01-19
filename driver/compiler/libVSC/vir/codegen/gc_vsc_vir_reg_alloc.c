@@ -2834,7 +2834,7 @@ static void _VIR_RA_LS_ExtendLRofMOVASrc0(
             endPoint = pDestLR->endPoint;
         }
     }
-    if (needExtendLR)
+    if (needExtendLR && (endPoint != gcvMAXUINT32))   /* if endPoint is gcvMAXUINT32, no usage is LDARR and donothing */
     {
         src0WebIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, pSrc0);
         if (VIR_INVALID_WEB_INDEX != src0WebIdx)
