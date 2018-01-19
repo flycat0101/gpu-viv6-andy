@@ -117,41 +117,42 @@ _AllocateCounters(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsCounterBuffer_PTR couterBuffer = gcvNULL;
+    gcsCounterBuffer_PTR counterBuffer = gcvNULL;
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
-        gcmSIZEOF(struct gcsCounterBuffer), (gctPOINTER *)&couterBuffer));
+        gcmSIZEOF(struct gcsCounterBuffer), (gctPOINTER *)&counterBuffer));
 
-    couterBuffer->couterBufobj = gcvNULL;
+    counterBuffer->couterBufobj = gcvNULL;
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
         gcmSIZEOF(gcsPROFILER_COUNTERS) * Profiler->coreCount,
-        (gctPOINTER *)&couterBuffer->counters));
+        (gctPOINTER *)&counterBuffer->counters));
 
-    gcoOS_ZeroMemory(couterBuffer->counters, gcmSIZEOF(gcsPROFILER_COUNTERS) * Profiler->coreCount);
+    gcoOS_ZeroMemory(counterBuffer->counters, gcmSIZEOF(gcsPROFILER_COUNTERS) * Profiler->coreCount);
 
-    couterBuffer->opType = gcvCOUNTER_OP_NONE;
-    couterBuffer->opID = 0;
+    counterBuffer->opType = gcvCOUNTER_OP_NONE;
+    counterBuffer->opID = 0;
 
-    couterBuffer->available = gcvTRUE;
-    couterBuffer->startPos =
-    couterBuffer->endPos = 0;
-    couterBuffer->dataSize = 0;
+    counterBuffer->available = gcvTRUE;
+    counterBuffer->needDump = gcvTRUE;
+    counterBuffer->startPos =
+    counterBuffer->endPos = 0;
+    counterBuffer->dataSize = 0;
 
-    *CounterBuffer = couterBuffer;
+    *CounterBuffer = counterBuffer;
 
     /* Success. */
     return gcvSTATUS_OK;
 OnError:
     
-    if (couterBuffer->counters)
+    if (counterBuffer->counters)
     {
-        gcmOS_SAFE_FREE(gcvNULL, couterBuffer->counters);
+        gcmOS_SAFE_FREE(gcvNULL, counterBuffer->counters);
     }
 
-    if (couterBuffer)
+    if (counterBuffer)
     {
-        gcmOS_SAFE_FREE(gcvNULL, couterBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, counterBuffer);
     }
     
     return status;
@@ -361,7 +362,7 @@ _WriteCounters(
 
 #define gcmGETCOUNTER(name) ((opID != 0 && opType == gcvCOUNTER_OP_DRAW) ? CalcDelta((counters->name), (preCounters->name)) : (counters->name))
 
-    if (Profiler->needDump)
+    if (Profiler->counterBuf->needDump)
     {
         gctINT32 * counterData;
         gctUINT32 counterIndex;
@@ -1182,7 +1183,7 @@ gcoPROFILER_Enable(
         gctUINT32 size;
         gcoBUFOBJ counterBufobj;
 
-        gcoHAL_ConfigPowerManagement(gcvTRUE);
+        gcoHAL_ConfigPowerManagement(gcvFALSE);
 
         /* disable old profiler in kernel. */
         iface.ignoreTLS = gcvFALSE;
@@ -1435,6 +1436,7 @@ gcoPROFILER_End(
 
     Profiler->counterBuf->opType = operationType;
     Profiler->counterBuf->opID = OpID;
+    Profiler->counterBuf->needDump = Profiler->needDump;
 
     /*update the counters info of currrent buffer*/
     gcmONERROR(_UpdateCounters(Profiler, clearCounters));

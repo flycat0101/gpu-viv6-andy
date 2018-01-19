@@ -1021,7 +1021,8 @@ struct gcsCounterBuffer
     gctUINT32                   startPos;
     gctUINT32                   endPos;
     gctUINT32                   dataSize;
-    gctUINT32                   available;
+    gctBOOL                     available;
+    gctBOOL                     needDump;
     gcsCounterBuffer_PTR        next;
     gcsCounterBuffer_PTR        prev;
 };
