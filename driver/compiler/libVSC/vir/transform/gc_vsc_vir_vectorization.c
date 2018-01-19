@@ -1176,7 +1176,7 @@ static VSC_ErrCode _RenameDstOfSeedInst(
                     VIR_SYM_VIRREG,
                     tempRegId,
                     VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(destOper)),
-                    VIR_STORAGE_UNKNOWN,
+                    VIR_Symbol_GetStorageClass(oldSymbol),
                     &newTempSymId);
     CHECK_ERROR(errCode, "VIR_Function_AddSymbol failed.");
     newSymbol = VIR_GetFuncSymFromId(currentFunc, newTempSymId);
@@ -1647,7 +1647,7 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
 
         dstOfSeedInst = VIR_Inst_GetDest(pSeedInst);
         dstofpInst = VIR_Inst_GetDest(pInst);
-        
+
         if (VIR_Operand_isSymbol(dstOfSeedInst) && VIR_Operand_isSymbol(dstofpInst) &&
             (VIR_Operand_GetSymbol(dstOfSeedInst) == VIR_Operand_GetSymbol(dstofpInst)) &&
             (VIR_Operand_GetEnable(dstOfSeedInst) == VIR_Operand_GetEnable(dstofpInst)) &&

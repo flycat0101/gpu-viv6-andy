@@ -211,7 +211,6 @@ clfGetDefaultPlatformID(
         gcoCL_InitializeHardware(); /*Init cl hardware for default hw */
         gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
         chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
-                        (chipModel == gcv3000 && chipRevision == 0x5450) ||
                         (chipModel == gcv2000 && chipRevision == 0x5108) ||
                         (chipModel == gcv3000 && chipRevision == 0x5513) ||
                         (chipModel == gcv3000 && chipRevision == 0x5451) ||
@@ -225,7 +224,6 @@ clfGetDefaultPlatformID(
         }
 
          version11 = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
-                     (chipModel == gcv3000 && chipRevision == 0x5450) ||
                      (chipModel == gcv2000 && chipRevision == 0x5108) ||
                      (chipModel == gcv3000 && chipRevision == 0x5451) ||
                      (chipModel == gcv3000 && chipRevision == 0x5513));

@@ -7397,7 +7397,7 @@ _VIR_RA_LS_InsertSpillOffset(
     /* compute the enable according to the usage */
     enable_channel = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(idxOpnd));
 
-    /* enable channel should be one channel */
+    /* enable channel should be one channel since ldarr/starr is not compontwise */
     if (!_VSC_RA_EnableSingleChannel(enable_channel))
     {
         gcmASSERT(0);
@@ -7442,12 +7442,33 @@ _VIR_RA_LS_InsertSpillOffset(
         /* we can only support max of 8 array spilled for now */
         gcmASSERT(shift < 4 * pRA->movaRegCount);
 
-        retErrCode = VIR_Function_AddInstructionBefore(pFunc,
-            VIR_OP_MOV,
-            VIR_TYPE_UINT32,
-            madInst,
-            gcvTRUE,
-            &movInst);
+        if (isLDARR)
+        {
+            retErrCode = VIR_Function_AddInstructionBefore(pFunc,
+                VIR_OP_MOV,
+                VIR_TYPE_UINT32,
+                madInst,
+                gcvTRUE,
+                &movInst);
+        }
+        else
+        {
+            /* TODO::we cann't handle vectorized MOVA + STARR now
+             * check MOVA src0 is single channel if usage of dest is STARR
+             */
+            VIR_Operand *movasrc0 = VIR_Inst_GetSource(pDef->defKey.pDefInst, VIR_Operand_Src0);
+            if (!_VSC_RA_EnableSingleChannel(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(movasrc0))))
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            retErrCode = VIR_Function_AddInstructionAfter(pFunc,
+                VIR_OP_MOV,
+                VIR_TYPE_UINT32,
+                pDef->defKey.pDefInst,
+                gcvTRUE,
+                &movInst);
+        }
+
         if (retErrCode != VSC_ERR_NONE) return retErrCode;
         src1Opnd = VIR_Inst_GetSource(movInst, VIR_Operand_Src0);
         VIR_Operand_Copy(src1Opnd,
@@ -7465,8 +7486,31 @@ _VIR_RA_LS_InsertSpillOffset(
         _VIR_RA_MakeColor(pRA->movaRegister[(shift/4)], (shift % 4), &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, movInst->dest, curColor);
         VIR_Operand_SetEnable(movInst->dest, VIR_ENABLE_X);
-        /* set swizzle of src operand according to the usage */
-        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(movInst, VIR_Operand_Src0), VIR_Enable_2_Swizzle(enable_channel));
+        /* set swizzle of src operand according to the usage, case like
+         * 030: MOVA               ivec4 addr_reg  temp(1503), uvec4 temp(1753).wzyx
+         * 031: LDARR              char temp(36).x, char temp(970).x, ivec4 temp(1503).x
+         *  ==>
+         *      MOV          t1.x       uvec4 temp(1752).w
+         *      MAD          offset.x, t1.x, __DEFAULT_TEMP_REGISTER_SIZE_IN_BYTE__, spillOffset
+         */
+        if (!_VSC_RA_EnableSingleChannel(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src1Opnd))))
+        {
+            gctSIZE_T channel = 0;
+            VIR_Swizzle swizzle_channel;
+            switch(enable_channel)
+            {
+                case VIR_ENABLE_X:    channel = 0; break;
+                case VIR_ENABLE_Y:    channel = 1; break;
+                case VIR_ENABLE_Z:    channel = 2; break;
+                case VIR_ENABLE_W:    channel = 3; break;
+                default:
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+            };
+            swizzle_channel = VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(src1Opnd), channel);
+            VIR_Operand_SetSwizzle(src1Opnd, swizzle_channel);
+        }
 
         if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
             VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))

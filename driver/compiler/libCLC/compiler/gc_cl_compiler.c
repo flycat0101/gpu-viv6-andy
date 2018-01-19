@@ -1243,7 +1243,6 @@ cloGetDefaultLanguageVersion()
     gctUINT chipRevision = gcGetHWCaps()->chipRevision;
 
     if(((chipModel == gcv1500 && chipRevision == 0x5246) ||
-        (chipModel == gcv3000 && chipRevision == 0x5450) ||
         (chipModel == gcv2000 && chipRevision == 0x5108) ||
         (chipModel == gcv3000 && chipRevision == 0x5451) ||
         (chipModel == gcv3000 && chipRevision == 0x5513)))

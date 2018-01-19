@@ -200,7 +200,6 @@ clGetDeviceIDs(
             clgDefaultDevice->platform  = platform;
 
             version11 = ((clgDefaultDevice->deviceInfo.chipModel == gcv1500 && clgDefaultDevice->deviceInfo.chipRevision == 0x5246) ||
-                    (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5450) ||
                     (clgDefaultDevice->deviceInfo.chipModel == gcv2000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5108) ||
                     (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5451) ||
                     (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5513));
@@ -247,7 +246,6 @@ clGetDeviceIDs(
                 chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
 
                 chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
-                        (chipModel == gcv3000 && chipRevision == 0x5450) ||
                         (chipModel == gcv2000 && chipRevision == 0x5108) ||
                         (chipModel == gcv3000 && chipRevision == 0x5513) ||
                         (chipModel == gcv3000 && chipRevision == 0x5451) ||
