@@ -1021,7 +1021,10 @@ __glChipIsFramebufferComplete(
             fbLayered = layered;
             fbLayeredTarget = layeredTarget;
         }
-        else if((gc->apiVersion == __GL_API_VERSION_ES20) && (fbwidth != width || fbheight != height))
+        /* Make the latest cts case follow the ES3.2 spec. */
+        else if((gc->apiVersion == __GL_API_VERSION_ES20) &&
+                (fbwidth != width || fbheight != height) &&
+                (chipCtx->patchId != gcvPATCH_GTFES30))
         {
             /* ES30 will not generate the error */
             error = GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;

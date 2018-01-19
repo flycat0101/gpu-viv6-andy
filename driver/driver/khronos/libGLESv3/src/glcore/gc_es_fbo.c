@@ -655,6 +655,14 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
 
     curRbo = gc->frameBuffer.boundRenderbufObj;
 
+    /* There is no renderbuffer object corresponding to the name zero,
+     * so client attempts to modify or query renderbuffer state while zero is bound will generate errors.
+     */
+    if (curRbo->name == 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
     /* Redundancy check */
     if ((curRbo->width == width) &&
         (curRbo->height == height) &&
