@@ -1108,7 +1108,7 @@ static VkResult __vki_ImportDmabuf(
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
     node->pool          = gcvPOOL_VIRTUAL;
-    node->size          = iface.u.WrapUserMemory.bytes;
+    node->size          = (gctSIZE_T)iface.u.WrapUserMemory.bytes;
     node->u.normal.node = iface.u.WrapUserMemory.node;
 
     node->physical2     = ~0U;

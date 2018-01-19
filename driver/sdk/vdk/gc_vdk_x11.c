@@ -246,8 +246,15 @@ _SignalHandler(
     _terminate = 1;
 }
 
+#include "gc_hal_base.h"
+#include "gc_hal_profiler.h"
+#include "gc_hal_driver.h"
+
 static int (* _ImportVideoMemory)(uint32_t name,
                                   uint32_t *node);
+
+static int (* _WrapUserMemory)(gcsUSER_MEMORY_DESC *desc,
+                               uint32_t *node);
 
 static int (* _ReleaseVideoMemory)(uint32_t node);
 
@@ -297,6 +304,7 @@ vdkInitialize(
 
     /* Require these 4 functions from Vivante GAL. */
     _ImportVideoMemory  = dlsym(RTLD_DEFAULT, "gcoHAL_ImportVideoMemory");
+    _WrapUserMemory     = dlsym(RTLD_DEFAULT, "gcoHAL_WrapUserMemory");
     _ReleaseVideoMemory = dlsym(RTLD_DEFAULT, "gcoHAL_ReleaseVideoMemory");
     _LockVideoMemory    = dlsym(RTLD_DEFAULT, "gcoHAL_LockVideoMemory");
     _UnlockVideoMemory  = dlsym(RTLD_DEFAULT, "gcoHAL_UnlockVideoMemory");
@@ -1098,6 +1106,111 @@ _UnlockPixmap(
         Pix->node    = 0;
     }
 }
+
+#elif defined(X11_DRI3)
+
+#include <X11/Xlibint.h>
+#include <xcb/xcb.h>
+#include <xcb/present.h>
+#include <xcb/xcbext.h>
+#include <xcb/dri3.h>
+#include <xcb/present.h>
+#include <xcb/sync.h>
+#include <X11/Xlib-xcb.h>
+
+static int create_fd_from_pixmap(xcb_connection_t *c, Pixmap pixmap, int *stride) {
+    int *fd;
+    xcb_dri3_buffer_from_pixmap_cookie_t cookie;
+    xcb_dri3_buffer_from_pixmap_reply_t *reply;
+
+    cookie = xcb_dri3_buffer_from_pixmap(c, pixmap);
+    reply = xcb_dri3_buffer_from_pixmap_reply(c, cookie, NULL);
+    if (!reply)
+        return -1;
+
+    if (reply->nfd != 1)
+        return -1;
+
+    *stride = reply->stride;
+    fd = xcb_dri3_buffer_from_pixmap_reply_fds(c, reply);
+    free(reply);
+    return fd[0];
+}
+
+static void
+_LockPixmap(
+    Display * dpy,
+    PixmapList * Pix
+    )
+{
+    int stride;
+    int pixmapfd;
+    uint32_t node = 0;
+    uint32_t address;
+    void * memory;
+    gcsUSER_MEMORY_DESC desc;
+    int status;
+
+    /* Require these functions. */
+    if (!_WrapUserMemory ||
+        !_ReleaseVideoMemory ||
+        !_LockVideoMemory ||
+        !_UnlockVideoMemory)
+    {
+        return;
+    }
+
+    pixmapfd = create_fd_from_pixmap(XGetXCBConnection(dpy), Pix->pixmap, &stride);
+    xcb_flush(XGetXCBConnection(dpy));
+    if (pixmapfd < 0)
+    {
+        return;
+    }
+
+    desc.flag = gcvALLOC_FLAG_DMABUF;
+    desc.handle = pixmapfd;
+    status = _WrapUserMemory(&desc, &node);
+    close(pixmapfd);
+    if (status != 0)
+    {
+        return;
+    }
+
+    status = _LockVideoMemory(node, 0, 0, &address, &memory);
+    if (status != 0)
+    {
+        /* Try again without cache. */
+        status = _LockVideoMemory(node, 1, 0, &address, &memory);
+    }
+
+    if (status != 0)
+    {
+        _ReleaseVideoMemory(node);
+        return;
+    }
+
+    Pix->stride  = stride;
+    Pix->memory  = memory;
+    Pix->address = address;
+    Pix->node    = node;
+}
+
+static void
+_UnlockPixmap(
+    Display * dpy,
+    PixmapList * Pix
+    )
+{
+    if (Pix->node)
+    {
+        _UnlockVideoMemory(Pix->node, 6, 0);
+        _ReleaseVideoMemory(Pix->node);
+
+        Pix->memory  = NULL;
+        Pix->address = ~0U;
+        Pix->node    = 0;
+    }
+}
 #endif
 
 VDKAPI vdkPixmap VDKLANG
@@ -1236,12 +1349,10 @@ vdkGetPixmapInfo(
 
     if (Stride != NULL || Bits != NULL)
     {
-#if defined(EGL_API_DRI)
         if (pix->stride == 0 || pix->memory == NULL)
         {
             _LockPixmap(dpy, pix);
         }
-#endif
 
         if (pix->stride == 0 || pix->memory == NULL)
         {
@@ -1317,12 +1428,10 @@ vdkDestroyPixmap(
                 prev->next = pix->next;
             }
 
-#if defined(EGL_API_DRI)
             if (pix->stride != 0 || pix->memory != NULL)
             {
                 _UnlockPixmap(dpy, pix);
             }
-#endif
 
             free(pix);
         }

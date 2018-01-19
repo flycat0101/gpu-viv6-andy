@@ -26,7 +26,7 @@ void _VGProgramCtor(gcoOS os, _VGProgram *program)
 {
     gcmHEADER_ARG("os=0x%x program=0x%x", os, program);
 
-    gcoOS_ZeroMemory(&program, sizeof(_VGProgram));
+    gcoOS_ZeroMemory(program, sizeof(_VGProgram));
 
     gcmFOOTER_NO();
 }
