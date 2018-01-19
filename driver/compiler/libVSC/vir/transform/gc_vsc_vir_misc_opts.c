@@ -310,11 +310,14 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
         VIR_Function*    func = func_node->function;
         VIR_InstIterator inst_iter;
         VIR_Instruction* inst;
+        VIR_OpCode       opCode;
 
         VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            opCode = VIR_Inst_GetOpcode(inst);
+
             for (srcInx = 0; srcInx < VIR_Inst_GetSrcNum(inst); ++srcInx)
             {
                 VIR_Operand         *srcOpnd = VIR_Inst_GetSource(inst, srcInx);
@@ -334,6 +337,12 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
                 }
                 if (VIR_Inst_GetOpcode(inst) == VIR_OP_SUBSAT &&
                     srcInx == 1)
+                {
+                    continue;
+                }
+
+                /* Don't propagate a 512bit uniform source. */
+                if (VIR_OPCODE_U512_SrcNo(opCode) > 0 && VIR_OPCODE_U512_SrcNo(opCode) == (gctINT)srcInx)
                 {
                     continue;
                 }
