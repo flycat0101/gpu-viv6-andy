@@ -460,6 +460,16 @@ VkResult __vkComputeClearVal(
         pClearVals[1] = pClearVals[0];
         break;
 
+    case VK_FORMAT_R8G8B8A8_UNORM:
+        pClearVals[0]
+            = (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[R], 8))
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[G], 8) <<  8)
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[B], 8) << 16)
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[A], 8) << 24);
+
+        pClearVals[1] = pClearVals[0];
+        break;
+
     case VK_FORMAT_B8G8R8A8_UNORM:
         pClearVals[0]
             = (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[R], 8) << 16)
@@ -1477,6 +1487,11 @@ VkResult halti5_clearImage(
         }
     }
 
+    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (img->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+    {
+        img->formatInfo.residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    }
+
     while (partIndex < pLevel->partCount)
     {
         uint32_t originX, originY;
@@ -1931,6 +1946,13 @@ VkResult halti5_copyImage(
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
         srcFmtFaked = (srcFormat != (uint32_t)srcImg->createInfo.format);
+
+        if ((srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        {
+            srcFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            srcFmtFaked = VK_FALSE;
+        }
+
         srcParts = pSrcLevel->partCount;
         srcPartSize = (uint32_t)pSrcLevel->partSize;
         srcAddress = srcImg->memory->devAddr;
@@ -2030,6 +2052,13 @@ VkResult halti5_copyImage(
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
         dstFmtFaked = (dstFormat != (uint32_t)dstImg->createInfo.format);
+
+        if ((dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        {
+            dstFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            dstFmtFaked = VK_FALSE;
+        }
+
         dstParts = pDstLevel->partCount;
         dstPartSize = (uint32_t)pDstLevel->partSize;
         dstAddress = dstImg->memory->devAddr;
@@ -3763,6 +3792,7 @@ VkResult halti5_helper_convertHwTxDesc(
     __vkImage *img = VK_NULL_HANDLE;
     uint32_t hwDescriptorSize = TX_HW_DESCRIPTOR_MEM_SIZE;
     uint32_t partIdx, partCount = 1;
+    uint32_t tmpResidentImgFormat = 0;
 
     __VK_ASSERT(hwTxDesc);
 
@@ -3772,7 +3802,14 @@ VkResult halti5_helper_convertHwTxDesc(
         subResourceRange = &imgv->createInfo.subresourceRange;
         baseLevel = &img->pImgLevels[subResourceRange->baseMipLevel];
         residentFormatInfo = (__vkFormatInfo *)imgv->formatInfo;
+        tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
         __VK_ASSERT(!bufv);
+
+        if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        {
+            tmpResidentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        }
 
         resourceMemory = img->memory;
         offsetInResourceMemory = img->memOffset;
@@ -3802,6 +3839,8 @@ VkResult halti5_helper_convertHwTxDesc(
 
         __VK_ASSERT(!imgv);
         residentFormatInfo = &bufv->formatInfo;
+        tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
+
         sizeInByte = (bufv->createInfo.range == VK_WHOLE_SIZE)
                    ? (uint32_t)(buf->createInfo.size - bufv->createInfo.offset)
                    : (uint32_t)bufv->createInfo.range;
@@ -3839,7 +3878,7 @@ VkResult halti5_helper_convertHwTxDesc(
         __VK_ASSERT(!"Must have one resource view to generate tx descriptor");
     }
 
-    hwTxFmtInfo = halti5_helper_convertHwTxInfo(devCtx, residentFormatInfo->residentImgFormat);
+    hwTxFmtInfo = halti5_helper_convertHwTxInfo(devCtx, tmpResidentImgFormat);
     if (!hwTxFmtInfo)
     {
         __VK_ONERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
@@ -4268,6 +4307,12 @@ VkResult halti5_helper_convertHwImgDesc(
         else
         {
             tiling = img->halTiling;
+        }
+
+        if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        {
+            tmpResidentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
         }
 
         width = userSize ? userSize->width : baseLevel->requestW;
@@ -6098,6 +6143,12 @@ VkResult halti5_createImageView(
     }
 
     __VK_MEMZERO(chipImgv, sizeof(halti5_imageView));
+
+    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+        (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+    {
+        residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    }
 
     if ((img->createInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT)
         || ((img->createInfo.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)

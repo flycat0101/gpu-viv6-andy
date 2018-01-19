@@ -3423,6 +3423,75 @@ VkResult halti5_setRenderTargets(
                         (rtImageView->createInfo.subresourceRange.layerCount > 0) ? (uint32_t)pLevel->sliceSize : 0);
                     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0426, VK_FALSE, (rtImageView->createInfo.subresourceRange.layerCount - 1));
                 }
+
+                /* For mutable image, image can be used to create a VkImageView with a different format from the image.
+                ** eg. image format is RGBA8_UINT, but imageView is RGBA8_UNORM.
+                ** 1)draw to this image, 2)copy this image to buffer.
+                ** PE not support RGBA8_UNORM, so treat the image as BGRA8_UNORM, but when copy, APP treat it as RGBA8_UINT. The R/B channel is opposite.
+                ** So, not use faked format BGRA8_UNORM for RGBA8_UNORM, and use PE swizzle to deal with.
+                ** But, For PE swizzle, not support MRT and Blend. So just a simple workround for this mutable group.
+                */
+                if ((rtImage->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+                    (rtImageView->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0529, VK_FALSE,
+                        ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ? 11:11))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ? 11:11)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12))) | (((gctUINT32) ((gctUINT32) (0x2) & ((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) ((gctUINT32) (0x1) & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) ((gctUINT32) (0x3) & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ? 19:18)))
+                        );
+                }
+                else
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0529, VK_FALSE,
+                        ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ? 11:11))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ? 11:11)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) ((gctUINT32) (0x1) & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16))) | (((gctUINT32) ((gctUINT32) (0x2) & ((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16)))
+                        & ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) ((gctUINT32) (0x3) & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ? 19:18)))
+                        );
+                }
             }
             else
             {
