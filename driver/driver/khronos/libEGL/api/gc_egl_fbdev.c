@@ -155,6 +155,16 @@ destroyDisplays(
     pthread_mutex_unlock(&displayMutex);
 }
 
+enum {
+    FB_SIG_INT,
+    FB_SIG_QUIT,
+    FB_SIG_TERM,
+
+    FB_SIG_NUM,
+};
+
+static struct sigaction oldSigHandlers[FB_SIG_NUM];
+
 static void sig_handler(gctINT signo)
 {
     static int hookSEGV = 0;
@@ -167,9 +177,21 @@ static void sig_handler(gctINT signo)
 
     destroyDisplays();
 
-    signal(SIGINT,  SIG_DFL);
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGTERM, SIG_DFL);
+    switch (signo)
+    {
+    case SIGINT:
+        sigaction(SIGINT, &oldSigHandlers[FB_SIG_INT],  NULL);
+        break;
+    case SIGQUIT:
+        sigaction(SIGINT, &oldSigHandlers[FB_SIG_QUIT], NULL);
+        break;
+    case SIGTERM:
+        sigaction(SIGINT, &oldSigHandlers[FB_SIG_TERM], NULL);
+        break;
+    default:
+        break;
+    }
+
     raise(signo);
 }
 
@@ -178,9 +200,9 @@ halOnExit(
     void
     )
 {
-    signal(SIGINT,  SIG_DFL);
-    signal(SIGQUIT, SIG_DFL);
-    signal(SIGTERM, SIG_DFL);
+    sigaction(SIGINT, &oldSigHandlers[FB_SIG_INT],  NULL);
+    sigaction(SIGINT, &oldSigHandlers[FB_SIG_QUIT], NULL);
+    sigaction(SIGINT, &oldSigHandlers[FB_SIG_TERM], NULL);
 
     destroyDisplays();
 }
@@ -193,14 +215,19 @@ onceInit(
     )
 {
     pthread_mutexattr_t mta;
+    struct sigaction newSigHandler;
 
     /* Register atexit callback. */
     atexit(halOnExit);
 
+    memset(&newSigHandler, 0, sizeof(newSigHandler));
+    sigemptyset(&newSigHandler.sa_mask);
+    newSigHandler.sa_handler = sig_handler;
+
     /* Register signal handler. */
-    signal(SIGINT,  sig_handler);
-    signal(SIGQUIT, sig_handler);
-    signal(SIGTERM, sig_handler);
+    sigaction(SIGINT,  &newSigHandler, &oldSigHandlers[FB_SIG_INT]);
+    sigaction(SIGQUIT, &newSigHandler, &oldSigHandlers[FB_SIG_QUIT]);
+    sigaction(SIGTERM, &newSigHandler, &oldSigHandlers[FB_SIG_TERM]);
 
     /* Init mutex attribute. */
     pthread_mutexattr_init(&mta);
