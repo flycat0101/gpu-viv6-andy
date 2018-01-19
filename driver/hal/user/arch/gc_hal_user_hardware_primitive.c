@@ -2562,12 +2562,10 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory));
     }
 
-#if gcdDEBUG
     if (Hardware->features[gcvFEATURE_DRAW_ID])
     {
         gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, Memory));
     }
-#endif
 
 #if gcdENABLE_TRUST_APPLICATION
     if (Hardware->features[gcvFEATURE_SECURITY] && Hardware->GPUProtecedModeDirty)
