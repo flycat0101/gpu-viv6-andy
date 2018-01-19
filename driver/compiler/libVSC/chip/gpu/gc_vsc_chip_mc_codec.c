@@ -1203,7 +1203,8 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        bAccessLocalStorage   : 1;
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        bDenorm               : 1;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -1217,7 +1218,8 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        bDenorm               : 1;
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
         gctUINT        bAccessLocalStorage   : 1;
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
@@ -1403,7 +1405,8 @@ typedef union _VSC_MC_IMG_ST_INST
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        bAccessLocalStorage   : 1;
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        bDenorm               : 1;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -1417,7 +1420,8 @@ typedef union _VSC_MC_IMG_ST_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        bDenorm               : 1;
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
         gctUINT        bAccessLocalStorage   : 1;
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
@@ -3899,12 +3903,12 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     pOutMcInst->load_inst.inst.bSkipForHelperKickoff = pInCodecHelperInst->instCtrl.bSkipForHelperKickoff;
     pOutMcInst->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
+    pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
     if (!bForImgLS)
     {
         gcmASSERT(!bEvisMode);
 
         pOutMcInst->load_inst.inst.packMode = pInCodecHelperInst->instCtrl.packMode;
-        pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
         pOutMcInst->load_inst.inst.bOffsetX3 = pInCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.bOffsetX3;
         pOutMcInst->load_inst.inst.offsetLeftShift = pInCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.offsetLeftShift;
     }
@@ -3963,10 +3967,10 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     pOutCodecHelperInst->instCtrl.bSkipForHelperKickoff = pInMcInst->load_inst.inst.bSkipForHelperKickoff;
     pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = pInMcInst->load_inst.inst.bAccessLocalStorage;
+    pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->load_inst.inst.bDenorm;
     if (!bForImgLS)
     {
         pOutCodecHelperInst->instCtrl.packMode = pInMcInst->load_inst.inst.packMode;
-        pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->load_inst.inst.bDenorm;
         pOutCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.bOffsetX3 = pInMcInst->load_inst.inst.bOffsetX3;
         pOutCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.offsetLeftShift = pInMcInst->load_inst.inst.offsetLeftShift;
     }

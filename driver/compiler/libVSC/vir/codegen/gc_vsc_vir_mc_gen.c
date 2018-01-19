@@ -1389,6 +1389,8 @@ _VSC_MC_GEN_GenDenormFlag(
     {
         if (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(Inst)) ||
             VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst)) ||
+            VIR_OPCODE_isImgLd(VIR_Inst_GetOpcode(Inst)) ||
+            VIR_OPCODE_isImgSt(VIR_Inst_GetOpcode(Inst)) ||
             VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(Inst)) ||
             VIR_Inst_GetOpcode(Inst) == VIR_OP_CMP ||
             VIR_Inst_GetOpcode(Inst) == VIR_OP_SELECT)
