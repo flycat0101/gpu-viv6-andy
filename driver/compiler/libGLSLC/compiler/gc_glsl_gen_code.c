@@ -17653,6 +17653,7 @@ _GenVecConstants(
 
 static gctUINT
 _GetMaxBindingForUniformAndBlock(
+    IN gcePATCH_ID      PatchId,
     IN sleSHADER_TYPE   ShaderType,
     IN slsDATA_TYPE *   DataType
     )
@@ -17766,36 +17767,44 @@ _GetMaxBindingForUniformAndBlock(
     }
     else if (slsDATA_TYPE_IsUnderlyingUniformBlock(DataType))
     {
-        switch (ShaderType)
+        /* A WAR to make GFXBench happy. */
+        if (PatchId == gcvPATCH_GFXBENCH || PatchId == gcvPATCH_GFXBENCH4)
         {
-        case slvSHADER_TYPE_VERTEX:
-            maxBinding = GetGLMaxVertexUniformBufferBindings();
-            break;
-
-        case slvSHADER_TYPE_FRAGMENT:
-            maxBinding = GetGLMaxFragmentUniformBufferBindings();
-            break;
-
-        case slvSHADER_TYPE_TCS:
-            maxBinding = GetGLMaxTCSUniformBufferBindings();
-            break;
-
-        case slvSHADER_TYPE_TES:
-            maxBinding = GetGLMaxTESUniformBufferBindings();
-            break;
-
-        case slvSHADER_TYPE_GS:
-            maxBinding = GetGLMaxGSUniformBufferBindings();
-            break;
-
-        case slvSHADER_TYPE_COMPUTE:
-            maxBinding = GetGLMaxComputeUniformBufferBindings();
-            break;
-
-        default:
-            gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
             maxBinding = GetGLMaxCombinedUniformBufferBindings();
-            break;
+        }
+        else
+        {
+            switch (ShaderType)
+            {
+            case slvSHADER_TYPE_VERTEX:
+                maxBinding = GetGLMaxVertexUniformBufferBindings();
+                break;
+
+            case slvSHADER_TYPE_FRAGMENT:
+                maxBinding = GetGLMaxFragmentUniformBufferBindings();
+                break;
+
+            case slvSHADER_TYPE_TCS:
+                maxBinding = GetGLMaxTCSUniformBufferBindings();
+                break;
+
+            case slvSHADER_TYPE_TES:
+                maxBinding = GetGLMaxTESUniformBufferBindings();
+                break;
+
+            case slvSHADER_TYPE_GS:
+                maxBinding = GetGLMaxGSUniformBufferBindings();
+                break;
+
+            case slvSHADER_TYPE_COMPUTE:
+                maxBinding = GetGLMaxComputeUniformBufferBindings();
+                break;
+
+            default:
+                gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+                maxBinding = GetGLMaxCombinedUniformBufferBindings();
+                break;
+            }
         }
     }
     else
@@ -17861,7 +17870,7 @@ _CheckBindingForUniformAndBlock(
             gctINT maxSize = 0;
             gctINT layoutBinding = slmDATA_TYPE_layoutBinding_GET(name->dataType);
 
-            maxSize = (gctINT)_GetMaxBindingForUniformAndBlock(Compiler->shaderType, name->dataType);
+            maxSize = (gctINT)_GetMaxBindingForUniformAndBlock(sloCOMPILER_GetPatchID(Compiler), Compiler->shaderType, name->dataType);
 
             if ((layoutBinding + slsDATA_TYPE_GetLogicalCountForAnArray(name->dataType)) > maxSize)
             {
