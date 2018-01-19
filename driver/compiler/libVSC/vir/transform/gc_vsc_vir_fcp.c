@@ -1353,6 +1353,144 @@ OnError:
 }
 #endif
 
+static VSC_ErrCode _FixEnableRestrictionForImageLoad(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Operand         *pOrigDest = VIR_Inst_GetDest(pInst);
+    VIR_Precision       precision = VIR_Operand_GetPrecision(pOrigDest);
+    VIR_Enable          enable = VIR_Operand_GetEnable(pOrigDest);
+    VIR_TypeId          dstTypeId = VIR_Operand_GetTypeId(pOrigDest);
+    VIR_TypeId          dstCompTypeId = VIR_GetTypeComponentType(dstTypeId);
+    VIR_TypeId          newTypeId = VIR_TypeId_ComposeNonOpaqueType(dstCompTypeId, VIR_CHANNEL_NUM, 1);
+    VIR_VirRegId        newRegId = VIR_INVALID_ID;
+    VIR_SymId           newRegSymId = VIR_INVALID_ID;
+    VIR_Instruction     *pNewMovInst = gcvNULL;
+    VIR_Operand         *pOpnd = gcvNULL;
+    VIR_OperandInfo     opndInfo;
+    gctUINT             i;
+
+    /* Check if we need to adjust the enable, now we only support full channel enable, XYZW. */
+    if (enable == VIR_ENABLE_XYZW)
+    {
+        return errCode;
+    }
+
+    /*
+    ** IMG_LOAD  r1.x, ...
+    **  -->
+    ** IMG_LOAD  r2.xyzw, ...
+    ** MOV       r1.x, r2.xyzw
+    */
+    /* Create a new temp register to save the IMG_LOAD. */
+    newRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   newRegId,
+                                   VIR_Shader_GetTypeFromId(pShader, newTypeId),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &newRegSymId);
+    ON_ERROR(errCode, "Add new symbol. ");
+
+    /*--------------Insert a IMG_LOAD instruction--------------*/
+    errCode = VIR_Function_AddCopiedInstructionBefore(pFunc,
+                                                      pInst,
+                                                      pInst,
+                                                      gcvTRUE,
+                                                      &pNewMovInst);
+    ON_ERROR(errCode, "Copy instruction IMG_LOAD. ");
+
+    /* Update DEST. */
+    pOpnd = VIR_Inst_GetDest(pNewMovInst);
+    memset(pOpnd, 0, sizeof(VIR_Operand));
+    VIR_Operand_SetLvalue(pOpnd, gcvTRUE);
+    VIR_Operand_SetTempRegister(pOpnd, pFunc, newRegSymId, newTypeId);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XYZW);
+    VIR_Operand_SetPrecision(pOpnd, precision);
+
+    /* Add a new def for IMG_LOAD instruction. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewMovInst,
+                     newRegId,
+                     1,
+                     VIR_ENABLE_XYZW,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(pNewMovInst); i++)
+    {
+        pOpnd = VIR_Inst_GetSource(pNewMovInst, i);
+        VIR_Operand_GetOperandInfo(pNewMovInst, pOpnd, &opndInfo);
+
+        if (opndInfo.isVreg)
+        {
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    pNewMovInst,
+                                    pOpnd,
+                                    gcvFALSE,
+                                    opndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+        }
+    }
+
+    /*--------------Change IMG_LOAD to MOV--------------*/
+    /* Delete all usages first. */
+    for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+    {
+        pOpnd = VIR_Inst_GetSource(pInst, i);
+        VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
+
+        if (opndInfo.isVreg)
+        {
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               pInst,
+                               pOpnd,
+                               gcvFALSE,
+                               opndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+        }
+    }
+
+    /* Change SrcNum and Opcode. */
+    VIR_Inst_SetSrcNum(pInst, 1);
+    VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+
+    /* Use the new temp as SRC0. */
+    pOpnd = VIR_Inst_GetSource(pInst, 0);
+    memset(pOpnd, 0, sizeof(VIR_Operand));
+    VIR_Operand_SetTempRegister(pOpnd, pFunc, newRegSymId, newTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYZW);
+    VIR_Operand_SetPrecision(pOpnd, precision);
+
+    /* Add the usage for SRC0. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            pNewMovInst,
+                            pInst,
+                            VIR_Inst_GetSource(pInst, 0),
+                            gcvFALSE,
+                            newRegId,
+                            1,
+                            enable,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+OnError:
+    return errCode;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PreCleanup)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
@@ -1375,6 +1513,7 @@ VSC_ErrCode vscVIR_PreCleanup(
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_DEF_USAGE_INFO  *pDuInfo = pPassWorker->pDuInfo;
     VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
@@ -1454,6 +1593,12 @@ VSC_ErrCode vscVIR_PreCleanup(
                 ON_ERROR(errCode, "Create concurrent workGroupCount. ");
             }
 #endif
+            if (!pHwCfg->hwFeatureFlags.hasImageLoadEnableFix &&
+                VIR_OPCODE_isImgLd(opCode))
+            {
+                errCode = _FixEnableRestrictionForImageLoad(pDuInfo, pShader, func, inst);
+                ON_ERROR(errCode, "Fix enable restriction for imageLoad. ");
+            }
         }
     }
 
