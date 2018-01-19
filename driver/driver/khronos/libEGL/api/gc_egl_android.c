@@ -980,7 +980,7 @@ _TranslateANativeBufferFormat(
  * EGL_FALSE on error.
  */
 static EGLBoolean
-_GetVivanteDrmBoBaseType(
+_GetVivanteDrmBufferBaseType(
     struct gralloc_vivante_bo_t * bo,
     struct drm_vivante_bo_tiling * TilingArgs,
     gceSURF_TYPE * BaseType
@@ -1025,13 +1025,170 @@ _GetVivanteDrmBoBaseType(
     return EGL_TRUE;
 }
 
+/*
+ * Get generic drm buffer tiling and matched base type.
+ * Base type could be:
+ * * gcvSURF_BITMAP
+ * * gcvSURF_TEXTURE
+ * * gcvSURF_RENDER_TARGET
+ * * gcvSURF_RENDER_TARGET_NO_TILE_STATUS
+ *
+ * EGL_TRUE on success.
+ *   Out type gcvSURF_TYPE_UNKNOWN if can not find a matched type.
+ * EGL_FALSE on error.
+ */
 static inline EGLBoolean
 _GetGenericDrmBufferBaseType(
     android_native_buffer_t * Buffer,
     gceSURF_TYPE * BaseType
     )
 {
-    *BaseType = gcvSURF_BITMAP;
+    /* TODO: Get base type. */
+    if (Buffer->usage & GRALLOC_USAGE_TILED_VIV)
+    {
+        *BaseType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+    }
+    else
+    {
+        *BaseType = gcvSURF_BITMAP;
+    }
+
+    return EGL_TRUE;
+}
+
+/*
+ * Push surface tiling information to bo.
+ * Return EGL_TRUE on success, EGL_FALSE on failure.
+ */
+static EGLBoolean
+_PushVivanteDrmBufferStatus(
+    gcoSURF Surface,
+    struct gralloc_vivante_bo_t * bo
+    )
+{
+    struct drm_vivante_bo_tiling tilingArgs;
+    uint64_t timeStamp = 0;
+    gceTILING tiling = gcvINVALIDTILED;
+
+    gcoSURF_GetTiling(Surface, &tiling);
+
+    switch (tiling)
+    {
+    case gcvLINEAR:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
+        break;
+    case gcvTILED:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
+        break;
+    case gcvSUPERTILED:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
+        break;
+    default:
+        /* Unknown surface tiling. */
+        return EGL_FALSE;
+    }
+
+    tilingArgs.ts_mode = Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
+                       : Surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
+                       : !Surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_NORMAL
+                       : DRM_VIV_GEM_TS_DISABLED;
+
+    tilingArgs.clear_value = ((uint64_t)Surface->fcValueUpper[0]) << 32
+                           | Surface->fcValue[0];
+
+    drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
+    drm_vivante_bo_inc_timestamp(bo->bo, &timeStamp);
+
+    return EGL_TRUE;
+}
+
+/*
+ * Push surface tiling information to drm buffer.
+ * Return EGL_TRUE on success, EGL_FALSE on failure.
+ */
+static EGLBoolean
+_PushGenericDrmBufferStatus(
+    gcoSURF Surface,
+    android_native_buffer_t * Buffer
+    )
+{
+    /* TODO: Set tiling, ts state, fast-clear value, etc. */
+    return EGL_TRUE;
+}
+
+/*
+ * Pop surface tiling information from bo.
+ * Timestamp: In last timeStamp, out updated timeStamp.
+ * Returns EGL_TRUE on success, EGL_FALSE on failure.
+ */
+static EGLBoolean
+_PopVivanteDrmBufferStatus(
+    struct gralloc_vivante_bo_t * Bo,
+    gcoSURF Surface,
+    gctUINT64 * TimeStamp
+    )
+{
+    int err;
+    struct drm_vivante_bo_tiling tilingArgs;
+    uint64_t timeStamp = 0;
+
+    err = drm_vivante_bo_get_tiling(Bo->bo, &tilingArgs);
+
+    if (err)
+    {
+        /* Error. */
+        return EGL_FALSE;
+    }
+
+    err = drm_vivante_bo_get_timestamp(Bo->bo, &timeStamp);
+
+    if (err)
+    {
+        return EGL_FALSE;
+    }
+
+    if (timeStamp == *TimeStamp)
+    {
+        /* surface is not updated. */
+        return EGL_TRUE;
+    }
+
+    *TimeStamp = timeStamp;
+
+    /* Update tile status information. */
+    switch (tilingArgs.ts_mode)
+    {
+    case DRM_VIV_GEM_TS_COMPRESSED:
+        Surface->compressed = gcvTRUE;
+    case DRM_VIV_GEM_TS_NORMAL:
+        Surface->tileStatusDisabled[0] = gcvFALSE;
+        Surface->fcValue[0]      = (gctUINT32)tilingArgs.clear_value;
+        Surface->fcValueUpper[0] = (gctUINT32)(tilingArgs.clear_value >> 32);
+        break;
+    case DRM_VIV_GEM_TS_DISABLED:
+        Surface->tileStatusDisabled[0] = gcvTRUE;
+        break;
+    default:
+        break;
+    }
+
+    return EGL_TRUE;
+}
+
+/*
+ * Pop surface tiling information from drm buffer.
+ * Timestamp: In last timeStamp, out updated timeStamp.
+ * Returns EGL_TRUE on success, EGL_FALSE on failure.
+ */
+static EGLBoolean
+_PopGenericDrmBufferStatus(
+    android_native_buffer_t * Buffer,
+    gcoSURF Surface,
+    gctUINT64 * TimeStamp
+    )
+{
+    /* TODO: Query tiling, ts state, fast-clear value, etc. */
+    *TimeStamp++;
     return EGL_TRUE;
 }
 
@@ -1041,7 +1198,7 @@ _GetGenericDrmBufferBaseType(
  * EGL_FALSE if baseType can not support specified rendering mode.
  */
 static inline EGLBoolean
-_CalibrateBufferType(
+_CalibrateSurfaceType(
     gceSURF_TYPE BaseType,
     EGLint RenderMode,
     gceSURF_TYPE * Type
@@ -1079,7 +1236,7 @@ _CalibrateBufferType(
         }
         else if (BaseType == gcvSURF_RENDER_TARGET_NO_TILE_STATUS)
         {
-            /* TODO: attach tile status?? */
+            /* Need append tile status later. */
             type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
         }
         break;
@@ -1117,19 +1274,170 @@ _CalibrateBufferType(
     return (type != gcvSURF_TYPE_UNKNOWN);
 }
 
-/* Generic drm buffer is treated as linear. */
+static EGLBoolean
+_CreateVivanteDrmBufferSurface(
+    android_native_buffer_t * Buffer,
+    struct gralloc_vivante_bo_t * Bo,
+    EGLint RenderMode,
+    gceSURF_FORMAT Format,
+    gcoSURF * Surface
+    )
+{
+    gceSTATUS status;
+    gcoSURF surface = gcvNULL;
+    gceSURF_TYPE baseType;
+    gceSURF_TYPE type;
+    struct drm_vivante_bo_tiling tilingArgs;
+    uint32_t node = 0, tsNode = 0;
+    uint64_t param;
+    gcePOOL pool;
+    gctSIZE_T size;
+    int err;
+
+    if (!_GetVivanteDrmBufferBaseType(Bo, &tilingArgs, &baseType))
+    {
+        return EGL_FALSE;
+    }
+
+    if (!_CalibrateSurfaceType(baseType, RenderMode, &type))
+    {
+        return EGL_FALSE;
+    }
+
+    /* Get pool type. */
+    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_POOL, &param);
+
+    if (err)
+    {
+        return EGL_FALSE;
+    }
+    pool = (gcePOOL)param;
+
+    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_SIZE, &param);
+
+    if (err)
+    {
+        return EGL_FALSE;
+    }
+    size = (gctSIZE_T)param;
+
+    /* Append no-vidmem hint to type. */
+    type |= gcvSURF_NO_VIDMEM;
+
+    /* Create surface wraper. */
+    gcmONERROR(gcoSURF_Construct(gcvNULL,
+                                 Buffer->width, Buffer->height, 1,
+                                 type, Format, (gcePOOL)pool,
+                                 &surface));
+
+    /* Reference and get node. */
+    err = drm_vivante_bo_ref_node(Bo->bo, &node, &tsNode);
+
+    if (err)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Assign parameters to surface. */
+    surface->size = size;
+
+    surface->node.u.normal.node = node;
+    surface->node.pool          = pool;
+    surface->node.size          = size; /* ??? */
+
+    /* shared mutex, for what? */
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL,
+                                 &surface->node.sharedMutex));
+
+#if gcdENABLE_3D
+    if (tsNode != 0)
+    {
+        surface->tileStatusNode.u.normal.node = tsNode;
+        surface->tileStatusNode.pool          = pool; /* ??? */
+        surface->tileStatusNode.size          = size >> 8; /* ??? */
+
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL,
+                                     &surface->tileStatusNode.sharedMutex));
+    }
+#endif
+
+    /* Initial lock. */
+    gcmONERROR(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
+
+    /* Set y-inverted rendering. */
+    gcmONERROR(gcoSURF_SetFlags(surface,
+                                gcvSURF_FLAG_CONTENT_YINVERTED,
+                                gcvTRUE));
+
+    /* Corrent tile status state. */
+    surface->tileStatusDisabled[0] =
+            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
+            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
+
+    if (RenderMode >= 0)
+    {
+        gceTILING tiling = gcvINVALIDTILED;
+
+        /* Tiling correction. */
+        gcoSURF_GetTiling(surface, &tiling);
+
+        switch (tiling)
+        {
+        case gcvLINEAR:
+            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
+            break;
+        case gcvTILED:
+            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
+            break;
+        case gcvSUPERTILED:
+            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
+            break;
+        default:
+            /* Unknown surface tiling. */
+            gcoSURF_Destroy(surface);
+            return EGL_FALSE;
+        }
+
+        drm_vivante_bo_set_tiling(Bo->bo, &tilingArgs);
+    }
+
+    *Surface = surface;
+    return EGL_TRUE;
+
+OnError:
+    if (surface)
+    {
+        gcoSURF_Destroy(surface);
+    }
+
+    return EGL_FALSE;
+}
+
 static EGLBoolean
 _CreateGenericDrmBufferSurface(
     android_native_buffer_t * Buffer,
-    gceSURF_TYPE Type,
+    EGLint RenderMode,
     gceSURF_FORMAT Format,
     gcoSURF * Surface
     )
 {
     gceSTATUS status;
     native_handle_t * handle;
+    gceSURF_TYPE baseType;
+    gceSURF_TYPE type;
     gctUINT stride = (gctUINT)Buffer->stride;
+    gcoSURF surface = gcvNULL;
     int fd;
+
+    if (!_GetGenericDrmBufferBaseType(Buffer, &baseType))
+    {
+        return EGL_FALSE;
+    }
+
+    if (!_CalibrateSurfaceType(baseType, RenderMode, &type))
+    {
+        return EGL_FALSE;
+    }
 
     /* Translate stride in bytes to in pixels. */
     switch (Format)
@@ -1174,120 +1482,33 @@ _CreateGenericDrmBufferSurface(
         return EGL_FALSE;
     }
 
+    /* TODO: Attach tile status from generic drm buffer. */
     status = gcoSURF_WrapUserMemory(gcvNULL,
                                     Buffer->width,
                                     Buffer->height,
                                     stride,
                                     1,
-                                    Type,
+                                    type,
                                     Format,
                                     (gctUINT32)fd,
                                     gcvALLOC_FLAG_DMABUF,
-                                    Surface);
+                                    &surface);
 
     if (gcmIS_SUCCESS(status))
     {
-        gcoSURF_SetFlags(*Surface,
+        gcoSURF_SetFlags(surface,
                          gcvSURF_FLAG_CONTENT_YINVERTED,
                          gcvTRUE);
     }
 
-    return gcmIS_SUCCESS(status) ? EGL_TRUE : EGL_FALSE;
-}
-
-static EGLBoolean
-_CreateVivanteDrmBufferSurface(
-    android_native_buffer_t * Buffer,
-    struct gralloc_vivante_bo_t * Bo,
-    gceSURF_TYPE Type,
-    gceSURF_FORMAT Format,
-    gcoSURF * Surface
-    )
-{
-    gceSTATUS status;
-    gcoSURF surface = gcvNULL;
-    struct gralloc_vivante_bo_t * bo;
-    uint32_t node = 0, tsNode = 0;
-    uint64_t param;
-    gcePOOL pool;
-    gctSIZE_T size;
-    int err;
-
-    /* Get pool type. */
-    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_POOL, &param);
-
-    if (err)
+    if ((RenderMode == VEGL_DIRECT_RENDERING_FCFILL) &&
+        (baseType == gcvSURF_RENDER_TARGET_NO_TILE_STATUS))
     {
-        return EGL_FALSE;
+        status = gcoSURF_AppendTileStatus(surface);
     }
-    pool = (gcePOOL)param;
-
-    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_SIZE, &param);
-
-    if (err)
-    {
-        return EGL_FALSE;
-    }
-    size = (gctSIZE_T)param;
-
-    /* Append no-vidmem hint to type. */
-    Type |= gcvSURF_NO_VIDMEM;
-
-    /* Create surface wraper. */
-    gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                 Buffer->width, Buffer->height, 1,
-                                 Type, Format, (gcePOOL)pool,
-                                 &surface));
-
-    /* Reference and get node. */
-    err = drm_vivante_bo_ref_node(Bo->bo, &node, &tsNode);
-
-    if (err)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
-    /* Assign parameters to surface. */
-    surface->size = size;
-
-    surface->node.u.normal.node = node;
-    surface->node.pool          = pool;
-    surface->node.size          = size; /* ??? */
-
-    /* shared mutex, for what? */
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                 &surface->node.sharedMutex));
-
-#if gcdENABLE_3D
-    if (tsNode != 0)
-    {
-        surface->tileStatusNode.u.normal.node = tsNode;
-        surface->tileStatusNode.pool          = pool; /* ??? */
-        surface->tileStatusNode.size          = size >> 8; /* ??? */
-
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                     &surface->tileStatusNode.sharedMutex));
-    }
-#endif
-
-    /* Initial lock. */
-    gcmONERROR(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
-
-    /* Set y-inverted rendering. */
-    gcmONERROR(gcoSURF_SetFlags(surface,
-                                gcvSURF_FLAG_CONTENT_YINVERTED,
-                                gcvTRUE));
 
     *Surface = surface;
-    return EGL_TRUE;
-
-OnError:
-    if (surface)
-    {
-        gcoSURF_Destroy(surface);
-    }
-
-    return EGL_FALSE;
+    return gcmIS_SUCCESS(status) ? EGL_TRUE : EGL_FALSE;
 }
 
 static EGLBoolean
@@ -1303,7 +1524,6 @@ _GetANativeBufferSurface(
     EGLBoolean success;
 
     struct gralloc_vivante_bo_t * bo;
-    struct drm_vivante_bo_tiling tilingArgs;
     int err;
 
     format = _TranslateANativeBufferFormat(Buffer, RenderMode);
@@ -1327,73 +1547,19 @@ _GetANativeBufferSurface(
 
     if (bo)
     {
-        if (!_GetVivanteDrmBoBaseType(bo, &tilingArgs, &type) ||
-            !_CalibrateBufferType(type, RenderMode, &type))
-        {
-            return EGL_FALSE;
-        }
-
         /* Create drm buffer by vivante drm interface. */
-        success = _CreateVivanteDrmBufferSurface(Buffer, bo, type, format, &surface);
+        success = _CreateVivanteDrmBufferSurface(
+                        Buffer, bo, RenderMode, format, &surface);
     }
     else
     {
-        if (!_GetGenericDrmBufferBaseType(Buffer, &type) ||
-            !_CalibrateBufferType(type, RenderMode, &type))
-        {
-            return EGL_FALSE;
-        }
-
         /* Create drm buffer by generic drm interface. */
-        success = _CreateGenericDrmBufferSurface(Buffer, type, format, &surface);
-    }
-
-    if (!success)
-    {
-        return EGL_FALSE;
-    }
-
-    if (bo && RenderMode >= 0)
-    {
-        gceTILING tiling = gcvINVALIDTILED;
-
-        /* Tiling correction. */
-        gcoSURF_GetTiling(surface, &tiling);
-
-        switch (tiling)
-        {
-        case gcvLINEAR:
-            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
-            break;
-        case gcvTILED:
-            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
-            break;
-        case gcvSUPERTILED:
-            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
-            break;
-        default:
-            /* Unknown surface tiling. */
-            gcoSURF_Destroy(surface);
-            return EGL_FALSE;
-        }
-
-        err = drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
-
-        if (err)
-        {
-            return EGL_FALSE;
-        }
-    }
-
-    if (bo)
-    {
-        surface->tileStatusDisabled[0] =
-                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
-                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
+        success = _CreateGenericDrmBufferSurface(
+                        Buffer, RenderMode, format, &surface);
     }
 
     *Surface = surface;
-    return EGL_TRUE;
+    return success;
 }
 
 /*
@@ -1453,7 +1619,7 @@ _NegotiateRenderMode(
         struct drm_vivante_bo_tiling tilingArgs;
 
         /* Try to get matched surface type for buffer and renderMode. */
-        success = _GetVivanteDrmBoBaseType(bo, &tilingArgs, &baseType);
+        success = _GetVivanteDrmBufferBaseType(bo, &tilingArgs, &baseType);
 
         (void)tilingArgs;
     }
@@ -1472,7 +1638,7 @@ _NegotiateRenderMode(
     /* Special for NOFC render mode, use this mode when explicitly reqeusted. */
     if (PreferRenderMode == VEGL_DIRECT_RENDERING_NOFC)
     {
-        if (_CalibrateBufferType(baseType, VEGL_DIRECT_RENDERING_NOFC, &type))
+        if (_CalibrateSurfaceType(baseType, VEGL_DIRECT_RENDERING_NOFC, &type))
         {
             renderMode = VEGL_DIRECT_RENDERING_NOFC;
             success = EGL_TRUE;
@@ -1491,7 +1657,7 @@ _NegotiateRenderMode(
 
         if (found)
         {
-            if (_CalibrateBufferType(baseType, preferModes[i], &type))
+            if (_CalibrateSurfaceType(baseType, preferModes[i], &type))
             {
                 renderMode = preferModes[i];
                 success = EGL_TRUE;
@@ -2596,40 +2762,15 @@ _PushBufferStatus(
 
     bo = gralloc_vivante_bo_from_handle(Buffer->handle);
 
-    if (!bo)
+    if (bo)
     {
-        /* Not GPU-buffer, skip. */
-        return;
+        /* GPU-buffer. */
+        _PushVivanteDrmBufferStatus(Surface, bo);
     }
-
-    gcoSURF_GetTiling(Surface, &tiling);
-
-    switch (tiling)
+    else
     {
-    case gcvLINEAR:
-        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
-        break;
-    case gcvTILED:
-        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
-        break;
-    case gcvSUPERTILED:
-        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
-        break;
-    default:
-        /* Unknown surface tiling. */
-        return;
+        _PushGenericDrmBufferStatus(Surface, Buffer);
     }
-
-    tilingArgs.ts_mode = Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
-                       : Surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_DISABLED
-                       : Surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
-                       : DRM_VIV_GEM_TS_NORMAL;
-
-    tilingArgs.clear_value = ((uint64_t)Surface->fcValueUpper[0]) << 32
-                           | Surface->fcValue[0];
-
-    drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
-    drm_vivante_bo_inc_timestamp(bo->bo, &timeStamp);
 }
 #endif
 
@@ -3481,61 +3622,34 @@ _UpdateANativeBuffer(
     )
 {
 #ifdef DRM_GRALLOC
-    int err;
+    EGLBoolean success;
     android_native_buffer_t * buffer;
     struct gralloc_vivante_bo_t * bo;
-    struct drm_vivante_bo_tiling tilingArgs;
     gcoSURF surface = Image->surface;
-    uint64_t timeStamp = 0;
+    gctUINT64 timeStamp = Image->u.ANativeBuffer.timeStamp;
 
     buffer = Image->u.ANativeBuffer.nativeBuffer;
 
     bo = gralloc_vivante_bo_from_handle(buffer->handle);
 
-    if (!bo)
+    if (bo)
     {
-        /* Not GPU-buffer, force require update. */
-        return gcvTRUE;
+        success = _PopVivanteDrmBufferStatus(bo, surface, &timeStamp);
+    }
+    else
+    {
+        success = _PopGenericDrmBufferStatus(buffer, surface, &timeStamp);
     }
 
-    err = drm_vivante_bo_get_tiling(bo->bo, &tilingArgs);
-
-    if (err)
+    if (success)
     {
-        /* Error. */
-        return gcvTRUE;
-    }
+        if (timeStamp == Image->u.ANativeBuffer.timeStamp)
+        {
+            /* Same timeStamp, not updated. */
+            return gcvFALSE;
+        }
 
-    err = drm_vivante_bo_get_timestamp(bo->bo, &timeStamp);
-
-    if (err)
-    {
-        return gcvTRUE;
-    }
-
-    if (timeStamp == Image->u.ANativeBuffer.timeStamp)
-    {
-        /* surface is not updated. */
-        return gcvFALSE;
-    }
-
-    Image->u.ANativeBuffer.timeStamp = timeStamp;
-
-    /* Update tile status information. */
-    switch (tilingArgs.ts_mode)
-    {
-    case DRM_VIV_GEM_TS_COMPRESSED:
-        /* Surface->compressed = gcvTRUE; */
-    case DRM_VIV_GEM_TS_NORMAL:
-        surface->tileStatusDisabled[0] = gcvFALSE;
-        surface->fcValue[0]      = (gctUINT32)tilingArgs.clear_value;
-        surface->fcValueUpper[0] = (gctUINT32)(tilingArgs.clear_value >> 32);
-        break;
-    case DRM_VIV_GEM_TS_DISABLED:
-        surface->tileStatusDisabled[0] = gcvTRUE;
-        break;
-    default:
-        break;
+        Image->u.ANativeBuffer.timeStamp = timeStamp;
     }
 
     return gcvTRUE;
