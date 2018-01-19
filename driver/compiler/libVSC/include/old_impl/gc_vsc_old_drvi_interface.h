@@ -1857,6 +1857,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxCombinedShaderOutputResources() (gcGetGLSLCaps()->maxCombinedShaderOutputResource)
 #define GetGLMaxComputeWorkGroupCount(Index)  (gcGetGLSLCaps()->maxWorkGroupCount[(Index)])
 #define GetGLMaxComputeWorkGroupSize(Index)   (gcGetGLSLCaps()->maxWorkGroupSize[(Index)])
+#define GetGLMaxWorkGroupInvocation()         (gcGetGLSLCaps()->maxWorkGroupInvocation)
 #define GetGLMaxSharedMemorySize()            (gcGetGLSLCaps()->maxShareMemorySize)
 #define GetGLMaxComputeUniformComponents()    (gcGetGLSLCaps()->maxCmptUniformVectors * 4)
 #define GetGLMaxComputeTextureImageUnits()    (gcGetGLSLCaps()->maxCmptTextureImageUnits)

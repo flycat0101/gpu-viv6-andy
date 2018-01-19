@@ -18185,6 +18185,15 @@ _checkComputeShaderSanity(
         status = gcvSTATUS_CS_NO_WORKGROUP_SIZE;
         gcmONERROR(status);
     }
+    else if (ComputeShader->shaderLayout.compute.workGroupSize[0] *
+             ComputeShader->shaderLayout.compute.workGroupSize[1] *
+             ComputeShader->shaderLayout.compute.workGroupSize[2]
+                >
+            GetGLMaxWorkGroupInvocation())
+    {
+        status = gcvSTATUS_CS_NO_WORKGROUP_SIZE;
+        gcmONERROR(status);
+    }
 
     /* Link error is generated if compute shader exceeds GL_MAX_COMPUTE_SHARED_MEMORY_SIZE. */
     {
