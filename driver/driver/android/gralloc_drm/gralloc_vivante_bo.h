@@ -34,6 +34,7 @@ struct gralloc_vivante_bo_t {
 
     int fb_handle;
 
+    void *vaddr;
     int lock_count;
     int locked_for;
 

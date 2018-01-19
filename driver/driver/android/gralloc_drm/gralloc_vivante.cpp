@@ -519,19 +519,23 @@ int gralloc_vivante_lock(struct gralloc_vivante_t *drv, buffer_handle_t handle,
 
     if (usage & (GRALLOC_USAGE_SW_WRITE_MASK |
              GRALLOC_USAGE_SW_READ_MASK)) {
-        /* the driver is supposed to wait for the bo */
-        err = drm_vivante_bo_mmap(bo->bo, vaddr);
-        if (err) {
-            gralloc_trace_error(1, "failed to mmap");
-            return err;
+        if (!bo->vaddr) {
+            gralloc_trace(2, "do mmap");
+            /* the driver is supposed to wait for the bo */
+            err = drm_vivante_bo_mmap(bo->bo, &bo->vaddr);
+            if (err) {
+                gralloc_trace_error(1, "failed to mmap");
+                return err;
+            }
         }
+        *vaddr = bo->vaddr;
     } else {
         /* kernel handles the synchronization here */
         *vaddr = NULL;
     }
 
     bo->lock_count++;
-    bo->locked_for |= usage;
+    bo->locked_for = usage;
 
     gralloc_trace(1, "ok: out vaddr=%p", *vaddr);
     return 0;
@@ -541,7 +545,6 @@ int gralloc_vivante_unlock(struct gralloc_vivante_t *drv,
             buffer_handle_t handle)
 {
     struct gralloc_vivante_bo_t *bo;
-    int mapped;
 
     gralloc_trace(0, "drv=%p handle=%p", drv, handle);
 
@@ -559,17 +562,16 @@ int gralloc_vivante_unlock(struct gralloc_vivante_t *drv,
         return 0;
     }
 
-    mapped = bo->locked_for &
-        (GRALLOC_USAGE_SW_WRITE_MASK | GRALLOC_USAGE_SW_READ_MASK);
-
-    if (mapped)
-        drm_vivante_bo_munmap(bo->bo);
-
     drm_vivante_bo_inc_timestamp(bo->bo, NULL);
 
-    bo->lock_count--;
-    if (!bo->lock_count)
+    if (!--bo->lock_count) {
+        if (bo->vaddr) {
+            gralloc_trace(2, "do munmap");
+            drm_vivante_bo_munmap(bo->bo);
+            bo->vaddr = NULL;
+        }
         bo->locked_for = 0;
+    }
 
     gralloc_trace(1, "ok");
     return 0;
