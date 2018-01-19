@@ -11822,6 +11822,9 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
             {
                 retValue = _VIR_RA_LS_SpillAddrComputation(&ra);
                 ON_ERROR(retValue, "_VIR_RA_LS_SpillAddrComputation");
+
+                /* Disable DUAL16 temporarily if registerSpill is used. */
+                VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
             }
             else
             {
