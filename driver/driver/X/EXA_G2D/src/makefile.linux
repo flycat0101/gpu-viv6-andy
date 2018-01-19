@@ -107,8 +107,7 @@ endif
 
 ifeq ($(X11_DRI3),1)
 CFLAGS += -I./imx_drm \
-          -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
-          -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
+          -I$(ROOTFS_USR)/include/libdrm
 LFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm

@@ -300,7 +300,6 @@ $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
 
 ifeq ($(X11_DRI3),1)
-LIB_DRM             := $(AQROOT)/driver/X/libdrm-2.4.88
 LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
 
 $(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
@@ -322,7 +321,6 @@ $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
 
 ifeq ($(X11_DRI3),1)
-LIB_DRM             := $(AQROOT)/driver/X/libdrm-2.4.88
 LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
 
 $(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
