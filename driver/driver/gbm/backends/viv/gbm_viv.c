@@ -37,6 +37,16 @@
 #define DRM_FORMAT_MOD_LINEAR 0
 #endif
 
+/**
+ * For 2.4.66 DRM,there is no DRM_RDWR
+ * but 2.4.88 DRM, there is DRM_RDWR
+ * not sure which version toolchain will use
+ * test if DRM_RDWR is defined
+ */
+#ifndef DRM_RDWR
+#define DRM_RDWR O_RDWR
+#endif
+
 struct gbm_backend gbm_viv_backend;
 
 gceSTATUS
