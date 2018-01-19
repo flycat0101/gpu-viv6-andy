@@ -1095,12 +1095,15 @@ eglCreateContext(
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
                 resetNotification = (gctINT)attrib_list[i + 1];
-                if ((resetNotification != EGL_NO_RESET_NOTIFICATION_EXT &&
-                    resetNotification != EGL_LOSE_CONTEXT_ON_RESET_EXT) ||
-                    !_IsExtSuppored(VEGL_EXTID_EXT_create_context_robustness))
+                if (resetNotification != EGL_NO_RESET_NOTIFICATION_EXT &&
+                    resetNotification != EGL_LOSE_CONTEXT_ON_RESET_EXT)
                 {
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+                else
+                {
+                    needCheckRobustAndVersion = EGL_TRUE;
                 }
                 robustAttribSet = gcvTRUE;
                 break;
