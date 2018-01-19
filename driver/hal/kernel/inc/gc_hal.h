@@ -2356,16 +2356,6 @@ gckHARDWARE_Reset(
     IN gckHARDWARE Hardware
     );
 
-typedef gceSTATUS (*gctISRMANAGERFUNC)(gctPOINTER Context);
-
-gceSTATUS
-gckHARDWARE_SetIsrManager(
-    IN gckHARDWARE Hardware,
-    IN gctISRMANAGERFUNC StartIsr,
-    IN gctISRMANAGERFUNC StopIsr,
-    IN gctPOINTER Context
-    );
-
 /* Check for Hardware features. */
 gceSTATUS
 gckHARDWARE_IsFeatureAvailable(
