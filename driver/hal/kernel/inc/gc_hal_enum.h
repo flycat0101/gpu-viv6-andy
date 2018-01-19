@@ -148,7 +148,6 @@ typedef enum _gceFEATURE
     gcvFEATURE_VG_FILTER,
     gcvFEATURE_VG21,
     gcvFEATURE_VG_DOUBLE_BUFFER,
-    gcvFEATURE_VG_RESOLUTION_8K,
     gcvFEATURE_MC20,
     gcvFEATURE_SUPER_TILED,
     gcvFEATURE_FAST_CLEAR_FLUSH,
@@ -513,7 +512,8 @@ typedef enum _gceFEATURE
     gcvFEATURE_WIDELINE_TRIANGLE_EMU,
     gcvFEATURE_FENCE,
     gcvFEATURE_PE_DEPTH_ONLY_OQFIX,
-
+    gcvFEATURE_VG_RESOLUTION_8K,
+    gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX, 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
@@ -2102,6 +2102,8 @@ gceCOMPRESSION_OPTION;
 #define gcvALLOC_FLAG_SECURITY              0x00000004
 /* Physical non contiguous. */
 #define gcvALLOC_FLAG_NON_CONTIGUOUS        0x00000008
+/* Can be exported as dmabuf-fd */
+#define gcvALLOC_FLAG_DMABUF_EXPORTABLE     0x00000010
 
 /* Do not try slow pools (gcvPOOL_VIRTUAL/gcvPOOL_CONTIGUOUS) */
 #define gcvALLOC_FLAG_FAST_POOLS            0x00000100

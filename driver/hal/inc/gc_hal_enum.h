@@ -471,7 +471,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_FENCE,
     gcvFEATURE_PE_DEPTH_ONLY_OQFIX,
     gcvFEATURE_VG_RESOLUTION_8K,
-
+    gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX, 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
