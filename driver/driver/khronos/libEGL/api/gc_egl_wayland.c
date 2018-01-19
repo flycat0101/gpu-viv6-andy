@@ -422,6 +422,12 @@ buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t t
 
     wl_callback_destroy(callback);
 
+    if (buffer->info.fd >= 0)
+    {
+        close(buffer->info.fd);
+        buffer->info.fd = -1;
+    }
+
     /* Switch to hardware type when buffer allocation. */
     gcoHAL_GetHardwareType(gcvNULL, &hwType);
     gcoHAL_SetHardwareType(gcvNULL, buffer->info.hwType);
@@ -429,8 +435,7 @@ buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t t
     gcoSURF_Unlock(buffer->info.surface, gcvNULL);
     gcoSURF_Destroy(buffer->info.surface);
     gcoHAL_Commit(gcvNULL, gcvFALSE);
-
-    close(buffer->info.fd);
+    buffer->info.surface = gcvNULL;
 
     free(buffer);
 
@@ -662,6 +667,12 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
     if (!done)
     {
         gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+
+        if (buffer->info.fd >= 0)
+        {
+            close(buffer->info.fd);
+            buffer->info.fd = -1;
+        }
 
         /* Switch to hardware type when buffer allocation. */
         gcoHAL_GetHardwareType(gcvNULL, &hwType);
@@ -1974,6 +1985,7 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
 {
     struct wl_egl_window *window = NULL;
     char *p;
+    int i;
 
     window = (struct wl_egl_window *) malloc(sizeof (struct wl_egl_window));
 
@@ -2009,6 +2021,10 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     }
 
     window->buffers = calloc(window->nr_buffers, sizeof(struct wl_egl_buffer));
+    for (i = 0; i < window->nr_buffers; ++i)
+    {
+        window->buffers[i].info.fd = -1;
+    }
 
     wl_egl_window_register(window);
 

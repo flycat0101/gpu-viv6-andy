@@ -26,6 +26,7 @@
 
 #include <poll.h>
 #include <pthread.h>
+#include <fcntl.h>
 
 #include <wayland-client.h>
 #include <wayland-viv-client-protocol.h>
@@ -89,6 +90,7 @@ struct __vkWaylandImageBufferRec
 
     VkImage                         resolveTarget;
     VkDeviceMemory                  resolveTargetMemory;
+    int32_t                         resolveFd;
 
     struct wl_buffer *              wl_buf;
     struct wl_callback *            frame_callback;
@@ -428,11 +430,14 @@ static VkResult __CreateImageBuffer(
 {
     VkImageCreateInfo imgInfo;
     VkMemoryAllocateInfo memAlloc;
-    VkDeviceMemory memory;
-    __vkImage *image;
     VkResult result = VK_SUCCESS;
 
     imageBuffer->swapchain = sc;
+    imageBuffer->renderTarget = VK_NULL_HANDLE;
+    imageBuffer->renderTargetMemory = VK_NULL_HANDLE;
+    imageBuffer->resolveTarget = VK_NULL_HANDLE;
+    imageBuffer->resolveTargetMemory = VK_NULL_HANDLE;
+    imageBuffer->resolveFd = -1;
 
     /* Create the swap chain render target images */
     __VK_MEMZERO(&imgInfo, sizeof(VkImageCreateInfo));
@@ -448,8 +453,6 @@ static VkResult __CreateImageBuffer(
     imgInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
     imgInfo.usage         = sc->imageUsage;
     imgInfo.flags         = 0;
-
-    imageBuffer->renderTarget = VK_NULL_HANDLE;
     __VK_ONERROR(__vk_CreateImage(sc->device, &imgInfo, gcvNULL, &imageBuffer->renderTarget));
 
     /* allocate memory for image. */
@@ -457,10 +460,10 @@ static VkResult __CreateImageBuffer(
     memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->memReq.size;
     memAlloc.memoryTypeIndex = 0;
-    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &memory));
+    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->renderTargetMemory));
 
     /* bind memory to image. */
-    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, memory, 0));
+    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, imageBuffer->renderTargetMemory, 0));
 
     /* Create the swap chain resolve buffers */
     __VK_MEMZERO(&imgInfo, sizeof(VkImageCreateInfo));
@@ -476,8 +479,6 @@ static VkResult __CreateImageBuffer(
     imgInfo.tiling        = VK_IMAGE_TILING_LINEAR;
     imgInfo.usage         = sc->imageUsage;
     imgInfo.flags         = 0;
-
-    imageBuffer->resolveTarget = VK_NULL_HANDLE;
     __VK_ONERROR(__vk_CreateImage(sc->device, &imgInfo, gcvNULL, &imageBuffer->resolveTarget));
 
     /* allocate memory for image. */
@@ -485,10 +486,10 @@ static VkResult __CreateImageBuffer(
     memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget))->memReq.size;
     memAlloc.memoryTypeIndex = 0;
-    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &memory));
+    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->resolveTargetMemory));
 
     /* bind memory to image. */
-    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->resolveTarget, memory, 0));
+    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->resolveTarget, imageBuffer->resolveTargetMemory, 0));
 
     {
         uint32_t alignedWidth;
@@ -497,6 +498,7 @@ static VkResult __CreateImageBuffer(
         gcsSURF_NODE *surfNode;
         uint32_t node = 0;
         gcsHAL_INTERFACE iface;
+        __vkImage *image;
         gceSTATUS status;
 
         image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
@@ -526,10 +528,10 @@ static VkResult __CreateImageBuffer(
             goto OnError;
         }
 
+        /* Name video memory in global space */
+        __VK_MEMZERO(&iface, sizeof(iface));
         iface.command = gcvHAL_NAME_VIDEO_MEMORY;
         iface.u.NameVideoMemory.handle = surfNode->u.normal.node;
-
-        iface.ignoreTLS = 0;
 
         status = gcoOS_DeviceControl(
             gcvNULL,
@@ -542,14 +544,35 @@ static VkResult __CreateImageBuffer(
         {
             status = iface.status;
         }
-
         if (gcmIS_ERROR(status))
         {
             result = VK_ERROR_OUT_OF_HOST_MEMORY;
             goto OnError;
         }
-
         node = iface.u.NameVideoMemory.name;
+
+        /* Export video memory as dmabuf fd */
+        __VK_MEMZERO(&iface, sizeof(iface));
+        iface.command = gcvHAL_EXPORT_VIDEO_MEMORY;
+        iface.u.ExportVideoMemory.node = surfNode->u.normal.node;
+        iface.u.ExportVideoMemory.flags = O_RDWR;
+        status = gcoOS_DeviceControl(
+            gcvNULL,
+            IOCTL_GCHAL_INTERFACE,
+            &iface, gcmSIZEOF(gcsHAL_INTERFACE),
+            &iface, gcmSIZEOF(gcsHAL_INTERFACE)
+            );
+
+        if (gcmIS_SUCCESS(status))
+        {
+            status = iface.status;
+        }
+        if (gcmIS_ERROR(status))
+        {
+            result = VK_ERROR_OUT_OF_HOST_MEMORY;
+            goto OnError;
+        }
+        imageBuffer->resolveFd = iface.u.ExportVideoMemory.fd;
 
         imageBuffer->wl_buf = wl_viv_create_buffer(
             sc->wl_viv,
@@ -563,7 +586,8 @@ static VkResult __CreateImageBuffer(
             surfNode->size,
             0,
             0,
-            0);
+            0,
+            imageBuffer->resolveFd);
 
         wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
 
@@ -577,23 +601,31 @@ OnError:
     if (imageBuffer->renderTarget)
     {
         if (imageBuffer->renderTargetMemory)
+        {
             __vk_FreeMemory(sc->device, imageBuffer->renderTargetMemory, gcvNULL);
+            imageBuffer->renderTargetMemory = VK_NULL_HANDLE;
+        }
 
         __vk_DestroyImage(sc->device, imageBuffer->renderTarget, gcvNULL);
-
         imageBuffer->renderTarget = VK_NULL_HANDLE;
-        imageBuffer->renderTargetMemory = VK_NULL_HANDLE;
     }
 
     if (imageBuffer->resolveTarget)
     {
+        if (imageBuffer->resolveFd >= 0)
+        {
+            close(imageBuffer->resolveFd);
+            imageBuffer->resolveFd = -1;
+        }
+
         if (imageBuffer->resolveTargetMemory)
+        {
             __vk_FreeMemory(sc->device, imageBuffer->resolveTargetMemory, gcvNULL);
+            imageBuffer->resolveTargetMemory = VK_NULL_HANDLE;
+        }
 
         __vk_DestroyImage(sc->device, imageBuffer->resolveTarget, gcvNULL);
-
         imageBuffer->resolveTarget = VK_NULL_HANDLE;
-        imageBuffer->resolveTargetMemory = VK_NULL_HANDLE;
     }
 
     return result;
@@ -627,6 +659,12 @@ static void __DestroyImageBuffer(
 
     if (imageBuffer->resolveTarget)
     {
+        if (imageBuffer->resolveFd >= 0)
+        {
+            close(imageBuffer->resolveFd);
+            imageBuffer->resolveFd = -1;
+        }
+
         if (imageBuffer->resolveTargetMemory)
         {
             __vk_FreeMemory(sc->device, imageBuffer->resolveTargetMemory, gcvNULL);
