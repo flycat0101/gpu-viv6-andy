@@ -2028,21 +2028,40 @@ __glChipReadPixels(
     switch (type)
     {
     case GL_UNSIGNED_BYTE:
-        if (format == GL_RGBA)
+        switch (format)
         {
+        case GL_RGBA:
             wrapformat = gcvSURF_A8B8G8R8;
-        }
-        else if (format == GL_BGRA_EXT)
-        {
+            break;
+        case GL_BGRA_EXT:
             wrapformat = gcvSURF_A8R8G8B8;
+            break;
+#ifdef OPENGL40
+        case GL_RED:
+            wrapformat = gcvSURF_R8;
+            break;
+        case GL_ALPHA:
+            wrapformat = gcvSURF_A8;
+            break;
+        case GL_LUMINANCE:
+            wrapformat = gcvSURF_L8;
+            break;
+        case GL_LUMINANCE_ALPHA:
+            wrapformat = gcvSURF_A8L8;
+            break;
+#endif
+        default:
+            break;
         }
         break;
+
     case GL_UNSIGNED_INT_2_10_10_10_REV:
         if (format == GL_RGBA)
         {
             wrapformat = gcvSURF_A2B10G10R10;
         }
         break;
+
     case GL_FLOAT:
         if (format == GL_RGBA)
         {
@@ -2056,54 +2075,108 @@ __glChipReadPixels(
         }
 #endif
         break;
-    case GL_UNSIGNED_INT:
-        if (format == GL_RGBA_INTEGER)
+
+#ifdef OPENGL40
+    case GL_UNSIGNED_SHORT:
+        switch (format)
         {
-            wrapformat = gcvSURF_A32B32G32R32UI;
+        case GL_RGBA_INTEGER:
+            wrapformat = gcvSURF_A16B16G16R16UI;
+            break;
+        case GL_RED_INTEGER:
+            wrapformat = gcvSURF_R16UI;
+            break;
+        case GL_RED:
+            wrapformat = gcvSURF_R16;
+            break;
+        case GL_ALPHA:
+            wrapformat = gcvSURF_A16;
+            break;
+        case GL_LUMINANCE:
+            wrapformat = gcvSURF_L16;
+            break;
+        case GL_LUMINANCE_ALPHA:
+            wrapformat = gcvSURF_A16L16;
+            break;
+        default:
+            break;
         }
         break;
+#endif
+
+    case GL_UNSIGNED_INT:
+        switch (format)
+        {
+        case GL_RGBA_INTEGER:
+            wrapformat = gcvSURF_A32B32G32R32UI;
+            break;
+#ifdef OPENGL40
+        case GL_RED_INTEGER:
+            wrapformat = gcvSURF_R32UI;
+            break;
+        case GL_RED:
+            wrapformat = gcvSURF_R32;
+            break;
+        case GL_ALPHA:
+            wrapformat = gcvSURF_A32;
+            break;
+        case GL_LUMINANCE:
+            wrapformat = gcvSURF_L32;
+            break;
+#endif
+        default:
+            break;
+        }
+        break;
+
     case GL_INT:
         if (format == GL_RGBA_INTEGER)
         {
             wrapformat = gcvSURF_A32B32G32R32I;
         }
         break;
+
     case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
         {
             wrapformat = gcvSURF_A4R4G4B4;
         }
         break;
+
     case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
         {
             wrapformat = gcvSURF_A1R5G5B5;
         }
         break;
+
 #ifdef OPENGL40
     case GL_UNSIGNED_INT_8_8_8_8_REV:
+        if (format == GL_RGBA)
         {
-             if (format == GL_RGBA)
-            {
-                wrapformat = gcvSURF_A8B8G8R8;
-            }
-            else if (format == GL_BGRA)
-            {
-                wrapformat = gcvSURF_A8R8G8B8;
-            }
+            wrapformat = gcvSURF_A8B8G8R8;
+        }
+        else if (format == GL_BGRA)
+        {
+            wrapformat = gcvSURF_A8R8G8B8;
         }
         break;
-     case GL_UNSIGNED_INT_8_8_8_8:
+
+    case GL_UNSIGNED_INT_8_8_8_8:
+        if (format == GL_BGRA)
         {
-             if (format == GL_BGRA)
-            {
-                wrapformat = gcvSURF_B8G8R8A8;
-            }
-            else if (format == GL_RGBA)
-            {
-                wrapformat = gcvSURF_R8G8B8A8;
-            }
+            wrapformat = gcvSURF_B8G8R8A8;
         }
+        else if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_R8G8B8A8;
+        }
+        break;
+
+    case GL_UNSIGNED_SHORT_5_6_5:
+        gcmASSERT(format == GL_RGB);
+        wrapformat = gcvSURF_B5G6R5;
         break;
 #endif
+
     default:
         break;
     }
@@ -2161,7 +2234,7 @@ __glChipReadPixels(
 
         /* Get the pointer to the bits. */
         gcmONERROR(gcoSURF_Lock(
-            dstView.surf, gcvNULL,&bit
+            dstView.surf, gcvNULL, (gctPOINTER*)&bit
             ));
     }
     else

@@ -298,12 +298,13 @@ static gceSTATUS _DestroyOnScreenSurfaceWrapper(
 
 static void _cleanAsyncFrame(asyncFrame *frame)
 {
-    if (!frame)
+    if (!frame || !frame->dridrawable)
         return;
 
     if (frame->pixmapfd)
     {
         close(frame->pixmapfd);
+        frame->pixmapfd = -1;
     }
 
     if (frame->dridrawable->display->dpy)
@@ -315,7 +316,7 @@ static void _cleanAsyncFrame(asyncFrame *frame)
     if (frame->fence_fd >= 0)
         close(frame->fence_fd);
 
-    if ( frame->pixWrapSurf )
+    if (frame->pixWrapSurf)
         gcoSURF_Destroy(frame->pixWrapSurf);
 
     if (frame->backPixmap)
@@ -929,9 +930,10 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
     drawable->oldh = 0;
     drawable->olddrawable = (PlatformWindowType)0;
 
-    for(index = 0; index < NUM_ASYNCFRAME; index++)
+    for (index = 0; index < NUM_ASYNCFRAME; index++)
     {
         drawable->ascframe[index].fence_fd = -1;
+        drawable->ascframe[index].pixmapfd = -1;
     }
 
     con = dri_GetXCB(display->dpy);
@@ -2841,14 +2843,16 @@ _GetWindowBackBuffer(
 
     if (drawable->ascframe[index].backPixmap == (Pixmap)0)
     {
-            drawable->ascframe[index].dridrawable = drawable;
-            drawable->ascframe[index].surftype = gcvSURF_BITMAP;
-            drawable->ascframe[index].surfformat = wininfo->format;
-            drawable->ascframe[index].pixWrapSurf = gcvNULL;
-            drawable->ascframe[index].Drawable = (PlatformWindowType)Surface->hwnd;
-            drawable->ascframe[index].backNode = 0;
-            _setupAsyncFrame(&drawable->ascframe[index]);
-    } else {
+        drawable->ascframe[index].dridrawable = drawable;
+        drawable->ascframe[index].surftype = gcvSURF_BITMAP;
+        drawable->ascframe[index].surfformat = wininfo->format;
+        drawable->ascframe[index].pixWrapSurf = gcvNULL;
+        drawable->ascframe[index].Drawable = (PlatformWindowType)Surface->hwnd;
+        drawable->ascframe[index].backNode = 0;
+        _setupAsyncFrame(&drawable->ascframe[index]);
+    }
+    else
+    {
        if (schanged)
        {
            _cleanAsyncFrame(&drawable->ascframe[index]);
