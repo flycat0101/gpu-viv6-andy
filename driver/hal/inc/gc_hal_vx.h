@@ -137,7 +137,7 @@ gcoVX_InvokeKernel(
     );
 
 gceSTATUS
-gcoVX_Upload(
+gcoVX_ConstructionInstruction(
     IN gctUINT32_PTR    Point,
     IN gctUINT32        Size,
     IN gctBOOL          Upload,
@@ -156,6 +156,11 @@ gcoVX_AllocateMemory(
 
 gceSTATUS
 gcoVX_FreeMemory(
+    IN gcsSURF_NODE_PTR Node
+    );
+
+gceSTATUS
+gcoVX_DestroyInstruction(
     IN gcsSURF_NODE_PTR Node
     );
 

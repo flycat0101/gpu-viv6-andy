@@ -601,7 +601,7 @@ OnError:
 }
 
 gceSTATUS
-gcoVX_Upload(
+gcoVX_ConstructionInstruction(
     IN gctUINT32_PTR    Point,
     IN gctUINT32        Size,
     IN gctBOOL          Upload,
@@ -678,7 +678,7 @@ gcoVX_KernelConstruct(
 #if !gcdVX_OPTIMIZER
     if (Context->node == gcvNULL)
     {
-        gcmONERROR(gcoVX_Upload((gctUINT32_PTR)Context->instructions->binarys, Context->instructions->count * 4 * 4, gcvTRUE, &Context->nodePhysicalAdress, gcvNULL, &Context->node));
+        gcmONERROR(gcoVX_ConstructionInstruction((gctUINT32_PTR)Context->instructions->binarys, Context->instructions->count * 4 * 4, gcvTRUE, &Context->nodePhysicalAdress, gcvNULL, &Context->node));
 
     }
 
@@ -701,7 +701,7 @@ gcoVX_LockKernel(
     gcmHEADER_ARG("Context=%p", Context);
 
 #if gcdVX_OPTIMIZER
-    gcmONERROR(gcoVX_Upload((gctUINT32_PTR)Context->instructions->binarys,
+    gcmONERROR(gcoVX_ConstructionInstruction((gctUINT32_PTR)Context->instructions->binarys,
                             Context->instructions->count * 4 * 4,
                             gcvTRUE,
                             &Context->instructions->physical,
@@ -839,6 +839,38 @@ gcoVX_FreeMemory(
         /* Unlock the buffer. */
         gcmONERROR(gcoHARDWARE_Unlock(Node,
                                       gcvSURF_VERTEX));
+
+        /* Create an event to free the video memory. */
+        gcmONERROR(gcsSURF_NODE_Destroy(Node));
+
+        free_memory_size += Node->size;
+
+        /* Free node. */
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Node));
+    }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_DestroyInstruction(
+    IN gcsSURF_NODE_PTR Node
+    )
+{
+
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Node=0x%x", Node);
+
+    /* Do we have a buffer allocated? */
+    if (Node && Node->pool != gcvPOOL_UNKNOWN)
+    {
+
+        /* Unlock the buffer. */
+        gcmONERROR(gcoHARDWARE_Unlock(Node,
+                                      gcvSURF_ICACHE));
 
         /* Create an event to free the video memory. */
         gcmONERROR(gcsSURF_NODE_Destroy(Node));

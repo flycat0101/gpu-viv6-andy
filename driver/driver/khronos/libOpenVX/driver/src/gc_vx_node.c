@@ -213,7 +213,7 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
             {
                 if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
                 {
-                    gcoVX_FreeMemory(kernelContext->hwContext[i]->node);
+                    gcoVX_DestroyInstruction(kernelContext->hwContext[i]->node);
                     kernelContext->hwContext[i]->node = gcvNULL;
                 }
                 vxFree(kernelContext->hwContext[i]);
@@ -670,7 +670,7 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
             {
                 if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
                 {
-                    gcoVX_FreeMemory(kernelContext->hwContext[i]->node);
+                    gcoVX_DestroyInstruction(kernelContext->hwContext[i]->node);
                     kernelContext->hwContext[i]->node = gcvNULL;
                 }
                 vxFree(kernelContext->hwContext[i]);

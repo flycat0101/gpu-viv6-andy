@@ -1009,6 +1009,7 @@ EXPORTS
     gcoVX_Commit
     gcoVX_AllocateMemory
     gcoVX_FreeMemory
+    gcoVX_DestroyInstruction
     gcoVX_KernelConstruct
     gcoVX_LockKernel
     gcoVX_Replay
