@@ -2226,6 +2226,8 @@ gcChipCopyTexSubImage(
     gcsSURF_VIEW        texView      = {gcvNULL, 0, 1};
     gcsSURF_VIEW        srcView      = {gcvNULL, 0, 1};
     gceSTATUS status = gcvSTATUS_OK;
+    gcePATCH_ID patchId = chipCtx->patchId;
+    gcoSURF     mip = gcvNULL;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d x=%d y=%d xoffset=%d yoffset=%d zoffset=%d width=%d height=%d",
                    gc, texObj, face, level, x, y, xoffset, yoffset, zoffset, width, height);
@@ -2300,6 +2302,21 @@ gcChipCopyTexSubImage(
         srcView.surf->tiling == texView.surf->tiling)
     {
         tryShader = gcvTRUE;
+    }
+
+    /* Just to check whether it has only 1 level of mipmap. */
+    gcoTEXTURE_GetMipMap(texInfo->object, texObj->params.baseLevel + 1, &mip);
+
+    /* When texture owns mipmap, gcoSURF_DrawBlit path would modify the tiling mode
+    ** which could cause mipmap level address and maxLevel incorrect when drawing.
+    */
+    if (patchId == gcvPATCH_DEQP &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MULTI_PIXELPIPES) &&
+        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER) &&
+        (mip || (texObj->params.sampler.minFilter != GL_NEAREST &&
+        texObj->params.sampler.minFilter != GL_LINEAR)))
+    {
+        tryShader = GL_FALSE;
     }
 
     /* If tex is bound to FBO and draw before calling CopyTexSubImage2D, shadow surface is dirty.
