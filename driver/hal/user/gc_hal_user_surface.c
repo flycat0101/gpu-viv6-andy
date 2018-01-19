@@ -128,38 +128,28 @@ gcoSURF_LockTileStatus(
         /* Check if this is the first lock. */
         if (Surface->tileStatusFirstLock)
         {
-            /* Fill the tile status memory with the filler. */
-            gcoOS_MemFill(Surface->tileStatusNode.logical,
-                          (gctUINT8) Surface->tileStatusFiller,
-                          Surface->tileStatusNode.size);
-
-            /* Flush the node from cache. */
-            gcmONERROR(
-                gcoSURF_NODE_Cache(&Surface->tileStatusNode,
-                                 Surface->tileStatusNode.logical,
-                                 Surface->tileStatusNode.size,
-                                 gcvCACHE_CLEAN));
-
-            /* Dump the memory write. */
-            gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
-                           address,
-                           Surface->tileStatusNode.logical,
-                           0,
-                           Surface->tileStatusNode.size);
-
-#if gcdDUMP
-            if (Surface->tileStatusFiller == 0x0)
+            if (!(Surface->hints & gcvSURF_NO_VIDMEM))
             {
-                gcmGETHARDWAREADDRESS(Surface->node, address);
+                /* Fill the tile status memory with the filler. */
+                gcoOS_MemFill(Surface->tileStatusNode.logical,
+                              (gctUINT8) Surface->tileStatusFiller,
+                              Surface->tileStatusNode.size);
+
+                /* Flush the node from cache. */
+                gcmONERROR(
+                    gcoSURF_NODE_Cache(&Surface->tileStatusNode,
+                                     Surface->tileStatusNode.logical,
+                                     Surface->tileStatusNode.size,
+                                     gcvCACHE_FLUSH));
+
+                /* Dump the memory write. */
                 gcmDUMP_BUFFER(gcvNULL,
                                "memory",
                                address,
-                               Surface->node.logical,
+                               Surface->tileStatusNode.logical,
                                0,
-                               Surface->node.size);
+                               Surface->tileStatusNode.size);
             }
-#endif
 
             /* No longer first lock. */
             Surface->tileStatusFirstLock = gcvFALSE;
