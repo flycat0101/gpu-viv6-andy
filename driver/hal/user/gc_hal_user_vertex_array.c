@@ -2290,7 +2290,7 @@ gcoVERTEXARRAY_StreamBind(
                 attrPtr->linkage    = vertexPtr->linkage;
                 attrPtr->size       = vertexPtr->size;
                 attrPtr->normalized = vertexPtr->normalized;
-                attrPtr->offset     = gcmPTR2INT32(vertexPtr->pointer);
+                attrPtr->offset     = gcmPTR2INT(vertexPtr->pointer);
                 attrPtr->enabled    = gcvTRUE;
 #if gcdUSE_WCLIP_PATCH
                 attrPtr->isPosition = vertexPtr->isPosition;
