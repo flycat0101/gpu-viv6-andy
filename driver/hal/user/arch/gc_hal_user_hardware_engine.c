@@ -9171,7 +9171,7 @@ gcoHARDWARE_FlushSampling(
             sampleCoords  = Hardware->MsaaStates->sampleCoords4;
             centroids     = Hardware->MsaaStates->centroids4;
             jitterIndex   = Hardware->MsaaStates->jitterIndex;
-            tableIndex    = yInverted ? 1 : 0;
+            tableIndex    = Hardware->features[gcvFEATURE_HALTI5] ? 0 : (yInverted ? 1 : 0);
         }
         break;
 
