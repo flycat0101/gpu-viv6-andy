@@ -482,7 +482,7 @@ clfLoadKernelArgValues(
                         swizzleA = 0;
                         break;
                     case CL_LUMINANCE:
-                        componentCount = 0;
+                        componentCount = 1;
                         swizzleR = 0;
                         swizzleG = 0;
                         swizzleB = 0;
