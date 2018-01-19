@@ -25,8 +25,11 @@
 #include <sync/sync.h>
 #include <cutils/log.h>
 
-/* TODO: drm gralloc. */
-#include <gc_gralloc_priv.h>
+#ifdef DRM_GRALLOC
+#   include <gralloc_handle.h>
+#else
+#   include <gc_gralloc_priv.h>
+#endif
 
 typedef struct __vkAndroidSurfaceKHRRec     __vkAndroidSurfaceKHR;
 typedef struct __vkAndroidSwapchainKHRRec   __vkAndroidSwapchainKHR;
@@ -270,6 +273,7 @@ static VkResult __GatherANativeWindowProperties(
     struct private_handle_t *handle;
     int minUndequeued = 0;
     int fenceFd;
+    int flags = 0;
 
     /*
      * Set default usage for native window. This is an egl surface,
@@ -322,7 +326,9 @@ static VkResult __GatherANativeWindowProperties(
         surf->consumerUsage = buffer->usage;
     }
 
-    handle = (struct private_handle_t *) buffer->handle;
+#ifndef DRM_GRALLOC
+    flags = ((struct private_handle_t*)buffer->handle)->flags;
+#endif
 
     if (surf->concreteType == NATIVE_WINDOW_FRAMEBUFFER)
     {
@@ -336,7 +342,7 @@ static VkResult __GatherANativeWindowProperties(
         win->cancelBuffer = NULL;
         ALOGV("%s: win type: NATIVE_WINDOW_FRAMEBUFFER", __func__);
     }
-    else if ((handle->flags & 0x0001 /* PRIV_FLAGS_FRAMEBUFFER */) ||
+    else if ((flags & 0x0001 /* PRIV_FLAGS_FRAMEBUFFER */) ||
         (surf->consumerUsage & GRALLOC_USAGE_HW_FB) ||
         (surf->consumerUsage & (GRALLOC_USAGE_HW_FB << 1)))
     {
@@ -427,18 +433,30 @@ static void __UpdateNativeWindowProducerUsage(
     case __VK_WSI_DIRECT_RENDERING_FCFILL:
     case __VK_WSI_DIRECT_RENDERING_FC_NOCC:
         /* Allocate render target with tile status but disable compression. */
+#ifdef DRM_GRALLOC
+        usage |= GRALLOC_USAGE_TS_VIV;
+#else
         usage |= GRALLOC_USAGE_RENDER_TARGET_NO_CC_VIV;
+#endif
         break;
 
     case __VK_WSI_DIRECT_RENDERING:
         /* Allocate normal render target. */
+#ifdef DRM_GRALLOC
+        usage |= GRALLOC_USAGE_TS_VIV;
+#else
         /* FIXME: MSAA? */
         usage |= GRALLOC_USAGE_RENDER_TARGET_VIV;
+#endif
         break;
 
     case __VK_WSI_DIRECT_RENDERING_NOFC:
         /* Allocate render target without tile status. */
+#ifdef DRM_GRALLOC
+        usage |= GRALLOC_USAGE_TILED_VIV;
+#else
         usage |= GRALLOC_USAGE_RENDER_TARGET_NO_TS_VIV;
+#endif
         break;
 
     default:
@@ -447,6 +465,7 @@ static void __UpdateNativeWindowProducerUsage(
 
     if (surf->producerUsage != usage)
     {
+#ifndef DRM_GRALLOC
         if ((surf->producerUsage & usage) == usage)
         {
             /*
@@ -457,15 +476,67 @@ static void __UpdateNativeWindowProducerUsage(
              */
             usage |= GRALLOC_USAGE_DUMMY_VIV;
         }
+#endif
 
         /* Pass usage to android framework. */
         ALOGV(" %s: surf=%p win=%p producerUsage=0x%08X", __func__, surf, win, usage);
         native_window_set_usage(win, usage);
 
         /* Store buffer usage. */
+#ifdef DRM_GRALLOC
+        surf->producerUsage = usage;
+#else
         surf->producerUsage = (usage & ~GRALLOC_USAGE_DUMMY_VIV);
+#endif
     }
 }
+
+#ifdef DRM_GRALLOC
+
+static VkResult __WrapNativeWindowBufferMemory(
+    VkDevice device,
+    ANativeWindowBuffer_t *nativeBuffer,
+    const VkAllocationCallbacks *pAllocator,
+    VkDeviceMemory *pMemory
+    )
+{
+    int err, fd;
+    VkMemoryAllocateInfo allocInfo;
+    __VkMemoryImportInfo importInfo;
+    native_handle_t * handle = (native_handle_t*)nativeBuffer->handle;
+
+    err = gralloc_handle_validate(handle);
+    if (err)
+    {
+        /* Invalid handle. */
+        ALOGE("%s(%d): invalid buffer=%p", __func__, __LINE__, nativeBuffer);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
+    if (fd < 0)
+    {
+        ALOGE("%s(%d): invalid fd=%d", __func__, __LINE__, fd);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    allocInfo = (VkMemoryAllocateInfo) {
+        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext              = NULL,
+        .allocationSize     = 0,
+        .memoryTypeIndex    = 0,
+    };
+
+    importInfo = (__VkMemoryImportInfo) {
+        .type              = __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF,
+        .u.dmaBuf.dmaBufFd = fd,
+    };
+
+    return __vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, pMemory);
+}
+
+#else
 
 /*
  * Wrap native window buffer to __vkDeviceMemory
@@ -500,6 +571,7 @@ static VkResult __WrapNativeWindowBufferMemory(
 
     return __vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, pMemory);
 }
+#endif
 
 static inline void __GetNativeWindowBufferSize(
     ANativeWindowBuffer_t *nativeBuffer,
@@ -1369,8 +1441,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetSwapchainGrallocUsageANDROID(
     )
 {
     *grallocUsage = GRALLOC_USAGE_HW_RENDER
-                  | GRALLOC_USAGE_HW_TEXTURE
-                  | GRALLOC_USAGE_RENDER_TARGET_NO_TS_VIV;
+#ifdef DRM_GRALLOC
+                  | GRALLOC_USAGE_TILED_VIV
+#else
+                  | GRALLOC_USAGE_RENDER_TARGET_NO_TS_VIV
+#endif
+                  | GRALLOC_USAGE_HW_TEXTURE;
 
     return VK_SUCCESS;
 }

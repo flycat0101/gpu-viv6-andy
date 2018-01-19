@@ -23,27 +23,25 @@
 
 #include <cutils/log.h>
 
-#include <pixelflinger/format.h>
-
 #if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
-#   undef LOGE
-#   undef LOGW
-#   undef LOGI
-#   undef LOGD
-#   undef LOGV
-#   define LOGE(...) ALOGE(__VA_ARGS__)
-#   define LOGW(...) ALOGW(__VA_ARGS__)
-#   define LOGI(...) ALOGI(__VA_ARGS__)
-#   define LOGD(...) ALOGD(__VA_ARGS__)
-#   define LOGV(...) ALOGV(__VA_ARGS__)
+#  include <ui/ANativeObjectBase.h>
+#  undef LOGE
+#  undef LOGW
+#  undef LOGI
+#  undef LOGD
+#  undef LOGV
+#  define LOGE(...) ALOGE(__VA_ARGS__)
+#  define LOGW(...) ALOGW(__VA_ARGS__)
+#  define LOGI(...) ALOGI(__VA_ARGS__)
+#  define LOGD(...) ALOGD(__VA_ARGS__)
+#  define LOGV(...) ALOGV(__VA_ARGS__)
 #else
-#   include <ui/android_native_buffer.h>
-#   include <ui/egl/android_natives.h>
+#  include <ui/android_native_buffer.h>
+#  include <ui/egl/android_natives.h>
 #endif
 
 #if ANDROID_SDK_VERSION >= 17
-#   include <sync/sync.h>
+#  include <sync/sync.h>
 #endif
 
 #include <hardware/gralloc.h>
@@ -53,14 +51,15 @@
 #  include <gc_hal_engine_vg.h>
 #endif
 
-#if gcdDRM_GRALLOC
-#   include <gralloc_drm_vivante.h>
-#   include <gralloc_drm_priv.h>
-#   include <gralloc_drm.h>
-#   include <vivante/vivante_bo.h>
-#   include "gc_hal_user.h"
+#ifdef DRM_GRALLOC
+#  include <drm.h>
+#  include <vivante_drm.h>
+#  include <vivante_bo.h>
+#  include <gralloc_vivante_bo.h>
+#  include <gralloc_handle.h>
+#  include "gc_hal_user.h"
 #else
-#   include <gc_gralloc_priv.h>
+#  include <gc_gralloc_priv.h>
 #endif
 
 typedef struct ANativeWindow *       PlatformWindowType;
@@ -147,6 +146,42 @@ _DeinitLocalDisplayInfo(
     return EGL_TRUE;
 }
 
+/*
+ * These format are removed in system/graphics.h after Kitkat, but
+ * are still defined in ui/PixelFormat.h.
+ * Keep for compatibility.
+ */
+#if ANDROID_SDK_VERSION >= 19
+#  define HAL_PIXEL_FORMAT_RGBA_5551  6
+#  define HAL_PIXEL_FORMAT_RGBA_4444  7
+#endif
+
+static const struct
+{
+    int redSize;
+    int greenSize;
+    int blueSize;
+    int alphaSize;
+
+    int luminanceSize;
+
+    gceSURF_FORMAT halFormat;
+}
+_AndroidPixelFormats[] =
+{
+    {0, 0, 0, 0, 0, gcvSURF_UNKNOWN},  /* PIXEL_FORMAT_NONE. */
+    {8, 8, 8, 8, 0, gcvSURF_A8B8G8R8}, /* HAL_PIXEL_FORMAT_RGBA_8888 */
+    {8, 8, 8, 0, 0, gcvSURF_X8B8G8R8}, /* HAL_PIXEL_FORMAT_RGBX_8888 */
+    {8, 8, 8, 0, 0, gcvSURF_UNKNOWN},  /* HAL_PIXEL_FORMAT_RGB_888, not supported */
+    {5, 6, 5, 0, 0, gcvSURF_R5G6B5},   /* HAL_PIXEL_FORMAT_RGB_565 */
+    {8, 8, 8, 8, 0, gcvSURF_A8R8G8B8}, /* HAL_PIXEL_FORMAT_BGRA_8888 */
+    {5, 5, 5, 1, 0, gcvSURF_R5G5B5A1}, /* HAL_PIXEL_FORMAT_RGBA_5551 */
+    {4, 4, 4, 4, 0, gcvSURF_R4G4B4A4}, /* HAL_PIXEL_FORMAT_RGBA_4444 */
+    {0, 0, 0, 8, 0, gcvSURF_A8},       /* PIXEL_FORMAT_A8 */
+    {0, 0, 0, 0, 8, gcvSURF_L8},       /* PIXEL_FORMAT_L8 */
+    {0, 0, 0, 8, 8, gcvSURF_A8L8},     /* PIXEL_FORMAT_LA_88 */
+};
+
 static EGLint
 _GetNativeVisualId(
     IN VEGLDisplay Display,
@@ -162,7 +197,7 @@ _GetNativeVisualId(
     switch (patchId)
     {
     case gcvPATCH_TEMPLERUN:
-        id = GGL_PIXEL_FORMAT_RGB_565;
+        id = HAL_PIXEL_FORMAT_RGB_565;
         return id;
 
     default:
@@ -172,15 +207,15 @@ _GetNativeVisualId(
     switch (Config->bufferSize)
     {
     case 16:
-        id = (Config->greenSize == 6) ? GGL_PIXEL_FORMAT_RGB_565
-           : (Config->greenSize == 5) ? GGL_PIXEL_FORMAT_RGBA_5551
-           : GGL_PIXEL_FORMAT_RGBA_4444;
+        id = (Config->greenSize == 6) ? HAL_PIXEL_FORMAT_RGB_565
+           : (Config->greenSize == 5) ? HAL_PIXEL_FORMAT_RGBA_5551
+           : HAL_PIXEL_FORMAT_RGBA_4444;
         break;
 
     case 32:
-        id = (Config->alphaSize == 0) ? GGL_PIXEL_FORMAT_RGBX_8888
-           : (Config->swizzleRB == EGL_TRUE) ? GGL_PIXEL_FORMAT_BGRA_8888
-           : GGL_PIXEL_FORMAT_RGBA_8888;
+        id = (Config->alphaSize == 0) ? HAL_PIXEL_FORMAT_RGBX_8888
+           : (Config->swizzleRB == EGL_TRUE) ? HAL_PIXEL_FORMAT_BGRA_8888
+           : HAL_PIXEL_FORMAT_RGBA_8888;
         break;
 
     default:
@@ -502,25 +537,34 @@ _TranslateFormat(
     IN int Format
     )
 {
-    /* Convert Android format to surface format. */
-    switch (Format)
+    if (Format > 0 && Format < (int)gcmCOUNTOF(_AndroidPixelFormats))
     {
-    case GGL_PIXEL_FORMAT_RGB_565:
-        return gcvSURF_R5G6B5;
-    case GGL_PIXEL_FORMAT_RGBA_8888:
-        return gcvSURF_A8B8G8R8;
-    case GGL_PIXEL_FORMAT_RGBX_8888:
-        return gcvSURF_X8B8G8R8;
-    case GGL_PIXEL_FORMAT_RGBA_4444:
-        return gcvSURF_R4G4B4A4;
-    case GGL_PIXEL_FORMAT_RGBA_5551:
-        return gcvSURF_R5G5B5A1;
-    case GGL_PIXEL_FORMAT_BGRA_8888:
-        return gcvSURF_A8R8G8B8;
-    case GGL_PIXEL_FORMAT_A_8:
-        return gcvSURF_A8;
-    default:
-        return gcvSURF_UNKNOWN;
+        return _AndroidPixelFormats[Format].halFormat;
+    }
+    else
+    {
+        switch (Format)
+        {
+        case HAL_PIXEL_FORMAT_YV12:
+            return gcvSURF_YV12;
+#if ANDROID_SDK_VERSION >= 18
+        case HAL_PIXEL_FORMAT_YCbCr_420_888:
+            return gcvSURF_NV12;
+#endif
+#if ANDROID_SDK_VERSION >= 24
+        case HAL_PIXEL_FORMAT_YCbCr_422_888:
+            return gcvSURF_YUY2;
+#endif
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+            return gcvSURF_NV16;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            return gcvSURF_NV21;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            return gcvSURF_YUY2;
+        default:
+            LOGE("%s: unknown android format=%x", __func__, Format);
+            return gcvSURF_UNKNOWN;
+        }
     }
 }
 
@@ -584,9 +628,9 @@ _GetWindowProperties(
         Info->bufferHeight = buffer->height;
 
         /* Get alloc flags and usage (combined consumer and producer usage). */
-#if gcdDRM_GRALLOC
+#ifdef DRM_GRALLOC
         flags = 0;
-        usage = ((struct gralloc_drm_handle_t*)buffer->handle)->usage;
+        usage = buffer->usage;
 #else
         flags = ((struct private_handle_t*)buffer->handle)->flags;
         usage = gc_native_handle_get(buffer->handle)->allocUsage;
@@ -716,7 +760,6 @@ _SetBufferCount(
         int minUndequeued;
         android_native_buffer_t *buffer;
         android_native_buffer_t *buffer2;
-        struct private_handle_t * handle;
 
         /* Set default value to 0. */
         Info->bufferCount = 0;
@@ -853,16 +896,18 @@ _ApiDisconnect(
 #endif
 }
 
-#if gcdDRM_GRALLOC
+#ifdef DRM_GRALLOC
+
 static gceSURF_FORMAT
 _TranslateANativeBufferFormat(
-    struct gralloc_drm_handle_t * Handle
+    android_native_buffer_t * Buffer,
+    EGLint RenderMode
     )
 {
-    if (Handle->usage & GRALLOC_USAGE_TILED_VIV)
+    if (Buffer->usage & GRALLOC_USAGE_TILED_VIV)
     {
         /* Use internal format for direct rendering. */
-        switch (Handle->format)
+        switch (Buffer->format)
         {
         case HAL_PIXEL_FORMAT_RGBA_8888:
             return gcvSURF_A8R8G8B8;
@@ -883,18 +928,153 @@ _TranslateANativeBufferFormat(
 
         default:
             ALOGE("%s: unsupported android format: %d",
-                  __func__, Handle->format);
+                  __func__, Buffer->format);
             return gcvSURF_UNKNOWN;
         }
     }
     else
     {
-        return _TranslateFormat(Handle->format);
+        return _TranslateFormat(Buffer->format);
     }
 }
 
+/*
+ * Get Vivante bo tiling and matched type.
+ *
+ * EGL_TRUE on success.
+ *   Out type gcvSURF_TYPE_UNKNOWN if can not find a matched type.
+ * EGL_FALSE on error.
+ */
 static EGLBoolean
-_CreateANativeBufferSurface(
+_GetVivanteDrmBoType(
+    struct gralloc_vivante_bo_t * bo,
+    EGLint RenderMode,
+    struct drm_vivante_bo_tiling * TilingArgs,
+    gceSURF_TYPE * Type
+    )
+{
+    gceSURF_TYPE type;
+    int err;
+
+    /* GPU buffers. Get tiling information. */
+    err = drm_vivante_bo_get_tiling(bo->bo, TilingArgs);
+
+    if (err)
+    {
+        ALOGE("%s: failed to get bo tiling", __func__);
+        return EGL_FALSE;
+    }
+
+    /* Determine surface type for GPU buffers from bo tiling. */
+    switch (TilingArgs->tiling_mode)
+    {
+    case DRM_VIV_GEM_TILING_LINEAR:
+        type = gcvSURF_BITMAP;
+        break;
+
+    case DRM_VIV_GEM_TILING_TILED:
+        type = gcvSURF_TEXTURE;
+        break;
+
+    case DRM_VIV_GEM_TILING_SUPERTILED:
+        type = (TilingArgs->ts_mode == DRM_VIV_GEM_TS_NONE) ?
+               gcvSURF_RENDER_TARGET_NO_TILE_STATUS : gcvSURF_RENDER_TARGET;
+        break;
+
+    default:
+        ALOGE("%s: unsupported tiling_mode: %d",
+              __func__, TilingArgs->tiling_mode);
+        return EGL_FALSE;
+    }
+
+    /* Override type for window buffer according to renderMode. */
+    switch (RenderMode)
+    {
+    case VEGL_DIRECT_RENDERING_NOFC:
+        type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+
+        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
+            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_NONE))
+        {
+            /* Can not support. */
+            type = gcvSURF_TYPE_UNKNOWN;
+            break;
+        }
+        break;
+    case VEGL_DIRECT_RENDERING_FC_NOCC:
+    case VEGL_DIRECT_RENDERING_FCFILL:
+        type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+
+        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
+            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_DISABLED))
+        {
+            /* Can not support. */
+            type = gcvSURF_TYPE_UNKNOWN;
+            break;
+        }
+        break;
+    case VEGL_DIRECT_RENDERING:
+        type = gcvSURF_RENDER_TARGET;
+
+        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
+            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_DISABLED))
+        {
+            /* Can not support. */
+            type = gcvSURF_TYPE_UNKNOWN;
+            break;
+        }
+        break;
+
+    case VEGL_INDIRECT_RENDERING:
+#if gcdGPU_LINEAR_BUFFER_ENABLED
+        type = gcvSURF_BITMAP;
+
+        if (TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_LINEAR)
+        {
+            ALOGI("%s: incorrect tiling_mode: %x requirex %x",
+                __func__, TilingArgs->tiling_mode, DRM_VIV_GEM_TILING_LINEAR);
+        }
+#else
+        type = gcvSURF_TEXTURE;
+
+        if (TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_TILED)
+        {
+            ALOGI("%s: incorrect tiling_mode: %x requires %x",
+                __func__, TilingArgs->tiling_mode, DRM_VIV_GEM_TILING_TILED);
+        }
+#endif
+        if (TilingArgs->ts_mode != DRM_VIV_GEM_TS_NONE)
+        {
+            ALOGI("%s: ts not required, but allocated", __func__);
+        }
+        break;
+
+    case -1:
+    default:
+        /* Do not override, for texture. */
+        break;
+    }
+
+    *Type = type;
+    return EGL_TRUE;
+}
+
+static inline EGLBoolean
+_GetGenericDrmBufferType(
+    android_native_buffer_t * Buffer,
+    EGLint RenderMode,
+    gceSURF_TYPE * Type
+    )
+{
+    *Type = (RenderMode > VEGL_INDIRECT_RENDERING)
+          ? gcvSURF_TYPE_UNKNOWN : gcvSURF_BITMAP;
+
+    return EGL_TRUE;
+}
+
+/* Generic drm buffer is treated as linear. */
+static EGLBoolean
+_CreateGenericDrmBufferSurface(
     android_native_buffer_t * Buffer,
     gceSURF_TYPE Type,
     gceSURF_FORMAT Format,
@@ -902,8 +1082,85 @@ _CreateANativeBufferSurface(
     )
 {
     gceSTATUS status;
+    native_handle_t * handle;
+    gctUINT stride = (gctUINT)Buffer->stride;
+    int fd;
+
+    /* Translate stride in bytes to in pixels. */
+    switch (Format)
+    {
+    case gcvSURF_A8R8G8B8:
+    case gcvSURF_X8R8G8B8:
+    case gcvSURF_A8B8G8R8:
+    case gcvSURF_X8B8G8R8:
+        stride *= 4;
+        break;
+
+    case gcvSURF_R5G6B5:
+    case gcvSURF_R4G4B4A4:
+    case gcvSURF_R5G5B5A1:
+    case gcvSURF_YUY2:
+    case gcvSURF_UYVY:
+    case gcvSURF_YVYU:
+    case gcvSURF_VYUY:
+        stride *= 2;
+        break;
+
+    case gcvSURF_NV12:
+    case gcvSURF_NV21:
+    case gcvSURF_NV16:
+    case gcvSURF_NV61:
+    case gcvSURF_YV12:
+    case gcvSURF_I420:
+        break;
+
+    default:
+        ALOGE("%s: unknown format=%x", __func__, Format);
+        *Surface = gcvNULL;
+        return EGL_FALSE;
+    }
+
+    handle = (native_handle_t *)Buffer->handle;
+    fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
+
+    if (fd < 0)
+    {
+        ALOGE("%s: invalid fd=%d", __func__, fd);
+        return EGL_FALSE;
+    }
+
+    status = gcoSURF_WrapUserMemory(gcvNULL,
+                                    Buffer->width,
+                                    Buffer->height,
+                                    stride,
+                                    1,
+                                    gcvSURF_BITMAP,
+                                    Format,
+                                    (gctUINT32)fd,
+                                    gcvALLOC_FLAG_DMABUF,
+                                    Surface);
+
+    if (gcmIS_SUCCESS(status))
+    {
+        gcoSURF_SetFlags(*Surface,
+                         gcvSURF_FLAG_CONTENT_YINVERTED,
+                         gcvTRUE);
+    }
+
+    return gcmIS_SUCCESS(status) ? EGL_TRUE : EGL_FALSE;
+}
+
+static EGLBoolean
+_CreateVivanteDrmBufferSurface(
+    android_native_buffer_t * Buffer,
+    struct gralloc_vivante_bo_t * Bo,
+    gceSURF_TYPE Type,
+    gceSURF_FORMAT Format,
+    gcoSURF * Surface
+    )
+{
+    gceSTATUS status;
     gcoSURF surface = gcvNULL;
-    struct gralloc_drm_handle_t * handle;
     struct gralloc_vivante_bo_t * bo;
     uint32_t node = 0, tsNode = 0;
     uint64_t param;
@@ -911,18 +1168,8 @@ _CreateANativeBufferSurface(
     gctSIZE_T size;
     int err;
 
-    handle = (struct gralloc_drm_handle_t *)Buffer->handle;
-
-    bo = (struct gralloc_vivante_bo_t *)
-            gralloc_drm_bo_from_handle(Buffer->handle);
-
-    if (!bo)
-    {
-        return EGL_FALSE;
-    }
-
     /* Get pool type. */
-    err = drm_vivante_bo_query(bo->bo, DRM_VIV_GEM_PARAM_POOL, &param);
+    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_POOL, &param);
 
     if (err)
     {
@@ -930,7 +1177,7 @@ _CreateANativeBufferSurface(
     }
     pool = (gcePOOL)param;
 
-    err = drm_vivante_bo_query(bo->bo, DRM_VIV_GEM_PARAM_SIZE, &param);
+    err = drm_vivante_bo_query(Bo->bo, DRM_VIV_GEM_PARAM_SIZE, &param);
 
     if (err)
     {
@@ -943,12 +1190,12 @@ _CreateANativeBufferSurface(
 
     /* Create surface wraper. */
     gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                 handle->width, handle->height, 1,
+                                 Buffer->width, Buffer->height, 1,
                                  Type, Format, (gcePOOL)pool,
                                  &surface));
 
     /* Reference and get node. */
-    err = drm_vivante_bo_ref_node(bo->bo, &node, &tsNode);
+    err = drm_vivante_bo_ref_node(Bo->bo, &node, &tsNode);
 
     if (err)
     {
@@ -962,6 +1209,10 @@ _CreateANativeBufferSurface(
     surface->node.pool          = pool;
     surface->node.size          = size; /* ??? */
 
+    /* shared mutex, for what? */
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL,
+                                 &surface->node.sharedMutex));
+
 #if gcdENABLE_3D
     if (tsNode != 0)
     {
@@ -969,7 +1220,6 @@ _CreateANativeBufferSurface(
         surface->tileStatusNode.pool          = pool; /* ??? */
         surface->tileStatusNode.size          = size >> 8; /* ??? */
 
-        /* shared mutex, for what? */
         gcmONERROR(gcoOS_CreateMutex(gcvNULL,
                                      &surface->tileStatusNode.sharedMutex));
     }
@@ -1002,73 +1252,63 @@ _GetANativeBufferSurface(
     gcoSURF * Surface
     )
 {
-    gcoSURF surface;
+    gcoSURF surface = gcvNULL;
     gceSURF_TYPE type;
     gceSURF_FORMAT format;
-    gceTILING tiling;
+    EGLBoolean success;
 
-    struct gralloc_drm_handle_t * handle;
-    struct gralloc_vivante_bo_t *bo;
+    struct gralloc_vivante_bo_t * bo;
     struct drm_vivante_bo_tiling tilingArgs;
     int err;
 
-    handle = (struct gralloc_drm_handle_t *)Buffer->handle;
-
-    bo = (struct gralloc_vivante_bo_t *)
-                gralloc_drm_bo_from_handle(Buffer->handle);
-
-    err = drm_vivante_bo_get_tiling(bo->bo, &tilingArgs);
-
-    if (err)
-    {
-        ALOGE("%s: failed to get bo tiling", __func__);
-        return EGL_FALSE;
-    }
-
-    format = _TranslateANativeBufferFormat(handle);
+    format = _TranslateANativeBufferFormat(Buffer, RenderMode);
 
     if (format == gcvSURF_UNKNOWN)
     {
         return EGL_FALSE;
     }
 
-    if (RenderMode >= 0)
+    err = gralloc_handle_validate(Buffer->handle);
+
+    if (err)
     {
-        /* Client: Determine rendering type by render-mode. */
-        switch (RenderMode)
-        {
-        case VEGL_DIRECT_RENDERING_NOFC:
-            type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
-            ALOGE_IF(tilingArgs.ts_mode != DRM_VIV_GEM_TS_NONE,
-                     "%s: ts not required, but allocated", __func__);
-            break;
-        case VEGL_DIRECT_RENDERING_FC_NOCC:
-            type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
-            ALOGE_IF(tilingArgs.ts_mode != DRM_VIV_GEM_TS_DISABLED,
-                     "%s: ts required, but not allocated", __func__);
-            break;
-        case VEGL_DIRECT_RENDERING_FCFILL:
-        case VEGL_DIRECT_RENDERING:
-            type = gcvSURF_RENDER_TARGET;
-            ALOGE_IF(tilingArgs.ts_mode != DRM_VIV_GEM_TS_DISABLED,
-                     "%s: ts required, but not allocated", __func__);
-            break;
+        /* Invalid handle. */
+        ALOGE("%s: invalid buffer=%p", __func__, Buffer);
+        return EGL_FALSE;
+    }
 
-        default:
-#if gcdGPU_LINEAR_BUFFER_ENABLED
-            type = gcvSURF_BITMAP;
-#else
-            type = gcvSURF_TEXTURE;
-#endif
-            ALOGE_IF(tilingArgs.ts_mode != DRM_VIV_GEM_TS_NONE,
-                     "%s: ts not required, but allocated", __func__);
-            break;
-        }
+    /* Try get gralloc_vivante_bo. */
+    bo = gralloc_vivante_bo_from_handle(Buffer->handle);
 
-        if (!_CreateANativeBufferSurface(Buffer, type, format, &surface))
+    if (bo)
+    {
+        if (!_GetVivanteDrmBoType(bo, RenderMode, &tilingArgs, &type))
         {
             return EGL_FALSE;
         }
+
+        /* Create drm buffer by vivante drm interface. */
+        success = _CreateVivanteDrmBufferSurface(Buffer, bo, type, format, &surface);
+    }
+    else
+    {
+        if (!_GetGenericDrmBufferType(Buffer, RenderMode, &type))
+        {
+            return EGL_FALSE;
+        }
+
+        /* Create drm buffer by generic drm interface. */
+        success = _CreateGenericDrmBufferSurface(Buffer, type, format, &surface);
+    }
+
+    if (!success)
+    {
+        return EGL_FALSE;
+    }
+
+    if (bo && RenderMode >= 0)
+    {
+        gceTILING tiling = gcvINVALIDTILED;
 
         /* Tiling correction. */
         gcoSURF_GetTiling(surface, &tiling);
@@ -1076,64 +1316,100 @@ _GetANativeBufferSurface(
         switch (tiling)
         {
         case gcvLINEAR:
-            ALOGI_IF(tilingArgs.tiling_mode != DRM_VIV_GEM_TILING_LINEAR,
-                     "%s: linear tiling incorrect: %d",
-                     __func__, tilingArgs.tiling_mode);
             tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
             break;
-
         case gcvTILED:
-            ALOGI_IF(tilingArgs.tiling_mode != DRM_VIV_GEM_TILING_TILED,
-                     "%s: tiled tiling incorrect: %d",
-                     __func__, tilingArgs.tiling_mode);
             tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
             break;
-
-        case DRM_VIV_GEM_TILING_SUPERTILED:
-            ALOGI_IF(tilingArgs.tiling_mode != DRM_VIV_GEM_TILING_TILED,
-                     "%s: supertiled tiling incorrect: %d",
-                     __func__, tilingArgs.tiling_mode);
-            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
+        case gcvSUPERTILED:
+            tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
             break;
-
         default:
-            ALOGE("%s: not supported tiling %d", __func__, tiling);
+            /* Unknown surface tiling. */
             gcoSURF_Destroy(surface);
             return EGL_FALSE;
         }
 
-        drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
+        err = drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
 
-        *Surface = surface;
-        return EGL_TRUE;
+        if (err)
+        {
+            return EGL_FALSE;
+        }
+    }
+
+    if (bo)
+    {
+        surface->tileStatusDisabled[0] =
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
+    }
+
+    *Surface = surface;
+    return EGL_TRUE;
+}
+
+static EGLBoolean
+_ValidateRenderMode(
+    struct ANativeWindow * Win,
+    EGLint RenderMode,
+    EGLint * OutRenderMode
+    )
+{
+    int err;
+    android_native_buffer_t * buffer;
+    struct gralloc_vivante_bo_t *bo;
+    struct drm_vivante_bo_tiling tilingArgs;
+    EGLBoolean success = EGL_FALSE;
+    gceSURF_TYPE type = gcvSURF_TYPE_UNKNOWN;
+
+    err = _DequeueBuffer(Win, &buffer);
+
+    if (err < 0)
+    {
+        /* Failed to dequeue buffer. */
+        return EGL_FALSE;
+    }
+
+    buffer->common.incRef(&buffer->common);
+
+    err = gralloc_handle_validate(buffer->handle);
+
+    if (err)
+    {
+        /* Invalid handle. */
+        ALOGE("%s: invalid buffer=%p", __func__, buffer);
+        success = EGL_FALSE;
+        goto out;
+    }
+
+    /* Try get gralloc_vivante_bo. */
+    bo = gralloc_vivante_bo_from_handle(buffer->handle);
+
+    if (bo)
+    {
+        /* Try to get matched surface type for buffer and renderMode. */
+        success = _GetVivanteDrmBoType(bo, RenderMode, &tilingArgs, &type);
     }
     else
     {
-        /* Server: Determine type by tiling. */
-        switch (tilingArgs.tiling_mode)
-        {
-        case DRM_VIV_GEM_TILING_LINEAR:
-            type = gcvSURF_BITMAP;
-            break;
-
-        case DRM_VIV_GEM_TILING_TILED:
-            type = gcvSURF_TEXTURE;
-            break;
-
-        case DRM_VIV_GEM_TILING_SUPERTILED:
-            type = (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ?
-                   gcvSURF_RENDER_TARGET_NO_TILE_STATUS : gcvSURF_RENDER_TARGET;
-            break;
-
-        default:
-            ALOGE("%s: unsupported tiling: %d",
-                  __func__, tilingArgs.tiling_mode);
-            return EGL_FALSE;
-        }
-
-        return _CreateANativeBufferSurface(Buffer, type, format, Surface);
+        success = _GetGenericDrmBufferType(buffer, RenderMode, &type);
     }
+
+    if (success)
+    {
+        /* Fail back to indirect rendering if not matched. */
+        *OutRenderMode = (type == gcvSURF_TYPE_UNKNOWN)
+                       ? VEGL_INDIRECT_RENDERING : RenderMode;
+    }
+
+out:
+    buffer->common.decRef(&buffer->common);
+    _CancelBuffer(Win, buffer);
+
+    return success;
 }
+
 #else
 
 static EGLBoolean
@@ -1161,6 +1437,16 @@ _GetANativeBufferSurface(
     gcoSURF_ReferenceSurface(surface);
 
     *Surface = surface;
+    return EGL_TRUE;
+}
+
+static inline EGLBoolean
+_ValidateRenderMode(
+    struct ANativeWindow * Win,
+    EGLint RenderMode,
+    EGLint * OutRenderMode
+    )
+{
     return EGL_TRUE;
 }
 #endif
@@ -1196,6 +1482,7 @@ _UpdateBufferCache(
     EGLint i;
     VEGLWindowInfo info = EglSurface->winInfo;
     void * handle = (void *) Buffer->handle;
+    void * bo = NULL;
     gcoSURF surface;
 
     for (i = 0; i < info->bufferCacheCount; i++)
@@ -1208,7 +1495,8 @@ _UpdateBufferCache(
         }
     }
 
-    if (i > info->bufferCount)
+    if ((info->bufferCount > 0 && i > info->bufferCount) ||
+        info->bufferCacheCount == 32)
     {
         /* Seems buffers are out of date. */
         LOGV("%s: buffers out of data: buffer=%p", __func__, handle);
@@ -1217,7 +1505,9 @@ _UpdateBufferCache(
     }
 
     LOGV("%s: win=%p cache handle[%d]=%p", __func__, EglSurface->hwnd, i, handle);
-    if (!_GetANativeBufferSurface(Buffer, EglSurface->renderMode, &surface))
+    if (!_GetANativeBufferSurface(Buffer,
+                                  EglSurface->renderMode,
+                                  &surface))
     {
         return EGL_FALSE;
     }
@@ -1257,7 +1547,6 @@ _IsFormatCompatible(
     )
 {
     int format = 0;
-    const GGLFormat * gglFormat;
     EGLint redSize, greenSize, blueSize, alphaSize;
     EGLint redSizeRT   = 0;
     EGLint greenSizeRT = 0;
@@ -1267,13 +1556,15 @@ _IsFormatCompatible(
     /* Query native window format. */
     Win->query(Win, NATIVE_WINDOW_FORMAT, &format);
 
-    /* Get format info. */
-    gglFormat = gglGetPixelFormatTable(gcvNULL) + format;
+    if (format <= 0 || format >= (int)gcmCOUNTOF(_AndroidPixelFormats))
+    {
+        return EGL_FALSE;
+    }
 
-    redSize   = gglFormat->rh - gglFormat->rl;
-    greenSize = gglFormat->gh - gglFormat->gl;
-    blueSize  = gglFormat->bh - gglFormat->bl;
-    alphaSize = gglFormat->ah - gglFormat->al;
+    redSize   = _AndroidPixelFormats[format].redSize;
+    greenSize = _AndroidPixelFormats[format].greenSize;
+    blueSize  = _AndroidPixelFormats[format].blueSize;
+    alphaSize = _AndroidPixelFormats[format].alphaSize;
 
     /* Check pixel format compatibility. */
     if ((Config->redSize   == 0 && redSize   != 0) ||
@@ -1624,33 +1915,6 @@ _QueryRenderMode(
             renderMode = VEGL_DIRECT_RENDERING_FCFILL;
         }
 
-#if gcdENABLE_RENDER_INTO_WINDOW_WITH_FC
-        if ((mode3D >= VEGL_DIRECT_RENDERING_FC_NOCC) &&
-            ((mode2D >= VEGL_DIRECT_RENDERING_FC_NOCC) || (mode2D == -1)))
-        {
-            /* No resolve with tile status. */
-            renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
-        }
-
-        /*
-         * If has 2D and 2D has color compression support, we can use compressed
-         * output. 3D composition should be rare.
-         * If there's no 2D, and 3D TX has decompress support, we can also use
-         * compressed output.
-         */
-        if (((mode2D == VEGL_DIRECT_RENDERING) &&
-                (compressNOAA || config->samples == 4)) ||
-            ((mode2D == -1) && (mode3D == VEGL_DIRECT_RENDERING)))
-        {
-            /* No resolve with tile status, compressed. */
-            renderMode = VEGL_DIRECT_RENDERING;
-        }
-
-        if (config->samples == 4)
-        {
-            renderMode = VEGL_INDIRECT_RENDERING;
-        }
-#endif
 
         /* Special render into window mode. */
         if ((renderMode == VEGL_INDIRECT_RENDERING) &&
@@ -1691,7 +1955,7 @@ _QueryRenderMode(
 #endif
 }
 
-#if gcdDRM_GRALLOC
+#ifdef DRM_GRALLOC
 static void
 _SetBufferUsage(
     IN VEGLSurface Surface,
@@ -1737,6 +2001,7 @@ _SetBufferUsage(
 
     if (info->producerUsage != usage)
     {
+#ifndef DRM_GRALLOC
         if ((info->producerUsage & usage) == usage)
         {
             /*
@@ -1747,13 +2012,18 @@ _SetBufferUsage(
              */
             usage |= GRALLOC_USAGE_DUMMY_VIV;
         }
+#endif
 
         /* Pass usage to android framework. */
         LOGV("%s: set producerUsage to 0x%08X", __func__, usage);
         native_window_set_usage(win, usage);
 
         /* Store buffer usage. */
+#ifdef DRM_GRALLOC
+        info->producerUsage = usage;
+#else
         info->producerUsage = (usage & ~GRALLOC_USAGE_DUMMY_VIV);
+#endif
 
         /* Buffer usage changed, invalidate cached buffers. */
         _InvalidateBufferCache(Surface);
@@ -1964,22 +2234,36 @@ _BindWindow(
     OUT EGLint * RenderMode
     )
 {
+    int result;
     EGLint renderMode;
     PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
+    android_native_buffer_t *buffer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(info);
 
     LOGV("%s: win=%p", __func__, win);
 
-    /* Determine render mode. */
+    /* Query prefered render mode. */
     renderMode = _QueryRenderMode(Surface);
 
     /* Set final producer usage. */
     _SetBufferUsage(Surface, renderMode);
 
-    *RenderMode = renderMode;
+    /* Validate if selected mode can be used. */
+    if (!_ValidateRenderMode(win, renderMode, RenderMode))
+    {
+        /* Error occured. */
+        return EGL_FALSE;
+    }
+
+    if (*RenderMode != renderMode)
+    {
+        /* Render mode changed. */
+        _SetBufferUsage(Surface, *RenderMode);
+    }
+
     return EGL_TRUE;
 }
 
@@ -2166,6 +2450,58 @@ _QueryBufferAge(
     return EGL_FALSE;
 }
 
+#ifdef DRM_GRALLOC
+static void
+_PushBufferStatus(
+    android_native_buffer_t * Buffer,
+    gcoSURF Surface
+    )
+{
+    int err;
+    struct gralloc_vivante_bo_t * bo;
+    struct drm_vivante_bo_tiling tilingArgs;
+    uint64_t timeStamp = 0;
+    gceTILING tiling = gcvINVALIDTILED;
+
+    bo = gralloc_vivante_bo_from_handle(Buffer->handle);
+
+    if (!bo)
+    {
+        /* Not GPU-buffer, skip. */
+        return;
+    }
+
+    gcoSURF_GetTiling(Surface, &tiling);
+
+    switch (tiling)
+    {
+    case gcvLINEAR:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_LINEAR;
+        break;
+    case gcvTILED:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_TILED;
+        break;
+    case gcvSUPERTILED:
+        tilingArgs.tiling_mode = DRM_VIV_GEM_TILING_SUPERTILED;
+        break;
+    default:
+        /* Unknown surface tiling. */
+        return;
+    }
+
+    tilingArgs.ts_mode = Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
+                       : Surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
+                       : !Surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_NORMAL
+                       : DRM_VIV_GEM_TS_DISABLED;
+
+    tilingArgs.clear_value = ((uint64_t)Surface->fcValueUpper[0]) << 32
+                           | Surface->fcValue[0];
+
+    drm_vivante_bo_set_tiling(bo->bo, &tilingArgs);
+    drm_vivante_bo_inc_timestamp(bo->bo, &timeStamp);
+}
+#endif
+
 static EGLBoolean
 _PostWindowBackBuffer(
     IN VEGLDisplay Display,
@@ -2186,8 +2522,9 @@ _PostWindowBackBuffer(
     LOGV("%s: win=%p buffer=%p surface=%p", __func__,
          win, buffer, BackBuffer->surface);
 
-#if gcdDRM_GRALLOC
-    /* TODO: ts info update. */
+#ifdef DRM_GRALLOC
+    /* Update buffer ts info and timestamp. */
+    _PushBufferStatus(buffer, BackBuffer->surface);
 #else
     /* Surface has changed. */
     gcmVERIFY_OK(gcoSURF_UpdateTimeStamp(BackBuffer->surface));
@@ -2227,8 +2564,9 @@ _PostWindowBackBufferFence(
     LOGV("%s: win=%p buffer=%p surface=%p", __func__,
          win, buffer, BackBuffer->surface);
 
-#if gcdDRM_GRALLOC
-    /* TODO: ts info update. */
+#ifdef DRM_GRALLOC
+    /* Update buffer ts info and timestamp. */
+    _PushBufferStatus(buffer, BackBuffer->surface);
 #else
     /* Surface has changed. */
     gcmVERIFY_OK(gcoSURF_UpdateTimeStamp(BackBuffer->surface));
@@ -2985,8 +3323,62 @@ _UpdateANativeBuffer(
     khrEGL_IMAGE * Image
     )
 {
-#if gcdDRM_GRALLOC
-    /* TODO: ts info update. */
+#ifdef DRM_GRALLOC
+    int err;
+    android_native_buffer_t * buffer;
+    struct gralloc_vivante_bo_t * bo;
+    struct drm_vivante_bo_tiling tilingArgs;
+    gcoSURF surface = Image->surface;
+    uint64_t timeStamp = 0;
+
+    buffer = Image->u.ANativeBuffer.nativeBuffer;
+
+    bo = gralloc_vivante_bo_from_handle(buffer->handle);
+
+    if (!bo)
+    {
+        /* Not GPU-buffer, force require update. */
+        return gcvTRUE;
+    }
+
+    err = drm_vivante_bo_get_tiling(bo->bo, &tilingArgs);
+
+    if (err)
+    {
+        /* Error. */
+        return gcvTRUE;
+    }
+
+    err = drm_vivante_bo_get_timestamp(bo->bo, &timeStamp);
+
+    if (err)
+    {
+        return gcvTRUE;
+    }
+
+    if (timeStamp == Image->u.ANativeBuffer.timeStamp)
+    {
+        /* surface is not updated. */
+        return gcvFALSE;
+    }
+
+    /* Update tile status information. */
+    switch (tilingArgs.ts_mode)
+    {
+    case DRM_VIV_GEM_TS_COMPRESSED:
+        surface->compressed = gcvTRUE;
+    case DRM_VIV_GEM_TS_NORMAL:
+        surface->tileStatusDisabled[0] = gcvFALSE;
+        surface->fcValue[0]      = (gctUINT32)tilingArgs.clear_value;
+        surface->fcValueUpper[0] = (gctUINT32)(tilingArgs.clear_value >> 32);
+        break;
+    case DRM_VIV_GEM_TS_DISABLED:
+        surface->tileStatusDisabled[0] = gcvTRUE;
+        break;
+    default:
+        break;
+    }
+
     return gcvTRUE;
 #else
     gceSTATUS status;

@@ -852,46 +852,6 @@ _CreateImageRenderBuffer(
 }
 
 #if defined(ANDROID)
-#if gcdDRM_GRALLOC
-static EGLBoolean
-_GetANativeBufferSurface(
-    android_native_buffer_t * Buffer,
-    gcoSURF * Surface
-    )
-{
-    return EGL_FALSE;
-}
-
-#  else
-#    include <gc_gralloc_priv.h>
-static EGLBoolean
-_GetANativeBufferSurface(
-    android_native_buffer_t * Buffer,
-    gcoSURF * Surface
-    )
-{
-    gcoSURF surface;
-
-    if (!Buffer->handle)
-    {
-        return EGL_FALSE;
-    }
-
-    surface = (gcoSURF)gcmUINT64_TO_PTR(
-                    gc_native_handle_get(Buffer->handle)->surface);
-
-    if (!surface)
-    {
-        return EGL_FALSE;
-    }
-
-    gcoSURF_ReferenceSurface(surface);
-
-    *Surface = surface;
-    return EGL_TRUE;
-}
-#  endif
-
 static VEGLImage
 _CreateImageANativeBuffer(
     VEGLThreadData Thread,

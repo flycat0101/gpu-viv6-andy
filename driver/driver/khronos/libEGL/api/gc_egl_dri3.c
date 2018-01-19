@@ -3686,6 +3686,6 @@ veglGetX11Platform(
         dri3support = check_dri3(dri_GetXCB(NativeDisplay));
     if (dri3support)
         return &driPlatform;
-    /* Go to DRI1 path without DRI3 support */
-    return _veglGetDRIPlatform(NativeDisplay);
+
+    return NULL;
 }

@@ -1,0 +1,33 @@
+
+Note (11/01/2017):
+
+The following directories:
+
+    DRI/...
+    DRI_1.10.4/...
+    drm/...
+
+are ONLY used for the legacy DRI framework support. They are NOT compatible with the
+latest DRI3 framework. Thus they are not used for DRI3 framework support anymore.
+
+The following directory:
+
+    EXA/...
+
+includes X11 EXA driver based on Vivante 2D GPU. It supports both DRI and DRI3 frameworks.
+
+Vivante 6.2.4 and later driver releases fully support the DRI3 framework. The DRI3 kernel driver
+support is included in the Vivante kernel driver galcore.ko. The Vivante DRI3 user-mode 
+library libdrm.so source code is included in the directory
+
+    libdrm-2.4.66/...
+
+To build X11 drivers for the DRI3 framework, set the following environment variables as:
+
+    export BUILD_OPTION_X11_DRI3=1
+    export BUILD_OPTION_EGL_API_DRI=0
+
+To build X11 drivers for the legacy DRI framework, set the following environment variables as:
+
+    export BUILD_OPTION_X11_DRI3=0
+    export BUILD_OPTION_EGL_API_DRI=1

@@ -85,7 +85,6 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/hal/os/linux/user \
-	$(AQROOT)/driver/android/gralloc \
 	$(AQROOT)/compiler/libVSC/include \
 	$(AQROOT)/compiler/libSPIRV/spvconverter
 
@@ -111,6 +110,17 @@ LOCAL_SHARED_LIBRARIES += \
 	libVSC \
 	libGAL \
 	libGLSLC
+
+ifeq ($(DRM_GRALLOC),1)
+LOCAL_C_INCLUDES += \
+	$(AQROOT)/driver/android/gralloc_drm
+
+LOCAL_CFLAGS += \
+	-DDRM_GRALLOC
+else
+LOCAL_C_INCLUDES += \
+	$(AQROOT)/driver/android/gralloc
+endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 24),1)
   LOCAL_MODULE         := libvulkan_$(GPU_VENDOR)

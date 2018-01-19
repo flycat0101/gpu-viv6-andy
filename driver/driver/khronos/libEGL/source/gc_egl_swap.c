@@ -15,12 +15,10 @@
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
-#      include <ui/ANativeObjectBase.h>
-#   else
-#      include <ui/android_native_buffer.h>
-#   endif
-
-#   include "gc_gralloc_priv.h"
+#    include <ui/ANativeObjectBase.h>
+#  else
+#    include <ui/android_native_buffer.h>
+#  endif
 #endif
 
 

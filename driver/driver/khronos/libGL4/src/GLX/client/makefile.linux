@@ -83,9 +83,15 @@ INCLUDE += \
 	-I$(TOPDIR)/include -I$(TOPDIR)/include/backend -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl  -I$(TOPDIR)/include/glcore \
 	-I$(ROOTFS_USR)/include/X11/extensions \
 	-I$(ROOTFS_USR)/include \
-	-I$(ROOTFS_USR)/include/pixman-1 \
-	-I$(ROOTFS_USR)/include/libdrm
+	-I$(ROOTFS_USR)/include/pixman-1
 
+ifeq ($(X11_DRI3),1)
+INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
+           -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
+else
+INCLUDE += -I$(ROOTFS_USR)/include/libdrm
+endif
+  
 CFLAGS += $(INCLUDE)
 
 TARGET_NAME=libGL.so.1.2

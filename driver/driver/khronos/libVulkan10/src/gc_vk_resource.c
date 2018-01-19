@@ -1088,6 +1088,43 @@ OnError:
 
 #endif
 
+static VkResult __vki_ImportDmabuf(
+    __vkDevContext *devCtx,
+    gcsSURF_NODE_PTR node,
+    int32_t fd
+    )
+{
+    VkResult result = VK_SUCCESS;
+    gcsHAL_INTERFACE iface;
+    uint32_t i;
+
+    __VK_MEMZERO(node, sizeof(gcsSURF_NODE));
+
+    iface.command = gcvHAL_WRAP_USER_MEMORY;
+    iface.u.WrapUserMemory.desc.flag   = gcvALLOC_FLAG_DMABUF;
+    iface.u.WrapUserMemory.desc.handle = fd;
+    iface.u.WrapUserMemory.desc.dmabuf = 0;
+
+    __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+
+    node->pool          = gcvPOOL_VIRTUAL;
+    node->size          = iface.u.WrapUserMemory.bytes;
+    node->u.normal.node = iface.u.WrapUserMemory.node;
+
+    node->physical2     = ~0U;
+    node->physical3     = ~0U;
+
+    for (i = 0; i < gcvHARDWARE_NUM_TYPES; i++)
+    {
+        node->hardwareAddresses[i] = ~0U;
+    }
+
+    return VK_SUCCESS;
+
+OnError:
+    return result;
+}
+
 static VkResult __vki_ImportVideoNode(
     __vkDevContext *devCtx,
     gcsSURF_NODE_PTR node,
@@ -1300,9 +1337,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
             break;
 
         case __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF:
-            /* Not supported yet. */
-            __VK_ASSERT(0);
+            result = __vki_ImportDmabuf(devCtx, &dvm->node, pImportInfo->u.dmaBuf.dmaBufFd);
+
+            /* Since dmabuf didn't know it's size in user mode, need to update user size after kernel retrive it */
+            if (__VK_IS_SUCCESS(result))
+            {
+                dvm->size = (gctSIZE_T)dvm->node.size;
+                dvm->allocInfo.allocationSize = (VkDeviceSize)dvm->node.size;
+            }
             break;
+
         default:
             __VK_ASSERT(0);
             break;
@@ -2043,7 +2087,66 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyBufferView(
 }
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
-/* TODO: drm gralloc. */
+#ifdef DRM_GRALLOC
+
+#include <gralloc_handle.h>
+
+/* VK_ANDROID_native_buffer. */
+static VkResult __BindAndroidNativeBufferMemory(
+    VkDevice device,
+    const VkNativeBufferANDROID* pNativeBuffer,
+    const VkAllocationCallbacks* pAllocator,
+    __vkImage* image
+    )
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkMemoryAllocateInfo allocInfo;
+    __VkMemoryImportInfo importInfo;
+    native_handle_t * handle = (native_handle_t*)pNativeBuffer->handle;
+    int err, fd;
+
+    err = gralloc_handle_validate(handle);
+    if (err)
+    {
+        /* Invalid handle. */
+        ALOGE("%s(%d): invalid buffer=%p", __func__, __LINE__, pNativeBuffer);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
+    if (fd < 0)
+    {
+        ALOGE("%s(%d): invalid fd=%d", __func__, __LINE__, fd);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    allocInfo = (VkMemoryAllocateInfo) {
+        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext              = NULL,
+        .allocationSize     = 0,
+        .memoryTypeIndex    = 0,
+    };
+
+    importInfo = (__VkMemoryImportInfo) {
+        .type              = __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF,
+        .u.dmaBuf.dmaBufFd = fd,
+    };
+
+    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, &memory));
+
+    image->memory    = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
+    image->memOffset = 0;
+    image->residentMemory = VK_TRUE;
+
+OnError:
+    return result;
+}
+
+#else
+
 #include <gc_gralloc_priv.h>
 
 /* VK_ANDROID_native_buffer. */
@@ -2087,6 +2190,7 @@ static VkResult __BindAndroidNativeBufferMemory(
 OnError:
     return result;
 }
+#endif
 #endif
 
 

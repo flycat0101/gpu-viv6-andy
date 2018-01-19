@@ -60,18 +60,7 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/hal/user \
 	$(AQROOT)/hal/os/linux/user \
-	$(AQROOT)/driver/android/gralloc \
 	$(AQROOT)/compiler/libVSC/include \
-
-ifeq ($(DRM_GRALLOC),1)
-LOCAL_C_INCLUDES += \
-    external/libdrm \
-    external/libdrm/include/drm \
-    external/drm_gralloc
-
-LOCAL_C_INCLUDES += \
-    hardware/imx/include
-endif
 
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
@@ -82,7 +71,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libdl \
 	libcutils \
 	libhardware \
-	libpixelflinger \
 	libGAL
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
@@ -91,9 +79,20 @@ LOCAL_SHARED_LIBRARIES += \
 endif
 
 ifeq ($(DRM_GRALLOC),1)
+LOCAL_C_INCLUDES += \
+	external/libdrm/vivante \
+	external/libdrm/include/drm \
+	$(AQROOT)/driver/android/gralloc_drm
+
 LOCAL_SHARED_LIBRARIES += \
-    libgralloc_drm \
-    libdrm_vivante
+	libdrm \
+	libdrm_vivante
+
+LOCAL_CFLAGS += \
+	-DDRM_GRALLOC
+else
+LOCAL_C_INCLUDES += \
+	$(AQROOT)/driver/android/gralloc
 endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)

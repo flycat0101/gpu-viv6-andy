@@ -87,6 +87,7 @@ LIB_EGL             := $(AQROOT)/driver/khronos/libEGL
 ifeq ($(LINUX_VSIMULATOR),0)
 LIB_LIST            += $(LIB_EGL)
 endif
+
 $(LIB_EGL):         $(LIB_GAL)
 
 .PHONY: egl
@@ -299,9 +300,12 @@ $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
 
 ifeq ($(X11_DRI3),1)
-LIB_LIST            += $(LIB_EXA)
+LIB_DRM             := $(AQROOT)/driver/X/libdrm-2.4.66
+LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
 
-$(LIB_EXA):         $(LIB_GAL)
+$(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
+$(LIB_EGL):         $(LIB_DRM)
+$(LIB_GL21):        $(LIB_DRM)
 endif # X11_DRI3
 
 
@@ -310,6 +314,7 @@ else
 ifeq ($(VIVANTE_ENABLE_2D),1)
 
 LIB_EXA             := $(AQROOT)/driver/X/EXA/src
+
 ifeq ($(EGL_API_DRI),1)
 LIB_LIST            += $(LIB_EXA)
 
@@ -317,9 +322,12 @@ $(LIB_EXA):         $(LIB_GAL)
 endif # EGL_API_DRI
 
 ifeq ($(X11_DRI3),1)
-LIB_LIST            += $(LIB_EXA)
+LIB_DRM             := $(AQROOT)/driver/X/libdrm-2.4.66
+LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
 
-$(LIB_EXA):         $(LIB_GAL)
+$(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
+$(LIB_EGL):         $(LIB_DRM)
+$(LIB_GL21):        $(LIB_DRM)
 endif # X11_DRI3
 
 

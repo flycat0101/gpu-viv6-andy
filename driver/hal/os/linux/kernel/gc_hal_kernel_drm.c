@@ -59,7 +59,7 @@
 #include <drm/drm_gem.h>
 #include <linux/dma-buf.h>
 #include "gc_hal_kernel_linux.h"
-#include "vivante_drm.h"
+#include "gc_hal_drm.h"
 
 #define _GC_OBJ_ZONE    gcvZONE_KERNEL
 
