@@ -242,6 +242,11 @@ vscVIR_PerformSEPBackPatch(
         vscPrintSEP(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx, pOutSEP, pShader);
     }
 
+    /* check shader instruction in dual16 mode, same check as AQSHADER30::Execute */
+    if (VIR_Shader_isDual16Mode(pShader) && (pOutSEP->endPCOfMainRoutine >= 1024))
+    {
+        gcmASSERT(0);
+    }
 OnError:
     return errCode;
 }

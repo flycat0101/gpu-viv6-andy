@@ -4519,7 +4519,15 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 }
                 if (needRunSingleT)
                 {
-                    runSignleTInstCount++;
+                    if (opcode == VIR_OP_JMPC || opcode == VIR_OP_JMP_ANY)
+                    {
+                        /* see _InsertCMPInst, cmp will be inserted before jmpc/jmp */
+                        runSignleTInstCount = runSignleTInstCount + 2;
+                    }
+                    else
+                    {
+                        runSignleTInstCount++;
+                    }
                     VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_DUAL_32);
 
                     /* VIV when hw has no half-dep fix, there is false depedence among
