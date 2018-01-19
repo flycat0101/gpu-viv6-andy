@@ -5125,7 +5125,7 @@ clEnqueueNDRangeKernel(
         gcKERNEL_FUNCTION kernelFunction;
         gctUINT         count, propertySize = 0;
         gctINT          propertyType = 0;
-        gctSIZE_T       propertyValues[3] = {0};
+        gctUINT         propertyValues[3] = {0};
 
         /* Set the required work group size. */
         gcSHADER_GetKernelFunctionByName((gcSHADER) Kernel->states.binary, Kernel->name, &kernelFunction);
@@ -5137,9 +5137,9 @@ clEnqueueNDRangeKernel(
 
             if (propertyType == gcvPROPERTY_KERNEL_SCALE_HINT)
             {
-                gcoOS_MemCopy(NDRangeKernel->globalScale,
-                    propertyValues,
-                    gcmSIZEOF(gctINT) * propertySize);
+                NDRangeKernel->globalScale[0] = propertyValues[0];
+                NDRangeKernel->globalScale[1] = propertyValues[1];
+                NDRangeKernel->globalScale[2] = propertyValues[2];
             }
         }
     }

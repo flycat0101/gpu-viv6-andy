@@ -2207,7 +2207,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     gctUINT         i;
     gctUINT         count, propertySize = 0;
     gctINT          propertyType = 0;
-    gctSIZE_T       propertyValues[3] = {0};
+    gctUINT         propertyValues[3] = {0};
     gceSHADER_FLAGS flags;
     gctPOINTER      pointer     = gcvNULL;
     gceSTATUS       status;
@@ -2251,9 +2251,9 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
 
         if (propertyType == gcvPROPERTY_REQD_WORK_GRP_SIZE)
         {
-            gcoOS_MemCopy(kernel->compileWorkGroupSize,
-                propertyValues,
-                gcmSIZEOF(gctINT) * propertySize);
+            kernel->compileWorkGroupSize[0] = propertyValues[0];
+            kernel->compileWorkGroupSize[1] = propertyValues[1];
+            kernel->compileWorkGroupSize[2] = propertyValues[2];
 
             gcoOS_MemCopy(kernelBinary->shaderLayout.compute.workGroupSize,
                 propertyValues,
@@ -2529,7 +2529,7 @@ gceSTATUS gcfVX_LoadShaderFromLinkedBinary(gctPOINTER linkedBinary, gctUINT32 li
 
     gctUINT         count, propertySize = 0, i;
     gctINT          propertyType = 0;
-    gctSIZE_T       propertyValues[3] = {0};
+    gctUINT         propertyValues[3] = {0};
 
 
     /* Allocate kernel. */
@@ -2558,9 +2558,9 @@ gceSTATUS gcfVX_LoadShaderFromLinkedBinary(gctPOINTER linkedBinary, gctUINT32 li
 
         if (propertyType == gcvPROPERTY_REQD_WORK_GRP_SIZE)
         {
-            gcoOS_MemCopy(kernel->compileWorkGroupSize,
-                propertyValues,
-                gcmSIZEOF(gctINT) * propertySize);
+            kernel->compileWorkGroupSize[0] = propertyValues[0];
+            kernel->compileWorkGroupSize[1] = propertyValues[1];
+            kernel->compileWorkGroupSize[2] = propertyValues[2];
 
             gcoOS_MemCopy(kernelBinary->shaderLayout.compute.workGroupSize,
                 propertyValues,

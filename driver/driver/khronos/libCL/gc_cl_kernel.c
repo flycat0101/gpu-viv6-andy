@@ -3164,7 +3164,7 @@ clCreateKernel(
     gctUINT         i, j;
     gctUINT         count, propertySize = 0;
     gctINT          propertyType = 0;
-    gctSIZE_T       propertyValues[3] = {0};
+    gctUINT         propertyValues[3] = {0};
     gceSHADER_FLAGS flags;
     gcKERNEL_FUNCTION kernelFunction;
     gceCHIPMODEL    chipModel;
@@ -3284,9 +3284,9 @@ clCreateKernel(
 
         if (propertyType == gcvPROPERTY_REQD_WORK_GRP_SIZE)
         {
-            gcoOS_MemCopy(kernel->compileWorkGroupSize,
-                propertyValues,
-                gcmSIZEOF(gctINT) * propertySize);
+            kernel->compileWorkGroupSize[0] = propertyValues[0];
+            kernel->compileWorkGroupSize[1] = propertyValues[1];
+            kernel->compileWorkGroupSize[2] = propertyValues[2];
 
             if (!(propertyValues[0] == 0 &&
                   propertyValues[1] == 0 &&
