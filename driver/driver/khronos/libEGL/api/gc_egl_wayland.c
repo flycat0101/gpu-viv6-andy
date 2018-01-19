@@ -717,7 +717,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     window->indequeue = 1;
 
     /* Try to read and dispatch some events. */
-    dispatch_queue(wl_dpy, wl_queue, 0);
+    dispatch_queue(wl_dpy, wl_queue, 1);
 
     if (window->nr_buffers > 1)
     {
