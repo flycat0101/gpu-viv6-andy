@@ -136,6 +136,84 @@ static VIR_RA_HWReg_Color InvalidColor = {
    ===========================================================================
 */
 
+/* const key for defInst of spilled src0 of LDARR */
+typedef struct _VSC_RA_MOVA_CONSTKEY
+{
+    VIR_Instruction*  defInst;
+    VIR_Enable       enable;
+} _VSC_RA_MOVA_CONSTKEY;
+
+
+static gctUINT _HFUNC_RA_MOVA_CONSTKEY(const void* ptr)
+{
+    gctUINT hashVal = (gctUINT)((((gctUINTPTR_T)((_VSC_RA_MOVA_CONSTKEY*)ptr)->defInst) << 4) |
+                                (((_VSC_RA_MOVA_CONSTKEY*)ptr)->enable & 0xf));
+
+    return hashVal;
+}
+
+static gctBOOL _HKCMP_RA_MOVA_CONSTKEY(const void* pHashKey1, const void* pHashKey2)
+{
+    return (((_VSC_RA_MOVA_CONSTKEY*)pHashKey1)->defInst == ((_VSC_RA_MOVA_CONSTKEY*)pHashKey2)->defInst)
+        && (((_VSC_RA_MOVA_CONSTKEY*)pHashKey1)->enable == ((_VSC_RA_MOVA_CONSTKEY*)pHashKey2)->enable);
+}
+
+static _VSC_RA_MOVA_CONSTKEY*
+_VSC_MOVA_NewConstKey(
+    VSC_MM      *pMM,
+    VIR_Instruction*  defInst,
+    VIR_Enable       enable
+    )
+{
+    _VSC_RA_MOVA_CONSTKEY* constKey = (_VSC_RA_MOVA_CONSTKEY*)vscMM_Alloc(pMM, sizeof(_VSC_RA_MOVA_CONSTKEY));
+    constKey->defInst = defInst;
+    constKey->enable =  enable;
+    return constKey;
+}
+
+static gctBOOL
+_VSC_RA_MOVA_GetConstVal(
+    IN VSC_HASH_TABLE*    movaHash,
+    IN VIR_Instruction*   defInst,
+    IN VIR_Enable        enable,
+    OUT void**            retConst
+    )
+{
+    _VSC_RA_MOVA_CONSTKEY    constKey;
+    constKey.defInst = defInst;
+    constKey.enable = enable;
+    return vscHTBL_DirectTestAndGet(movaHash, &constKey, retConst);
+}
+
+static void
+_VSC_RA_MOVA_RemoveConstValAllChannel(
+    IN OUT VSC_HASH_TABLE*    movaHash,
+    IN VIR_Instruction*       defInst
+    )
+{
+    _VSC_RA_MOVA_CONSTKEY    constKey;
+    constKey.defInst = defInst;
+    constKey.enable = VIR_ENABLE_X;
+    vscHTBL_DirectRemove(movaHash, &constKey);
+    constKey.enable = VIR_ENABLE_Y;
+    vscHTBL_DirectRemove(movaHash, &constKey);
+    constKey.enable = VIR_ENABLE_Z;
+    vscHTBL_DirectRemove(movaHash, &constKey);
+    constKey.enable = VIR_ENABLE_W;
+    vscHTBL_DirectRemove(movaHash, &constKey);
+}
+
+static gctBOOL
+_VSC_RA_EnableSingleChannel(
+    IN VIR_Enable            enable
+    )
+{
+    return (enable == VIR_ENABLE_X ||
+            enable == VIR_ENABLE_Y ||
+            enable == VIR_ENABLE_Z ||
+            enable == VIR_ENABLE_W);
+}
+
 static VIR_RA_HWReg_Color
 _VIR_RA_GetLRColor(
     VIR_RA_LS_Liverange *pLR)
@@ -1047,7 +1125,7 @@ static void _VIR_RA_LS_Init(
     }
 
     pRA->movaHash = vscHTBL_Create(VIR_RA_LS_GetMM(pRA),
-        vscHFUNC_Default, vscHKCMP_Default, 64);
+        _HFUNC_RA_MOVA_CONSTKEY, _HKCMP_RA_MOVA_CONSTKEY, 64);
 
     /* reserved HW register for data, we may need to reserve more than one
        registers to save the data, since in some instruction, maybe more than
@@ -2685,6 +2763,92 @@ void _VIR_RA_LS_MarkUse(
     }
 }
 
+/* extend the liverange of src0 of MOVA conservatively for correctness
+ * if src0 of LDARR is selected spilled, mov will be inserted before ldarr (see _VIR_RA_LS_InsertSpillOffset)
+ * in following case, extend endPoint of temp(238).x to temp(538).x's endPoint
+ * 158: MOVA               int addr_reg  temp(537).x, int temp(232).x
+      <- "mov baseReg.x  temp(232).x" inserted here
+ * 159: LDARR              int temp(533).x, int temp(17).x, int temp(537).x
+  ...
+ * 163: MOVA               int addr_reg  temp(538).x, int temp(238).x
+ * 164: LDARR              int temp(535).x, int temp(25).x, int temp(537).x
+       <- "mov baseReg.x temp(238).x" inserted here
+ * 167: LDARR              int temp(536).x, int temp(25).x, int temp(538).x
+ */
+static void _VIR_RA_LS_ExtendLRofMOVASrc0(
+    VIR_RA_LS       *pRA,
+    VIR_Instruction *pInst)
+{
+    gctUINT                  src0WebIdx, defIdx, endPoint;
+    VIR_Operand             *pSrc0 = pInst->src[VIR_Operand_Src0];
+    VIR_RA_LS_Liverange     *pSrc0LR = gcvNULL;
+    gctBOOL                  needExtendLR = gcvTRUE;
+    VIR_Enable               enable = VIR_Operand_GetEnable(pInst->dest);
+    VIR_RA_LS_Liverange     *pDestLR = gcvNULL;
+    
+    endPoint = gcvMAXUINT32;
+    defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
+    if (defIdx != VIR_INVALID_DEF_INDEX)
+    {
+        if (_VSC_RA_EnableSingleChannel(enable))
+        {
+            VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
+            VSC_DU_ITERATOR          duIter;
+            VIR_DEF                 *pDef;
+            VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
+            VIR_USAGE               *pUsage;
+            VIR_Instruction         *pUseInst;
+
+            pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
+            /* go through all the uses */
+            VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
+            pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
+            for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
+            {
+                pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
+                pUseInst = pUsage->usageKey.pUsageInst;
+                /* only deal usage instr is LDARR */
+                if (pUseInst->_opcode == VIR_OP_LDARR)
+                {
+                    /* if MOVA defines one channel and LDARR is the next of MOVA, donothing*/
+                    if (VIR_Inst_GetNext(pInst) == pUseInst)
+                    {
+                        needExtendLR = gcvFALSE;
+                        break;
+                    }
+                    else
+                    {
+                        /* set nearest pos to endPoint */
+                        if (endPoint > ((gctUINT)VIR_Inst_GetId(pUseInst) + 1))
+                        {
+                            endPoint = ((gctUINT)VIR_Inst_GetId(pUseInst) + 1);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            pDestLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
+            gcmASSERT(pDestLR);
+            endPoint = pDestLR->endPoint;
+        }
+    }
+    if (needExtendLR)
+    {
+        src0WebIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, pSrc0);
+        if (VIR_INVALID_WEB_INDEX != src0WebIdx)
+        {
+            pSrc0LR = _VIR_RA_LS_Web2ColorLR(pRA, src0WebIdx);
+            gcmASSERT(pSrc0LR);
+            if (endPoint > pSrc0LR->endPoint)
+            {
+                pSrc0LR->endPoint = endPoint;
+            }
+        }
+    }
+}
+
 void _VIR_RA_LS_MarkUses(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst)
@@ -2770,6 +2934,12 @@ void _VIR_RA_LS_MarkUses(
                                    defEnableMask);
             }
         }
+    }
+
+    /* specially handling for MOVA, extend the endPC of src0 as the dest */
+    if (opCode == VIR_OP_MOVA)
+    {
+        _VIR_RA_LS_ExtendLRofMOVASrc0(pRA, pInst);
     }
 
     /* specially handling for VX instruction */
@@ -4039,6 +4209,12 @@ VIR_RA_HWReg_Color _VIR_RA_LS_FindNewColor(
                     }
                 }
             }
+        }
+        /* reset retValue to invalid if no valid regno is fit from startReg */
+        if ((startReg != -1) && (regno >= _VIR_RA_LS_GetMaxReg(pRA, pLR->hwType, reservedDataReg)))
+        {
+            retValue = InvalidColor;
+            preferedColorOnly = gcvFALSE;
         }
     }
 
@@ -7195,6 +7371,8 @@ _VIR_RA_LS_InsertSpillOffset(
     VIR_DEF             *pDef;
     VIR_SymId           tmpSymId;
     gctUINT             shift = 0;
+    VSC_MM              *pMM =  VIR_RA_LS_GetMM(pRA);
+    VIR_Enable          enable_channel;
 
     curColor = InvalidColor;
 
@@ -7216,6 +7394,15 @@ _VIR_RA_LS_InsertSpillOffset(
     {
         idxOpnd = pInst->src[VIR_Operand_Src0];
     }
+    /* compute the enable according to the usage */
+    enable_channel = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(idxOpnd));
+
+    /* enable channel should be one channel */
+    if (!_VSC_RA_EnableSingleChannel(enable_channel))
+    {
+        gcmASSERT(0);
+    }
+
     vscVIR_InitGeneralUdIterator(&udIter,
         pLvInfo->pDuInfo, pInst, idxOpnd, gcvFALSE, gcvFALSE);
     for(pDef = vscVIR_GeneralUdIterator_First(&udIter);
@@ -7240,17 +7427,25 @@ _VIR_RA_LS_InsertSpillOffset(
     }
 
     /* insert a MOV after MOVA, in case mova_src0 is redefined,
-       to-do: insert only when redefined */
-    if (!vscHTBL_DirectTestAndGet(pRA->movaHash, (void*)pDef->defKey.pDefInst, (void**)&movInst))
+       to-do: insert only when redefined
+       add enable_channel to hash function for case like one defInst has multi usages
+       030: MOVA               ivec4 addr_reg  temp(1503), uvec4 temp(1753)
+       031: LDARR              char temp(36).x, char temp(970).x, ivec4 temp(1503).x
+       032: LDARR              char_X2 temp(1248).x, char temp(970).x, ivec4 temp(1503).y
+       033: LDARR              char_X2 temp(1248).y, char temp(970).x, ivec4 temp(1503).z
+       ...
+       ivec4 temp(1503).x, ivec4 temp(1503).y, ivec4 temp(1503).z has same defInst but need different enable channel
+    */
+    if (!_VSC_RA_MOVA_GetConstVal(pRA->movaHash, pDef->defKey.pDefInst, enable_channel, (void *)&movInst))
     {
         shift = vscHTBL_CountItems(pRA->movaHash);
         /* we can only support max of 8 array spilled for now */
         gcmASSERT(shift < 4 * pRA->movaRegCount);
 
-        retErrCode = VIR_Function_AddInstructionAfter(pFunc,
+        retErrCode = VIR_Function_AddInstructionBefore(pFunc,
             VIR_OP_MOV,
             VIR_TYPE_UINT32,
-            pDef->defKey.pDefInst,
+            madInst,
             gcvTRUE,
             &movInst);
         if (retErrCode != VSC_ERR_NONE) return retErrCode;
@@ -7270,6 +7465,8 @@ _VIR_RA_LS_InsertSpillOffset(
         _VIR_RA_MakeColor(pRA->movaRegister[(shift/4)], (shift % 4), &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, movInst->dest, curColor);
         VIR_Operand_SetEnable(movInst->dest, VIR_ENABLE_X);
+        /* set swizzle of src operand according to the usage */
+        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(movInst, VIR_Operand_Src0), VIR_Enable_2_Swizzle(enable_channel));
 
         if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
             VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
@@ -7279,7 +7476,7 @@ _VIR_RA_LS_InsertSpillOffset(
             VIR_Inst_Dump(pDumper, movInst);
         }
 
-        vscHTBL_DirectSet(pRA->movaHash, (void*)pDef->defKey.pDefInst, (void*)movInst);
+        vscHTBL_DirectSet(pRA->movaHash, _VSC_MOVA_NewConstKey(pMM, pDef->defKey.pDefInst, enable_channel), (void*)movInst);
     }
     else
     {
@@ -7344,7 +7541,7 @@ _VIR_RA_LS_InsertSpillOffset(
     if (vscVIR_IsUniqueUsageInstOfDefInst(pLvInfo->pDuInfo, pDef->defKey.pDefInst, pInst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
     {
         VIR_Function_DeleteInstruction(pFunc, pDef->defKey.pDefInst);
-        vscHTBL_DirectRemove(pRA->movaHash, (void*)pDef->defKey.pDefInst);
+        _VSC_RA_MOVA_RemoveConstValAllChannel(pRA->movaHash, pDef->defKey.pDefInst);
     }
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),

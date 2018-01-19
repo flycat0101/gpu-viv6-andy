@@ -486,6 +486,19 @@ VIR_Lower_IsIntOpcode(
 }
 
 gctBOOL
+VIR_Lower_IsDstBool(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   typeId   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
+
+    gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isBoolean(typeId);
+}
+
+gctBOOL
 VIR_Lower_IsDstFloat(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst

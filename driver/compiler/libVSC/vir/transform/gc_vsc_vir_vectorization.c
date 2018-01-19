@@ -15,7 +15,7 @@
 #include "vir/transform/gc_vsc_vir_vectorization.h"
 
 #define MAX_CANDIDATE_SEARCH_ITERATE_COUNT    20000
-#define MAX_VECTORIZED_VEC_IMM                330
+#define MAX_VECTORIZED_VEC_IMM                700
 
 typedef struct VIR_VECTORIZER_INFO
 {
@@ -1113,6 +1113,105 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _CanOpndVectorizedToSeedOpnd(VIR_VECTORI
     return ovcResult;
 }
 
+static VSC_ErrCode _RenameDstOfSeedInst(
+    VIR_Instruction* pSeedInst,
+    VIR_Instruction* pUsageInst,
+    VIR_Operand*     pUsageOper,
+    VIR_DEF_USAGE_INFO* pDuInfo,
+    VIR_Shader* pShader
+    )
+{
+    VIR_VirRegId tempRegId;
+    VSC_ErrCode  errCode;
+    VIR_SymId    newTempSymId;
+    VIR_Symbol* newSymbol;
+    VIR_Symbol* oldSymbol;
+    VIR_Function* currentFunc;
+    VIR_Operand* destOper;
+
+    /*delete def*/
+    destOper = VIR_Inst_GetDest(pSeedInst);
+    gcmASSERT(VIR_Operand_isSymbol(destOper));
+
+    oldSymbol = VIR_Operand_GetSymbol(destOper);
+    {
+        VIR_Enable instDestEnable = VIR_Operand_GetEnable(destOper);
+        VIR_OperandInfo instDestInfo;
+        gctUINT8 channel;
+
+        VIR_Operand_GetOperandInfo(pSeedInst, destOper, &instDestInfo);
+
+        for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+        {
+            if(instDestEnable & (1 << channel))
+            {
+                vscVIR_DeleteDef(pDuInfo, pSeedInst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            }
+        }
+    }
+    /*delete usage in pUsageInst*/
+    {
+        VIR_OperandInfo instSrcInfo;
+        VIR_Swizzle instSrcSwizzle = VIR_Operand_GetSwizzle(pUsageOper);
+        VIR_Enable instSrcEnable = VIR_Swizzle_2_Enable(instSrcSwizzle);
+
+        VIR_Operand_GetOperandInfo(pUsageInst, pUsageOper, &instSrcInfo);
+        vscVIR_DeleteUsage(pDuInfo,
+                           pSeedInst,
+                           pUsageInst,
+                           pUsageOper,
+                           gcvFALSE,
+                           instSrcInfo.u1.virRegInfo.startVirReg,
+                           instSrcInfo.u1.virRegInfo.virRegCount,
+                           instSrcEnable,
+                           VIR_HALF_CHANNEL_MASK_FULL,
+                           gcvNULL);
+    }
+
+    /*Allocate a new temp register as dst of pSeedInst.*/
+
+    tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    currentFunc = VIR_Shader_GetCurrentFunction(pShader);
+    errCode = VIR_Function_AddSymbol(currentFunc,
+                    VIR_SYM_VIRREG,
+                    tempRegId,
+                    VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(destOper)),
+                    VIR_STORAGE_UNKNOWN,
+                    &newTempSymId);
+    CHECK_ERROR(errCode, "VIR_Function_AddSymbol failed.");
+    newSymbol = VIR_GetFuncSymFromId(currentFunc, newTempSymId);
+    VIR_Symbol_SetPrecision(newSymbol, VIR_Symbol_GetPrecision(oldSymbol));
+
+    /* set new symbol in destOper and pUsageOper */
+    VIR_Operand_SetSym(destOper, newSymbol);
+    VIR_Operand_SetSym(pUsageOper, newSymbol);
+
+    /*update du to add define and usage */
+    {
+        VIR_Enable instDestEnable = VIR_Operand_GetEnable(destOper);
+        VIR_OperandInfo instDestInfo;
+        gctUINT          firstRegNo, regNoRange;
+
+        VIR_Operand_GetOperandInfo(pSeedInst, destOper, &instDestInfo);
+
+        vscVIR_AddNewDef(pDuInfo, pSeedInst,
+                         instDestInfo.u1.virRegInfo.startVirReg,
+                         instDestInfo.u1.virRegInfo.virRegCount,
+                         instDestEnable, VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL, gcvNULL);
+
+        firstRegNo  = instDestInfo.u1.virRegInfo.startVirReg;
+        regNoRange  = 1;
+
+        vscVIR_AddNewUsageToDef(pDuInfo, pSeedInst, pUsageInst, pUsageOper,
+                               gcvFALSE, firstRegNo, regNoRange, instDestEnable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+    }
+
+    return errCode;
+}
+
 static gctBOOL _CanMoveInstToSeedInst(VIR_Shader* pShader,
                                       VIR_DEF_USAGE_INFO* pDuInfo,
                                       VIR_OPND_VECTORIZE_CALLBACKS* pOvCallbacks,
@@ -1526,6 +1625,38 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         _IsDstHasNoSwizzleFlag(pDuInfo, pInst))
     {
         return gcvFALSE;
+    }
+
+    /* if pSeedInst and pInst use same symbol and enable bits in dest operands, like following case
+        SUB               hp temp(4121).hp.x, hp  temp(4286).hp.x, hp  temp(4287).hp.x   <- pSeedInst
+        CMP.lt            hp temp(4118).hp.x, hp  temp(4121).abs.hp.x, 0.050000[3d4ccccd], 1.000000[3f800000] <=  only usage instr
+        ...
+        SUB               hp temp(4121).hp.x, hp  temp(4286).hp.y, hp  temp(4287).hp.y   <- pInst
+        => create a new Symbol to the dst operand and update DU info
+        SUB               hp temp(6825).hp.x, hp  temp(4286).hp.x, hp  temp(4287).hp.x   <- pSeedInst
+        CMP.lt            hp temp(4118).hp.x, hp  temp(6825).abs.hp.x, 0.050000[3d4ccccd], 1.000000[3f800000]    <- update Usage
+        ...
+        SUB               hp temp(4121).hp.x, hp  temp(4286).hp.y, hp  temp(4287).hp.y   <- pInst
+    */
+    {
+        VIR_Operand* dstOfSeedInst = gcvNULL;
+        VIR_Operand* dstofpInst = gcvNULL;
+        VIR_Instruction* pUsageInst = gcvNULL;
+        VIR_Operand *pUsageOper = gcvNULL;
+        gctBOOL bIsIndexingRegUsage;
+
+        dstOfSeedInst = VIR_Inst_GetDest(pSeedInst);
+        dstofpInst = VIR_Inst_GetDest(pInst);
+        
+        if (VIR_Operand_isSymbol(dstOfSeedInst) && VIR_Operand_isSymbol(dstofpInst) &&
+            (VIR_Operand_GetSymbol(dstOfSeedInst) == VIR_Operand_GetSymbol(dstofpInst)) &&
+            (VIR_Operand_GetEnable(dstOfSeedInst) == VIR_Operand_GetEnable(dstofpInst)) &&
+            vscVIR_DoesDefInstHaveUniqueUsageInst(pDuInfo, pSeedInst, gcvTRUE, &pUsageInst, &pUsageOper, &bIsIndexingRegUsage) &&  /* only one usage instr */
+            (VIR_Inst_GetSrcNum(pUsageInst) > 0) &&
+            vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo, pUsageInst, pUsageOper, bIsIndexingRegUsage, pSeedInst, gcvNULL))  /*only one define instr*/
+        {
+            _RenameDstOfSeedInst(pSeedInst, pUsageInst, pUsageOper, pDuInfo, pShader);
+        }
     }
 
     /* Check dst */

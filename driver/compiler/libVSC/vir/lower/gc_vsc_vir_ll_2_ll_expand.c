@@ -902,6 +902,26 @@ _isSrc1Zero(
 }
 
 static gctBOOL
+_isSrcFloatZero(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN gctUINT SrcIndex
+    )
+{
+    VIR_Operand           *src = VIR_Inst_GetSource(Inst, SrcIndex);
+
+    gcmASSERT(SrcIndex < VIR_MAX_SRC_NUM);
+    if(src == gcvNULL)
+        return gcvFALSE;
+    if(VIR_Operand_GetOpKind(src) != VIR_OPND_IMMEDIATE)
+        return gcvFALSE;
+    if(VIR_Operand_GetImmediateFloat(src) != 0.0)
+        return gcvFALSE;
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 _isSrcFloatOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -942,6 +962,15 @@ _isSrcIntOne(
 }
 
 static gctBOOL
+_isSrc0FloatZero(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcFloatZero(Context, Inst, 0);
+}
+
+static gctBOOL
 _isSrc0FloatOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -957,6 +986,34 @@ _isSrc0IntOne(
     )
 {
     return _isSrcIntOne(Context, Inst, 0);
+}
+
+static gctBOOL
+_isSrc1IntOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcIntOne(Context, Inst, 1);
+}
+
+static gctBOOL
+_isSrc1IntZero
+    (
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcZero(Context, Inst, 1);
+}
+
+static gctBOOL
+_isSrc2IntZero(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcZero(Context, Inst, 2);
 }
 
 static gctBOOL
@@ -3326,6 +3383,26 @@ all_source_float(
 }
 
 static gctBOOL
+all_source_not_float(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    gctUINT i;
+    for(i = 0; i < VIR_Inst_GetSrcNum(Inst); i++)
+    {
+        VIR_Operand* src = VIR_Inst_GetSource(Inst, i);
+        VIR_TypeId src_typeid = VIR_Operand_GetTypeId(src);
+        if(VIR_GetTypeFlag(src_typeid) & VIR_TYFLAG_ISFLOAT)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 all_source_integer(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -3364,12 +3441,30 @@ supportCONV(
 }
 
 static gctBOOL
+jmp_2_succ2(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return jmp_2_succ(Context, Inst, 2);
+}
+
+static gctBOOL
 jmp_2_succ3(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
     return jmp_2_succ(Context, Inst, 3);
+}
+
+static gctBOOL
+jmp_2_succ4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+     return jmp_2_succ(Context, Inst, 4);
 }
 
 static gctBOOL
@@ -8056,13 +8151,54 @@ static VIR_PatternReplaceInst _jmpcRepInst9[] = {
     { VIR_OP_KILL, -1, 0, { 0, 2, 3, 0 }, { reverseCondOp } }
 };
 
+/* JMPC.ne          #sh_383, bool hp  temp(4272).hp.x, bool false
+   JMP              #sh_385
+   LABEL            #sh_383:
+   MOV              hp temp(4268).hp.x, 1.000000[3f800000]
+   JMP              #sh_384
+   LABEL            #sh_385:
+   MOV              hp temp(4268).hp.x, 0.000000[0]
+   LABEL            #sh_384:
+   ==> replaced by
+   CMP.ne           hp temp(4268).hp.x, bool hp  temp(4272).hp.x, bool false, 1.000000[3f800000]
+*/
 static VIR_PatternMatchInst _jmpcPatInst10[] = {
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_single_value, jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 7, 0, 0 }, { _isSrc0FloatOne }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 10, 0, 0 }, { _isSrc0FloatZero }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _jmpcRepInst10[] = {
+     { VIR_OP_CMP, -1, 0, { 6, 2, 3, 7 }, { 0, 0, 0, 0 } },
+};
+
+static VIR_PatternMatchInst _jmpcPatInst11[] = {
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_not_float, all_source_single_value, jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 7, 0, 0 }, { _isSrc0IntOne }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 10, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _jmpcRepInst11[] = {
+     { VIR_OP_CMP, -1, 0, { 6, 2, 3, 7 }, { 0, 0, 0, 0 } },
+};
+
+static VIR_PatternMatchInst _jmpcPatInst12[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { jmp_2_succ2_resCondOp_singleChannel }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { no_source }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _jmpcRepInst10[] = {
+static VIR_PatternReplaceInst _jmpcRepInst12[] = {
     { VIR_OP_JMPC, -1, 0, { 4, 2, 3, 0 }, { reverseCondOp } }
 };
 
@@ -8078,6 +8214,8 @@ static VIR_Pattern _jmpcPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 8) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 9) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 10) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 11) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 12) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -8227,6 +8365,44 @@ static VIR_PatternReplaceInst _cmpRepInst7[] = {
     { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, {  1, 1, 0, 0 }, { 0 } },
 };
 
+/*
+    COMPARE.lt       bool hp temp(4123).hp.x, hp  temp(4122).hp.x, 0.050000[3d4ccccd]
+    CSELECT.selmsb   bool hp temp(4123).hp.x, bool hp  temp(4123).hp.x, uint 1, uint 0
+    JMPC.ne          #sh_127, bool hp  temp(4123).hp.x, bool false
+    ==> replaced by
+    JMPC.lt          #sh_127, hp  temp(4122).hp.x, 0.050000[3d4ccccd]
+*/
+
+static VIR_PatternMatchInst _cmpPatInst8[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_single_value, VIR_Lower_IsDstBool }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, { 1, 1, 4, 5 }, { _isSrc1IntOne, _isSrc2IntZero }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMPC, VIR_COP_NOT_EQUAL, 0, { 6, 1, 7, 0 }, { _isSrc1IntZero }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _cmpRepInst8[] = {
+    { VIR_OP_JMPC, -1, 0, { 6, 2, 3, 0 }, { 0, 0, 0, 0 } },
+};
+
+/*
+  COMPARE.eq       bvec3 hp temp(4253).hp.xyz, uvec3 hp  temp(4251).hp.xyz, uvec3 hp  temp(4252).hp.xyz
+  CSELECT.selmsb   bvec3 hp temp(4253).hp.xyz, bvec3 hp  temp(4253).hp.xyz, uint 1, uint 0
+  ALL              bool hp temp(4254).hp.x, bvec3 hp  temp(4253).hp.xyz
+  ==> replaced by
+  VIR_OP_COMPARE   bvec3 hp temp(4253).hp.xyz, uvec3 hp  temp(4251).hp.xyz, uvec3 hp  temp(4252).hp.xyz
+  CSELECT.allmsb   bool hp temp(4254).hp.x, bvec3 hp temp(4253).hp.xyz, uint 1, uint 0
+*/
+static VIR_PatternMatchInst _cmpPatInst9[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, { 1, 1, 4, 5 }, { _isSrc1IntOne, _isSrc2IntZero }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_ALL, VIR_PATTERN_ANYCOND, 0, { 6, 1, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR},
+
+};
+
+static VIR_PatternReplaceInst _cmpRepInst9[] = {
+    { VIR_OP_COMPARE, -1, 0, { 1, 2, 3, 0 }, {0, 0, 0, 0} },
+    { VIR_OP_CSELECT, VIR_COP_ALLMSB, 0, { 6, 1, 4, 5 }, { 0, 0, 0, 0 } },
+};
+
 static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 1) },
@@ -8236,6 +8412,8 @@ static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 5) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 6) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 7) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 8) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 9) },
     { VIR_PATN_FLAG_NONE }
 };
 

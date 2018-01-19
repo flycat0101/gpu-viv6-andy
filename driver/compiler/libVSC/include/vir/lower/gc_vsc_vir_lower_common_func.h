@@ -228,6 +228,12 @@ VIR_Lower_IsIntOpcode(
     );
 
 gctBOOL
+VIR_Lower_IsDstBool(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstFloat(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
