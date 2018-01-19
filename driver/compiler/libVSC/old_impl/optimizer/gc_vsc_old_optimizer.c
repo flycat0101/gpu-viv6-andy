@@ -4267,7 +4267,7 @@ _GetInlineBudget(
         /* WAR for some APPs. */
         (patchID != gcvPATCH_YOUILABS_SHADERTEST && !gcdPROC_IS_WEBGL(patchID)))
     {
-        if (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP)
+        if (patchID == gcvPATCH_GTFES30)
         {
             return 0x7FFFFFFF;
         }
@@ -4468,7 +4468,7 @@ _InlineSinglelFunction(
     if (function->shaderFunction &&
         gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
         Optimizer->shader->storageBlockCount == 0 &&
-        (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
+        (patchID == gcvPATCH_GTFES30))
     {
         inlineAllFunctionForCTS = gcvTRUE;
         Optimizer->isCTSInline = gcvTRUE;
