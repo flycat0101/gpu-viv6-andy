@@ -12907,8 +12907,10 @@ gcSHADER_LinkLibFunction(
     gcmONERROR(gcSHADER_GetFunctionByName(Library, functionName, &libFunction));
     if (libFunction == gcvNULL)
     {
+#if gcmIS_DEBUG(gcdDEBUG_CODE)
         gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
                          functionName, GetShaderID(Shader));
+#endif
         *Function = gcvNULL;
         return gcvSTATUS_UNSAT_LIB_SYMBOL;
     }
@@ -12918,8 +12920,10 @@ gcSHADER_LinkLibFunction(
         if(libFunction->intrinsicsKind == gceINTRIN_source)
         {
             gcmASSERT(libFunction->codeCount == 0);
+#if gcmIS_DEBUG(gcdDEBUG_CODE)
             gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
                         functionName, GetShaderID(Shader));
+#endif
             *Function = gcvNULL;
             return gcvSTATUS_UNSAT_LIB_SYMBOL;
         }
