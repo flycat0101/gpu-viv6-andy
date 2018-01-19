@@ -130,8 +130,10 @@ _GenExtension(
 #endif
 
     gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (patchId == gcvPATCH_DEQP &&
-        !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_ROBUSTNESS))
+    if (patchId == gcvPATCH_DEQP ||
+        patchId == gcvPATCH_GTFES30 ||
+        (!gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_ROBUSTNESS) &&
+        !gcdPROC_IS_WEBGL(patchId)))
     {
         extensions[VEGL_EXTID_EXT_create_context_robustness].enabled = EGL_FALSE;
     }

@@ -1077,12 +1077,32 @@ eglCreateContext(
                 break;
 
             case EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR:
-            case EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_KHR:
                 if (thread->api != EGL_OPENGL_API)
                 {
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
+                break;
+
+            case EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_KHR:
+                /* According to EGL Spec:
+                ** This attribute is supported only for OpenGL and OpenGL ES contexts.
+                */
+                if (thread->api != EGL_OPENGL_API &&
+                    thread->api != EGL_OPENGL_ES_API)
+                {
+                    veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+                resetNotification = (gctINT)attrib_list[i + 1];
+                if ((resetNotification != EGL_NO_RESET_NOTIFICATION_EXT &&
+                    resetNotification != EGL_LOSE_CONTEXT_ON_RESET_EXT) ||
+                    !_IsExtSuppored(VEGL_EXTID_EXT_create_context_robustness))
+                {
+                    veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+                robustAttribSet = gcvTRUE;
                 break;
 
             case EGL_CONTEXT_OPENGL_ROBUST_ACCESS_EXT:

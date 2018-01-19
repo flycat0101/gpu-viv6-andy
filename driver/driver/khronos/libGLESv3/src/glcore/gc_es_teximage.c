@@ -1473,13 +1473,21 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
     return GL_TRUE;
 }
 
-GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GLboolean *isASTC)
+GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GLboolean *supportCubeMapArray)
 {
-    *isASTC = GL_FALSE;
+    *supportCubeMapArray = GL_FALSE;
 
     switch (internalFormat)
     {
     case GL_ETC1_RGB8_OES:
+    case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+
+        break;
+
+    /* According to es3.2, these format should support cube map array */
     case GL_COMPRESSED_R11_EAC:
     case GL_COMPRESSED_SIGNED_R11_EAC:
     case GL_COMPRESSED_RG11_EAC:
@@ -1490,11 +1498,7 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GL
     case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
     case GL_COMPRESSED_RGBA8_ETC2_EAC:
     case  GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
-
-    case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
-    case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
-    case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
-    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+        *supportCubeMapArray = GL_TRUE;
         break;
 
 #if defined(GL_KHR_texture_compression_astc_ldr)
@@ -1528,10 +1532,9 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GL
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
 
-        *isASTC = GL_TRUE;
-
         if (__glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled)
         {
+            *supportCubeMapArray = GL_TRUE;
             break;
         }
 #endif
@@ -2850,7 +2853,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
                                                const GLvoid *data)
 {
     GLuint mipHintDirty = 0;
-    GLboolean isASTC = GL_FALSE;
+    GLboolean supportCubeMapArray = GL_FALSE;
     __GLtextureObject *tex = NULL;
     __GLmipMapLevel *mipmap = NULL;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
@@ -2890,26 +2893,16 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
     }
 
     /* Check arguments */
-    if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &isASTC))
+    if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &supportCubeMapArray))
     {
         __GL_EXIT();
     }
 
-    /* Now internalFormat is valid, only allows 2D_ARRAY target currently in ES3.1. */
-    if(__glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled)
+    /* Now internalFormat is valid, allows 2D_ARRAY and some CUBE_MAP_ARRAY target currently in ES3.2. */
+    if (!(target == GL_TEXTURE_2D_ARRAY ||
+        (target == GL_TEXTURE_CUBE_MAP_ARRAY && supportCubeMapArray)))
     {
-        if (!(target == GL_TEXTURE_2D_ARRAY ||
-             (target == GL_TEXTURE_CUBE_MAP_ARRAY && isASTC)))
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-    }
-    else
-    {
-        if (target != GL_TEXTURE_2D_ARRAY)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, depth, border))
@@ -2977,7 +2970,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
     GLuint activeUnit;
     GLuint mipHintDirty = 0;
     GLboolean isPalette = GL_FALSE;
-    GLboolean isASTC = GL_FALSE;
+    GLboolean supportCubeMapArray = GL_FALSE;
     __GLtextureObject *tex;
     __GLmipMapLevel *mipmap;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
@@ -3020,7 +3013,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
         break;
 
     default:
-        if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &isASTC))
+        if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &supportCubeMapArray))
         {
             __GL_EXIT();
         }

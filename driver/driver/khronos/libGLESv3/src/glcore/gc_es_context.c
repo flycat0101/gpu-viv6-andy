@@ -1139,7 +1139,12 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
         gc->contextFlags |= GL_CONTEXT_FLAG_DEBUG_BIT_KHR;
     }
 
-    if (imports->contextFlags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR)
+    /* Robust buffer access is enabled by creating a context with robust access enabled 
+     * through the window system binding APIs.
+     * Robust buffer access behavior may be queried by calling  GetIntegerv with pname CONTEXT_FLAGS.
+     */
+    if ((imports->contextFlags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR) ||
+        (imports->robustAccess == gcvTRUE))
     {
         gc->contextFlags |= GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT;
     }
