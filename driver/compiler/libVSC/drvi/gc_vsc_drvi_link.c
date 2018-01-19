@@ -331,6 +331,19 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 
                 if (pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries)
                 {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].inputAttachmentTable.countOfEntries; j++)
+                    {
+                        PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY iaEntry = pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries[j];
+
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx++)
+                        {
+                            if (iaEntry.hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase)
+                            {
+                                gcoOS_Free(gcvNULL, iaEntry.hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase);
+                            }
+                        }
+                    }
+
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries);
                     pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries = gcvNULL;
                 }
