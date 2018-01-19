@@ -141,9 +141,6 @@ struct drm_fb
     uint8_t *map;
 };
 
-typedef struct _FBDisplay * PlatformDisplayType;
-typedef struct _FBWindow *  PlatformWindowType;
-typedef struct _FBPixmap *  PlatformPixmapType;
 
 /* Structure that defines a display. */
 struct _FBDisplay

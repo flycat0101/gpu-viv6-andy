@@ -45,10 +45,6 @@
 #define GC_FB_MIN_SWAP_INTERVAL     0
 
 
-typedef struct _FBDisplay * PlatformDisplayType;
-typedef struct _FBWindow *  PlatformWindowType;
-typedef struct _FBPixmap *  PlatformPixmapType;
-
 /* Structure that defines a display. */
 struct _FBDisplay
 {
