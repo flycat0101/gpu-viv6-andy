@@ -57,61 +57,79 @@ struct wl_viv;
  */
 extern const struct wl_interface wl_viv_interface;
 
-#define WL_VIV_CREATE_BUFFER    0
-#define WL_VIV_ENABLE_TILE_STATUS    1
+#define WL_VIV_CREATE_BUFFER	0
+#define WL_VIV_ENABLE_TILE_STATUS	1
 
 /**
  * @ingroup iface_wl_viv
  */
-#define WL_VIV_CREATE_BUFFER_SINCE_VERSION    1
+#define WL_VIV_CREATE_BUFFER_SINCE_VERSION	1
 /**
  * @ingroup iface_wl_viv
  */
-#define WL_VIV_ENABLE_TILE_STATUS_SINCE_VERSION    1
+#define WL_VIV_ENABLE_TILE_STATUS_SINCE_VERSION	1
 
 /** @ingroup iface_wl_viv */
 static inline void
 wl_viv_set_user_data(struct wl_viv *wl_viv, void *user_data)
 {
-    wl_proxy_set_user_data((struct wl_proxy *) wl_viv, user_data);
+	wl_proxy_set_user_data((struct wl_proxy *) wl_viv, user_data);
 }
 
 /** @ingroup iface_wl_viv */
 static inline void *
 wl_viv_get_user_data(struct wl_viv *wl_viv)
 {
-    return wl_proxy_get_user_data((struct wl_proxy *) wl_viv);
+	return wl_proxy_get_user_data((struct wl_proxy *) wl_viv);
 }
+
+/*
+static inline uint32_t
+wl_viv_get_version(struct wl_viv *wl_viv)
+{
+	return wl_proxy_get_version((struct wl_proxy *) wl_viv);
+}
+*/
 
 /** @ingroup iface_wl_viv */
 static inline void
 wl_viv_destroy(struct wl_viv *wl_viv)
 {
-    wl_proxy_destroy((struct wl_proxy *) wl_viv);
+	wl_proxy_destroy((struct wl_proxy *) wl_viv);
 }
 
 /**
  * @ingroup iface_wl_viv
+ *
+ * Map the client buffer to server side.
+ * Buffer is a actually surface object.
  */
 static inline struct wl_buffer *
-wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t type, uint32_t node, int32_t pool, uint32_t size, uint32_t tsNode, int32_t tsPool, uint32_t tsSize)
+wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t type, uint32_t node, int32_t pool, uint32_t size, uint32_t tsNode, int32_t tsPool, uint32_t tsSize, int32_t fd)
 {
-    struct wl_proxy *id;
+	struct wl_proxy *id;
 
-    id = wl_proxy_marshal_constructor((struct wl_proxy *) wl_viv,
-             WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, type, node, pool, size, tsNode, tsPool, tsSize);
+	id = wl_proxy_marshal_constructor((struct wl_proxy *) wl_viv,
+			 WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, type, node, pool, size, tsNode, tsPool, tsSize, fd);
 
-    return (struct wl_buffer *) id;
+	return (struct wl_buffer *) id;
 }
 
 /**
  * @ingroup iface_wl_viv
+ *
+ * Pass tile status information to server side.
+ * @enabled:		tile status is now enabled.
+ * @compressed:	compressed, tile status must be enabled.
+ * @dirty:			some pixels are not resolved, ie, tile status is dirty.
+ * @fc_value:		the fast clear value.
+ * @fc_value_upper:	upper 32bit fast clear value.
  */
 static inline void
 wl_viv_enable_tile_status(struct wl_viv *wl_viv, struct wl_buffer *id, uint32_t enabled, uint32_t compressed, uint32_t dirty, uint32_t fc_value, uint32_t fc_value_upper)
 {
-    wl_proxy_marshal((struct wl_proxy *) wl_viv,
-             WL_VIV_ENABLE_TILE_STATUS, id, enabled, compressed, dirty, fc_value, fc_value_upper);
+	wl_proxy_marshal((struct wl_proxy *) wl_viv,
+			 WL_VIV_ENABLE_TILE_STATUS, id, enabled, compressed, dirty, fc_value, fc_value_upper);
 }
 
 #ifdef __cplusplus

@@ -36,6 +36,12 @@ CFLAGS += -I../../main \
           -I$(AQROOT)/driver/khronos/libEGL/inc \
           -I$(ROOTFS)/usr/include/libdrm
 
+ifeq ($(EGL_API_WL),1)
+  CFLAGS += -I$(AQROOT)/driver/wayland \
+             -I$(WAYLAND_DIR)/include
+endif
+
+
 ################################################################################
 # Define flags for the linker.
 
@@ -45,6 +51,12 @@ LDFLAGS := $(LFLAGS) -Wl,-z,defs
 # Supply necessary libraries.
 
 LDLIBS += -ldrm -lGAL
+
+ifeq ($(EGL_API_WL),1)
+LDLIBS += -L$(WAYLAND_DIR)/lib \
+            -lwayland-server
+
+endif
 
 ################################################################################
 # Describe object files.

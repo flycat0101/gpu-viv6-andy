@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
+#include <fcntl.h>
 #include <xf86drm.h>
 
 #include "gbm_vivint.h"
@@ -116,6 +117,71 @@ OnError:
     return status;
 }
 
+
+#ifdef WL_EGL_PLATFORM
+#include <wayland-server.h>
+#include <wl-viv-buffer.h>
+uint32_t gbm_viv_query_waylandbuffer(
+    void *Buffer,
+    int32_t * Width,
+    int32_t * Height,
+    int32_t *Stride,
+    int32_t *Format,
+    int * Fd
+    )
+{
+    struct wl_viv_buffer *buffer;
+    gceSTATUS status = gcvSTATUS_OK;
+    buffer = wl_resource_get_user_data((struct wl_resource *)Buffer);
+
+    if (Format)
+    {
+        gcmONERROR(gcoSURF_GetFormat(buffer->surface, gcvNULL, (gceSURF_FORMAT *)Format));
+    }
+
+    if (Width)
+    {
+        *Width = buffer->width;
+    }
+
+    if (Height)
+    {
+        *Height = buffer->height;
+    }
+
+    if (Stride)
+    {
+        gctUINT wx;
+        gctUINT hx;
+        gcmONERROR(gcoSURF_GetAlignedSize(buffer->surface, &wx, &hx, Stride));
+    }
+
+    if (Fd)
+    {
+        *Fd = buffer->fd;
+        if (buffer->fd < 0)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
+    return 1;
+OnError:
+    return 0;
+}
+#else
+uint32_t gbm_viv_query_waylandbuffer(
+    void *Buffer,
+    int32_t * Width,
+    int32_t * Height,
+    int32_t *Stride,
+    int32_t *Format,
+    int * Fd
+    )
+{
+    return 0;
+}
+#endif
+
 gceSTATUS
 gbm_viv_get_gbm_format(
     gceSURF_FORMAT HalFormat,
@@ -179,16 +245,24 @@ gbm_viv_bo_write(
     )
 {
     struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
-
     memcpy(bo->map, buf, count);
-
     return 0;
 }
 
 static int
 gbm_viv_bo_get_fd(struct gbm_bo *_bo)
 {
-    return 0;
+    struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
+    int32_t fd;
+
+    if (bo->type == GBM_BO_IMPORT_FD || bo->type == GBM_BO_IMPORT_WL_BUFFER)
+    return (bo->fd >=0 ? dup(bo->fd): -1);
+
+
+    if (drmPrimeHandleToFD(_bo->gbm->fd, _bo->handle.u32, DRM_CLOEXEC, &fd))
+        return -1;
+
+    return fd;
 }
 
 static void *
@@ -209,6 +283,7 @@ gbm_viv_bo_map_fd(struct gbm_viv_bo *bo)
 
    bo->map = mmap(0, bo->size, PROT_WRITE,
                   MAP_SHARED, bo->base.gbm->fd, map_arg.offset);
+
    if (bo->map == MAP_FAILED)
    {
       bo->map = NULL;
@@ -238,11 +313,29 @@ gbm_viv_bo_import(
     struct gbm_import_fd_data *fd_data = buffer;
     struct gbm_viv_bo *bo = NULL;
     struct drm_prime_handle prime_handle;
+    struct gbm_import_fd_data wl_fd_data={0};
     int ret;
 
-    if (type == GBM_BO_IMPORT_WL_BUFFER || type == GBM_BO_IMPORT_EGL_IMAGE)
+    if (type == GBM_BO_IMPORT_EGL_IMAGE)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Wrap a import_fd_data for WL_BUFFER */
+    if (type == GBM_BO_IMPORT_WL_BUFFER)
+    {
+        int32_t w,h,stride,fd,format;
+        if (gbm_viv_query_waylandbuffer(buffer, &w, &h, &stride, &format, &fd))
+        {
+            wl_fd_data.fd = (int)fd;
+            wl_fd_data.width = (uint32_t)w;
+            wl_fd_data.height = (uint32_t)h;
+            gbm_viv_get_gbm_format((gceSURF_FORMAT)format, &wl_fd_data.format);
+            wl_fd_data.stride = (uint32_t)stride;
+            fd_data = &wl_fd_data;
+        } else {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
     bo = calloc(1, sizeof *bo);
@@ -253,15 +346,16 @@ gbm_viv_bo_import(
 
     bo->base.gbm = gbm;
     bo->type = type;
+    bo->fd = -1;
 
-    if(type == GBM_BO_IMPORT_FD)
+    if(type == GBM_BO_IMPORT_FD || type == GBM_BO_IMPORT_WL_BUFFER)
     {
         if (!gbm_viv_is_format_supported(gbm, fd_data->format, usage))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
-        prime_handle.fd = fd_data->fd;
 
+        prime_handle.fd = fd_data->fd;
         ret = drmIoctl(dev->base.fd, DRM_IOCTL_PRIME_FD_TO_HANDLE, &prime_handle);
         if (ret)
         {
@@ -275,6 +369,7 @@ gbm_viv_bo_import(
         bo->base.stride = fd_data->stride;
         bo->base.format = fd_data->format;
         bo->size = fd_data->height * fd_data->stride;
+        bo->fd = prime_handle.fd;
 
         if (gbm_viv_bo_map_fd(bo) == NULL)
         {
@@ -309,7 +404,6 @@ gbm_viv_bo_map(
     )
 {
     struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
-
     /* If it's a dumb buffer, we already have a mapping */
     if (bo->map)
     {
@@ -394,6 +488,7 @@ create_dumb(
     bo->base.format = format;
     bo->base.handle.u32 = create_arg.handle;
     bo->size = create_arg.size;
+    bo->fd = -1;
 
     if (gbm_viv_bo_map_fd(bo) == NULL)
         goto destroy_dumb;
@@ -493,6 +588,8 @@ gbm_viv_bo_destroy(struct gbm_bo *_bo)
         memset(&arg, 0, sizeof(arg));
         arg.handle = bo->base.handle.u32;
         drmIoctl(dev->base.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg);
+        if (bo->fd >= 0)
+            close(bo->fd);
     }
 
     free(bo);

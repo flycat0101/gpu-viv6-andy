@@ -35,6 +35,7 @@ struct wl_viv_buffer
     gctUINT32 physical[3];
     gctUINT32 gpuBaseAddr;
     gceTILING tiling;
+    gctINT32 fd;
 };
 
 /* Legacy naming. */

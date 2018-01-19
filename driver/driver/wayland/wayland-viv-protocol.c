@@ -20,34 +20,35 @@
 extern const struct wl_interface wl_buffer_interface;
 
 static const struct wl_interface *types[] = {
-    &wl_buffer_interface,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    &wl_buffer_interface,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+	&wl_buffer_interface,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	&wl_buffer_interface,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static const struct wl_message wl_viv_requests[] = {
-    { "create_buffer", "nuuuiiuiuuiu", types + 0 },
-    { "enable_tile_status", "ouuuuu", types + 12 },
+	{ "create_buffer", "nuuuiiuiuuiuh", types + 0 },
+	{ "enable_tile_status", "ouuuuu", types + 13 },
 };
 
 WL_EXPORT const struct wl_interface wl_viv_interface = {
-    "wl_viv", 1,
-    2, wl_viv_requests,
-    0, NULL,
+	"wl_viv", 1,
+	2, wl_viv_requests,
+	0, NULL,
 };
 

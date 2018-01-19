@@ -24,6 +24,8 @@
 
 #include <pthread.h>
 
+#include <fcntl.h>
+
 #include <wayland-viv-client-protocol.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
@@ -107,6 +109,7 @@ struct wl_egl_buffer
         gctSIZE_T tsSize;
         gcoSURF surface;
         gceHARDWARE_TYPE hwType;
+        gctINT32 fd;
     } info;
 
     EGLint age;
@@ -427,6 +430,8 @@ buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t t
     gcoSURF_Destroy(buffer->info.surface);
     gcoHAL_Commit(gcvNULL, gcvFALSE);
 
+    close(buffer->info.fd);
+
     free(buffer);
 
     /* Restore hardware type. */
@@ -506,6 +511,7 @@ wl_egl_buffer_create(struct wl_egl_window *window,
 {
     gceSTATUS status;
     gcoSURF surface = gcvNULL;
+    gctINT32 fd;
 
     /*
      * Current hardware type should be correctly set already.
@@ -545,6 +551,10 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                                 &buffer->info.node,
                                 &buffer->info.pool,
                                 &buffer->info.size));
+
+    gcmONERROR(gcoHAL_ExportVideoMemory(buffer->info.node, O_RDWR, &fd));
+
+    buffer->info.fd = fd;
 
     gcmONERROR(
         gcoHAL_NameVideoMemory(buffer->info.node,
@@ -587,7 +597,8 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                 buffer->info.size,
                 buffer->info.tsNode,
                 buffer->info.tsPool,
-                buffer->info.tsSize);
+                buffer->info.tsSize,
+                buffer->info.fd);
 
     wl_buffer_add_listener(buffer->wl_buf, &buffer_listener, buffer);
 
@@ -661,6 +672,7 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         gcoHAL_Commit(gcvNULL, gcvFALSE);
 
         buffer->info.surface = gcvNULL;
+        close(buffer->info.fd);
 
         /* Restore hardware type. */
         gcoHAL_SetHardwareType(gcvNULL, hwType);
@@ -2343,6 +2355,7 @@ veglCreateWaylandBufferFromImage(
     struct wl_buffer *wl_buf = NULL;
     struct wl_egl_display *display;
     struct wl_egl_buffer *buffer;
+    gctINT32 fd;
 
     VEGL_LOCK_DISPLAY_RESOURCE(Dpy);
 
@@ -2365,6 +2378,10 @@ veglCreateWaylandBufferFromImage(
                                &buffer->info.node,
                                &buffer->info.pool,
                                &buffer->info.size));
+
+    gcmONERROR(gcoHAL_ExportVideoMemory(buffer->info.node, O_RDWR, &fd));
+    buffer->info.fd = fd;
+
     gcmONERROR(
         gcoSURF_GetFormat(Image->image.surface,
                           &buffer->info.type,
@@ -2379,7 +2396,7 @@ veglCreateWaylandBufferFromImage(
                 buffer->info.width, buffer->info.height, buffer->info.stride,
                 buffer->info.format, buffer->info.type,
                 buffer->info.node, buffer->info.pool, buffer->info.size,
-                buffer->info.tsNode, buffer->info.tsPool, buffer->info.tsSize);
+                buffer->info.tsNode, buffer->info.tsPool, buffer->info.tsSize, buffer->info.fd);
 
     wl_proxy_set_queue((struct wl_proxy *)buffer->wl_buf, NULL);
 

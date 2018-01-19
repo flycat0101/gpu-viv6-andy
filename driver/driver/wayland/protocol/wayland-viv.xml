@@ -19,6 +19,7 @@
        <arg name="tsNode" type="uint"/>
        <arg name="tsPool" type="int"/>
        <arg name="tsSize" type="uint"/>
+       <arg name="fd" type="fd"/>
      </request>
      <request name="enable_tile_status">
        <description summary="Sync tile status">
