@@ -4737,16 +4737,6 @@ gcoHARDWARE_Construct(
     /* Check if big endian */
     hardware->bigEndian = (*(gctUINT8 *)&data == 0xff);
 
-    /* Don't stall before primitive. */
-    hardware->stallDestination =
-        hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
-            gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND;
-
-    hardware->stallSource =
-        hardware->features[gcvFEATURE_BLT_ENGINE] ?
-            gcvWHERE_BLT : gcvWHERE_PIXEL;
-
-
     gcmONERROR(gcoHARDWARE_DetectProcess(hardware));
 
     hardware->threadDefault = ThreadDefault;
@@ -5242,6 +5232,23 @@ gcoHARDWARE_Construct(
     gcmONERROR(_FillInConfigTable(hardware, hardware->config));
     gcmVERIFY_OK(_FillInFeatureTable(hardware, hardware->features));
     gcmVERIFY_OK(_FillInSWWATable(hardware, hardware->swwas));
+
+    /*for the chip which support halti5, the mirror diamonds centroids
+    ** table should be same with the diamonds centroids talbe */
+    if (hardware->features[gcvFEATURE_HALTI5])
+    {
+        hardware->MsaaStates->sampleCoords4[1] = hardware->MsaaStates->sampleCoords4[0];
+        hardware->MsaaStates->centroids4[1] = hardware->MsaaStates->centroids4[0];
+    }
+
+    /* Don't stall before primitive. */
+    hardware->stallDestination =
+        hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
+            gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND;
+
+    hardware->stallSource =
+        hardware->features[gcvFEATURE_BLT_ENGINE] ?
+            gcvWHERE_BLT : gcvWHERE_PIXEL;
 
 #if gcdENABLE_3D
     hardware->unifiedConst = hardware->config->unifiedConst;

@@ -125,6 +125,7 @@ __GLextension __glExtension[] =
     {"GL_EXT_primitive_bounding_box",               GL_FALSE, GL_TRUE },
     {"GL_EXT_shader_framebuffer_fetch",             GL_FALSE, GL_TRUE },
     {"GL_EXT_protected_textures",                   GL_FALSE, GL_FALSE},
+    {"GL_EXT_sRGB",                                 GL_FALSE, GL_FALSE},
     {"GL_ANDROID_extension_pack_es31a",             GL_FALSE, GL_TRUE },
 
     /* Vendor extensions */

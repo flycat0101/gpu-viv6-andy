@@ -543,6 +543,8 @@ gcChipInitExtension(
         {
             __glExtension[__GL_EXTID_EXT_protected_textures].bEnabled = GL_TRUE;
         }
+
+        __glExtension[__GL_EXTID_EXT_sRGB].bEnabled = GL_TRUE;
     }
 
     /* extension enabled only for context 3.1 and later */

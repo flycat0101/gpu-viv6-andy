@@ -586,6 +586,10 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
         break;
 
     case GL_SRGB8_ALPHA8:
+        if (!__glExtension[__GL_EXTID_EXT_sRGB].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
         break;
 
     case GL_DEPTH_COMPONENT16:

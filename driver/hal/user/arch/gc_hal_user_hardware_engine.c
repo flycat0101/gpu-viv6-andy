@@ -9517,9 +9517,14 @@ gcoHARDWARE_FlushSampling(
 };
 
 
-        /* Program sample coordinates. */
-        {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1  <= 1024);
+        /* Program sample coordinates. No need program sample coords for the chip
+        ** which support halti5, as those chip use fixed sample coords, and just program
+        ** the corresponding centroids table.
+        */
+        if (!Hardware->features[gcvFEATURE_HALTI5])
+        {
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
@@ -9530,7 +9535,7 @@ gcoHARDWARE_FlushSampling(
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
  26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1 ) & ((gctUINT32) ((((1 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
  25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
  25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
@@ -9538,16 +9543,11 @@ gcoHARDWARE_FlushSampling(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0384, sampleCoords[tableIndex] );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
 
-
-        gcmSETSTATEDATA_NEW(
-            stateDelta, reserve, memory, gcvFALSE, 0x0384,
-            sampleCoords[tableIndex]
-        );
-
-        gcmENDSTATEBATCH_NEW(
-            reserve, memory
-            );
+        }
 
         /* Program the centroid table. */
         {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);

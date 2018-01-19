@@ -197,6 +197,19 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RGB8, GL_RGB, GL_UNSIGNED_INT_2_10_10_10_REV_EXT, 4, GL_TRUE },
     { GL_RGB565, GL_RGB, GL_UNSIGNED_INT_2_10_10_10_REV_EXT, 4, GL_TRUE },
     { GL_DEPTH_COMPONENT32_OES, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4, GL_TRUE },
+
+    /* required by GL_EXT_sRGB extension */
+    { GL_SRGB_EXT, GL_SRGB_EXT, GL_UNSIGNED_BYTE, 4, GL_FALSE },
+    { GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
+
+    /*  GL_EXT_texture_rg extension GL_OES_texture_float and GL_OES_texture_half_float 
+    ** would make these formats color-renderable */
+    { GL_RED_EXT, GL_RED_EXT, GL_FLOAT, 4, GL_TRUE },
+    { GL_RED_EXT, GL_RED_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
+    { GL_RED_EXT, GL_RED_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_FLOAT, 4, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
 };
 
 
@@ -531,9 +544,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_RGBA32F:
         case GL_BGRA_EXT:
 
-        case GL_SRGB:
         case GL_SRGB8:
-        case GL_SRGB8_ALPHA8:
 
         case GL_LUMINANCE:
         case GL_LUMINANCE8_OES:
@@ -554,14 +565,19 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 
             break;
         case GL_STENCIL_INDEX8:
+            if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
             {
-                if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
-                {
-                    invalid = GL_TRUE;
-                }
-                break;
-
+                invalid = GL_TRUE;
             }
+            break;
+
+        case GL_SRGB_EXT:
+        case GL_SRGB_ALPHA_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_sRGB].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30)
+            {
+                invalid = GL_TRUE;
+            }
+            break;
 
         default:
             invalid = GL_TRUE;
@@ -618,7 +634,13 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
                 invalid = GL_TRUE;
             }
             break;
-
+        case GL_SRGB_EXT:
+        case GL_SRGB_ALPHA_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_sRGB].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30)
+            {
+                invalid = GL_TRUE;
+            }
+            break;
         default:
             invalid = GL_TRUE;
             break;
@@ -993,6 +1015,32 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
             break;
         case GL_HALF_FLOAT_OES:
             invalid = (GL_ALPHA != internalFormat || !__glExtension[__GL_EXTID_OES_texture_half_float].bEnabled);
+            break;
+
+        default:
+            invalid = GL_TRUE;
+            break;
+        }
+        break;
+
+    case GL_SRGB_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            invalid = (GL_SRGB_EXT != internalFormat || !__glExtension[__GL_EXTID_EXT_sRGB].bEnabled);
+            break;
+
+        default:
+            invalid = GL_TRUE;
+            break;
+        }
+        break;
+
+    case GL_SRGB_ALPHA_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            invalid = (GL_SRGB_ALPHA_EXT != internalFormat || !__glExtension[__GL_EXTID_EXT_sRGB].bEnabled);
             break;
 
         default:

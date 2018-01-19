@@ -109,6 +109,7 @@ typedef enum
     __GL_EXTID_EXT_primitive_bounding_box,
     __GL_EXTID_EXT_shader_framebuffer_fetch,
     __GL_EXTID_EXT_protected_textures,
+    __GL_EXTID_EXT_sRGB,
     __GL_EXTID_ANDROID_extension_pack_es31a,
 
     /* Vendor extensions */

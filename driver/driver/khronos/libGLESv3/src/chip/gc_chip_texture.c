@@ -548,6 +548,26 @@ gcChipUtilGetImageFormat(
             break;
         }
         break;
+
+    case GL_SRGB_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 24;
+            imageFormat = gcvSURF_SBGR8;
+            break;
+        }
+        break;
+
+    case GL_SRGB_ALPHA_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 32;
+            imageFormat = gcvSURF_A8_SBGR8;
+            break;
+        }
+        break;
     }
 
     if (pImageFormat)

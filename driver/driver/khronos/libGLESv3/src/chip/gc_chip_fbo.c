@@ -949,13 +949,7 @@ __glChipIsFramebufferComplete(
                 break;
             }
 
-            /*
-            ** For ES3.0, only canonical format combination is legal.
-            */
-            if (gc->apiVersion == __GL_API_VERSION_ES30)
-            {
-                renderable &= tex->canonicalFormat;
-            }
+            renderable &= tex->canonicalFormat;
 
             texInfo = (__GLchipTextureInfo *)tex->privateData;
             chipMipLevel = &texInfo->mipLevels[attachPoint->level];

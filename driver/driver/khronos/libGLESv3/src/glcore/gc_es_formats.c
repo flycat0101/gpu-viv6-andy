@@ -2709,9 +2709,11 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RGB10_A2:
         drvFormat = __GL_FMT_RGB10_A2;
         break;
+    case GL_SRGB_EXT:
     case GL_SRGB8:
         drvFormat = __GL_FMT_SRGB8;
         break;
+    case GL_SRGB_ALPHA_EXT:
     case GL_SRGB8_ALPHA8:
         drvFormat = __GL_FMT_SRGB8_ALPHA8;
         break;
