@@ -10463,9 +10463,8 @@ gcoHARDWARE_FlushShaderVidMemNode(
             continue;
         }
 
-        gcmONERROR(gcoSURF_LockNode((gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i],
-                                    &physical,
-                                    gcvNULL));
+        gcmGETHARDWAREADDRESSP((gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i],
+                                    physical);
         gcmASSERT((gctUINT32)~0 != physical);
 
         /* Update the states. */
