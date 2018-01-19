@@ -565,6 +565,8 @@ int gralloc_vivante_unlock(struct gralloc_vivante_t *drv,
     if (mapped)
         drm_vivante_bo_munmap(bo->bo);
 
+    drm_vivante_bo_inc_timestamp(bo->bo, NULL);
+
     bo->lock_count--;
     if (!bo->lock_count)
         bo->locked_for = 0;

@@ -176,7 +176,14 @@ OBJECTS := $(OBJ_DIR)/gc_vdk_egl.o \
 
 EGL_API_OBJECT :=
 
-ifeq ($(EGL_API_NULLWS),1)
+ifeq ($(EGL_API_X),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
+else ifeq ($(EGL_API_DRI),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o \
+                    $(OBJ_DIR)/XF86dri.o
+else ifeq ($(X11_DRI3),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
+else ifeq ($(EGL_API_NULLWS),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_nullws.o
 else ifeq ($(EGL_API_WL),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_wayland.o \
@@ -187,13 +194,6 @@ else ifeq ($(EGL_API_DFB),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_dfb.o
 else ifeq ($(EGL_API_GBM),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_gbm.o
-else ifeq ($(EGL_API_X),1)
-  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
-else ifeq ($(EGL_API_DRI),1)
-  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o \
-                    $(OBJ_DIR)/XF86dri.o
-else ifeq ($(X11_DRI3),1)
-  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
 endif
 
 OBJECTS += $(EGL_API_OBJECT)

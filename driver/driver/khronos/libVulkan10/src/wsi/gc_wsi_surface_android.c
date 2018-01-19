@@ -553,7 +553,6 @@ static VkResult __WrapNativeWindowBufferMemory(
     gc_native_handle_t*  handle;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
-    /* TODO: drm gralloc. */
     handle = gc_native_handle_get(nativeBuffer->handle);
 
     allocInfo = (VkMemoryAllocateInfo) {

@@ -1915,6 +1915,33 @@ _QueryRenderMode(
             renderMode = VEGL_DIRECT_RENDERING_FCFILL;
         }
 
+#if gcdENABLE_RENDER_INTO_WINDOW_WITH_FC
+        if ((mode3D >= VEGL_DIRECT_RENDERING_FC_NOCC) &&
+            ((mode2D >= VEGL_DIRECT_RENDERING_FC_NOCC) || (mode2D == -1)))
+        {
+            /* No resolve with tile status. */
+            renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+        }
+
+        /*
+         * If has 2D and 2D has color compression support, we can use compressed
+         * output. 3D composition should be rare.
+         * If there's no 2D, and 3D TX has decompress support, we can also use
+         * compressed output.
+         */
+        if (((mode2D == VEGL_DIRECT_RENDERING) &&
+                (compressNOAA || config->samples == 4)) ||
+            ((mode2D == -1) && (mode3D == VEGL_DIRECT_RENDERING)))
+        {
+            /* No resolve with tile status, compressed. */
+            renderMode = VEGL_DIRECT_RENDERING;
+        }
+
+        if (config->samples == 4)
+        {
+            renderMode = VEGL_INDIRECT_RENDERING;
+        }
+#endif
 
         /* Special render into window mode. */
         if ((renderMode == VEGL_INDIRECT_RENDERING) &&
@@ -3361,6 +3388,8 @@ _UpdateANativeBuffer(
         /* surface is not updated. */
         return gcvFALSE;
     }
+
+    Image->u.ANativeBuffer.timeStamp = timeStamp;
 
     /* Update tile status information. */
     switch (tilingArgs.ts_mode)

@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <unistd.h>
 #include <dlfcn.h>
@@ -159,7 +160,7 @@ vdkCreateWindow(
     int Height
     )
 {
-    return NULL;
+    return (vdkWindow)(uintptr_t)NULL;
 }
 
 VDKAPI int VDKLANG
@@ -285,7 +286,7 @@ vdkCreatePixmap(
     int BitsPerPixel
     )
 {
-    return NULL;
+    return (vdkPixmap)(uintptr_t)NULL;
 }
 
 VDKAPI int VDKLANG
