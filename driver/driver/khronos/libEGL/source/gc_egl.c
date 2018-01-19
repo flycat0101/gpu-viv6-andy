@@ -19,6 +19,7 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_EGL_API
 
+#if !defined gcdSTATIC_LINK
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
 static pthread_mutex_t client_handles_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -34,7 +35,7 @@ static gctCONST_STRING _dispatchNames[] =
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 #endif
-
+#endif
 /*******************************************************************************
 ***** Version Signature *******************************************************/
 
