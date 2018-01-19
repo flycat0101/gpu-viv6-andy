@@ -413,7 +413,7 @@ static VkResult __vki_CreateGraphicsPipeline(
     pip->primitiveRestartEnable = info->pInputAssemblyState->primitiveRestartEnable;
 
     /* RS states */
-    pip->rasterDiscard = info->pRasterizationState->rasterizerDiscardEnable;
+    pip->rasterDiscard = (info->pRasterizationState->rasterizerDiscardEnable || (info->pRasterizationState->cullMode == VK_CULL_MODE_FRONT_AND_BACK));
     pip->depthBiasEnable = info->pRasterizationState->depthBiasEnable;
     pip->frontFace = info->pRasterizationState->frontFace;
 
