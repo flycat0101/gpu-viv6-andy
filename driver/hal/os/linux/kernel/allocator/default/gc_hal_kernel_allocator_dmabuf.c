@@ -336,7 +336,7 @@ _DmabufUnmapUser(
     }
 
     userLogical -= buf_desc->sgtable->sgl->offset;
-    vm_munmap((unsigned long)userLogical, Mdl->numPages >> PAGE_SHIFT);
+    vm_munmap((unsigned long)userLogical, Mdl->numPages << PAGE_SHIFT);
 }
 
 static gceSTATUS
@@ -378,7 +378,7 @@ _DmabufMapUser(
 OnError:
     if (gcmIS_ERROR(status) && userLogical)
     {
-        _DmabufUnmapUser(Allocator, Mdl, userLogical, Mdl->numPages >> PAGE_SHIFT);
+        _DmabufUnmapUser(Allocator, Mdl, userLogical, Mdl->numPages << PAGE_SHIFT);
     }
     return status;
 }
