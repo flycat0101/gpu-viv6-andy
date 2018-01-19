@@ -854,7 +854,7 @@ _SetupVidMem(
                     if (gcmIS_SUCCESS(status))
                     {
                         gckALLOCATOR allocator = ((PLINUX_MDL)device->contiguousPhysical)->allocator;
-                        device->contiguousVidMem->capability = allocator->capability;
+                        device->contiguousVidMem->capability = allocator->capability | gcvALLOC_FLAG_MEMLIMIT;
                         device->contiguousVidMem->physical = device->contiguousPhysical;
                         device->contiguousBase = physAddr;
                         break;
@@ -909,7 +909,7 @@ _SetupVidMem(
                     ));
 
                 allocator = ((PLINUX_MDL)device->contiguousPhysical)->allocator;
-                device->contiguousVidMem->capability = allocator->capability;
+                device->contiguousVidMem->capability = allocator->capability | gcvALLOC_FLAG_MEMLIMIT;
                 device->contiguousVidMem->physical = device->contiguousPhysical;
                 device->requestedContiguousBase = ContiguousBase;
                 device->requestedContiguousSize = ContiguousSize;
