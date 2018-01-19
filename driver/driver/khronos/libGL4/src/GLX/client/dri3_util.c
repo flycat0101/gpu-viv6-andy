@@ -450,19 +450,14 @@ static void _createPixmapInfo(
 {
     int xx, yy;
     unsigned int ww, hh, bb;
-    int pixmapStride;
+    int pixmapStride = 0;
     unsigned int depth = 24;
     Window  root;
-    int pixmapfd;
+    int pixmapfd = -1;
     Pixmap pixmap = 0;
     gcoSURF surface;
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gctUINT32 fdhandle = 0;
-    gctUINT bufferoffset = 0;
-
-
     __DRInativeDisplay * display;
+    gceSTATUS status = gcvSTATUS_OK;
 
     display = dridrawable->display;
 
@@ -482,24 +477,23 @@ static void _createPixmapInfo(
     }
 
     pixmapfd = create_fd_from_pixmap(XGetXCBConnection(display), pixmap, &pixmapStride);
-    if (pixmapfd <= 0) {
+    if (pixmapfd < 0) {
         goto OnError;
     }
 
-    fdhandle = (gctUINT32)pixmapfd;
-    gcmONERROR(gcoSURF_WrapUserMultiBuffer(
+    gcmONERROR(gcoSURF_WrapUserMemory(
         gcvNULL,
         ww,
         hh,
+        (gctUINT)pixmapStride,
+        1,
         surftype,
         surfformat,
-        (gctUINT *)&pixmapStride,
-        &fdhandle,
-        &bufferoffset,
+        (gctUINT32)pixmapfd,
         gcvALLOC_FLAG_DMABUF,
         &surface
     ));
-    close(fdhandle);
+    close(pixmapfd);
 
     *pixWrapSurf = surface;
     *backPixmap = pixmap;

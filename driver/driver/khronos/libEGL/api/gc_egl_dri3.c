@@ -332,23 +332,21 @@ static void _setupAsyncFrame(asyncFrame *frame)
 {
     int xx, yy;
     unsigned int ww, hh, bb;
-    int stride;
+    int stride = 0;
     unsigned int depth = 24;
-    Window    root;
-    gceSTATUS status = gcvSTATUS_OK;
     __DRIDisplay * display;
+    gceSTATUS status = gcvSTATUS_OK;
 
-
-    gctUINT32 fdhandle = 0;
-    gctUINT bufferoffset = 0;
-
-
-    if(frame == NULL)
+    if (frame == NULL)
+    {
         return;
+    }
+
     display = frame->dridrawable->display;
 
     if ((frame->dridrawable->w == 0) || (frame->dridrawable->h == 0))
     {
+        Window root;
         XGetGeometry(display->dpy, frame->Drawable, &root, &xx, &yy, &ww, &hh, &bb, &depth);
         frame->dridrawable->w = ww;
         frame->dridrawable->h = hh;
@@ -385,25 +383,21 @@ static void _setupAsyncFrame(asyncFrame *frame)
     }
     xcb_flush(dri_GetXCB(display->dpy));
 
-    fdhandle = frame->pixmapfd;
-
-    gcmONERROR(gcoSURF_WrapUserMultiBuffer(
+    gcmONERROR(gcoSURF_WrapUserMemory(
         gcvNULL,
         ww,
         hh,
+        (gctUINT)stride,
+        1,
         frame->surftype,
         frame->surfformat,
-        (gctUINT *)&stride,
-        &fdhandle,
-        &bufferoffset,
+        (gctUINT32)frame->pixmapfd,
         gcvALLOC_FLAG_DMABUF,
         &frame->pixWrapSurf
     ));
 
-
     xshmfence_reset(frame->shm_fence);
     xshmfence_trigger(frame->shm_fence);
-
     return;
 
 OnError:
@@ -2803,26 +2797,34 @@ _GetWindowBackBuffer(
                 abort();
             }
 
-            do {
-                switch (ev->evtype) {
-                case XCB_PRESENT_CONFIGURE_NOTIFY:
+            do
+            {
+                switch (ev->evtype)
                 {
-                 xcb_present_configure_notify_event_t *ce = (void *) ev;
+                case XCB_PRESENT_CONFIGURE_NOTIFY:
+                    {
+                        xcb_present_configure_notify_event_t *ce = (void *) ev;
 
-                 if ( ce->width != drawable->w || ce->height != drawable->h)
-                     schanged = 1;
+                         if (ce->width != drawable->w || ce->height != drawable->h)
+                         {
+                             schanged = 1;
+                         }
 
-                 drawable->w = ce->width;
-                 drawable->h = ce->height;
-                 }
-                 break;
+                         drawable->w = ce->width;
+                         drawable->h = ce->height;
+                    }
+                    break;
+
                 case XCB_PRESENT_COMPLETE_NOTIFY:
                     break;
+
                 case XCB_PRESENT_EVENT_IDLE_NOTIFY:
                     {
                         xcb_present_idle_notify_event_t *ie = (xcb_present_idle_notify_event_t *)ev;
-                        for (index = 0; index < NUM_ASYNCFRAME; index++) {
-                            if (drawable->ascframe[index].backPixmap == ie->pixmap) {
+                        for (index = 0; index < NUM_ASYNCFRAME; index++)
+                        {
+                            if (drawable->ascframe[index].backPixmap == ie->pixmap)
+                            {
                                 drawable->busyframe[index] = _FRAME_FREE;
                                 break;
                             }
@@ -2836,7 +2838,6 @@ _GetWindowBackBuffer(
 
             continue;
         }
-
 
         break;
     }
@@ -2890,13 +2891,12 @@ _PostWindowBackBuffer(
     IN struct eglRegion * DamageHint
     )
 {
-    gcoSURF surface;
-    __DRIdrawablePriv * drawable;
     int index = 0;
+    __DRIdrawablePriv * drawable;
     unsigned int present_flags = XCB_PRESENT_OPTION_ASYNC;
 
-    static X11DISPLAY    dpy = gcvNULL;
-    static int firsttime = 1;
+    static X11DISPLAY dpy = gcvNULL;
+    static EGLBoolean firsttime = EGL_TRUE;
 
     asyncFrame *frame = NULL;
     xcb_xfixes_region_t update = 0;
@@ -2908,54 +2908,54 @@ _PostWindowBackBuffer(
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
-    (void) surface;
-
-
     drawable = (__DRIdrawablePriv *)BackBuffer->context;
 
     for (index = 0; index < NUM_ASYNCFRAME; index++)
     {
         if (drawable->ascframe[index].pixWrapSurf == BackBuffer->surface)
+        {
             break;
+        }
     }
 
-    gcmASSERT(index < NUM_ASYNCFRAME);
+    if (index == NUM_ASYNCFRAME)
+    {
+        return EGL_FALSE;
+    }
 
     if (firsttime)
     {
         XInitThreads();
         dpy = XOpenDisplay(NULL);
+        firsttime = EGL_FALSE;
     }
 
-    firsttime = 0;
-
     frame = &drawable->ascframe[index];
-
 
     sync_args.flags = DMA_BUF_SYNC_END;
 
     ioctl(frame->pixmapfd, DMA_BUF_IOCTL_SYNC, sync_args);
 
-
     if (frame->fence_fd) {
-    xshmfence_await(frame->shm_fence);
-    xshmfence_reset(frame->shm_fence);
+        xshmfence_await(frame->shm_fence);
+        xshmfence_reset(frame->shm_fence);
     }
 
     xcb_present_pixmap(dri_GetXCB(dpy), frame->Drawable, frame->backPixmap,
-    serial++,
-    0, /* valid */
-    update, /* update */
-    0, /* x_off */
-    0, /* y_off */
-    None,
-    None, /* wait fence */
-    frame->sync_fence,
-    present_flags,
-    0, /* target msc */
-    0, /* divisor */
-    0, /* remainder */
-    0, (xcb_present_notify_t *)NULL);
+        serial++,
+        0, /* valid */
+        update, /* update */
+        0, /* x_off */
+        0, /* y_off */
+        None,
+        None, /* wait fence */
+        frame->sync_fence,
+        present_flags,
+        0, /* target msc */
+        0, /* divisor */
+        0, /* remainder */
+        0, (xcb_present_notify_t *)NULL
+        );
 
     xcb_flush(dri_GetXCB(dpy));
     return EGL_TRUE;
@@ -2968,21 +2968,23 @@ _CancelWindowBackBuffer(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    __DRIdrawablePriv * drawable;
     int index = 0;
+    __DRIdrawablePriv * drawable = (__DRIdrawablePriv *)BackBuffer->context;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-
-
-    drawable = (__DRIdrawablePriv *)BackBuffer->context;
 
     for (index = 0; index < NUM_ASYNCFRAME; index++)
     {
         if (drawable->ascframe[index].pixWrapSurf == BackBuffer->surface)
+        {
             break;
+        }
     }
 
-    gcmASSERT( index < NUM_ASYNCFRAME);
+    if (index == NUM_ASYNCFRAME)
+    {
+        return EGL_FALSE;
+    }
 
     drawable->busyframe[index] = _FRAME_FREE;
 
@@ -3005,23 +3007,30 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    __DRIdrawablePriv * drawable;
     int index = 0;
-    drawable = (__DRIdrawablePriv *)BackBuffer->context;
+    __DRIdrawablePriv * drawable = (__DRIdrawablePriv *)BackBuffer->context;
 
     for (index = 0; index < NUM_ASYNCFRAME; index++)
     {
         if (drawable->ascframe[index].age)
+        {
             drawable->ascframe[index].age++;
+        }
     }
 
     for (index = 0; index < NUM_ASYNCFRAME; index++)
     {
         if (drawable->ascframe[index].pixWrapSurf == BackBuffer->surface)
+        {
             break;
+        }
     }
 
-    gcmASSERT( index < NUM_ASYNCFRAME);
+    if (index == NUM_ASYNCFRAME)
+    {
+        return EGL_FALSE;
+    }
+
     drawable->ascframe[index].age = 1;
     return EGL_TRUE;
 }
@@ -3034,9 +3043,8 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    __DRIdrawablePriv * drawable;
     int index = 0;
-    __DRIDisplay* driDisplay;
+    __DRIdrawablePriv *drawable;
 
     if (BackBuffer && BackBuffer->context)
     {
@@ -3045,8 +3053,16 @@ _QueryBufferAge(
         for (index = 0; index < NUM_ASYNCFRAME; index++)
         {
             if (drawable->ascframe[index].pixWrapSurf == BackBuffer->surface)
+            {
                 break;
+            }
         }
+
+        if (index == NUM_ASYNCFRAME)
+        {
+            return EGL_FALSE;
+        }
+
         *BufferAge = drawable->ascframe[index].age;
         return EGL_TRUE;
     }
@@ -3057,7 +3073,7 @@ _QueryBufferAge(
          * It's safe to return age of buffer to dequeue next time --- except that
          * there're 0 aged buffers.
          */
-        driDisplay = (__DRIDisplay*)Display->localInfo;
+        __DRIDisplay* driDisplay = (__DRIDisplay*)Display->localInfo;
         drawable = _FindDrawable(driDisplay, (PlatformWindowType)Surface->hwnd);
 
         for (index = 0; index < NUM_ASYNCFRAME; index++)
@@ -3312,8 +3328,7 @@ _ConnectPixmap(
     gctINT pixmapStride = 0;
     gceSURF_FORMAT pixmapFormat;
     gctINT pixmapBpp;
-    gctINT pixmapFD = 0;
-    gctUINT bufferoffset = 0;
+    gctINT pixmapFD = -1;
     gctUINT32 physical[3] = {0};
     gctPOINTER logical[3] = {0};
     gcoSURF wrapper = gcvNULL;
@@ -3349,15 +3364,15 @@ _ConnectPixmap(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    gcmONERROR(gcoSURF_WrapUserMultiBuffer(
+    gcmONERROR(gcoSURF_WrapUserMemory(
             gcvNULL,
             pixmapWidth,
             pixmapHeight,
+            (gctUINT)pixmapStride,
+            1,
             gcvSURF_BITMAP,
             pixmapFormat,
-            (gctUINT*)&pixmapStride,
-            (gctUINT32*)&pixmapFD,
-            &bufferoffset,
+            (gctUINT32)pixmapFD,
             gcvALLOC_FLAG_DMABUF,
             &wrapper
         ));
