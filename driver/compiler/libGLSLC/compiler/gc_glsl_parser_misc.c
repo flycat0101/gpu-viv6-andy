@@ -13338,14 +13338,44 @@ slParseLayoutId(
                break;
 
            case slvLAYOUT_WORK_GROUP_SIZE_X:
+               if (Value->u.constant.intValue > (gctINT)GetGLMaxComputeWorkGroupSize(0))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "local_size_x \"%d\" is greater than the maximum value \"%d\".",
+                                                   Value->u.constant.intValue,
+                                                   GetGLMaxComputeWorkGroupSize(0)));
+               }
                layoutQualifier.u.qualifiers.layout.workGroupSize[0] = Value->u.constant.intValue;
                break;
 
            case slvLAYOUT_WORK_GROUP_SIZE_Y:
+               if (Value->u.constant.intValue > (gctINT)GetGLMaxComputeWorkGroupSize(1))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "local_size_y \"%d\" is greater than the maximum value \"%d\".",
+                                                   Value->u.constant.intValue,
+                                                   GetGLMaxComputeWorkGroupSize(1)));
+               }
                layoutQualifier.u.qualifiers.layout.workGroupSize[1] = Value->u.constant.intValue;
                break;
 
            case slvLAYOUT_WORK_GROUP_SIZE_Z:
+               if (Value->u.constant.intValue > (gctINT)GetGLMaxComputeWorkGroupSize(2))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "local_size_z \"%d\" is greater than the maximum value \"%d\".",
+                                                   Value->u.constant.intValue,
+                                                   GetGLMaxComputeWorkGroupSize(2)));
+               }
                layoutQualifier.u.qualifiers.layout.workGroupSize[2] = Value->u.constant.intValue;
                break;
 

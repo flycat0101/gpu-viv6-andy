@@ -9612,7 +9612,7 @@ gcLINKTREE_CheckAPILevelResource(
     case gcSHADER_TYPE_COMPUTE:
         maxUniformCount = GetGLMaxComputeUniformComponents() / 4;
         maxSamplerCount = GetGLMaxComputeTextureImageUnits();
-        maxImageCount = GetGLMaxCombinedImageUniforms();
+        maxImageCount = GetGLMaxComputeImageUniforms();
         maxAtomicCount = GetGLMaxComputeAtomicCounters();
         break;
     default:
