@@ -16415,8 +16415,14 @@ _EnableTileStatus(
 
     /* Cannot auto disable TS for compressed case, because the TS buffer
     ** contains info for compress.
+    ** For blt engine clear, HW may change tileMode from REQUEST64 to FAST_CLEAR,
+    ** which means fast clear value re-work for this tile, and in logic, the counter
+    ** of autoDisable should do "counter--", But HW only has operation "counter++"
+    ** and don't do such thing, so, we need reset counter or disable autoDisable optimization
+    ** in this situation
     */
     autoDisable = ((Surface->compressed == gcvFALSE) &&
+                   !Hardware->features[gcvFEATURE_BLT_ENGINE] &&
                    ((Hardware->features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT_WIDTH]) ||
                     ((Hardware->features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT]) &&
                      (tileCount < (1 << 20))
