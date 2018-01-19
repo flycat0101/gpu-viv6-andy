@@ -968,18 +968,22 @@ _TranslateANativeBufferFormat(
 }
 
 /*
- * Get Vivante bo tiling and matched type.
+ * Get Vivante bo tiling and matched base type.
+ * Base type could be:
+ * * gcvSURF_BITMAP
+ * * gcvSURF_TEXTURE
+ * * gcvSURF_RENDER_TARGET
+ * * gcvSURF_RENDER_TARGET_NO_TILE_STATUS
  *
  * EGL_TRUE on success.
  *   Out type gcvSURF_TYPE_UNKNOWN if can not find a matched type.
  * EGL_FALSE on error.
  */
 static EGLBoolean
-_GetVivanteDrmBoType(
+_GetVivanteDrmBoBaseType(
     struct gralloc_vivante_bo_t * bo,
-    EGLint RenderMode,
     struct drm_vivante_bo_tiling * TilingArgs,
-    gceSURF_TYPE * Type
+    gceSURF_TYPE * BaseType
     )
 {
     gceSURF_TYPE type;
@@ -1016,89 +1020,101 @@ _GetVivanteDrmBoType(
         return EGL_FALSE;
     }
 
-    /* Override type for window buffer according to renderMode. */
-    switch (RenderMode)
-    {
-    case VEGL_DIRECT_RENDERING_NOFC:
-        type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
 
-        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
-            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_NONE))
-        {
-            /* Can not support. */
-            type = gcvSURF_TYPE_UNKNOWN;
-            break;
-        }
-        break;
-    case VEGL_DIRECT_RENDERING_FC_NOCC:
-    case VEGL_DIRECT_RENDERING_FCFILL:
-        type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
-
-        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
-            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_DISABLED))
-        {
-            /* Can not support. */
-            type = gcvSURF_TYPE_UNKNOWN;
-            break;
-        }
-        break;
-    case VEGL_DIRECT_RENDERING:
-        type = gcvSURF_RENDER_TARGET;
-
-        if ((TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_SUPERTILED) ||
-            (TilingArgs->ts_mode != DRM_VIV_GEM_TS_DISABLED))
-        {
-            /* Can not support. */
-            type = gcvSURF_TYPE_UNKNOWN;
-            break;
-        }
-        break;
-
-    case VEGL_INDIRECT_RENDERING:
-#if gcdGPU_LINEAR_BUFFER_ENABLED
-        type = gcvSURF_BITMAP;
-
-        if (TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_LINEAR)
-        {
-            ALOGI("%s: incorrect tiling_mode: %x requirex %x",
-                __func__, TilingArgs->tiling_mode, DRM_VIV_GEM_TILING_LINEAR);
-        }
-#else
-        type = gcvSURF_TEXTURE;
-
-        if (TilingArgs->tiling_mode != DRM_VIV_GEM_TILING_TILED)
-        {
-            ALOGI("%s: incorrect tiling_mode: %x requires %x",
-                __func__, TilingArgs->tiling_mode, DRM_VIV_GEM_TILING_TILED);
-        }
-#endif
-        if (TilingArgs->ts_mode != DRM_VIV_GEM_TS_NONE)
-        {
-            ALOGI("%s: ts not required, but allocated", __func__);
-        }
-        break;
-
-    case -1:
-    default:
-        /* Do not override, for texture. */
-        break;
-    }
-
-    *Type = type;
+    *BaseType = type;
     return EGL_TRUE;
 }
 
 static inline EGLBoolean
-_GetGenericDrmBufferType(
+_GetGenericDrmBufferBaseType(
     android_native_buffer_t * Buffer,
+    gceSURF_TYPE * BaseType
+    )
+{
+    *BaseType = gcvSURF_BITMAP;
+    return EGL_TRUE;
+}
+
+/*
+ * Calibrate buffer type for rendering mode.
+ * EGL_TRUE on success.
+ * EGL_FALSE if baseType can not support specified rendering mode.
+ */
+static inline EGLBoolean
+_CalibrateBufferType(
+    gceSURF_TYPE BaseType,
     EGLint RenderMode,
     gceSURF_TYPE * Type
     )
 {
-    *Type = (RenderMode > VEGL_INDIRECT_RENDERING)
-          ? gcvSURF_TYPE_UNKNOWN : gcvSURF_BITMAP;
+    gceSURF_TYPE type = gcvSURF_TYPE_UNKNOWN;
 
-    return EGL_TRUE;
+    /*
+     * BaseType could be:
+     * * gcvSURF_BITMAP
+     * * gcvSURF_TEXTURE
+     * * gcvSURF_RENDER_TARGET
+     * * gcvSURF_RENDER_TARGET_NO_TILE_STATUS
+     */
+    /* Override type for window buffer according to renderMode. */
+    switch (RenderMode)
+    {
+    case VEGL_INDIRECT_RENDERING:
+#if gcdGPU_LINEAR_BUFFER_ENABLED
+        if (BaseType == gcvSURF_BITMAP)
+        {
+            type = gcvSURF_BITMAP;
+        }
+#else
+        if (BaseType == gcvSURF_TEXTURE)
+        {
+            type = gcvSURF_TEXTURE;
+        }
+#endif
+        break;
+    case VEGL_DIRECT_RENDERING_FCFILL:
+        if (BaseType == gcvSURF_RENDER_TARGET)
+        {
+            type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+        }
+        else if (BaseType == gcvSURF_RENDER_TARGET_NO_TILE_STATUS)
+        {
+            /* TODO: attach tile status?? */
+            type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+        }
+        break;
+    case VEGL_DIRECT_RENDERING_NOFC:
+        if (BaseType == gcvSURF_RENDER_TARGET ||
+            BaseType == gcvSURF_RENDER_TARGET_NO_TILE_STATUS)
+        {
+            type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+        }
+        break;
+    case VEGL_DIRECT_RENDERING_FC_NOCC:
+        if (BaseType == gcvSURF_RENDER_TARGET)
+        {
+            type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+        }
+        break;
+    case VEGL_DIRECT_RENDERING:
+        if (BaseType == gcvSURF_RENDER_TARGET)
+        {
+            type = gcvSURF_RENDER_TARGET;
+        }
+        break;
+    case -1:
+    default:
+        /* Use base type directly. */
+        type = BaseType;
+        break;
+    }
+
+    if (Type)
+    {
+        *Type = type;
+    }
+
+    return (type != gcvSURF_TYPE_UNKNOWN);
 }
 
 /* Generic drm buffer is treated as linear. */
@@ -1163,7 +1179,7 @@ _CreateGenericDrmBufferSurface(
                                     Buffer->height,
                                     stride,
                                     1,
-                                    gcvSURF_BITMAP,
+                                    Type,
                                     Format,
                                     (gctUINT32)fd,
                                     gcvALLOC_FLAG_DMABUF,
@@ -1311,7 +1327,8 @@ _GetANativeBufferSurface(
 
     if (bo)
     {
-        if (!_GetVivanteDrmBoType(bo, RenderMode, &tilingArgs, &type))
+        if (!_GetVivanteDrmBoBaseType(bo, &tilingArgs, &type) ||
+            !_CalibrateBufferType(type, RenderMode, &type))
         {
             return EGL_FALSE;
         }
@@ -1321,7 +1338,8 @@ _GetANativeBufferSurface(
     }
     else
     {
-        if (!_GetGenericDrmBufferType(Buffer, RenderMode, &type))
+        if (!_GetGenericDrmBufferBaseType(Buffer, &type) ||
+            !_CalibrateBufferType(type, RenderMode, &type))
         {
             return EGL_FALSE;
         }
@@ -1378,19 +1396,34 @@ _GetANativeBufferSurface(
     return EGL_TRUE;
 }
 
+/*
+ * Negotiate render mode with buffer allocator.
+ * IN:  prefered render mode.
+ * OUT: matched render mode.
+ */
 static EGLBoolean
-_ValidateRenderMode(
+_NegotiateRenderMode(
     struct ANativeWindow * Win,
-    EGLint RenderMode,
-    EGLint * OutRenderMode
+    EGLint PreferRenderMode,
+    EGLint * MatchedRenderMode
     )
 {
     int err;
     android_native_buffer_t * buffer;
     struct gralloc_vivante_bo_t *bo;
-    struct drm_vivante_bo_tiling tilingArgs;
     EGLBoolean success = EGL_FALSE;
+    gceSURF_TYPE baseType = gcvSURF_TYPE_UNKNOWN;
     gceSURF_TYPE type = gcvSURF_TYPE_UNKNOWN;
+    EGLint renderMode = -1;
+    EGLBoolean found = EGL_FALSE;
+    gctUINT i;
+    const EGLint preferModes[] =
+    {
+        VEGL_DIRECT_RENDERING,
+        VEGL_DIRECT_RENDERING_FC_NOCC,
+        VEGL_DIRECT_RENDERING_FCFILL,
+        VEGL_INDIRECT_RENDERING,
+    };
 
     err = _DequeueBuffer(Win, &buffer);
 
@@ -1417,26 +1450,67 @@ _ValidateRenderMode(
 
     if (bo)
     {
+        struct drm_vivante_bo_tiling tilingArgs;
+
         /* Try to get matched surface type for buffer and renderMode. */
-        success = _GetVivanteDrmBoType(bo, RenderMode, &tilingArgs, &type);
+        success = _GetVivanteDrmBoBaseType(bo, &tilingArgs, &baseType);
+
+        (void)tilingArgs;
     }
     else
     {
-        success = _GetGenericDrmBufferType(buffer, RenderMode, &type);
+        success = _GetGenericDrmBufferBaseType(buffer, &baseType);
     }
 
-    if (success)
+    if (!success)
     {
-        /* Fail back to indirect rendering if not matched. */
-        *OutRenderMode = (type == gcvSURF_TYPE_UNKNOWN)
-                       ? VEGL_INDIRECT_RENDERING : RenderMode;
+        goto out;
+    }
+
+    success = EGL_FALSE;
+
+    /* Special for NOFC render mode, use this mode when explicitly reqeusted. */
+    if (PreferRenderMode == VEGL_DIRECT_RENDERING_NOFC)
+    {
+        if (_CalibrateBufferType(baseType, VEGL_DIRECT_RENDERING_NOFC, &type))
+        {
+            renderMode = VEGL_DIRECT_RENDERING_NOFC;
+            success = EGL_TRUE;
+        }
+
+        /* Do not try other modes. */
+        goto out;
+    }
+
+    for (i = 0; i < gcmCOUNTOF(preferModes); i++)
+    {
+        if (preferModes[i] == PreferRenderMode)
+        {
+            found = EGL_TRUE;
+        }
+
+        if (found)
+        {
+            if (_CalibrateBufferType(baseType, preferModes[i], &type))
+            {
+                renderMode = preferModes[i];
+                success = EGL_TRUE;
+                break;
+            }
+        }
     }
 
 out:
     buffer->common.decRef(&buffer->common);
     _CancelBuffer(Win, buffer);
 
-    return success;
+    if (success)
+    {
+        *MatchedRenderMode = renderMode;
+        return EGL_TRUE;
+    }
+
+    return EGL_FALSE;
 }
 
 #else
@@ -1470,13 +1544,13 @@ _GetANativeBufferSurface(
 }
 
 static inline EGLBoolean
-_ValidateRenderMode(
+_NegotiateRenderMode(
     struct ANativeWindow * Win,
-    EGLint RenderMode,
+    EGLint PreferRenderMode,
     EGLint * OutRenderMode
     )
 {
-    *OutRenderMode = RenderMode;
+    *OutRenderMode = PreferRenderMode;
     return EGL_TRUE;
 }
 #endif
@@ -2309,7 +2383,7 @@ _BindWindow(
     _SetBufferUsage(Surface, renderMode);
 
     /* Validate if selected mode can be used. */
-    if (!_ValidateRenderMode(win, renderMode, RenderMode))
+    if (!_NegotiateRenderMode(win, renderMode, RenderMode))
     {
         /* Error occured. */
         return EGL_FALSE;
