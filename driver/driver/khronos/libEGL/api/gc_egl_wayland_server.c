@@ -42,6 +42,11 @@ destroy_buffer(struct wl_resource *resource)
     {
         gcoSURF surface = buffer->surface;
 
+        if (buffer->fd >= 0)
+            close(buffer->fd);
+
+        buffer->fd = -1;
+
         if (surface)
         {
             gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;

@@ -46,12 +46,16 @@ gbm_viv_query_attrib_from_image(
     gctINT *height,
     gctINT *stride,
     gceSURF_FORMAT *format,
-    void **pixel
+    void **pixel,
+    uint32_t *handle
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF   surface = gcvNULL;
     khrEGL_IMAGE *image = (khrEGL_IMAGE_PTR)eglImage;
+
+    if (handle)
+        *handle = 0xFFFFFFFF;
 
     /* Get texture attributes. */
     switch (image->type)
@@ -96,15 +100,19 @@ gbm_viv_query_attrib_from_image(
 
             if (pixel != gcvNULL)
             {
-                gctPOINTER memory[3] = {gcvNULL};
-
                 if(image->type == KHR_IMAGE_PIXMAP)
                 {
-                    gcmONERROR(gcoSURF_Lock(surface, gcvNULL, memory));
+                    struct gbm_viv_bo *bo=(struct gbm_viv_bo *)image->u.pixmap.nativePixmap;
+                    *pixel = bo->map;
                 }
-
-                *pixel = memory[0];
             }
+
+            if (handle != gcvNULL && image->type == KHR_IMAGE_PIXMAP)
+            {
+                struct gbm_viv_bo *bo=(struct gbm_viv_bo *)image->u.pixmap.nativePixmap;
+                *handle = bo->base.handle.u32;
+            }
+
         }
         break;
     default:
@@ -252,13 +260,7 @@ gbm_viv_bo_write(
 static int
 gbm_viv_bo_get_fd(struct gbm_bo *_bo)
 {
-    struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
     int32_t fd;
-
-    if (bo->type == GBM_BO_IMPORT_FD || bo->type == GBM_BO_IMPORT_WL_BUFFER)
-    return (bo->fd >=0 ? dup(bo->fd): -1);
-
-
     if (drmPrimeHandleToFD(_bo->gbm->fd, _bo->handle.u32, DRM_CLOEXEC, &fd))
         return -1;
 
@@ -321,6 +323,12 @@ gbm_viv_bo_import(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* It is buggy, disble it until WL_BUFFER can work */
+    if (type == GBM_BO_IMPORT_WL_BUFFER)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
     /* Wrap a import_fd_data for WL_BUFFER */
     if (type == GBM_BO_IMPORT_WL_BUFFER)
     {
@@ -346,7 +354,6 @@ gbm_viv_bo_import(
 
     bo->base.gbm = gbm;
     bo->type = type;
-    bo->fd = -1;
 
     if(type == GBM_BO_IMPORT_FD || type == GBM_BO_IMPORT_WL_BUFFER)
     {
@@ -369,7 +376,6 @@ gbm_viv_bo_import(
         bo->base.stride = fd_data->stride;
         bo->base.format = fd_data->format;
         bo->size = fd_data->height * fd_data->stride;
-        bo->fd = prime_handle.fd;
 
         if (gbm_viv_bo_map_fd(bo) == NULL)
         {
@@ -378,7 +384,25 @@ gbm_viv_bo_import(
     }
     else
     {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        if (type == GBM_BO_IMPORT_EGL_IMAGE)
+        {
+            gctINT width;
+            gctINT height;
+            gctINT stride;
+            gceSURF_FORMAT format;
+            void *pixel;
+            uint32_t handle;
+            gcmONERROR(gbm_viv_query_attrib_from_image(buffer, &width, &height, &stride, &format, &pixel, &handle));
+            bo->base.handle.u32 = handle;
+            bo->base.width = width;
+            bo->base.height = height;
+            bo->base.stride = stride;
+            bo->base.format = format;
+            bo->size = height * stride;
+            bo->map = pixel;
+        } else {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
     return &bo->base;
@@ -488,7 +512,6 @@ create_dumb(
     bo->base.format = format;
     bo->base.handle.u32 = create_arg.handle;
     bo->size = create_arg.size;
-    bo->fd = -1;
 
     if (gbm_viv_bo_map_fd(bo) == NULL)
         goto destroy_dumb;
@@ -588,8 +611,6 @@ gbm_viv_bo_destroy(struct gbm_bo *_bo)
         memset(&arg, 0, sizeof(arg));
         arg.handle = bo->base.handle.u32;
         drmIoctl(dev->base.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg);
-        if (bo->fd >= 0)
-            close(bo->fd);
     }
 
     free(bo);
