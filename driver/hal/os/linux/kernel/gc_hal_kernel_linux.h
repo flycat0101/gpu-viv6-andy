@@ -63,10 +63,6 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
-#ifdef FLAREON
-#error 1
-#   include <asm/arch-realview/dove_gpio_irq.h>
-#endif
 #include <linux/interrupt.h>
 #include <linux/vmalloc.h>
 #include <linux/dma-mapping.h>

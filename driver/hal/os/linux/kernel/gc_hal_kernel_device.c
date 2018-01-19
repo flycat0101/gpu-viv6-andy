@@ -67,10 +67,6 @@
 
 #define gcdDEBUG_FS_WARN    "Experimental debug entry, may be removed in future release, do NOT rely on it!\n"
 
-#ifdef FLAREON
-    static struct dove_gpio_irq_handler gc500_handle;
-#endif
-
 static gckGALDEVICE galDevice;
 
 extern gcTA globalTA[16];
@@ -1784,6 +1780,23 @@ gckGALDEVICE_Destroy(
     return gcvSTATUS_OK;
 }
 
+static const char *isrNames[] =
+{
+    "galcore:0",
+    "galcore:3d-1",
+    "galcore:3d-2",
+    "galcore:3d-3",
+    "galcore:3d-4",
+    "galcore:3d-5",
+    "galcore:3d-6",
+    "galcore:3d-7",
+    "galcore:2d",
+    "galcore:vg",
+#if gcdDEC_ENABLE_AHB
+    "galcore:dec"
+#endif
+};
+
 /*******************************************************************************
 **
 **  gckGALDEVICE_Setup_ISR
@@ -1824,21 +1837,17 @@ gckGALDEVICE_Setup_ISR(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-    /* Hook up the isr based on the irq line. */
-#ifdef FLAREON
-    gc500_handle.dev_name  = "galcore interrupt service";
-    gc500_handle.dev_id    = Device;
-    gc500_handle.handler   = isrRoutine;
-    gc500_handle.intr_gen  = GPIO_INTR_LEVEL_TRIGGER;
-    gc500_handle.intr_trig = GPIO_TRIG_HIGH_LEVEL;
+#if defined(__GNUC__) && ((__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4))
+    {
+        _Static_assert(gcvCORE_COUNT == gcmCOUNTOF(isrNames),
+                       "Core count is lager than isrNames size");
+    }
+#endif
 
-    ret = dove_gpio_request(
-        DOVE_GPIO0_7, &gc500_handle
-        );
-#else
+    /* Hook up the isr based on the irq line. */
     ret = request_irq(
         Device->irqLines[Core], isrRoutine, gcdIRQF_FLAG,
-        "galcore interrupt service", (gctPOINTER)Core
+        isrNames[Core], (gctPOINTER)Core
         );
 
     if (ret != 0)
@@ -1855,7 +1864,6 @@ gckGALDEVICE_Setup_ISR(
 
     /* Mark ISR as initialized. */
     Device->isrInitializeds[Core] = gcvTRUE;
-#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1883,22 +1891,10 @@ gckGALDEVICE_Setup_ISR_VG(
     }
 
     /* Hook up the isr based on the irq line. */
-#ifdef FLAREON
-    gc500_handle.dev_name  = "galcore interrupt service";
-    gc500_handle.dev_id    = Device;
-    gc500_handle.handler   = isrRoutineVG;
-    gc500_handle.intr_gen  = GPIO_INTR_LEVEL_TRIGGER;
-    gc500_handle.intr_trig = GPIO_TRIG_HIGH_LEVEL;
-
-    ret = dove_gpio_request(
-        DOVE_GPIO0_7, &gc500_handle
-        );
-#else
     ret = request_irq(
         Device->irqLines[gcvCORE_VG], isrRoutineVG, gcdIRQF_FLAG,
-        "galcore interrupt service for 2D", Device
+        isrNames[gcvCORE_VG], Device
         );
-#endif
 
     if (ret != 0)
     {
@@ -1955,11 +1951,7 @@ gckGALDEVICE_Release_ISR(
     /* release the irq */
     if (Device->isrInitializeds[Core])
     {
-#ifdef FLAREON
-        dove_gpio_free(DOVE_GPIO0_7, "galcore interrupt service");
-#else
         free_irq(Device->irqLines[Core], (gctPOINTER)Core);
-#endif
         Device->isrInitializeds[Core] = gcvFALSE;
     }
 
@@ -1979,12 +1971,7 @@ gckGALDEVICE_Release_ISR_VG(
     /* release the irq */
     if (Device->isrInitializeds[gcvCORE_VG])
     {
-#ifdef FLAREON
-        dove_gpio_free(DOVE_GPIO0_7, "galcore interrupt service");
-#else
         free_irq(Device->irqLines[gcvCORE_VG], Device);
-#endif
-
         Device->isrInitializeds[gcvCORE_VG] = gcvFALSE;
     }
 
