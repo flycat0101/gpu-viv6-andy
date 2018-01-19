@@ -1279,7 +1279,9 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
 
 static VSC_ErrCode _VSC_CPP_CopyToMOV(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
-    IN     VIR_Instruction          *inst
+    IN     VIR_Instruction          *inst,
+    IN     VSC_HASH_TABLE           *inst_def_set,
+    IN     VSC_HASH_TABLE           *inst_usage_set
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
@@ -1309,9 +1311,6 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
     VIR_NATIVE_DEF_FLAGS      nativeDefFlags;
 
     gctBOOL covered_channels[VIR_CHANNEL_NUM] = {gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE};
-    VSC_HASH_TABLE          *inst_def_set     = gcvNULL;
-    inst_def_set = vscHTBL_Create(VSC_CPP_GetMM(cpp),
-                            vscHFUNC_Default, vscHKCMP_Default, 512);
 
     gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_MOV);
 
@@ -1841,22 +1840,17 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
 
     if(invalid_case)
     {
+        vscHTBL_Reset(inst_def_set);
         return errCode;
     }
 
     /* do transformation */
     /* collect the usage of the dest of the input inst, change the sym and map the usage channel */
     {
-        VSC_HASH_TABLE          *inst_usage_set     = gcvNULL;
         VIR_GENERAL_DU_ITERATOR  inst_du_iter;
         VIR_USAGE               *inst_usage         = gcvNULL;
         gctUINT                 *channelMask        = gcvNULL;
 
-        inst_usage_set = vscHTBL_Create(
-            VSC_CPP_GetMM(cpp),
-            _VSC_CPP_Usage_HFUNC,
-            _VSC_CPP_Usage_HKCMP,
-            512);
         for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
         {
             if(!(inst_dest_enable & (1 << channel)))
@@ -2059,16 +2053,18 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
         }
         VIR_Function_DeleteInstruction(func, inst);
 
-        vscHTBL_Destroy(inst_usage_set);
+        vscHTBL_Reset(inst_usage_set);
     }
 
-    vscHTBL_Destroy(inst_def_set);
+    vscHTBL_Reset(inst_def_set);
 
     return errCode;
 }
 
 static VSC_ErrCode _VSC_CPP_CopyPropagationForBB(
-    IN OUT VSC_CPP_CopyPropagation  *cpp
+    IN OUT VSC_CPP_CopyPropagation  *cpp,
+    IN     VSC_HASH_TABLE           *inst_def_set,
+    IN     VSC_HASH_TABLE           *inst_usage_set
     )
 {
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
@@ -2096,7 +2092,7 @@ static VSC_ErrCode _VSC_CPP_CopyPropagationForBB(
             if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options),
                 VSC_OPTN_CPPOptions_BACKWARD_OPT))
             {
-                _VSC_CPP_CopyToMOV(cpp, inst);
+                _VSC_CPP_CopyToMOV(cpp, inst, inst_def_set, inst_usage_set);
             }
         }
 
@@ -2118,6 +2114,9 @@ static VSC_ErrCode VSC_CPP_PerformOnFunction(
     VIR_CONTROL_FLOW_GRAPH* cfg;
     CFG_ITERATOR cfg_iter;
     VIR_BASIC_BLOCK* bb;
+    /* hash table create once here for using _VSC_CPP_CopyToMOV */
+    VSC_HASH_TABLE          *inst_def_set     = gcvNULL;
+    VSC_HASH_TABLE          *inst_usage_set     = gcvNULL;
 
     cfg = VIR_Function_GetCFG(func);
 
@@ -2134,12 +2133,16 @@ static VSC_ErrCode VSC_CPP_PerformOnFunction(
     if (VIR_Inst_Count(&func->instList) > 1)
     {
         CFG_ITERATOR_INIT(&cfg_iter, cfg);
+        /* create two hash tables here */
+        inst_def_set = vscHTBL_Create(VSC_CPP_GetMM(cpp), vscHFUNC_Default, vscHKCMP_Default, 512);
+        inst_usage_set = vscHTBL_Create(VSC_CPP_GetMM(cpp), _VSC_CPP_Usage_HFUNC, _VSC_CPP_Usage_HKCMP, 512);
+
         for(bb = CFG_ITERATOR_FIRST(&cfg_iter); bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfg_iter))
         {
             if(BB_GET_LENGTH(bb) != 0)
             {
                 VSC_CPP_SetCurrBB(cpp, bb);
-                errCode = _VSC_CPP_CopyPropagationForBB(cpp);
+                errCode = _VSC_CPP_CopyPropagationForBB(cpp, inst_def_set, inst_usage_set);
             }
 
             if(errCode)
@@ -2150,6 +2153,10 @@ static VSC_ErrCode VSC_CPP_PerformOnFunction(
 
         func->instList.pHead = func->instList.pHead->parent.BB->pStartInst;
         func->instList.pTail = func->instList.pTail->parent.BB->pEndInst;
+
+        /*destroy two hash tables */
+        vscHTBL_Destroy(inst_def_set);
+        vscHTBL_Destroy(inst_usage_set);
     }
 
     /* dump output cfg */
