@@ -227,6 +227,11 @@ sloCOMPILER_SetOutputInvariant(
     IN gctBOOL Flag
     );
 
+gctBOOL
+sloCOMPILER_GetOutputInvariant(
+    IN sloCOMPILER Compiler
+    );
+
 gceSTATUS
 sloCOMPILER_Construct_General(
     IN sleSHADER_TYPE ShaderType,

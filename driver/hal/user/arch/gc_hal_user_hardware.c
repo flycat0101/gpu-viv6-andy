@@ -5235,7 +5235,7 @@ gcoHARDWARE_Construct(
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsHARDWARE_CONFIG), &pointer));
     gcoOS_ZeroMemory(pointer,gcmSIZEOF(gcsHARDWARE_CONFIG));
     hardware->config = pointer;
-    gcmVERIFY_OK(_QueryHardwareIdAndOptions(hardware));
+    gcmONERROR(_QueryHardwareIdAndOptions(hardware));
 #if gcdENABLE_3D
     gcmONERROR(_SetSpecialHint(hardware));
 #endif
