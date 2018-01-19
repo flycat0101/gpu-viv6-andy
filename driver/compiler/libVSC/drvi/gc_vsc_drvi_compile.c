@@ -666,6 +666,9 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     /* It must be called after lower */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_ML);
 
+    /* simplification pass on ML */
+    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
+
     /* Call (schedule) passes of ML by ourselves */
     CALL_SH_PASS(vscVIR_CheckVariableUsage, 0, &checkVarUsage);
 

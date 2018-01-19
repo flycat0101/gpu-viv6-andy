@@ -948,9 +948,9 @@ typedef struct _clsATTRIBUTE
     gctBOOL  alwaysInline;
     gctBOOL  hostEndian; /*default 0: follow device's endian NOT host */
     gctINT vecTypeHint; /*default is int*/
-    gctSIZE_T reqdWorkGroupSize[3]; /*default {0,0,0} */
-    gctSIZE_T workGroupSizeHint[3]; /*default {0,0,0} */
-    gctSIZE_T kernelScaleHint[3];   /*default {1,1,1} */
+    gctUINT32 reqdWorkGroupSize[3]; /*default {0,0,0} */
+    gctUINT32 workGroupSizeHint[3]; /*default {0,0,0} */
+    gctUINT32 kernelScaleHint[3];   /*default {1,1,1} */
 } clsATTRIBUTE;
 
 struct _cloIR_EXPR;
@@ -1009,9 +1009,9 @@ typedef struct _clsNAME
         struct _clsNAME_SPACE *localSpace;
         struct _cloIR_SET *funcBody;
         gctINT vecTypeHint;
-        gctSIZE_T reqdWorkGroupSize[3];
-        gctSIZE_T workGroupSizeHint[3];
-        gctSIZE_T kernelScaleHint[3];
+        gctUINT32 reqdWorkGroupSize[3];
+        gctUINT32 workGroupSizeHint[3];
+        gctUINT32 kernelScaleHint[3];
         gctSIZE_T localMemorySize;
         gctUINT  refCount;
         gctBOOL  needLocalMemory;

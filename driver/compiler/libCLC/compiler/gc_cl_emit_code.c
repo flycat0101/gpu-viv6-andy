@@ -8939,24 +8939,24 @@ IN clsNAME *FuncName
 
    /* Add required work group size */
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
-                                                            gcvPROPERTY_REQD_WORK_GRP_SIZE,
-                                                            (sizeof(FuncName->u.funcInfo.reqdWorkGroupSize) + sizeof(gctINT) - 1)/sizeof(gctINT),
-                                                            (gctINT *)FuncName->u.funcInfo.reqdWorkGroupSize
-                                                            );
+                                                          gcvPROPERTY_REQD_WORK_GRP_SIZE,
+                                                          3,
+                                                          (gctINT *)FuncName->u.funcInfo.reqdWorkGroupSize
+                                                          );
    if(gcmIS_ERROR(status)) return status;
 
    /* Add work group size hint */
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
-                                                            gcvPROPERTY_WORK_GRP_SIZE_HINT,
-                                                            (sizeof(FuncName->u.funcInfo.workGroupSizeHint) + sizeof(gctINT) - 1)/sizeof(gctINT),
-                                                            (gctINT *)FuncName->u.funcInfo.workGroupSizeHint
-                                                            );
+                                                          gcvPROPERTY_WORK_GRP_SIZE_HINT,
+                                                          3,
+                                                          (gctINT *)FuncName->u.funcInfo.workGroupSizeHint
+                                                          );
    if(gcmIS_ERROR(status)) return status;
 
    /* Add kernel scale hint */
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                           gcvPROPERTY_KERNEL_SCALE_HINT,
-                                                          (sizeof(FuncName->u.funcInfo.kernelScaleHint) + sizeof(gctINT) - 1)/sizeof(gctINT),
+                                                          3,
                                                           (gctINT *)FuncName->u.funcInfo.kernelScaleHint
                                                           );
    if(gcmIS_ERROR(status)) return status;

@@ -1008,6 +1008,15 @@ _isSrc1IntZero
 }
 
 static gctBOOL
+_isSrc1FloatOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcFloatOne(Context, Inst, 1);
+}
+
+static gctBOOL
 _isSrc2IntZero(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -1015,6 +1024,16 @@ _isSrc2IntZero(
 {
     return _isSrcZero(Context, Inst, 2);
 }
+
+static gctBOOL
+_isSrc2FloatZero(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isSrcFloatZero(Context, Inst, 2);
+}
+
 
 static gctBOOL
 _isNeedToSetLod(
@@ -8403,6 +8422,16 @@ static VIR_PatternReplaceInst _cmpRepInst9[] = {
     { VIR_OP_CSELECT, VIR_COP_ALLMSB, 0, { 6, 1, 4, 5 }, { 0, 0, 0, 0 } },
 };
 
+static VIR_PatternMatchInst _cmpPatInst10[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, VIR_Lower_IsDstBool }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, { 1, 1, 4, 5 }, { _isSrc1IntOne, _isSrc2IntZero }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 6, 1, 7, 8 }, { VIR_Lower_IsDstFloat, _isSrc1FloatOne, _isSrc2FloatZero}, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _cmpRepInst10[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 6, 2, 3, 0 }, { 0, 0, 0, 0 } },
+};
+
 static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 1) },
@@ -8414,6 +8443,7 @@ static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 7) },
     { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 8) },
     { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 9) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 10) },
     { VIR_PATN_FLAG_NONE }
 };
 

@@ -17,14 +17,12 @@ void VSC_SIMP_Simplification_Init(
     IN VSC_SIMP_Simplification* simp,
     IN VIR_Shader* shader,
     IN VIR_Function* currFunc,
-    IN VIR_BASIC_BLOCK* currBB,
     IN VSC_OPTN_SIMPOptions* options,
     IN VIR_Dumper* dumper
     )
 {
     VSC_SIMP_Simplification_SetShader(simp, shader);
     VSC_SIMP_Simplification_SetCurrFunc(simp, currFunc);
-    VSC_SIMP_Simplification_SetCurrBB(simp, currBB);
     VSC_SIMP_Simplification_SetOptions(simp, options);
     VSC_SIMP_Simplification_SetDumper(simp, dumper);
 }
@@ -448,6 +446,22 @@ gctBOOL _VSC_SIMP_OperandIsInteger(
     return VIR_TypeId_isInteger(typeId);
 }
 
+/* now only deal with positive integer */
+static
+gctBOOL _VSC_SIMP_ImmPowerOf2(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    if ((VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE) &&
+        (VIR_TypeId_isInteger(VIR_Operand_GetTypeId(opnd))))
+    {
+        gctINT imm = VIR_Operand_GetImmediateInt(opnd);
+        return (imm > 0) && (!(imm&(imm-1)));
+    }
+    return gcvFALSE;
+}
+
 /* _VSC_SIMP_STEPS_TRANS */
 static
 void _VSC_SIMP_MOVDestSrc0(
@@ -531,6 +545,54 @@ void _VSC_SIMP_Change2NOP(
     )
 {
     VIR_Function_ChangeInstToNop(VIR_Inst_GetFunction(inst), inst);
+}
+
+/* now only deal with positive integer */
+static
+gctINT _VSC_SIMP_LOG2(
+    gctINT powerof2
+    )
+{
+    gctINT i = 0;
+    while (powerof2 > 1)
+    {
+        i++;
+        powerof2 = powerof2 >> 1;
+    }
+    return i;
+}
+
+static
+void _VSC_SIMP_ChangeDIV2RShift(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    VIR_Operand *src1 = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand *newsrc1;
+    gctINT imm, log2value;
+    gcmASSERT(VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE);
+    imm = VIR_Operand_GetImmediateInt(src1);
+    VIR_Function_DupOperand(VIR_Inst_GetFunction(inst), src1, &newsrc1);
+    log2value = _VSC_SIMP_LOG2(imm);
+    VIR_Operand_SetImmediateInt(newsrc1, log2value);
+    VIR_Inst_SetOpcode(inst, VIR_OP_RSHIFT);
+    VIR_Inst_SetSource(inst, 1, newsrc1);
+}
+
+static
+void _VSC_SIMP_ChangeMOD2AndBitwise(
+    IN OUT VIR_Instruction* inst
+)
+{
+    VIR_Operand *src1 = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand *newsrc1;
+    gctINT imm;
+    gcmASSERT(VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE);
+    imm = VIR_Operand_GetImmediateInt(src1);
+    VIR_Function_DupOperand(VIR_Inst_GetFunction(inst), src1, &newsrc1);
+    VIR_Operand_SetImmediateInt(newsrc1, imm-1);
+    VIR_Inst_SetOpcode(inst, VIR_OP_AND_BITWISE);
+    VIR_Inst_SetSource(inst, 1, newsrc1);
 }
 
 /* Simplification Steps */
@@ -673,6 +735,20 @@ _VSC_SIMP_Steps SWIZZLE_Steps[] = {
     {_VSC_SIMP_STEPS_END, {0}}
 };
 
+_VSC_SIMP_Steps DIV_Steps[] = {
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmPowerOf2}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeDIV2RShift}},
+    {_VSC_SIMP_STEPS_END, {0}}
+};
+
+_VSC_SIMP_Steps MOD_Steps[] = {
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmPowerOf2}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeMOD2AndBitwise}},
+    {_VSC_SIMP_STEPS_END, {0}}
+};
+
 _VSC_SIMP_Steps* _VSC_SIMP_GetSteps(
     IN VIR_OpCode opc)
 {
@@ -700,6 +776,10 @@ _VSC_SIMP_Steps* _VSC_SIMP_GetSteps(
             return CSELECT_Steps;
         case VIR_OP_SWIZZLE:
             return SWIZZLE_Steps;
+        case VIR_OP_DIV:
+            return DIV_Steps;
+        case VIR_OP_MOD:
+            return MOD_Steps;
         default:
             return gcvNULL;
     }
@@ -934,42 +1014,6 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnInst(
     return errCode;
 }
 
-VSC_ErrCode VSC_SIMP_Simplification_PerformOnBB(
-    IN VSC_SIMP_Simplification* simp
-    )
-{
-    VSC_ErrCode errCode  = VSC_ERR_NONE;
-    VSC_OPTN_SIMPOptions* options = VSC_SIMP_Simplification_GetOptions(simp);
-    VIR_BASIC_BLOCK* bb = VSC_SIMP_Simplification_GetCurrBB(simp);
-    VIR_Instruction* inst;
-
-    /* dump input bb */
-    if(VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_INPUT_BB))
-    {
-        VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-        VIR_LOG(dumper, "%s\nSimplification Start for BB %d\n%s\n",
-            VSC_TRACE_STAR_LINE, bb->dgNode.id, VSC_TRACE_STAR_LINE);
-        VIR_BasicBlock_Dump(dumper, bb, gcvFALSE);
-    }
-
-    inst = BB_GET_START_INST(bb);
-    while(inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
-    {
-        VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
-        inst = VIR_Inst_GetNext(inst);
-    }
-
-    /* dump output bb */
-    if(VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_OUTPUT_BB))
-    {
-        VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-        VIR_LOG(dumper, "%s\nSimplification End for BB %d\n%s\n",
-            VSC_TRACE_STAR_LINE, bb->dgNode.id, VSC_TRACE_STAR_LINE);
-        VIR_BasicBlock_Dump(dumper, bb, gcvFALSE);
-    }
-
-    return errCode;
-}
 
 VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
     IN OUT VSC_SIMP_Simplification* simp
@@ -978,9 +1022,6 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
     VSC_ErrCode errCode  = VSC_ERR_NONE;
     VSC_OPTN_SIMPOptions* options = VSC_SIMP_Simplification_GetOptions(simp);
     VIR_Function* func;
-    VIR_CONTROL_FLOW_GRAPH* cfg;
-    CFG_ITERATOR cfg_iter;
-    VIR_BASIC_BLOCK* bb;
     static gctUINT32 counter = 0;
 
     if(!VSC_OPTN_InRange(counter, VSC_OPTN_SIMPOptions_GetBeforeFunc(options), VSC_OPTN_SIMPOptions_GetAfterFunc(options)))
@@ -1005,44 +1046,38 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
         VIR_LOG_FLUSH(dumper);
     }
 
-    cfg = VIR_Function_GetCFG(func);
-
-    /* dump input cfg */
+    /* dump input function */
     if(VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_INPUT_FUNCTION))
     {
         VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-        VIR_LOG(dumper, "%s\nSimplification: input cfg of function %s\n%s\n",
+        VIR_LOG(dumper, "%s\nSimplification: input function %s\n%s\n",
             VSC_TRACE_STAR_LINE, VIR_Function_GetNameString(func), VSC_TRACE_STAR_LINE);
         VIR_LOG_FLUSH(dumper);
-        VIR_CFG_Dump(dumper, cfg, gcvTRUE);
+        VIR_Function_Dump(dumper, func);
     }
 
-    if (VIR_Inst_Count(&func->instList) > 1)
+    /* scan instruction list of function */
     {
-        CFG_ITERATOR_INIT(&cfg_iter, cfg);
-        for(bb = CFG_ITERATOR_FIRST(&cfg_iter); bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfg_iter))
-        {
-            if(BB_GET_LENGTH(bb) != 0)
-            {
-                VSC_SIMP_Simplification_SetCurrBB(simp, bb);
-                errCode = VSC_SIMP_Simplification_PerformOnBB(simp);
-            }
+        VIR_InstIterator        inst_iter;
+        VIR_Instruction        *inst;
 
-            if(errCode)
-            {
-                return errCode;
-            }
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            errCode = VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
+            CHECK_ERROR(errCode, "VSC_SIMP_Simplification_PerformOnInst failed");
         }
     }
 
-    /* dump output cfg */
+    /* dump output */
     if(VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_OUTPUT_FUNCTION))
     {
         VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-        VIR_LOG(dumper, "%s\nSimplification: output cfg of function %s: \n%s\n",
+        VIR_LOG(dumper, "%s\nSimplification: output function %s: \n%s\n",
             VSC_TRACE_STAR_LINE, VIR_Function_GetNameString(func), VSC_TRACE_STAR_LINE);
         VIR_LOG_FLUSH(dumper);
-        VIR_CFG_Dump(dumper, cfg, gcvTRUE);
+        VIR_Function_Dump(dumper, func);
     }
     if(VSC_OPTN_SIMPOptions_GetTrace(options))
     {
@@ -1058,10 +1093,10 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
 
 DEF_QUERY_PASS_PROP(VSC_SIMP_Simplification_PerformOnShader)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML |
+                                 VSC_PASS_LEVEL_LL;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SIMP;
 
-    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
     /*  destroy data flow info if instruction is replaced by NOP
      *  TODO:  only set destroy info if _VSC_SIMP_Change2NOP is called
      */
@@ -1099,7 +1134,7 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnShader(
         }
     }
 
-    VSC_SIMP_Simplification_Init(&simp, shader, gcvNULL, gcvNULL, options, dumper);
+    VSC_SIMP_Simplification_Init(&simp, shader, gcvNULL, options, dumper);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
     for(func_node = VIR_FuncIterator_First(&func_iter);

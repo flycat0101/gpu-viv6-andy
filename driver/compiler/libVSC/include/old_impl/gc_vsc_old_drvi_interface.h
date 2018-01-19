@@ -523,7 +523,6 @@ struct _gcsHINT
     gctUINT     maxInstCount;
     gctUINT     maxConstCount;      /* Shader uniform registers. */
 
-    gcSHADER_VID_NODES shaderVidNodes; /* SURF Node for memory that is used in shader. */
     gceSHADING  shaderMode;         /* Flag whether program is smooth or flat. */
     gctUINT32   shaderConfigData;   /* Data for register: 0x0218.
                                        For vertex shader, only save the bit that
@@ -697,6 +696,8 @@ struct _gcsHINT
 
     /* Concurrent workGroupCount. */
     gctUINT16   workGroupCount;
+
+    gcSHADER_VID_NODES shaderVidNodes; /* SURF Node for memory that is used in shader. */
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)

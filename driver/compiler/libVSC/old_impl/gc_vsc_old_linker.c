@@ -19943,8 +19943,6 @@ _LoadShaderVidNodes(
 
             if (sizeInByte > 0)
             {
-                gcmASSERT(Hints->shaderVidNodes.instVidmemNode[i]);
-
                 gcoSHADER_AllocateVidMem(gcvNULL,
                                          gcvSURF_ICACHE,
                                          "video memory for loading CL kernel",
@@ -20540,7 +20538,11 @@ gcSaveCLSingleKernel(
 {
     gctUINT32 kernelShaderBytes;
     gctUINT32 bytes;
-    gctUINT32 hintSize = ProgramState.hints ? gcSHADER_GetHintSize() : 0;
+    /*
+    ** Because there are some pointer variables within gcsHINT, the size with 32bit&64bit OS are different,
+    ** we can't save the whole structure, we need to exclude gcSHADER_VID_NODES.
+    */
+    gctUINT32 hintSize = ProgramState.hints ? gcmOFFSETOF(_gcsHINT, shaderVidNodes) : 0;
     gctUINT32 vidNodesSize = _CaculateShaderVidNodesSize(KernelShader, ProgramState.hints);
     gctUINT8_PTR bytePtr;
     gctUINT32 bufferSize;
@@ -20858,8 +20860,8 @@ gcLoadCLSingleKernel(
             gcmERR_BREAK(gcoOS_Allocate(os,
                                         gcSHADER_GetHintSize(),
                                         &pointer));
-
-            ProgramState->hints = pointer;
+            gcoOS_ZeroMemory(pointer, gcSHADER_GetHintSize());
+            ProgramState->hints = (gcsHINT_PTR)pointer;
 
             /* Copy the HINT structure. */
             gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);

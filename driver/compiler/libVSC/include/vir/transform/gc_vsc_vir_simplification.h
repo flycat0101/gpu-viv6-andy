@@ -22,7 +22,6 @@ typedef struct VIR_SIMP_SIMPLIFICATION
 {
     VIR_Shader* shader;
     VIR_Function* currFunc;
-    VIR_BASIC_BLOCK* currBB;
     VSC_OPTN_SIMPOptions* options;
     VIR_Dumper* dumper;
 } VSC_SIMP_Simplification;
@@ -31,8 +30,6 @@ typedef struct VIR_SIMP_SIMPLIFICATION
 #define VSC_SIMP_Simplification_SetShader(simp, s)          ((simp)->shader = (s))
 #define VSC_SIMP_Simplification_GetCurrFunc(simp)           ((simp)->currFunc)
 #define VSC_SIMP_Simplification_SetCurrFunc(simp, f)        ((simp)->currFunc = (f))
-#define VSC_SIMP_Simplification_GetCurrBB(simp)             ((simp)->currBB)
-#define VSC_SIMP_Simplification_SetCurrBB(simp, b)          ((simp)->currBB = (b))
 #define VSC_SIMP_Simplification_GetOptions(simp)            ((simp)->options)
 #define VSC_SIMP_Simplification_SetOptions(simp, o)         ((simp)->options = (o))
 #define VSC_SIMP_Simplification_GetDumper(simp)             ((simp)->dumper)
@@ -42,7 +39,6 @@ extern void VSC_SIMP_Simplification_Init(
     IN VSC_SIMP_Simplification* simp,
     IN VIR_Shader* shader,
     IN VIR_Function* currFunc,
-    IN VIR_BASIC_BLOCK* currBB,
     IN VSC_OPTN_SIMPOptions* options,
     IN VIR_Dumper* dumper
     );
@@ -55,10 +51,6 @@ extern VSC_ErrCode VSC_SIMP_Simplification_PerformOnInst(
     IN OUT VSC_SIMP_Simplification* simp,
     IN OUT VIR_Instruction* inst,
     OUT gctBOOL* change
-    );
-
-extern VSC_ErrCode VSC_SIMP_Simplification_PerformOnBB(
-    IN OUT VSC_SIMP_Simplification* simp
     );
 
 extern VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
