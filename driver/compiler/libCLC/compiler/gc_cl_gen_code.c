@@ -1161,7 +1161,6 @@ IN OUT clsROPERAND * ROperand
        if (opcode != clvOPCODE_INVALID) {
            clsGEN_CODE_DATA_TYPE newDataType;
 
-           gcmASSERT(clmGEN_CODE_IsScalarDataType(ROperand->dataType));
            if(gcIsScalarDataType(ROperand->dataType)) {
                 newDataType = clGetSubsetDataType(NewDataType, 1);
            }
@@ -14835,8 +14834,6 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
              RightParameters->dataTypes[i].def = LeftParameters->dataTypes[i].def;
          }
          else if(LeftParameters->needROperand) { /* convert left */
-             gcmASSERT(gcIsScalarDataType(LeftParameters->dataTypes[i].def));
-
              status = _ImplicitConvertOperand(Compiler,
                                               LineNo,
                                               StringNo,
@@ -22338,9 +22335,10 @@ IN OUT gctUINT * Start
     }
     else count = 1;
 
-    if(Constant->u.uniformArr == gcvNULL &&
-       !(clmDECL_IsScalar(&Constant->exprBase.decl) ||
-         clmDATA_TYPE_IsHighPrecision(Constant->exprBase.decl.dataType))) {
+    if(Constant->variable &&
+       Constant->u.uniformArr == gcvNULL &&
+       (!clmDECL_IsScalar(&Constant->exprBase.decl) ||
+        clmDATA_TYPE_IsHighPrecision(Constant->exprBase.decl.dataType))) {
         gctPOINTER pointer;
         gctSTRING nameBuffer = gcvNULL;
         cltPOOL_STRING namePtr;
@@ -22432,8 +22430,9 @@ IN OUT gctUINT * Start
 
         operand = Parameters->rOperands + *Start;
         operandCount = _GetLogicalOperandCount(Decl);
-        if(!clmDECL_IsScalar(Decl) ||
-           clmDATA_TYPE_IsHighPrecision(Decl->dataType)) {
+        if(Constant->variable &&
+           (!clmDECL_IsScalar(Decl) ||
+            clmDATA_TYPE_IsHighPrecision(Decl->dataType))) {
             gctREG_INDEX regSize = gcGetDataTypeRegSize(binaryDataType);
 
             for(i = 0; i < operandCount; i++) {

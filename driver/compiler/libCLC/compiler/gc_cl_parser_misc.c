@@ -5144,6 +5144,8 @@ OUT cloIR_EXPR *ConstantExpr
 
     gcmASSERT (ConstantExpr);
     if (clmDECL_IsScalar(Decl) ||
+        (!clmDATA_TYPE_IsHighPrecision(Decl->dataType) &&
+         _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) ||
         Constant->variable || Constant->allValuesEqual) {
        *ConstantExpr = &Constant->exprBase;
        return gcvSTATUS_OK;
@@ -5563,26 +5565,32 @@ IN cloIR_EXPR RightOperand
   isMul = Operator->u.operator == '*';
   if(clsDECL_IsEqual(leftDecl, rightDecl)) return gcvSTATUS_OK;
   if(clmDECL_IsScalar(leftDecl)) {
-      if((clmDECL_IsVectorType(rightDecl) || clmDECL_IsMat(rightDecl))
-         && (leftDecl->dataType->elementType > rightDecl->dataType->elementType)) {
+      if((clmDECL_IsVectorType(rightDecl) || clmDECL_IsMat(rightDecl)) &&
+         clAreElementTypeInRankOrder(Compiler,
+                                     leftDecl->dataType->elementType,
+                                     rightDecl->dataType->elementType,
+                                     cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          LeftOperand->base.lineNo,
                                          LeftOperand->base.stringNo,
-                         clvREPORT_ERROR,
-                         "conversion from a scalar to a lower ranking vector "
+                                         clvREPORT_ERROR,
+                                         "conversion from a scalar to a lower ranking vector "
                                          "or matrix type not allowed"));
          return gcvSTATUS_INVALID_ARGUMENT;
       }
   }
   else if(clmDECL_IsScalar(rightDecl)) {
-      if(rightDecl->dataType->elementType > leftDecl->dataType->elementType) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        RightOperand->base.lineNo,
-                        RightOperand->base.stringNo,
-                        clvREPORT_ERROR,
-                        "conversion from a scalar to a lower ranking vector "
-                                        "or matrix type not allowed"));
-        return gcvSTATUS_INVALID_ARGUMENT;
+      if(clAreElementTypeInRankOrder(Compiler,
+                                     rightDecl->dataType->elementType,
+                                     leftDecl->dataType->elementType,
+                                     cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT)) {
+          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                          RightOperand->base.lineNo,
+                                          RightOperand->base.stringNo,
+                                          clvREPORT_ERROR,
+                                          "conversion from a scalar to a lower ranking vector "
+                                          "or matrix type not allowed"));
+          return gcvSTATUS_INVALID_ARGUMENT;
       }
   }
   else if(clmDECL_IsVectorType(leftDecl)) {
@@ -5631,7 +5639,10 @@ IN cloIR_EXPR RightOperand
   }
   else if(clmDECL_IsMat(leftDecl)) { /* Left operand must be a matrix */
      if(clmDECL_IsVectorType(rightDecl)) {
-       if(rightDecl->dataType->elementType > leftDecl->dataType->elementType) {
+       if(clAreElementTypeInRankOrder(Compiler,
+                                      rightDecl->dataType->elementType,
+                                      leftDecl->dataType->elementType,
+                                      cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                          RightOperand->base.lineNo,
                          RightOperand->base.stringNo,
@@ -5736,7 +5747,10 @@ IN cloIR_EXPR RightOperand
 
   if(clmDECL_IsScalar(leftDecl)) {
     if(clmDECL_IsVectorType(rightDecl)) {
-       if(clAreElementTypeInRankOrder(leftDecl->dataType->elementType, rightDecl->dataType->elementType)) {
+       if(clAreElementTypeInRankOrder(Compiler,
+                                      leftDecl->dataType->elementType,
+                                      rightDecl->dataType->elementType,
+                                      cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          LeftOperand->base.lineNo,
                                          LeftOperand->base.stringNo,
@@ -5756,7 +5770,10 @@ IN cloIR_EXPR RightOperand
   }
   else if(clmDECL_IsScalar(rightDecl)) {
     if(clmDECL_IsVectorType(leftDecl)) {
-      if(clAreElementTypeInRankOrder(rightDecl->dataType->elementType, leftDecl->dataType->elementType)) {
+      if(clAreElementTypeInRankOrder(Compiler,
+                                     rightDecl->dataType->elementType,
+                                     leftDecl->dataType->elementType,
+                                     cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          RightOperand->base.lineNo,
                                          RightOperand->base.stringNo,
@@ -5977,8 +5994,8 @@ IN cloIR_EXPR RightOperand
     return gcvSTATUS_INVALID_ARGUMENT;
      }
      return _CheckAssignImplicitOperability(Compiler,
-                                            RightOperand,
-                                            LeftOperand);
+                                            LeftOperand,
+                                            RightOperand);
   }
 }
 
@@ -6415,26 +6432,32 @@ IN cloIR_EXPR RightOperand
 
   if(clsDECL_IsEqual(leftDecl, rightDecl)) return gcvSTATUS_OK;
   if(clmDECL_IsScalar(leftDecl)) {
-      if(clmDECL_IsVectorType(rightDecl)
-         && (leftDecl->dataType->elementType > rightDecl->dataType->elementType)) {
+      if(clmDECL_IsVectorType(rightDecl) &&
+         clAreElementTypeInRankOrder(Compiler,
+                                     leftDecl->dataType->elementType,
+                                     rightDecl->dataType->elementType,
+                                     cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          LeftOperand->base.lineNo,
                                          LeftOperand->base.stringNo,
-                         clvREPORT_ERROR,
-                         "conversion from a scalar to a lower ranking vector not allowed"));
+                                         clvREPORT_ERROR,
+                                         "conversion from a scalar to a lower ranking vector not allowed"));
          return gcvSTATUS_INVALID_ARGUMENT;
       }
   }
   else {  /* left operand being a vector */
       if(clmDECL_IsScalar(rightDecl)) {
-         if(rightDecl->dataType->elementType > leftDecl->dataType->elementType) {
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                            RightOperand->base.lineNo,
-                            RightOperand->base.stringNo,
-                            clvREPORT_ERROR,
-                            "conversion from a scalar to a lower ranking vector not allowed"));
-            return gcvSTATUS_INVALID_ARGUMENT;
-         }
+          if(clAreElementTypeInRankOrder(Compiler,
+                                         rightDecl->dataType->elementType,
+                                         leftDecl->dataType->elementType,
+                                         cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT)) {
+              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                              RightOperand->base.lineNo,
+                                              RightOperand->base.stringNo,
+                                              clvREPORT_ERROR,
+                                              "conversion from a scalar to a lower ranking vector not allowed"));
+              return gcvSTATUS_INVALID_ARGUMENT;
+          }
       }
       else if(!clmDECL_IsSameVectorType(leftDecl, rightDecl)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
@@ -6883,24 +6906,27 @@ IN cloIR_EXPR RightOperand
   if(clsDECL_IsEqual(leftDecl, rightDecl)) return gcvSTATUS_OK;
   if(clmDECL_IsScalar(leftDecl)) {
      if(clmDECL_IsVectorType(rightDecl) || clmDECL_IsMat(rightDecl)) {
-    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                    RightOperand->base.lineNo,
-                    RightOperand->base.stringNo,
-                    clvREPORT_ERROR,
-                    "require a scalar arithmetic expression"));
-    return gcvSTATUS_INVALID_ARGUMENT;
+         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                         RightOperand->base.lineNo,
+                         RightOperand->base.stringNo,
+                         clvREPORT_ERROR,
+                         "require a scalar arithmetic expression"));
+         return gcvSTATUS_INVALID_ARGUMENT;
      }
   }
   else if(clmDECL_IsScalar(rightDecl)) {
-     if(rightDecl->dataType->elementType > leftDecl->dataType->elementType) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        RightOperand->base.lineNo,
-                        RightOperand->base.stringNo,
-                        clvREPORT_ERROR,
-                        "conversion from a scalar to a lower ranking vector "
-                                        "or matrix type not allowed"));
-        return gcvSTATUS_INVALID_ARGUMENT;
-     }
+      if(clAreElementTypeInRankOrder(Compiler,
+                                     rightDecl->dataType->elementType,
+                                     leftDecl->dataType->elementType,
+                                     cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT)) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           RightOperand->base.lineNo,
+                                           RightOperand->base.stringNo,
+                                           clvREPORT_ERROR,
+                                           "conversion from a scalar to a lower ranking vector "
+                                           "or matrix type not allowed"));
+           return gcvSTATUS_INVALID_ARGUMENT;
+      }
   }
   else if(clmDECL_IsVectorType(leftDecl)) {
      if(clmDECL_IsVectorType(rightDecl)) { /* both are vector types */
@@ -7653,18 +7679,31 @@ OUT clsDECL *Decl
     if(gcmIS_ERROR(status)) return status;
 
     if(decl->dataType->type == T_TYPE_NAME) {
-        return _ParseFlattenType(Compiler,
+        status = _ParseFlattenType(Compiler,
+                                   decl,
+                                   decl);
+        if (gcmIS_ERROR(status)) return status;
+    }
+    status = clMergePtrDscrToDecl(Compiler,
+                                  TypeDecl->ptrDscr,
+                                  decl,
+                                  TypeDecl->array.numDim == 0);
+    if (gcmIS_ERROR(status)) return status;
+
+    if (TypeDecl->array.numDim != 0) {
+        /* may need to handle array of pointers to array */
+        status = _ParseMergeArrayDecl(Compiler,
+                                      decl,
+                                      &TypeDecl->array,
+                                      decl);
+        if (gcmIS_ERROR(status)) return status;
+    }
+
+    return cloCOMPILER_CloneDecl(Compiler,
+                                 decl->dataType->accessQualifier,
+                                 decl->dataType->addrSpaceQualifier,
                                  decl,
                                  Decl);
-    }
-    else {
-        clMergePtrDscrToDecl(Compiler, TypeDecl->ptrDscr, decl, TypeDecl->ptrDscr != gcvNULL);
-        return cloCOMPILER_CloneDecl(Compiler,
-                                     decl->dataType->accessQualifier,
-                                     decl->dataType->addrSpaceQualifier,
-                                     decl,
-                                     Decl);
-    }
 }
 
 static gceSTATUS
@@ -9321,7 +9360,8 @@ IN cloIR_EXPR InitExpr
         if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
 #if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-        if (clmDECL_IsAggregateType(&name->decl)) {
+        if (clmDECL_IsAggregateType(&name->decl) ||
+            clmDATA_TYPE_IsHighPrecision(name->decl.dataType)) {
 #else
         if (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
             ((clGetOperandCountForRegAlloc(&name->decl) > _clmMaxOperandCountToUseMemory(&constant->exprBase.decl)) ||
@@ -9428,6 +9468,10 @@ IN cloIR_EXPR InitExpr
      }
      break;
 
+  case clvIR_CONSTANT:
+     constant = (cloIR_CONSTANT) &initExpr->base;
+     break;
+
   default:
      break;
   }
@@ -9472,7 +9516,9 @@ IN cloIR_EXPR InitExpr
   }
   else if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_CONSTANT &&
       (name->decl.dataType->accessQualifier == clvQUALIFIER_CONST ||
-       (!clmDECL_IsPointerType(&name->decl) && !clmDECL_IsElementScalar(&name->decl)))) {
+       (!clmDECL_IsPointerType(&name->decl) && 
+        (!clmDECL_IsElementScalar(&name->decl) ||
+         clmDATA_TYPE_IsHighPrecision(name->decl.dataType))))) {
      name->u.variableInfo.u.constant = gcvNULL;
      if(!clsDECL_IsInitializableTo(&name->decl, &initExpr->decl)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
@@ -9523,7 +9569,8 @@ IN cloIR_EXPR InitExpr
            name->u.variableInfo.u.constant = (cloIR_CONSTANT)(&initExpr->base);
            name->u.variableInfo.u.constant->variable = name;
            if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
-              clmDECL_IsAggregateType(&name->decl)) {
+              (clmDECL_IsAggregateType(&name->decl) ||
+               clmDATA_TYPE_IsHighPrecision(name->decl.dataType))) {
                status = cloCOMPILER_AllocateVariableMemory(Compiler,
                                                            name);
                return DeclOrDeclListPtr;
@@ -9549,12 +9596,14 @@ IN cloIR_EXPR InitExpr
         }
 
 #if _CREATE_UNNAMED_CONSTANT_IN_MEMORY
-        if(!clmDECL_IsScalar(&initExpr->decl) &&
-           (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
-           (constant && clmDECL_IsAggregateTypeOverRegLimit(&constant->exprBase.decl)) ||
-           (constant && clmDECL_IsAggregateType(&constant->exprBase.decl) && _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) ||
-           (clmDECL_IsExtendedVectorType(&name->decl) &&
-            (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
+        if((_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES && constant &&
+            (clmDATA_TYPE_IsHighPrecision(constant->exprBase.decl.dataType) ||
+             clmDECL_IsAggregateType(&constant->exprBase.decl))) ||
+            (!clmDECL_IsScalar(&initExpr->decl) &&
+             (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+              (constant && clmDECL_IsAggregateTypeOverRegLimit(&constant->exprBase.decl)) ||
+              (clmDECL_IsExtendedVectorType(&name->decl) &&
+               (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))))) {
            status = _CreateUnnamedConstantExpr(Compiler,
                                                &name->decl,
                                                (cloIR_CONSTANT) (&initExpr->base),
@@ -10866,7 +10915,7 @@ _EqualizeExprOperandType(
           if (unaryExpr->type != clvUNARY_FIELD_SELECTION) {
               tempOperand = _EqualizeExprOperandType(Compiler,
                                                      unaryExpr->operand,
-                                                     &Operand->decl);
+                                                     Decl);
               unaryExpr->operand = tempOperand;
           }
           else {
@@ -10885,11 +10934,11 @@ _EqualizeExprOperandType(
           if(binaryExpr->type != clvBINARY_SUBSCRIPT) {
               tempOperand = _EqualizeExprOperandType(Compiler,
                                                      binaryExpr->leftOperand,
-                                                     &Operand->decl);
+                                                     Decl);
               binaryExpr->leftOperand = tempOperand;
               tempOperand = _EqualizeExprOperandType(Compiler,
                                                      binaryExpr->rightOperand,
-                                                     &Operand->decl);
+                                                     Decl);
               binaryExpr->rightOperand = tempOperand;
           }
           else {
@@ -10936,6 +10985,9 @@ IN OUT cloIR_EXPR *NewCondExpr
 )
 {
     cloIR_EXPR newCondExpr = CondExpr;
+    cloIR_EXPR operandExpr;
+    cloIR_UNARY_EXPR unaryExpr;
+    cloIR_BINARY_EXPR binaryExpr;
     gcmASSERT(CondExpr);
     gcmASSERT(CondExpr->decl.dataType);
 
@@ -10950,6 +11002,36 @@ IN OUT cloIR_EXPR *NewCondExpr
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
+    operandExpr = CondExpr;
+    switch(cloIR_OBJECT_GetType(&operandExpr->base)) {
+    case clvIR_UNARY_EXPR:
+       unaryExpr = (cloIR_UNARY_EXPR) &operandExpr->base;
+       if (unaryExpr->type != clvUNARY_FIELD_SELECTION) {
+           operandExpr = unaryExpr->operand;
+       }
+       break;
+ 
+    case clvIR_BINARY_EXPR:
+       binaryExpr = (cloIR_BINARY_EXPR) &operandExpr->base;
+       if(!(binaryExpr->type == clvBINARY_SUBSCRIPT ||
+            binaryExpr->type == clvBINARY_LSHIFT ||
+            binaryExpr->type == clvBINARY_RSHIFT)) {
+           cltELEMENT_TYPE leftElementType, rightElementType;
+ 
+           leftElementType = clmDATA_TYPE_elementType_GET(binaryExpr->leftOperand->decl.dataType);
+           rightElementType = clmDATA_TYPE_elementType_GET(binaryExpr->rightOperand->decl.dataType);
+ 
+           operandExpr = binaryExpr->rightOperand;
+           if(leftElementType > rightElementType) { /* convert right */
+               operandExpr = binaryExpr->leftOperand;
+           }
+       }
+       break;
+ 
+    default:
+       break;
+    }
+
 /* A FOR condition expression is used more than once during FOR statement
    IR code generation. Due to implicit type conversion and the condition
    expression operands' data type may be modified. To prevent the data type
@@ -10960,7 +11042,7 @@ IN OUT cloIR_EXPR *NewCondExpr
 
      newCondExpr = _EqualizeExprOperandType(Compiler,
                                             CondExpr,
-                                            &CondExpr->decl);
+                                            &operandExpr->decl);
      if(!newCondExpr) {
           return gcvSTATUS_INVALID_ARGUMENT;
      }
@@ -11822,43 +11904,27 @@ IN cloIR_EXPR ArrayLengthExpr
 {
     gceSTATUS status;
     clsARRAY array[1];
-    clsNAME    *name;
     clsDECL arrayDecl;
 
     if (Decl->dataType == gcvNULL || ArrayLengthExpr == gcvNULL) return gcvNULL;
 
     clmEvaluateExprToArrayLength(Compiler,
-                     ArrayLengthExpr,
-                     array,
-                     gcvFALSE,
-                     status);
+                                 ArrayLengthExpr,
+                                 array,
+                                 gcvFALSE,
+                                 status);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     status = cloCOMPILER_CreateArrayDecl(Compiler,
-                         Decl->dataType,
-                         array,
-                         Decl->ptrDscr,
-                         &arrayDecl);
+                                         Decl->dataType,
+                                         array,
+                                         Decl->ptrDscr,
+                                         &arrayDecl);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
-    status = cloCOMPILER_CreateName(Compiler,
-                    (Identifier != gcvNULL)? Identifier->lineNo : 0,
-                    (Identifier != gcvNULL)? Identifier->stringNo : 0,
-                    clvPARAMETER_NAME,
-                    &arrayDecl,
-                    (Identifier != gcvNULL)? Identifier->u.identifier.name : "",
-                    (Identifier != gcvNULL)? Identifier->u.identifier.ptrDscr : gcvNULL,
-                    clvEXTENSION_NONE,
-                    &name);
-    if (gcmIS_ERROR(status)) return gcvNULL;
-
-    _ParseFillVariableAttr(Compiler, &arrayDecl, name, gcvNULL);
-    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
-                clvDUMP_PARSER,
-                "<PARAMETER_DECL dataType=\"0x%x\" name=\"%s\" />",
-                Decl->dataType,
-                (Identifier != gcvNULL)? Identifier->u.identifier.name : ""));
-    return name;
+    return clParseParameterDecl(Compiler,
+                                &arrayDecl,
+                                Identifier);
 }
 
 #define _clmMakeIdentifierToken(Token, Symbol)  \
@@ -12070,7 +12136,8 @@ IN clsDECL *Decl
         }
     }
     if(accessQualifier != clvQUALIFIER_NONE) {
-        if(Decl->dataType->accessQualifier != clvQUALIFIER_NONE) {
+        if(Decl->dataType->accessQualifier != clvQUALIFIER_NONE &&
+           Decl->dataType->accessQualifier != accessQualifier) {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                             cloCOMPILER_GetCurrentLineNo(Compiler),
                                             cloCOMPILER_GetCurrentStringNo(Compiler),

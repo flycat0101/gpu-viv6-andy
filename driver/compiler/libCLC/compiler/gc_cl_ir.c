@@ -2559,13 +2559,19 @@ IN clsDATA_TYPE **VecDataType
 
 gctBOOL
 clAreElementTypeInRankOrder(
+IN cloCOMPILER Compiler,
 IN cltELEMENT_TYPE HighRank,
-IN cltELEMENT_TYPE LowRank
+IN cltELEMENT_TYPE LowRank,
+IN gctBOOL IsConst
 )
 {
    gctINT index;
    clsBUILTIN_DATATYPE_INFO *typeInfo;
    cltELEMENT_TYPE highRank, lowRank;
+   gctBOOL noCheck;
+   gcePATCH_ID patchId  = gcvPATCH_INVALID;
+
+   patchId = *gcGetPatchId();
 
    if(clmIsElementTypePacked(HighRank)) {
        index = HighRank - _BuiltinPackedVectorTypes[0].elementType;
@@ -2585,7 +2591,19 @@ IN cltELEMENT_TYPE LowRank
    }
    else lowRank = LowRank;
 
-   return (highRank > lowRank);
+   noCheck = IsConst && clmIsElementTypeInteger(highRank) && clmIsElementTypeInteger(lowRank);
+   if (patchId == gcvPATCH_OCLCTS)
+   {
+       return !noCheck && (highRank > lowRank);
+   }
+   else
+   {
+       return (highRank > lowRank) &&
+              !(noCheck ||
+                (highRank == clvTYPE_UINT && lowRank == clvTYPE_INT) ||
+                (highRank == clvTYPE_USHORT && lowRank == clvTYPE_SHORT) ||
+                (highRank == clvTYPE_UCHAR && lowRank == clvTYPE_CHAR));
+   }
 }
 
 

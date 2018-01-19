@@ -2229,8 +2229,10 @@ IN gctINT8 NumComponents
 
 gctBOOL
 clAreElementTypeInRankOrder(
+IN cloCOMPILER Compiler,
 IN cltELEMENT_TYPE HighRank,
-IN cltELEMENT_TYPE LowRank
+IN cltELEMENT_TYPE LowRank,
+IN gctBOOL IsConst
 );
 
 void

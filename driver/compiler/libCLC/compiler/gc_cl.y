@@ -617,6 +617,18 @@ parameter_declarator :
 		{ $$ = clParseParameterDecl(Compiler, &$1, &$2); }
 	| type_specifier direct_declarator array_declarator
 		{ $$ = clParseArrayParameterDecl(Compiler, &$1, &$2, $3); }
+        | type_specifier type_qualifier_list direct_declarator
+		{ 
+                    clsDECL decl;
+                    decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
+                    $$ = clParseParameterDecl(Compiler, &decl, &$3);
+                }
+	| type_specifier type_qualifier_list direct_declarator array_declarator
+                {
+                    clsDECL decl;
+                    decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
+		    $$ = clParseArrayParameterDecl(Compiler, &decl, &$3, $4);
+                }
 	;
 
 parameter_declaration :
@@ -648,8 +660,21 @@ parameter_qualifier :
 parameter_type_specifier :
 	type_specifier
 		{ $$ = clParseParameterDecl(Compiler, &$1, gcvNULL); }
-	| type_specifier '[' constant_expression ']'
-		{ $$ = clParseArrayParameterDecl(Compiler, &$1, gcvNULL, $3); }
+	| type_specifier array_declarator
+		{ $$ = clParseArrayParameterDecl(Compiler, &$1, gcvNULL, $2); }
+
+	| type_specifier pointer 
+		{ 
+                    clsDECL decl;
+                    decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
+		    $$ = clParseParameterDecl(Compiler, &decl, gcvNULL);
+                }
+	| type_specifier pointer array_declarator
+		{ 
+                    clsDECL decl;
+                    decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
+		    $$ = clParseArrayParameterDecl(Compiler, &decl, gcvNULL, $3);
+                }
 	;
 
 type_qualifier_list :
@@ -813,6 +838,13 @@ fully_specified_type :
                 { $$ = clParseQualifiedType(Compiler, $1, gcvFALSE, &$2); }
 	| type_specifier type_qualifier_list
                 { $$ = clParseQualifiedType(Compiler, $2, gcvFALSE, &$1); }
+	| type_qualifier_list type_specifier type_qualifier_list
+                {
+                    clsDECL decl;
+
+                    decl = clParseQualifiedType(Compiler, $1, gcvFALSE, &$2);
+                    $$ = clParseQualifiedType(Compiler, $3, gcvFALSE, &decl);
+                }
 	| T_TYPEOF '(' typeof_type_specifier ')'
                 { $$ = $3; }
 	;
