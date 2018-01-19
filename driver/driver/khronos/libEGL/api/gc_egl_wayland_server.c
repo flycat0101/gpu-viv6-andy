@@ -34,7 +34,7 @@ struct wl_viv_buffer_private
 static void
 destroy_buffer(struct wl_resource *resource)
 {
-    struct wl_viv_buffer *buffer = resource->data;
+    struct wl_viv_buffer *buffer = wl_resource_get_user_data(resource);
     struct wl_viv_buffer_private *priv =
             (struct wl_viv_buffer_private *)&buffer[1];
 
@@ -197,8 +197,35 @@ OnError:
     return;
 }
 
-struct wl_viv_interface wl_viv_implementation = {
+static void
+enable_tile_status(struct wl_client *client,
+                   struct wl_resource *resource,
+                   struct wl_resource *id,
+                   uint32_t enabled,
+                   uint32_t compressed,
+                   uint32_t dirty,
+                   uint32_t fc_value,
+                   uint32_t fc_value_upper)
+{
+#if gcdENABLE_3D
+    struct wl_viv_buffer * buffer;
+    gcoSURF surface;
+
+    buffer = wl_resource_get_user_data(id);
+    surface = buffer->surface;
+
+    surface->tileStatusDisabled[0] = !enabled;
+    surface->dirty[0] = dirty;
+    surface->fcValue[0] = fc_value;
+    surface->fcValueUpper[0] = fc_value_upper;
+    surface->compressed = compressed;
+#endif
+}
+
+static struct wl_viv_interface wl_viv_implementation =
+{
     viv_handle_create_buffer,
+    enable_tile_status,
 };
 
 static void

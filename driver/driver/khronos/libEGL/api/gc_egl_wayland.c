@@ -825,6 +825,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         struct wl_egl_buffer *buffer,
         struct eglRegion *damage)
 {
+    gcoSURF surface = NULL;
     struct wl_egl_display *display = window->display;
     struct wl_display *wl_dpy = display->wl_dpy;
     struct wl_event_queue *commit_queue = display->commit_queue;
@@ -883,6 +884,11 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->attached_height = window->height;
     window->dx = 0;
     window->dy = 0;
+
+    surface = buffer->info.surface;
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+        !surface->tileStatusDisabled[0], surface->compressed,
+        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
 
     wl_surface_attach(window->surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(window->surface, x, y, width, height);
