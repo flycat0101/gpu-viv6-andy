@@ -4195,6 +4195,7 @@ struct _gcsVERTEXARRAY_BUFOBJ
     gctSIZE_T                               count;
 
     gctUINT                                 dynamicCacheStride;
+    gctSIZE_T                               streamCopySize;
 
     gctBOOL                                 copyAll;
 

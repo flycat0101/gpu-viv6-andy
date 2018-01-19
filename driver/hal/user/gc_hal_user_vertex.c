@@ -3256,7 +3256,7 @@ _copyBuffersEx(
                 }
 
                 /* Copy attr data to dynamic cache */
-                copySize = streamPtr->stride * streamPtr->count;
+                copySize = streamPtr->streamCopySize;
                 gcoOS_MemCopy(dst, src, copySize);
                 copiedBytes += copySize;
 
@@ -3671,10 +3671,13 @@ gcoSTREAM_CacheAttributesEx(
             gctBOOL hasGeneric  = gcvFALSE;
             gctSIZE_T minOffset = (gctSIZE_T)-1;
             gctSIZE_T maxOffset = 0;
+            gctUINT   lastAttrBytes = 0;
+            gctSIZE_T perCountCopyBytes = 0;
 
             /* Assume that stream can be copied with one memcopy */
             streamPtr->copyAll = gcvTRUE;
             stride = 0;
+            streamPtr->streamCopySize = 0;
 
             /* Walk all attributes */
             for (attrPtr = streamPtr->attributePtr; attrPtr != gcvNULL; attrPtr = attrPtr->next)
@@ -3687,10 +3690,26 @@ gcoSTREAM_CacheAttributesEx(
                 {
                     hasGeneric = gcvTRUE;
                 }
+
+                /* Attrib already sort by start address, check last attrb bytes */
+                if (attrPtr->next == gcvNULL)
+                {
+                    lastAttrBytes = attrPtr->bytes;
+                }
             }
 
+            /* Compute perCount copy bytes */
+            perCountCopyBytes = maxOffset - minOffset + lastAttrBytes;
+
+            gcmASSERT(perCountCopyBytes <= streamPtr->stride);
+
+            /* Check for boundary condition */
+            if (stride > maxStride)
+            {
+                gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+            }
             /* Check if we can simply do a full copy */
-            if (hasGeneric || streamPtr->merged ||
+            else if (hasGeneric || streamPtr->merged || streamPtr->stride > maxStride ||
                 (maxOffset - minOffset > maxAttribOffset)
                 )
             {
@@ -3705,35 +3724,20 @@ gcoSTREAM_CacheAttributesEx(
                 streamPtr->dynamicCacheStride = streamPtr->stride;
             }
 
-            /* Check for boundary condition */
-            if (streamPtr->dynamicCacheStride > maxStride)
+            /* calculate total bytes */
+            if (streamPtr->copyAll)
             {
-                if (streamPtr->copyAll == gcvTRUE)
+                if (streamPtr->count > 0)
                 {
-                    gctUINT32 strideTmp = 0;
-                    for (attrPtr = streamPtr->attributePtr; attrPtr != gcvNULL; attrPtr = attrPtr->next)
-                    {
-                        strideTmp += attrPtr->bytes;
-                    }
-
-                    if (strideTmp > maxStride)
-                    {
-                        gcmONERROR(gcvSTATUS_TOO_COMPLEX);
-                    }
-                    else
-                    {
-                        streamPtr->copyAll = gcvFALSE;
-                        streamPtr->dynamicCacheStride = strideTmp;
-                    }
-                }
-                else
-                {
-                    gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+                    streamPtr->streamCopySize = (streamPtr->dynamicCacheStride * (streamPtr->count - 1) + perCountCopyBytes);
                 }
             }
+            else
+            {
+                streamPtr->streamCopySize = streamPtr->dynamicCacheStride * streamPtr->count;
+            }
 
-            /* calculate total bytes */
-            totalBytesTmp += (streamPtr->dynamicCacheStride * streamPtr->count);
+            totalBytesTmp += streamPtr->streamCopySize;
 
             if ((streamPtr->copyAll == gcvFALSE) && (streamPtr->merged == gcvFALSE))
             {
