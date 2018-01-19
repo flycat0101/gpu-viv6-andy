@@ -17651,6 +17651,193 @@ _GenVecConstants(
     return gcvSTATUS_OK;
 }
 
+static gctUINT
+_GetMaxBindingForUniformAndBlock(
+    IN sleSHADER_TYPE   ShaderType,
+    IN slsDATA_TYPE *   DataType
+    )
+{
+    gctUINT maxBinding = 0;
+
+    if (slsDATA_TYPE_IsOpaque(DataType))
+    {
+        if (slsDATA_TYPE_IsImage(DataType))
+        {
+            switch (ShaderType)
+            {
+            case slvSHADER_TYPE_VERTEX:
+                maxBinding = GetGLMaxVertexImageUniforms();
+                break;
+
+            case slvSHADER_TYPE_FRAGMENT:
+                maxBinding = GetGLMaxFragmentImageUniforms();
+                break;
+
+            case slvSHADER_TYPE_TCS:
+                maxBinding = GetGLMaxTCSImageUniforms();
+                break;
+
+            case slvSHADER_TYPE_TES:
+                maxBinding = GetGLMaxTESImageUniforms();
+                break;
+
+            case slvSHADER_TYPE_GS:
+                maxBinding = GetGLMaxGSImageUniforms();
+                break;
+
+            case slvSHADER_TYPE_COMPUTE:
+                maxBinding = GetGLMaxComputeImageUniforms();
+                break;
+
+            default:
+                gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+                maxBinding = GetGLMaxImageUnits();
+                break;
+            }
+        }
+        else if (slsDATA_TYPE_IsSampler(DataType))
+        {
+            switch (ShaderType)
+            {
+            case slvSHADER_TYPE_VERTEX:
+                maxBinding = GetGLMaxVertexTextureImageUnits();
+                break;
+
+            case slvSHADER_TYPE_FRAGMENT:
+                maxBinding = GetGLMaxFragTextureImageUnits();
+                break;
+
+            case slvSHADER_TYPE_TCS:
+                maxBinding = GetGLMaxTCSTextureImageUnits();
+                break;
+
+            case slvSHADER_TYPE_TES:
+                maxBinding = GetGLMaxTESTextureImageUnits();
+                break;
+
+            case slvSHADER_TYPE_GS:
+                maxBinding = GetGLMaxGSTextureImageUnits();
+                break;
+
+            case slvSHADER_TYPE_COMPUTE:
+                maxBinding = GetGLMaxComputeTextureImageUnits();
+                break;
+
+            default:
+                gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+                maxBinding = GetGLMaxCombinedTextureImageUnits();
+                break;
+            }
+        }
+        else
+        {
+            switch (ShaderType)
+            {
+            case slvSHADER_TYPE_VERTEX:
+                maxBinding = GetGLMaxVertexAtomicCounters();
+                break;
+
+            case slvSHADER_TYPE_FRAGMENT:
+                maxBinding = GetGLMaxFragmentAtomicCounters();
+                break;
+
+            case slvSHADER_TYPE_TCS:
+                maxBinding = GetGLMaxTCSAtomicCounters();
+                break;
+
+            case slvSHADER_TYPE_TES:
+                maxBinding = GetGLMaxTESAtomicCounters();
+                break;
+
+            case slvSHADER_TYPE_GS:
+                maxBinding = GetGLMaxGSAtomicCounters();
+                break;
+
+            case slvSHADER_TYPE_COMPUTE:
+                maxBinding = GetGLMaxComputeAtomicCounters();
+                break;
+
+            default:
+                gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+                maxBinding = (gctINT)GetGLMaxAtomicCounterBindings();
+                break;
+            }
+        }
+    }
+    else if (slsDATA_TYPE_IsUnderlyingUniformBlock(DataType))
+    {
+        switch (ShaderType)
+        {
+        case slvSHADER_TYPE_VERTEX:
+            maxBinding = GetGLMaxVertexUniformBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_FRAGMENT:
+            maxBinding = GetGLMaxFragmentUniformBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_TCS:
+            maxBinding = GetGLMaxTCSUniformBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_TES:
+            maxBinding = GetGLMaxTESUniformBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_GS:
+            maxBinding = GetGLMaxGSUniformBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_COMPUTE:
+            maxBinding = GetGLMaxComputeUniformBufferBindings();
+            break;
+
+        default:
+            gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+            maxBinding = GetGLMaxCombinedUniformBufferBindings();
+            break;
+        }
+    }
+    else
+    {
+        gcmASSERT(slsDATA_TYPE_IsUnderlyingStorageBlock(DataType));
+
+        switch (ShaderType)
+        {
+        case slvSHADER_TYPE_VERTEX:
+            maxBinding = GetGLMaxVertexShaderStorageBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_FRAGMENT:
+            maxBinding = GetGLMaxFragmentShaderStorageBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_TCS:
+            maxBinding = GetGLMaxTCSShaderStorageBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_TES:
+            maxBinding = GetGLMaxTESShaderStorageBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_GS:
+            maxBinding = GetGLMaxGSShaderStorageBufferBindings();
+            break;
+
+        case slvSHADER_TYPE_COMPUTE:
+            maxBinding = GetGLMaxComputeShaderStorageBufferBindings();
+            break;
+
+        default:
+            gcmASSERT(ShaderType == slvSHADER_TYPE_LIBRARY);
+            maxBinding = GetGLMaxShaderStorageBufferBindings();
+            break;
+        }
+    }
+
+    return maxBinding;
+}
+
 static gceSTATUS
 _CheckBindingForUniformAndBlock(
     IN sloCOMPILER Compiler,
@@ -17674,30 +17861,7 @@ _CheckBindingForUniformAndBlock(
             gctINT maxSize = 0;
             gctINT layoutBinding = slmDATA_TYPE_layoutBinding_GET(name->dataType);
 
-            if (slsDATA_TYPE_IsOpaque(name->dataType))
-            {
-                if (slsDATA_TYPE_IsImage(name->dataType))
-                {
-                    maxSize = (gctINT)GetGLMaxImageUnits();
-                }
-                else if (slsDATA_TYPE_IsSampler(name->dataType))
-                {
-                    maxSize = (gctINT)GetGLMaxCombinedTextureImageUnits();
-                }
-                else
-                {
-                    maxSize = (gctINT)GetGLMaxAtomicCounterBindings();
-                }
-            }
-            else if (slsDATA_TYPE_IsUnderlyingUniformBlock(name->dataType))
-            {
-                maxSize = (gctINT)GetGLMaxUniformBufferBindings();
-            }
-            else
-            {
-                gcmASSERT(slsDATA_TYPE_IsUnderlyingStorageBlock(name->dataType));
-                maxSize = (gctINT)GetGLMaxShaderStorageBufferBindings();
-            }
+            maxSize = (gctINT)_GetMaxBindingForUniformAndBlock(Compiler->shaderType, name->dataType);
 
             if ((layoutBinding + slsDATA_TYPE_GetLogicalCountForAnArray(name->dataType)) > maxSize)
             {
