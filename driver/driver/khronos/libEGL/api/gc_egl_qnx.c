@@ -1269,8 +1269,8 @@ _CreateWindowBuffers(
 {
     gceSTATUS status = gcvSTATUS_OK;
     VEGLNativeBuffer buffer;
-    screen_buffer_t *bufs, front_buf;
-    int num_of_buffers, i, rc;
+    screen_buffer_t *bufs;
+    int num_of_buffers = 0, i, rc;
     gctPOINTER pointer;
 
     /* Valid Window?  */
@@ -1279,45 +1279,24 @@ _CreateWindowBuffers(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
     /* Get number of buffers assigned to the window */
-    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &num_of_buffers);
-    if (rc)
+    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_BUFFER_COUNT, &num_of_buffers);
+    if (rc || (num_of_buffers < 1))
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    /* Is there a front buffer already assigned to the window? */
-    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_FRONT_BUFFER, (void **)&front_buf);
-    if (rc)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    /* Allocate memory for all render buffers and possible also front buffer */
+    /* Allocate memory for all render buffers */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
-            (num_of_buffers + 1) * sizeof(screen_buffer_t),
+            num_of_buffers * sizeof(screen_buffer_t),
             &pointer));
 
-    gcoOS_ZeroMemory(pointer, (num_of_buffers + 1) * sizeof(screen_buffer_t));
+    gcoOS_ZeroMemory(pointer, num_of_buffers * sizeof(screen_buffer_t));
     bufs = pointer;
 
-    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)bufs);
+    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_BUFFERS, (void**)bufs);
     if (rc)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    /* If the front buffer is non zero, I need to add it to the list (in case it is not already there */
-    if (front_buf != NULL) {
-        for (i = 0; i < num_of_buffers; i++) {
-            /* Check if the front buffer is already in the list (probably just the case when the window does have only one buffer */
-            if (bufs[i] == front_buf) {
-                break;
-            }
-        }
-        if (i == num_of_buffers) {
-            bufs[num_of_buffers] = front_buf; /* Not found, add it to the list and increase the num of buffers */
-            num_of_buffers++;
-        }
     }
 
     for(i = 0; i < num_of_buffers; i++) {
