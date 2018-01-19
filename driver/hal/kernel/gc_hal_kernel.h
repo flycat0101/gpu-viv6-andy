@@ -1080,6 +1080,9 @@ struct _gckVIDMEM
     gctSIZE_T                   freeBytes;
     gctSIZE_T                   minFreeBytes;
 
+    /* caps inherit from its allocator, ~0u if allocator was not applicable. */
+    gctUINT32                   capability;
+
     /* Mapping for each type of surface. */
     gctINT                      mapping[gcvSURF_NUM_TYPES];
 

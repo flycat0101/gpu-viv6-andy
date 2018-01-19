@@ -1111,14 +1111,21 @@ AllocateMemory:
             if (gcmIS_SUCCESS(status))
             {
                 /* Allocate memory. */
+                if ((Flag & videoMemory->capability) != Flag)
+                {
+                    status = gcvSTATUS_NOT_SUPPORTED;
+
+                    gcmkFATAL("%s(%d): Reject alloc because VIDMEM (pool=%d) caps=0x%x cannot meet required Flag=0x%x",
+                              __FUNCTION__, __LINE__, pool, videoMemory->capability, Flag);
+                }
 #if defined(gcdLINEAR_SIZE_LIMIT)
                 /* 512 KB */
-                if (Bytes > gcdLINEAR_SIZE_LIMIT)
+                else if (Bytes > gcdLINEAR_SIZE_LIMIT)
                 {
                     status = gcvSTATUS_OUT_OF_MEMORY;
                 }
-                else
 #endif
+                else
                 {
                     hasFastPools = gcvTRUE;
                     status = gckVIDMEM_AllocateLinear(Kernel,
