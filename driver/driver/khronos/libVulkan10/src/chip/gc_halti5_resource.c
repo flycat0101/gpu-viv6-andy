@@ -6186,6 +6186,8 @@ VkResult halti5_createImageView(
             case VK_FORMAT_D16_UNORM:
             case VK_FORMAT_X8_D24_UNORM_PACK32:
             case VK_FORMAT_D24_UNORM_S8_UINT:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
                 /* Create Hw texture descriptor for all unsupported formats */
                 {
                     static const VkSamplerCreateInfo s_SamplerCreateInfo =

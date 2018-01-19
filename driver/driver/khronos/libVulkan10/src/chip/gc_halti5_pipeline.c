@@ -3879,6 +3879,8 @@ static VkResult halti5_pip_build_gfxshaders(
                         case VK_FORMAT_D16_UNORM:
                         case VK_FORMAT_X8_D24_UNORM_PACK32:
                         case VK_FORMAT_D24_UNORM_S8_UINT:
+                        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+                        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
                             decodeInfo->renderpassInfo->attachments[j].attachmentFlag = SPV_ATTACHMENTFLAG_TREAT_AS_SAMPLER;
                             break;
                         default:
