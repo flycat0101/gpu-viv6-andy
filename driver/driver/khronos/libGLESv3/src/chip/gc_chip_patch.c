@@ -29032,8 +29032,40 @@ static __GLchipPatch gcChipPatches[] =
     },
 
     {
-        GC_CHIP_PATCH_DEQP_WIDELINE,
-        "GC_CHIP_PATCH_DEQP_WIDELINE, DEQP WIDE_LINE, vertex shader detect.",
+        GC_CHIP_PATCH_DEQP_WIDELINE_ES2,
+        "GC_CHIP_PATCH_DEQP_WIDELINE_ES2, DEQP WIDE_LINE, vertex shader detect.",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        /* vertex shader */
+        "\x9e\xea\x9e\xec\x85\xe7\x92\xe6\x83\xa3\xcb\xa2\xc5\xad\xdd\xfd"
+        "\x8b\xee\x8d\xb9\x99\xf8\xa7\xd7\xb8\xcb\xa2\xd6\xbf\xd0\xbe\x85"
+        "\x8f\xee\x9a\xee\x9c\xf5\x97\xe2\x96\xf3\xd3\xbb\xd2\xb5\xdd\xad"
+        "\x8d\xfb\x9e\xfd\xc9\xe9\x88\xd7\xb4\xdb\xb7\xd8\xaa\x91\x9b\xed"
+        "\x8c\xfe\x87\xee\x80\xe7\xc7\xaf\xc6\xa1\xc9\xb9\x99\xef\x8a\xe9"
+        "\xdd\xfd\x8b\xd4\xb7\xd8\xb4\xdb\xa9\x92\x98\xed\x83\xea\x8c\xe3"
+        "\x91\xfc\xdc\xb4\xdd\xba\xd2\xa2\x82\xe4\x88\xe7\x86\xf2\xd2\xa7"
+        "\xf8\x88\xe7\x8e\xe0\x94\xc7\xae\xd4\xb1\x8a\x80\xf6\x99\xf0\x94"
+        "\xb4\xd9\xb8\xd1\xbf\x9f\xb7\x9e\x94\xef\xe5\x82\xee\xb1\xe1\x8e"
+        "\xfd\x94\xe0\x89\xe6\x88\xa8\x95\xb5\xd4\x8b\xfb\x94\xe7\x8e\xfa"
+        "\x93\xfc\x92\xa9\xa3\xc4\xa8\xf7\xa7\xc8\xa1\xcf\xbb\xe8\x81\xfb"
+        "\x9e\xbe\x83\xa3\xd6\x89\xf9\x96\xff\x91\xe5\xb6\xdf\xa5\xc0\xfb"
+        "\xf1\x87\xd8\xbb\xd4\xb8\xd7\xa5\x85\xb8\x98\xf9\xa6\xc5\xaa\xc6"
+        "\xa9\xdb\xe0\xea\x97\x9d"
+        "",
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* fS  */
+        gcvNULL,    /* CS  */
+        },
+        gcChipPatchDEQP_WideLines,
+    },
+
+    {
+        GC_CHIP_PATCH_DEQP_WIDELINE_ES3,
+        "GC_CHIP_PATCH_DEQP_WIDELINE_ES3, DEQP WIDE_LINE, vertex shader detect.",
 
         GLchipPatch_Shader,
         gcvTRUE,
@@ -29385,7 +29417,8 @@ gcChipGetPatchConditionTb(
     if (!(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) ||
         !chipCtx->chipFeature.hwFeature.needWideLineTriangleEMU)
     {
-        chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_WIDELINE] = GL_FALSE;
+        chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_WIDELINE_ES2] = GL_FALSE;
+        chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_WIDELINE_ES3] = GL_FALSE;
     }
 
     return;

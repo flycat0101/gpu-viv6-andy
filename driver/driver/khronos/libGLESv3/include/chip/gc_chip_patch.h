@@ -159,22 +159,22 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_FWIDTH,
     GC_CHIP_PATCH_CAR_CHASE,
 
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_1, /* dEQP-GLES31.functional.ssbo.layout.random.arrays_of_arrays.6 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_2, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.3 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_3, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.5 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_4, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.23 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_5, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.0 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_6, /* dEQP-GLES31.functional.ubo.random.all_per_block_buffers.20 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_3,   /* dEQP-GLES3.functional.uniform_api.random.83 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_4,   /* dEQP-GLES3.functional.uniform_api.random.13 */
-
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_1, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_2, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_3, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_4, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_5, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_6, 
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_3,   
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_4,   
     GC_CHIP_PATCH_GFX4_FILL2,
     GC_CHIP_PATCH_ES20_CONF_CUBE,
     GC_CHIP_PATCH_GLMARK2_ES2,
     GC_CHIP_PATCH_GLU3,
     GC_CHIP_PATCH_GLU4,
     GC_CHIP_PATCH_MRVELBM20,
-    GC_CHIP_PATCH_DEQP_WIDELINE,
+    GC_CHIP_PATCH_DEQP_WIDELINE_ES2, 
+    GC_CHIP_PATCH_DEQP_WIDELINE_ES3, 
     GC_CHIP_PATCH_LAST
 } __GCPatchNum;
 

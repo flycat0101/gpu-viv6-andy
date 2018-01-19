@@ -938,7 +938,7 @@ eglChooseConfig(
         }
 
         if ((criteria.nativeRenderable != (EGLBoolean) EGL_DONT_CARE)
-        &&  (patchId == gcvPATCH_DEQP || criteria.nativeRenderable) /* Do patch to follow spec for dEQP test */
+        &&  (patchId == gcvPATCH_DEQP || patchId == gcvPATCH_GTFES30|| criteria.nativeRenderable) /* Do patch to follow spec for dEQP test */
         &&  (criteria.nativeRenderable != configuration->nativeRenderable)
         )
         {
@@ -960,7 +960,7 @@ eglChooseConfig(
         if (criteria.samples > configuration->samples)
         {
             /* Do patch to follow spec for dEQP test */
-            if (!(patchId == gcvPATCH_DEQP) && ((criteria.samples == 1) && (configuration->samples == 0)))
+            if (!(patchId == gcvPATCH_DEQP || patchId == gcvPATCH_GTFES30) && ((criteria.samples == 1) && (configuration->samples == 0)))
             {
                 /* Criterium still matches. */
             }

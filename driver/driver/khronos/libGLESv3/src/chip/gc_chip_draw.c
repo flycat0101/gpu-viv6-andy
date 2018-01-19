@@ -5750,6 +5750,7 @@ gcChipSplitDrawWideLine(
     __GLchipInstantDraw tmpInstantDraw;
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+    gctFLOAT preLineWidth = (gctFLOAT)gc->state.line.aliasedWidth;
 
     gcmHEADER();
 
@@ -5820,6 +5821,9 @@ gcChipSplitDrawWideLine(
                                              tmpInstantDraw.primCount,
                                              tmpInstantDraw.count,
                                              gc->vertexArray.instanceCount));
+
+    /* reset line width */
+    gcmONERROR(gco3D_SetAALineWidth(chipCtx->engine, preLineWidth));
 
 OnError:
 
