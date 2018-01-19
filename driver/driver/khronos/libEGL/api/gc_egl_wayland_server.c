@@ -35,17 +35,17 @@ static void
 destroy_buffer(struct wl_resource *resource)
 {
     struct wl_viv_buffer *buffer = wl_resource_get_user_data(resource);
-    struct wl_viv_buffer_private *priv =
-            (struct wl_viv_buffer_private *)&buffer[1];
+    struct wl_viv_buffer_private *priv = (struct wl_viv_buffer_private*)&buffer[1];
 
     if (buffer != NULL)
     {
         gcoSURF surface = buffer->surface;
 
         if (buffer->fd >= 0)
+        {
             close(buffer->fd);
-
-        buffer->fd = -1;
+            buffer->fd = -1;
+        }
 
         if (surface)
         {

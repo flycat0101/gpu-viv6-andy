@@ -39,6 +39,7 @@ struct gbm_viv_bo
     uint32_t size;
     void *map;
     uint32_t type;
+    int32_t fd;
 };
 
 struct gbm_viv_buffer

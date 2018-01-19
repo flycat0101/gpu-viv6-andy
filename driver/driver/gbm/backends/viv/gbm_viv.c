@@ -260,11 +260,19 @@ gbm_viv_bo_write(
 static int
 gbm_viv_bo_get_fd(struct gbm_bo *_bo)
 {
-    int32_t fd;
-    if (drmPrimeHandleToFD(_bo->gbm->fd, _bo->handle.u32, DRM_CLOEXEC, &fd))
-        return -1;
+    struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
 
-    return fd;
+    if (bo->fd < 0)
+    {
+        int32_t fd;
+
+        if (drmPrimeHandleToFD(_bo->gbm->fd, _bo->handle.u32, DRM_RDWR | DRM_CLOEXEC, &fd) == 0)
+        {
+            bo->fd = fd;
+        }
+    }
+
+    return bo->fd;
 }
 
 static void *
@@ -323,12 +331,6 @@ gbm_viv_bo_import(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* It is buggy, disble it until WL_BUFFER can work */
-    if (type == GBM_BO_IMPORT_WL_BUFFER)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
     /* Wrap a import_fd_data for WL_BUFFER */
     if (type == GBM_BO_IMPORT_WL_BUFFER)
     {
@@ -354,6 +356,7 @@ gbm_viv_bo_import(
 
     bo->base.gbm = gbm;
     bo->type = type;
+    bo->fd = -1;
 
     if(type == GBM_BO_IMPORT_FD || type == GBM_BO_IMPORT_WL_BUFFER)
     {
@@ -512,6 +515,7 @@ create_dumb(
     bo->base.format = format;
     bo->base.handle.u32 = create_arg.handle;
     bo->size = create_arg.size;
+    bo->fd = -1;
 
     if (gbm_viv_bo_map_fd(bo) == NULL)
         goto destroy_dumb;
@@ -541,7 +545,7 @@ gbm_viv_bo_create(
 {
     if (modifiers)
     {
-         return NULL;
+        return NULL;
     }
     else
     {
@@ -604,13 +608,21 @@ gbm_viv_bo_destroy(struct gbm_bo *_bo)
 {
     struct gbm_viv_device *dev = gbm_viv_device(_bo->gbm);
     struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
-    struct drm_mode_destroy_dumb arg;
 
     {
+        struct drm_mode_destroy_dumb arg = {
+            .handle = bo->base.handle.u32
+        };
+
         gbm_viv_bo_unmap_fd(bo);
-        memset(&arg, 0, sizeof(arg));
-        arg.handle = bo->base.handle.u32;
+
         drmIoctl(dev->base.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg);
+
+        if (bo->fd >= 0)
+        {
+            close(bo->fd);
+            bo->fd = -1;
+        }
     }
 
     free(bo);
@@ -672,32 +684,36 @@ gbm_viv_create_buffers(
 
     for (i = 0; i < surf->buffer_count; i++)
     {
-        surf->buffers[i].bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, 0, 0);
-        if (!surf->buffers[i].bo)
+        gcoSURF rtSurf = gcvNULL;
+        struct gbm_bo *bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, 0, 0);
+
+        if (!bo)
         {
             gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
         }
+        surf->buffers[i].bo = bo;
+
+        gcmONERROR(gcoSURF_WrapUserMemory(
+            gcvNULL,
+            width,
+            height,
+            bo->stride,
+            1,
+            gcvSURF_BITMAP,
+            gc_format,
+            gbm_viv_bo_get_fd(bo),
+            gcvALLOC_FLAG_DMABUF,
+            &rtSurf));
 
         surf->buffers[i].surf = surf;
+        surf->buffers[i].render_surface = rtSurf;
         surf->buffers[i].status = FREE;
-        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
-        gcmONERROR(gcoSURF_ConstructWrapper(NULL, &surf->buffers[i].render_surface));
-        gcmONERROR(gcoSURF_SetBuffer(surf->buffers[i].render_surface,
-                                     gcvSURF_BITMAP,
-                                     gc_format,
-                                     (gctUINT)surf->buffers[i].bo->stride,
-                                     gbm_viv_bo(surf->buffers[i].bo)->map, ~0U));
-        gcmONERROR(gcoSURF_SetWindow(surf->buffers[i].render_surface,
-                                     0,
-                                     0,
-                                     width,
-                                     height));
     }
 
     return gcvSTATUS_OK;
 
 OnError:
-    for (i=0; i<surf->buffer_count; i++)
+    for (i = 0; i < surf->buffer_count; i++)
     {
         if (surf->buffers[i].render_surface)
         {
