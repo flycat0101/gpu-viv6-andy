@@ -449,11 +449,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyInstance(
             vscDestroyPrivateData(&phyDev->vscCoreSysCtx, phyDev->vscCoreSysCtx.hPrivData);
         }
 
-        if (inst->chipPriv)
-        {
-            __VK_FREE(inst->chipPriv);
-        }
-
         __VK_FREE(inst);
     }
 

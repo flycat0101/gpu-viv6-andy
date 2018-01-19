@@ -419,66 +419,8 @@ typedef struct halti5_vscprogram_blit
 
 } halti5_vscprogram_blit;
 
-/* host write uniform buff render pass info */
-typedef struct hwub_render_pass_info_rec
-{
-    uint8_t* ref;
-    uint8_t* rt;
-
-    uint32_t renderCount;
-    uint32_t render;
-
-}hwub_render_pass_info;
-
-typedef struct halti5_cmdbuf_tweak_info_rec
-{
-    uint32_t type;
-
-    /* rt count */
-    uint32_t curRPGet;
-    uint32_t curRPPrepare;
-    uint32_t curCmdBuf;
-    uint32_t RPperCmdBuf[16];
-    hwub_render_pass_info renderPass[32];
-
-    /* reset cmd buf */
-    VkResult (*end_render_pass)(
-        IN void *thisPointer,
-        IN __vkCommandBuffer *pCmdBuf
-        );
-
-    VkResult (*end_cmd_buf)(
-        IN void *thisPointer,
-        IN __vkCommandBuffer *pCmdBuf
-        );
-
-    /* reset cmd buf */
-    VkResult (*begin_submit_cmd_buf)(
-        IN void *thisPointer,
-        IN __vkCommandBuffer *pCmdBuf
-        );
-}halti5_cmdbuf_tweak_info;
-
-typedef struct
-{
-    /* some other info */
-
-    /* tweak info */
-    halti5_cmdbuf_tweak_info* tweakInfo;
-}halti5_instance;
-
-enum
-{
-    __VK_TWEAK_TYPE_NONE = 0,
-    __VK_TWEAK_TYPE_CUBE_USE_LOD,
-    __VK_TWEAK_TYPE_UBO48,
-    __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF,
-};
-
 typedef struct halti5_tweak_handler
 {
-    uint32_t tweakType;
-
     char reversedName[__VK_MAX_NAME_LENGTH];
 
     VkBool32 (* match)(
@@ -1048,19 +990,11 @@ VkResult halti5_createSampler(
     VkSampler sampler
     );
 
-VkResult halti5_endRenderPass(
-    VkCommandBuffer commandBuffer
-    );
-
 VkResult halti5_beginCommandBuffer(
     VkCommandBuffer commandBuffer
     );
 
 VkResult halti5_endCommandBuffer(
-    VkCommandBuffer commandBuffer
-    );
-
-VkResult halti5_beginSubmitCmdBuf(
     VkCommandBuffer commandBuffer
     );
 
@@ -1213,11 +1147,6 @@ VkResult halti5_setRtTileStatus(
     __vkImage *img,
     VkImageSubresourceRange* pRanges,
     uint32_t hwRtIndex
-    );
-
-VkResult halti5_initChipInstance(
-    __vkCommandBuffer *cmdBuf,
-    uint32_t type
     );
 
 #define TX_HW_DESCRIPTOR_MEM_SIZE   256

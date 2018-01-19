@@ -1008,12 +1008,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             __vkCommandBuffer *cmd = (__vkCommandBuffer *)pSubmits[isub].pCommandBuffers[icmd];
             __vkCmdExecuteCommandsInfo *exeInfo = cmd->executeList;
             __vkStateBuffer *stateBuffer = cmd->stateBufferList;
-            uint32_t stateBufCount = 0;
+            uint32_t stateBufCount = cmd->lastStateBufferIndex;
             uint32_t icommits = 0;
-
-            /* before queue submit */
-            (*cmd->devCtx->chipFuncs->BeginSubmitCmdBuf)(pSubmits[isub].pCommandBuffers[icmd]);
-            stateBufCount = cmd->lastStateBufferIndex;
 
             if (cmd->state != __VK_CMDBUF_STATE_EXECUTABLE)
                 continue;
@@ -1353,8 +1349,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
 
     __vki_CmdResolveSubPass(commandBuffer);
-
-    (*cmd->devCtx->chipFuncs->EndRenderPass)(commandBuffer);
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
 

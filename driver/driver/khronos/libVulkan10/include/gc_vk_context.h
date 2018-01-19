@@ -218,8 +218,6 @@ struct __vkInstanceRec
     __vkDrvCtrlOption  drvOption;
     __vkChipInfo       chipInfo;
 
-    void *chipPriv;
-
     struct __vkInstanceRec *pNext;
 };
 

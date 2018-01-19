@@ -5243,34 +5243,6 @@ VkResult halti5_setDesriptorSets(
 
 }
 
-VkResult halti5_endRenderPass(
-    VkCommandBuffer commandBuffer
-    )
-{
-    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
-    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
-    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
-    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
-
-    if (chipPipeline && chipPipeline->tweakHandler &&
-        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
-    {
-        /* init tweakinfo */
-        if (chipInstance == VK_NULL_HANDLE)
-        {
-            halti5_initChipInstance(cmdBuf, chipPipeline->tweakHandler->tweakType);
-            chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
-        }
-
-        if (chipInstance->tweakInfo->end_render_pass)
-        {
-            (*chipInstance->tweakInfo->end_render_pass)(chipInstance->tweakInfo, cmdBuf);
-        }
-    }
-
-    return VK_SUCCESS;
-}
-
 VkResult halti5_beginCommandBuffer(
     VkCommandBuffer commandBuffer
     )
@@ -5386,11 +5358,6 @@ VkResult halti5_endCommandBuffer(
     VkCommandBuffer commandBuffer
     )
 {
-    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
-    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
-    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
-    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
-
 #if __VK_RESOURCE_SAVE_TGA || gcdDUMP
     uint32_t *states;
 
@@ -5421,36 +5388,6 @@ VkResult halti5_endCommandBuffer(
 
     __vk_CmdReleaseBuffer(commandBuffer, 2);
 #endif
-
-    if (chipPipeline && chipPipeline->tweakHandler &&
-        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
-    {
-        if (chipInstance->tweakInfo && chipInstance->tweakInfo->end_cmd_buf)
-        {
-            (*chipInstance->tweakInfo->end_cmd_buf)(chipInstance->tweakInfo, cmdBuf);
-        }
-    }
-
-    return VK_SUCCESS;
-}
-
-VkResult halti5_beginSubmitCmdBuf(
-    VkCommandBuffer commandBuffer
-    )
-{
-    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
-    halti5_instance *chipInstance = (halti5_instance *)cmdBuf->devCtx->pPhyDevice->pInst->chipPriv;
-    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
-    halti5_pipeline *chipPipeline = pip ? (halti5_pipeline *)pip->chipPriv : VK_NULL_HANDLE;
-
-    if (chipPipeline && chipPipeline->tweakHandler &&
-        chipPipeline->tweakHandler->tweakType == __VK_TWEAK_TYPE_HOST_WRITE_UNIFORM_BUF)
-    {
-        if (chipInstance->tweakInfo && chipInstance->tweakInfo->begin_submit_cmd_buf)
-        {
-            (*chipInstance->tweakInfo->begin_submit_cmd_buf)(chipInstance->tweakInfo, cmdBuf);
-        }
-    }
 
     return VK_SUCCESS;
 }
@@ -6142,7 +6079,8 @@ VkResult halti5_bindDescriptors(
                        | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
                        | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
                        | VK_PIPELINE_STAGE_TRANSFER_BIT
-                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT))
+                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
+                       | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT))
      {
          if (srcAccessMask & (VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT))
          {

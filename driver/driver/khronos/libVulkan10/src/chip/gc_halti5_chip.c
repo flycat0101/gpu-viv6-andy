@@ -37,7 +37,6 @@ __vkChipFuncTable halti5_chip =
     halti5_destroyImageView,
     halti5_createBufferView,
     halti5_destroyBufferView,
-    halti5_endRenderPass,
     halti5_beginCommandBuffer,
     halti5_endCommandBuffer,
     halti5_allocDescriptorSet,
@@ -53,7 +52,6 @@ __vkChipFuncTable halti5_chip =
     halti5_bindPipeline,
     halti5_setMultiGpuSync,
     halti5_flushCache,
-    halti5_beginSubmitCmdBuf,
 };
 
 static void halti5_helper_computeCentroids(
