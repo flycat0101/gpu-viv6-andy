@@ -985,6 +985,7 @@ _GFPAlloctorInit(
                           | gcvALLOC_FLAG_CACHEABLE
                           | gcvALLOC_FLAG_MEMLIMIT
                           | gcvALLOC_FLAG_ALLOC_ON_FAULT
+                          | gcvALLOC_FLAG_DMABUF_EXPORTABLE
                           ;
 
 #if defined(gcdEMULATE_SECURE_ALLOCATOR)

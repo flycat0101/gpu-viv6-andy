@@ -538,7 +538,9 @@ _CMAFSLAlloctorInit(
 
     _CMAAllocatorDebugfsInit(allocator, Parent);
 
-    allocator->capability = gcvALLOC_FLAG_CONTIGUOUS;
+    allocator->capability = gcvALLOC_FLAG_CONTIGUOUS
+                          | gcvALLOC_FLAG_DMABUF_EXPORTABLE
+                          ;
 
     *Allocator = allocator;
 

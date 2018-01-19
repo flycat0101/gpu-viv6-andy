@@ -581,7 +581,7 @@ _DmaAlloctorInit(
      * DMA allocator is only used for NonPaged memory
      * when NO_DMA_COHERENT is not defined.
      */
-    allocator->capability = 0;
+    allocator->capability = gcvALLOC_FLAG_DMABUF_EXPORTABLE;
 
     *Allocator = allocator;
 

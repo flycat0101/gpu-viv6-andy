@@ -491,7 +491,9 @@ _DmabufAlloctorInit(
     gcmkONERROR(
         gckALLOCATOR_Construct(Os, &DmabufAllocatorOperations, &allocator));
 
-    allocator->capability = gcvALLOC_FLAG_DMABUF;
+    allocator->capability = gcvALLOC_FLAG_DMABUF
+                          | gcvALLOC_FLAG_DMABUF_EXPORTABLE
+                          ;
 
     /* Register private data. */
     allocator->privateData = priv;

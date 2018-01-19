@@ -165,7 +165,7 @@ static int viv_ioctl_gem_create(struct drm_device *drm, void *data,
     gckKERNEL kernel;
     gctUINT32 processID;
     gckVIDMEM_NODE nodeObject;
-    gctUINT32 flags = 0;
+    gctUINT32 flags = gcvALLOC_FLAG_DMABUF_EXPORTABLE;
     gceSTATUS status = gcvSTATUS_OK;
 
     gal_dev = (gckGALDEVICE)drm->dev_private;

@@ -2154,6 +2154,16 @@ _AllocateSurface(
             allocFlags |= gcvALLOC_FLAG_CACHEABLE;
         }
 
+        if (Surface->hints & gcvSURF_CMA_LIMIT)
+        {
+            allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
+        }
+
+        if (Surface->hints & gcvSURF_DMABUF_EXPORTABLE)
+        {
+            allocFlags |= gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+        }
+
         if (Format & gcvSURF_FORMAT_OCL)
         {
             bytes = gcmALIGN(bytes + 64,  64);

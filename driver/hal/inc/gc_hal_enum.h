@@ -607,33 +607,22 @@ typedef enum _gceSURF_TYPE
     gcvSURF_NUM_TYPES, /* Make sure this is the last one! */
 
     /* Combinations. */
-    gcvSURF_NO_TILE_STATUS = 0x100,
-    gcvSURF_NO_VIDMEM      = 0x200, /* Used to allocate surfaces with no underlying vidmem node.
-                                       In Android, vidmem node is allocated by another process. */
-    gcvSURF_CACHEABLE      = 0x400, /* Used to allocate a cacheable surface */
-
-    gcvSURF_TILE_RLV_FENCE = 0x800, /* create texture fence as tile */
-
-    gcvSURF_TILE_STATUS_DIRTY  = 0x1000, /* Init tile status to all dirty */
-
-    gcvSURF_LINEAR             = 0x2000,
-
-    gcvSURF_CREATE_AS_TEXTURE  = 0x4000,  /* create it as a texture */
-
-    gcvSURF_PROTECTED_CONTENT  = 0x8000,  /* create it as content protected */
-
-    gcvSURF_CREATE_AS_DISPLAYBUFFER = 0x10000, /*create it as a display buffer surface */
-
-    gcvSURF_CONTIGUOUS         = 0x20000,      /*create it as contiguous */
-
-    /* Create it as no compression, valid on when it has tile status. */
-    gcvSURF_NO_COMPRESSION     = 0x40000,
-
-    gcvSURF_DEC                = 0x80000,  /* Surface is DEC compressed */
-
-    gcvSURF_NO_HZ              = 0x100000,
-
-    gcvSURF_3D                  = 0x200000, /* It's 3d surface */
+    gcvSURF_NO_TILE_STATUS          = 0x100,
+    gcvSURF_NO_VIDMEM               = 0x200,    /* Used to allocate surfaces with no underlying vidmem node.
+                                                   In Android, vidmem node is allocated by another process. */
+    gcvSURF_CACHEABLE               = 0x400,    /* Used to allocate a cacheable surface */
+    gcvSURF_TILE_RLV_FENCE          = 0x800,    /* create texture fence as tile */
+    gcvSURF_TILE_STATUS_DIRTY       = 0x1000,   /* Init tile status to all dirty */
+    gcvSURF_LINEAR                  = 0x2000,
+    gcvSURF_CREATE_AS_TEXTURE       = 0x4000,   /* create it as a texture */
+    gcvSURF_PROTECTED_CONTENT       = 0x8000,   /* create it as content protected */
+    gcvSURF_CREATE_AS_DISPLAYBUFFER = 0x10000,  /*create it as a display buffer surface */
+    gcvSURF_CONTIGUOUS              = 0x20000,  /*create it as contiguous */
+    gcvSURF_NO_COMPRESSION          = 0x40000,  /* Create it as no compression, valid on when it has tile status. */
+    gcvSURF_DEC                     = 0x80000,  /* Surface is DEC compressed */
+    gcvSURF_NO_HZ                   = 0x100000,
+    gcvSURF_3D                      = 0x200000, /* It's 3d surface */
+    gcvSURF_DMABUF_EXPORTABLE       = 0x400000, /* master node can be exported as dma-buf fd */
 
     gcvSURF_TEXTURE_LINEAR               = gcvSURF_TEXTURE
                                          | gcvSURF_LINEAR,
@@ -2071,6 +2060,8 @@ gceCOMPRESSION_OPTION;
 #define gcvALLOC_FLAG_SECURITY              0x00000004
 /* Physical non contiguous. */
 #define gcvALLOC_FLAG_NON_CONTIGUOUS        0x00000008
+/* Can be exported as dmabuf-fd */
+#define gcvALLOC_FLAG_DMABUF_EXPORTABLE     0x00000010
 
 /* Do not try slow pools (gcvPOOL_VIRTUAL/gcvPOOL_CONTIGUOUS) */
 #define gcvALLOC_FLAG_FAST_POOLS            0x00000100
