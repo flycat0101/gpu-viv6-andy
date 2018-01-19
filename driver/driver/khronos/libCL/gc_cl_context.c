@@ -461,11 +461,11 @@ clCreateContextFromType(
     VCL_TRACE_API(CreateContextFromType_Pre)(Properties, DeviceType, PfnNotify, UserData, ErrcodeRet);
 
     /* We support only GPU */
-    if ((DeviceType & CL_DEVICE_TYPE_GPU) == 0)
+    if ((DeviceType & (CL_DEVICE_TYPE_GPU | CL_DEVICE_TYPE_DEFAULT)) == 0)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-002005: (clCreateContextFromType) DeviceType (0x%x) is not CL_DEVICE_TYPE_GPU (0x%x).\n",
-            DeviceType, CL_DEVICE_TYPE_GPU);
+            "OCL-002005: (clCreateContextFromType) DeviceType (0x%x) is not CL_DEVICE_TYPE_GPU or CL_DEVICE_TYPE_DEFAULT \n",
+            DeviceType);
         clmRETURN_ERROR(CL_DEVICE_NOT_FOUND);
     }
 
