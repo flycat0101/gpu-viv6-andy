@@ -2517,9 +2517,9 @@ _PushBufferStatus(
     }
 
     tilingArgs.ts_mode = Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
+                       : Surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_DISABLED
                        : Surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
-                       : !Surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_NORMAL
-                       : DRM_VIV_GEM_TS_DISABLED;
+                       : DRM_VIV_GEM_TS_NORMAL;
 
     tilingArgs.clear_value = ((uint64_t)Surface->fcValueUpper[0]) << 32
                            | Surface->fcValue[0];
@@ -3395,7 +3395,7 @@ _UpdateANativeBuffer(
     switch (tilingArgs.ts_mode)
     {
     case DRM_VIV_GEM_TS_COMPRESSED:
-        surface->compressed = gcvTRUE;
+        /* Surface->compressed = gcvTRUE; */
     case DRM_VIV_GEM_TS_NORMAL:
         surface->tileStatusDisabled[0] = gcvFALSE;
         surface->fcValue[0]      = (gctUINT32)tilingArgs.clear_value;
