@@ -561,6 +561,35 @@ _TranslateFormat(
             return gcvSURF_NV21;
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
             return gcvSURF_YUY2;
+#if ANDROID_SDK_VERSION >= 26
+        case HAL_PIXEL_FORMAT_RGBA_1010102:
+            return gcvSURF_R10G10B10A2;
+        case HAL_PIXEL_FORMAT_RGBA_FP16:
+            return gcvSURF_A16B16G16R16F;
+#endif
+#if ANDROID_SDK_VERSION >= 25
+        case HAL_PIXEL_FORMAT_RAW16:
+            return gcvSURF_A16;
+        case HAL_PIXEL_FORMAT_Y16:
+            return gcvSURF_A16;
+        case HAL_PIXEL_FORMAT_Y8:
+            return gcvSURF_A8;
+#endif
+#if ANDROID_SDK_VERSION >= 17
+        case HAL_PIXEL_FORMAT_BLOB:
+            return gcvSURF_A8;
+#endif
+        /* graphics_ext. */
+#ifdef FSL_YUV_EXT
+        case HAL_PIXEL_FORMAT_YCbCr_422_P:
+            return gcvSURF_UNKNOWN;
+        case HAL_PIXEL_FORMAT_YCbCr_420_P:
+            return gcvSURF_I420;
+        case HAL_PIXEL_FORMAT_CbYCrY_422_I:
+            return gcvSURF_UYVY;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+            return gcvSURF_NV12;
+#endif
         default:
             LOGE("%s: unknown android format=%x", __func__, Format);
             return gcvSURF_UNKNOWN;

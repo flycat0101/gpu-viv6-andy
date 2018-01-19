@@ -64,6 +64,18 @@ static int gralloc_vivante_get_bpp(int format)
     int bpp;
 
     switch (format) {
+    case HAL_PIXEL_FORMAT_RGBA_1010102:
+    case HAL_PIXEL_FORMAT_RGBA_FP16:
+        bpp = 8;
+        break;
+    case HAL_PIXEL_FORMAT_Y16:
+    case HAL_PIXEL_FORMAT_RAW16:
+        bpp = 2;
+        break;
+    case HAL_PIXEL_FORMAT_Y8:
+    case HAL_PIXEL_FORMAT_BLOB:
+        bpp = 1;
+        break;
     case HAL_PIXEL_FORMAT_RGBA_8888:
     case HAL_PIXEL_FORMAT_RGBX_8888:
     case HAL_PIXEL_FORMAT_BGRA_8888:
