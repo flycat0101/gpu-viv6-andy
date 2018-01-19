@@ -344,6 +344,7 @@ gceSTATUS
 gcoCL_WrapUserMemory(
     IN gctPOINTER           Ptr,
     IN gctUINT              Bytes,
+    IN gctBOOL              VIVUnCached,
     OUT gctUINT32_PTR       Physical,
     OUT gcsSURF_NODE_PTR *  Node
     )
@@ -373,10 +374,18 @@ gcoCL_WrapUserMemory(
     surf = pointer;
 
     surf->u.normal.node = node;
-    surf->pool          = gcvPOOL_VIRTUAL;
     surf->size          = Bytes;
 
-    surf->u.normal.cacheable = gcvTRUE;
+    if (VIVUnCached)
+    {
+        surf->pool          = gcvPOOL_USER;
+        surf->u.normal.cacheable = gcvFALSE;
+    }
+    else
+    {
+        surf->pool          = gcvPOOL_VIRTUAL;
+        surf->u.normal.cacheable = gcvTRUE;
+    }
 
     surf->physical2     = gcvINVALID_ADDRESS;
     surf->physical3     = gcvINVALID_ADDRESS;
@@ -447,6 +456,12 @@ gcoCL_FlushMemory(
 
     if (Node /*&& Node->pool == gcvPOOL_VIRTUAL*/)
     {
+        if (Node->pool == gcvPOOL_USER && !Node->u.normal.cacheable)
+        {
+            gcmFOOTER();
+            return status;
+        }
+
         /*gcmONERROR(gcoOS_CacheFlush(gcvNULL, Node->u.normal.node, Logical, Bytes));*/
         gcmONERROR(gcoSURF_NODE_Cache(Node,
                                       Logical,
@@ -500,6 +515,12 @@ gcoCL_InvalidateMemoryCache(
 
     if (Node /*&& Node->pool == gcvPOOL_VIRTUAL*/)
     {
+        if (Node->pool == gcvPOOL_USER && !Node->u.normal.cacheable)
+        {
+            gcmFOOTER();
+            return status;
+        }
+
         /*gcmONERROR(gcoOS_CacheInvalidate(gcvNULL, Node->u.normal.node, Logical, Bytes));*/
         gcmONERROR(gcoSURF_NODE_Cache(Node,
                                       Logical,
@@ -715,6 +736,12 @@ gcoCL_FlushSurface(
     {
         if (Surface->node.pool == gcvPOOL_USER)
         {
+            if (!Surface->node.u.normal.cacheable)
+            {
+                gcmFOOTER();
+                return status;
+            }
+
             status = gcoOS_CacheFlush(gcvNULL,
                                            0,
                                            Surface->node.logical,

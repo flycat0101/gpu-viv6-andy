@@ -247,6 +247,7 @@ gceSTATUS
 gcoCL_WrapUserMemory(
     IN gctPOINTER           Ptr,
     IN gctUINT              Bytes,
+    IN gctBOOL              VIVUnCached,
     OUT gctUINT32_PTR       Physical,
     OUT gcsSURF_NODE_PTR *  Node
     );

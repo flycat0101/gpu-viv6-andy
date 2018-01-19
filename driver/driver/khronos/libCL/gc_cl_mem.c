@@ -362,7 +362,7 @@ clfExecuteHWCopy(
                 /* flush and invalid user ptr cache */
                 gcoCL_FlushMemory(gcvNULL, readBuffer->ptr, size);
 
-                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, &dstPhysical, &node));
+                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
 
                 EVENT_SET_GPU_RUNNING(Command, engine);
                 gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
@@ -2986,6 +2986,7 @@ clCreateBuffer(
 #if MAP_TO_DEVICE
     gceCHIPMODEL  chipModel;
     gctUINT32 chipRevision;
+    gctBOOL   disableByChip = gcvTRUE;
 #endif
     gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
                    Context, Size, HostPtr, Flags);
@@ -3051,13 +3052,19 @@ clCreateBuffer(
     chipModel = Context->devices[0]->deviceInfo.chipModel;
     chipRevision = Context->devices[0]->deviceInfo.chipRevision;
 
+    disableByChip = (chipModel == gcv5000 ) ||
+                    (chipModel == gcv3000 && (chipRevision != 0x5514 && chipRevision != 0x5451));
+
     if ((Flags & CL_MEM_USE_HOST_PTR)
          && !(gcmPTR2INT(HostPtr) & 0x3F)
-         && !((chipModel == gcv3000 && chipRevision != 0x5514) || chipModel == gcv5000))
+         && !disableByChip)
     {
         gctUINT32 physical;
 
-        gcoCL_WrapUserMemory(HostPtr, Size, &physical, &buffer->u.buffer.node);
+        if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)) 
+            gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node);
+        else
+            gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node);
 
         buffer->u.buffer.allocatedSize  = Size;
         buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
