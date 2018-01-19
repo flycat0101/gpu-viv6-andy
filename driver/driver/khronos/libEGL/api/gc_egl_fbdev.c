@@ -180,13 +180,13 @@ static void sig_handler(gctINT signo)
     switch (signo)
     {
     case SIGINT:
-        sigaction(SIGINT, &oldSigHandlers[FB_SIG_INT],  NULL);
+        sigaction(SIGINT,  &oldSigHandlers[FB_SIG_INT],  NULL);
         break;
     case SIGQUIT:
-        sigaction(SIGINT, &oldSigHandlers[FB_SIG_QUIT], NULL);
+        sigaction(SIGQUIT, &oldSigHandlers[FB_SIG_QUIT], NULL);
         break;
     case SIGTERM:
-        sigaction(SIGINT, &oldSigHandlers[FB_SIG_TERM], NULL);
+        sigaction(SIGTERM, &oldSigHandlers[FB_SIG_TERM], NULL);
         break;
     default:
         break;
@@ -200,9 +200,9 @@ halOnExit(
     void
     )
 {
-    sigaction(SIGINT, &oldSigHandlers[FB_SIG_INT],  NULL);
-    sigaction(SIGINT, &oldSigHandlers[FB_SIG_QUIT], NULL);
-    sigaction(SIGINT, &oldSigHandlers[FB_SIG_TERM], NULL);
+    sigaction(SIGINT,  &oldSigHandlers[FB_SIG_INT],  NULL);
+    sigaction(SIGQUIT, &oldSigHandlers[FB_SIG_QUIT], NULL);
+    sigaction(SIGTERM, &oldSigHandlers[FB_SIG_TERM], NULL);
 
     destroyDisplays();
 }
