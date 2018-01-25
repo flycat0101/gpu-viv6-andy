@@ -585,10 +585,10 @@ _DestroySurfaceObjects(
 
         for (i = 0; i < EGL_WORKER_COUNT; i++)
         {
-            if (Surface->damage[Surface->curDamage].numRects != 0)
+            if (Surface->damage[i].numRects != 0)
             {
-                gcmOS_SAFE_FREE(gcvNULL, Surface->damage[Surface->curDamage].rects);
-                Surface->damage[Surface->curDamage].numRects = 0;
+                gcmOS_SAFE_FREE(gcvNULL, Surface->damage[i].rects);
+                Surface->damage[i].numRects = 0;
             }
         }
 
