@@ -1126,32 +1126,8 @@ _ConnectWindow(
     /* Set display to window. */
     window->display = Display->localInfo;
 
-    {
-        gceSURF_FORMAT configFormat = gcvSURF_UNKNOWN;
-
-        switch (Surface->config.greenSize)
-        {
-        case 4:
-            configFormat = (Surface->config.alphaSize == 0)
-                ? gcvSURF_X4R4G4B4 : gcvSURF_A4R4G4B4;
-            break;
-        case 5:
-            configFormat = (Surface->config.alphaSize == 0)
-                ? gcvSURF_X1R5G5B5 : gcvSURF_A1R5G5B5;
-            break;
-        case 6:
-            configFormat = gcvSURF_R5G6B5;
-            break;
-        case 8:
-            configFormat = (Surface->config.alphaSize == 0)
-                ? gcvSURF_X8R8G8B8 : gcvSURF_A8R8G8B8;
-            break;
-        default:
-            return EGL_FALSE;
-        }
-
-        wl_egl_window_set_format(window, gcvSURF_BITMAP, configFormat);
-    }
+    gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
+    wl_egl_window_set_format(window, gcvSURF_BITMAP, Surface->renderTargetFormat);
 
     /* Save window info structure. */
     Surface->winInfo = (void *) 1;
