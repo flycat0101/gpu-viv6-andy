@@ -951,7 +951,7 @@ __SpvGenEnable(
     }
     else if (VIR_Type_isVector(DestType))
     {
-        enable = virEnableCompact[SPV_ID_TYPE_VEC_COMP_NUM(ResultTypeId)];
+        enable = VIR_TypeId_Conv2Enable(VIR_Type_GetIndex(DestType));
     }
     else if (VIR_Type_isMatrix(DestType) || VIR_Type_isStruct(DestType))
     {
@@ -3187,7 +3187,7 @@ static VSC_ErrCode __SpvInsertInstruction3(gcSPV spv, VIR_Shader * virShader, VI
     dstVirType = SPV_ID_TYPE_VIR_TYPE(dstType);
     dstVirTypeId = SPV_ID_TYPE_VIR_TYPE_ID(dstType);
 
-    virEnableMask = __SpvGenEnable(spv, dstVirType, SPV_ID_SYM_SPV_TYPE(dstType));
+    virEnableMask = __SpvGenEnable(spv, dstVirType, dstType);
 
     if (virFunction != gcvNULL)
     {
