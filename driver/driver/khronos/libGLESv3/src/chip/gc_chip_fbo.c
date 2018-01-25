@@ -2020,9 +2020,9 @@ __glChipRenderbufferStorage(
 
     }
 
-    if (drvFormat == __GL_FMT_RGBA4 &&
-        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)&&
-        !chipCtx->chipFeature.hwFeature.hasPEDitherFix2)
+     if (drvFormat == __GL_FMT_RGBA4 &&
+        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
+        ! gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI5))
     {
         drvFormat = __GL_FMT_RGBA8;
     }
