@@ -111,6 +111,26 @@ static const char* __vkiGetResultString(VkResult result)
     return "ERROR_UNKNOWN_RESULT";
 }
 
+__VK_INLINE void __vkLogShaderStrings(size_t codeSize, unsigned char *pCode)
+{
+    size_t i;
+    uint32_t offs;
+    char strbuf[80];
+
+    __VK_LOG_API("#### SPIRV Size: %d ####\n", codeSize);
+    for (i = 0, offs = 0; i < codeSize; i++)
+    {
+        gcoOS_PrintStrSafe(strbuf, 80, &offs, "%02X ", pCode[i]);
+        if (offs >= 75 || i == (codeSize - 1))
+        {
+            strbuf[offs] = '\0';
+            __VK_LOG_API("%s\n", strbuf);
+            offs = 0;
+        }
+    }
+    __VK_LOG_API("####\n");
+}
+
 /*
 ** Vulkan API Validation Layer that is enabled for App development and can be skipped at runtime.
 */
@@ -2252,6 +2272,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateShaderModule(VkDevice device, const
     VkResult result = VK_SUCCESS;
 
     __VK_LOG_API("(tid=%d): vkCreateShaderModule(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+
+    __vkLogShaderStrings(pCreateInfo->codeSize, (unsigned char *)pCreateInfo->pCode);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
