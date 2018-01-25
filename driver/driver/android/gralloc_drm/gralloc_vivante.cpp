@@ -234,6 +234,18 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
             .clear_value = 0,
         };
         drm_vivante_bo_set_tiling(bo->bo, &tiling_args);
+
+        if (!(gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_RENDER)) {
+            /* zero memory for non GPU buffers. */
+            void *vaddr = NULL;
+
+            err = drm_vivante_bo_mmap(bo->bo, &vaddr);
+            if (!err) {
+                ALOGD("zero memory: handle=%p", handle);
+                memset(vaddr, 0, size);
+                drm_vivante_bo_munmap(bo->bo);
+            }
+        }
     }
 
     drm_vivante_bo_get_handle(bo->bo, &gem_handle);
