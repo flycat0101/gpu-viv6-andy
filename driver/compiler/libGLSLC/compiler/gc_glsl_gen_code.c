@@ -17653,12 +17653,13 @@ _GenVecConstants(
 
 static gctUINT
 _GetMaxBindingForUniformAndBlock(
-    IN gcePATCH_ID      PatchId,
     IN sleSHADER_TYPE   ShaderType,
-    IN slsDATA_TYPE *   DataType
+    IN slsDATA_TYPE *   DataType,
+    IN gctBOOL *        UseSameBindingForArray
     )
 {
     gctUINT maxBinding = 0;
+    gctBOOL useSameBindingForArray = gcvFALSE;
 
     if (slsDATA_TYPE_IsOpaque(DataType))
     {
@@ -17672,7 +17673,14 @@ _GetMaxBindingForUniformAndBlock(
         }
         else
         {
+            gcmASSERT(slsDATA_TYPE_IsAtomic(DataType));
             maxBinding = GetGLMaxAtomicCounterBindings();
+
+            /*
+            ** For a atomic counter array, all array elements share the same binding
+            ** so they are consistent within the atomic counter buffer size.
+            */
+            useSameBindingForArray = gcvTRUE;
         }
     }
     else if (slsDATA_TYPE_IsUnderlyingUniformBlock(DataType))
@@ -17683,6 +17691,11 @@ _GetMaxBindingForUniformAndBlock(
     {
         gcmASSERT(slsDATA_TYPE_IsUnderlyingStorageBlock(DataType));
         maxBinding = GetGLMaxShaderStorageBufferBindings();
+    }
+
+    if (UseSameBindingForArray)
+    {
+        *UseSameBindingForArray = useSameBindingForArray;
     }
 
     return maxBinding;
@@ -17710,10 +17723,17 @@ _CheckBindingForUniformAndBlock(
         {
             gctINT maxSize = 0;
             gctINT layoutBinding = slmDATA_TYPE_layoutBinding_GET(name->dataType);
+            gctBOOL useSameBindingForArray = gcvFALSE;
+            gctINT arrayCount = 1;
 
-            maxSize = (gctINT)_GetMaxBindingForUniformAndBlock(sloCOMPILER_GetPatchID(Compiler), Compiler->shaderType, name->dataType);
+            maxSize = (gctINT)_GetMaxBindingForUniformAndBlock(Compiler->shaderType, name->dataType, &useSameBindingForArray);
 
-            if ((layoutBinding + slsDATA_TYPE_GetLogicalCountForAnArray(name->dataType)) > maxSize)
+            if (!useSameBindingForArray)
+            {
+                arrayCount = slsDATA_TYPE_GetLogicalCountForAnArray(name->dataType);
+            }
+
+            if ((layoutBinding + arrayCount) > maxSize)
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 name->lineNo,
