@@ -338,16 +338,17 @@ wl_egl_display_destroy(struct wl_egl_display *display)
 
         for (i = 0; i < window->nr_buffers; i++)
         {
-            int ret = 0;
             struct wl_egl_buffer *buffer = &window->buffers[i];
 
             if (buffer->frame_callback)
             {
+                int ret = 0;
+
                 pthread_mutex_lock(&window->commit_mutex);
-
                 while (buffer->frame_callback && ret != -1)
+                {
                     ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
-
+                }
                 pthread_mutex_unlock(&window->commit_mutex);
             }
         }
@@ -2032,18 +2033,17 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
 
     for (i = 0; i < window->nr_buffers; i++)
     {
-        int ret = 0;
         struct wl_egl_buffer *buffer = &window->buffers[i];
 
-        assert(!(buffer->frame_callback && !display));
-
-        if (buffer->frame_callback)
+        if (display && buffer->frame_callback)
         {
+            int ret = 0;
+
             pthread_mutex_lock(&window->commit_mutex);
-
             while (buffer->frame_callback && ret != -1)
+            {
                 ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
-
+            }
             pthread_mutex_unlock(&window->commit_mutex);
         }
 
