@@ -206,8 +206,8 @@ _CMAFSLGetSGT(
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
-#if (defined(CONFIG_ARM) || defined(CONFIG_ARM64)) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0))
-    page = pfn_to_page (dma_to_pfn (&Allocator->os->device->platform->device->dev, mdl_priv->dmaHandle));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+    page = phys_to_page (mdlPriv->physical);
 #else
     page = phys_to_page(dma_to_phys(&Allocator->os->device->platform->device->dev, mdl_priv->physical));
 #endif
