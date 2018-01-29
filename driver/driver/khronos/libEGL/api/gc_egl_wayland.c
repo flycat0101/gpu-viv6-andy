@@ -2026,6 +2026,8 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
 
     window->nr_buffers  = WL_EGL_NUM_BACKBUFFERS;
 
+    window->attached_width  = width;
+    window->attached_height = height;
     window->width  = width;
     window->height = height;
     window->format = gcvSURF_A8R8G8B8;
