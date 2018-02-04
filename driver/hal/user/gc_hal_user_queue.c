@@ -97,9 +97,6 @@ gcoQUEUE_Destroy(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
 
-    /* Commit the event queue. */
-    gcmONERROR(gcoQUEUE_Commit(Buffer, Queue, gcvTRUE));
-
     while (Queue->chunks != gcvNULL)
     {
         /* Unlink the first chunk. */
@@ -262,46 +259,20 @@ gcoQUEUE_Commit(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
 
-    if (Queue->head != gcvNULL)
+    if (Queue->head != gcvNULL && Buffer)
     {
-        if (Buffer)
+        gcoWorkerInfo* worker;
+
+        /* Find an available worker. */
+        worker = gcoGetWorker(Queue, Buffer, gcvTRUE);
+
+        if (worker == gcvNULL)
         {
-            gcoWorkerInfo* worker;
-
-            /* Find an available worker. */
-            worker = gcoGetWorker(Queue, Buffer, gcvTRUE);
-
-            if (worker == gcvNULL)
-            {
-                return gcvSTATUS_OUT_OF_MEMORY;
-            }
-
-            /* Submit the worker. */
-            gcoSubmitWorker(Buffer, worker);
+            return gcvSTATUS_OUT_OF_MEMORY;
         }
-        else
-        {
-            gcsHAL_INTERFACE iface;
 
-            /* Initialize event commit command. */
-            iface.ignoreTLS     = gcvFALSE;
-            iface.command       = gcvHAL_EVENT_COMMIT;
-            iface.engine        = Queue->engine;
-            iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
-
-            /* Send command to kernel. */
-            gcmONERROR(
-                gcoOS_DeviceControl(gcvNULL,
-                                    IOCTL_GCHAL_INTERFACE,
-                                    &iface, gcmSIZEOF(iface),
-                                    &iface, gcmSIZEOF(iface)));
-
-            /* Test for error. */
-            gcmONERROR(iface.status);
-
-            /* Free any records in the queue. */
-            gcmONERROR(gcoQUEUE_Free(Queue));
-        }
+        /* Submit the worker. */
+        gcoSubmitWorker(Buffer, worker);
 
         /* Wait for the execution to complete. */
         if (Stall)

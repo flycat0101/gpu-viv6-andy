@@ -5914,7 +5914,7 @@ gceSTATUS gcoHARDWARE_Destroy(
     /* Destroy the command buffer. */
     if (Hardware->engine[gcvENGINE_BLT].buffer != gcvNULL)
     {
-        gcmONERROR(gcoBUFFER_Destroy(Hardware->engine[gcvENGINE_BLT].buffer));
+        gcmONERROR(gcoBUFFER_Destroy(Hardware->engine[gcvENGINE_BLT].buffer, Hardware->engine[gcvENGINE_BLT].queue));
         Hardware->engine[gcvENGINE_BLT].buffer = gcvNULL;
     }
 
@@ -5926,7 +5926,7 @@ gceSTATUS gcoHARDWARE_Destroy(
 
     if (Hardware->engine[gcvENGINE_RENDER].buffer != gcvNULL)
     {
-        gcmONERROR(gcoBUFFER_Destroy(Hardware->engine[gcvENGINE_RENDER].buffer));
+        gcmONERROR(gcoBUFFER_Destroy(Hardware->engine[gcvENGINE_RENDER].buffer, Hardware->engine[gcvENGINE_RENDER].queue));
         Hardware->engine[gcvENGINE_RENDER].buffer = gcvNULL;
     }
 

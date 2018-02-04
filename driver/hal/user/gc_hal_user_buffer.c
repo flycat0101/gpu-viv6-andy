@@ -31,6 +31,20 @@
 ********************************** Structures **********************************
 \******************************************************************************/
 
+typedef struct _gcoCommitWorker
+{
+    gctHANDLE                   workerThread;
+    gctSIGNAL                   startSignal;
+    gctSIGNAL                   stopSignal;
+    gctPOINTER                  suspendMutex;
+
+    gcoWorkerInfo*              workerFifo[gcmWORKER_FIFO_SIZE];
+    gctUINT32                   workerHead;
+    gctUINT32                   workerFree;
+    gctUINT32                   workerRef;
+}
+gcoCommitWorker;
+
 struct _gcoBUFFER
 {
     /* Object. */
@@ -107,20 +121,8 @@ struct _gcoBUFFER
 
     gctHANDLE                   commitProcess;
     gcoWorkerInfo               *deltaWorker;
+    gcoCommitWorker             *commitWorker;
 };
-
-typedef struct _gcoCommitWorker
-{
-    gctHANDLE                   workerThread;
-    gctSIGNAL                   startSignal;
-    gctSIGNAL                   stopSignal;
-
-    gcoWorkerInfo*              workerFifo[gcmWORKER_FIFO_SIZE];
-    gctUINT32                   workerHead;
-    gctUINT32                   workerFree;
-    gctUINT32                   workerRef;
-}
-gcoCommitWorker;
 
 /******************************************************************************\
 ******************************* Private Functions ******************************
@@ -684,6 +686,52 @@ OnError:
     return status;
 }
 
+void
+gcoSuspendWorker(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    gcmASSERT(Buffer != gcvNULL);
+    gcmASSERT(Buffer->commitWorker != gcvNULL);
+
+    if (Buffer->commitWorker->suspendMutex != gcvNULL)
+    {
+        gcmONERROR(gcoOS_AcquireMutex(gcvNULL, Buffer->commitWorker->suspendMutex, gcvINFINITE));
+    }
+    gcmFOOTER_NO();
+    return;
+
+OnError:
+    gcmFOOTER();
+    return;
+}
+
+void
+gcoResumeWorker(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    gcmASSERT(Buffer != gcvNULL);
+    gcmASSERT(Buffer->commitWorker != gcvNULL);
+
+    if (Buffer->commitWorker->suspendMutex != gcvNULL)
+    {
+        gcmONERROR(gcoOS_ReleaseMutex(gcvNULL, Buffer->commitWorker->suspendMutex));
+    }
+    gcmFOOTER_NO();
+    return;
+
+OnError:
+    gcmFOOTER();
+    return;
+}
+
 gceSTATUS
 gcoFreeWorkerDelta(
     gcoWorkerInfo * Worker
@@ -847,7 +895,8 @@ OnError:
 
 gcoWorkerInfo*
 gcoCreateWorker(
-    gcoOS Os
+    gcoOS Os,
+    gceENGINE Engine
     )
 {
     gcoWorkerInfo *worker = gcvNULL;
@@ -858,8 +907,7 @@ gcoCreateWorker(
 
     gcmONERROR(gcoOS_AllocateSharedMemory(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&worker->commandBuffer));
 
-    gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoQUEUE), (gctPOINTER*)&worker->queue));
-    gcoOS_ZeroMemory(worker->queue, gcmSIZEOF(struct _gcoQUEUE));
+    gcmONERROR(gcoQUEUE_Construct(Os, Engine, &worker->queue));
 
     gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &worker->signal));
 
@@ -911,29 +959,34 @@ gcoGetWorker(
         return gcvNULL;
     }
 
-    commitWorker = tls->commitWorker;
+    commitWorker = Buffer->commitWorker;
     if (!commitWorker)
     {
         return gcvNULL;
     }
 
+    gcoSuspendWorker(Buffer);
+
     worker = commitWorker->workerFifo[commitWorker->workerFree];
     if (worker == gcvNULL)
     {
+        gcoResumeWorker(Buffer);
         return gcvNULL;
     }
 
     if(gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, worker->signal, gcvINFINITE)))
     {
+        gcoResumeWorker(Buffer);
         return gcvNULL;
     }
 
     commitWorker->workerFree = (commitWorker->workerFree + 1) % gcmCOUNTOF(commitWorker->workerFifo);
 
+    gcoResumeWorker(Buffer);
+
     worker->emptyBuffer = EmptyBuffer;
     worker->currentCoreIndex = tls->currentCoreIndex;
-
-    gcmGETCURRENTHARDWARE(worker->hardwareType);
+    worker->hardwareType = tls->currentType;
 
     if (EmptyBuffer == gcvFALSE)
     {
@@ -961,14 +1014,7 @@ gcoGetWorker(
 
         Queue->engine = worker->queue->engine;
 
-        if (Queue->object.type != gcvOBJ_QUEUE)
-        {
-            Queue->object.type = gcvOBJ_QUEUE;
-        }
-        else
-        {
-            gcoQUEUE_Free(Queue);
-        }
+        gcoQUEUE_Free(Queue);
     }
 
     /* Return the worker. */
@@ -1026,31 +1072,10 @@ gcoSubmitWorker(
     gcoWorkerInfo* Worker
     )
 {
-    gcsTLS_PTR tls;
-    gceSTATUS status;
-    gcoCommitWorker *commitWorker;
-
-    if (Worker == gcvNULL)
-    {
-        return gcvFALSE;
-    }
-
-    status = gcoOS_GetTLS(&tls);
-    if (gcmIS_ERROR(status))
-    {
-        return gcvFALSE;
-    }
-
-    commitWorker = tls->commitWorker;
-    if (!commitWorker)
-    {
-        return gcvFALSE;
-    }
-
     Worker->buffer = Buffer;
     Worker->commit = gcvTRUE;
 
-    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, commitWorker->startSignal, gcvTRUE));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->commitWorker->startSignal, gcvTRUE));
 
     return gcvTRUE;
 }
@@ -1465,16 +1490,24 @@ gcoBUFFER_Construct(
 
         gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &commitWorker->stopSignal));
 
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &commitWorker->suspendMutex));
+
         for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
         {
-            commitWorker->workerFifo[i] = gcoCreateWorker(gcvNULL);
+            commitWorker->workerFifo[i] = gcoCreateWorker(gcvNULL, Engine);
         }
 
         gcmONERROR(gcoOS_CreateThread(gcvNULL, gcoBufferCommitWorker, commitWorker, &commitWorker->workerThread));
         tls->commitWorker = commitWorker;
     }
 
+    buffer->commitWorker = commitWorker;
+
+    gcoSuspendWorker(buffer);
+
     commitWorker->workerRef++;
+
+    gcoResumeWorker(buffer);
 
     /* Return pointer to the gcoBUFFER object. */
     *Buffer = buffer;
@@ -1485,7 +1518,7 @@ gcoBUFFER_Construct(
 
 OnError:
     /* Roll back. */
-    gcmVERIFY_OK(gcoBUFFER_Destroy(buffer));
+    gcmVERIFY_OK(gcoBUFFER_Destroy(buffer, gcvNULL));
 
     /* Return the status. */
     gcmFOOTER();
@@ -1887,14 +1920,14 @@ gcoBUFFER_GetFence(
 */
 gceSTATUS
 gcoBUFFER_Destroy(
-    IN gcoBUFFER Buffer
+    IN gcoBUFFER Buffer,
+    IN gcoQUEUE Queue
     )
 {
     gceSTATUS status;
     gcoCMDBUF commandBuffer;
     struct _gcsPATCH_LIST *patchList;
     gcoCommitWorker *commitWorker;
-    gcsTLS_PTR tls;
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
@@ -1954,16 +1987,31 @@ gcoBUFFER_Destroy(
 
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer->tempCMDBUF.buffer));
 
-    gcmONERROR(gcoOS_GetTLS(&tls));
+    commitWorker = Buffer->commitWorker;
 
-    commitWorker = tls->commitWorker;
+    if (Queue)
+    {
+        gcmVERIFY_OK(gcoQUEUE_Commit(Buffer, Queue, gcvTRUE));
+    }
 
     /* Stop the worker thread. */
     if (commitWorker)
     {
-       commitWorker->workerRef--;
+        gctUINT32 workerRef;
 
-        if (!commitWorker->workerRef)
+        gcoSuspendWorker(Buffer);
+
+        commitWorker->workerRef--;
+        workerRef = commitWorker->workerRef;
+
+        gcoResumeWorker(Buffer);
+
+        if (workerRef < 0)
+        {
+            gcmPRINT("%s: worker reference(%d) has fatal error !\n", __FUNCTION__, workerRef);
+        }
+
+        if (!workerRef)
         {
             /* Set thread's stop signal. */
             gcmASSERT(commitWorker->stopSignal != gcvNULL);
@@ -1986,13 +2034,16 @@ gcoBUFFER_Destroy(
             gcvNULL, commitWorker->workerThread
             ));
 
-            gcmVERIFY_OK(gcoOS_Free(gcvNULL, commitWorker));
+            gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, commitWorker->suspendMutex));
 
-            tls->commitWorker = gcvNULL;
+            gcmVERIFY_OK(gcoOS_Free(gcvNULL, commitWorker));
         }
     }
 
-    gcoFreeWorker(gcvNULL, Buffer->deltaWorker);
+    if (Buffer->deltaWorker)
+    {
+        gcoFreeWorker(gcvNULL, Buffer->deltaWorker);
+    }
 
     /* Free the object memory. */
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer));

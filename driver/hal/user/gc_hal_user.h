@@ -3329,7 +3329,8 @@ gcoBUFFER_Construct(
 /* Destroy an gcoBUFFER object. */
 gceSTATUS
 gcoBUFFER_Destroy(
-    IN gcoBUFFER Buffer
+    IN gcoBUFFER Buffer,
+    IN gcoQUEUE Queue
     );
 
 /* Reserve space in a command buffer. */
