@@ -297,7 +297,8 @@ gcoGetWorker(
 gctBOOL
 gcoSubmitWorker(
     gcoBUFFER Buffer,
-    gcoWorkerInfo* Worker
+    gcoWorkerInfo* Worker,
+    gctBOOL Stall
     );
 
 typedef struct {

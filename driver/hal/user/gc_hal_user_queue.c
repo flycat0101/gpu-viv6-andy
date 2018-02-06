@@ -253,7 +253,6 @@ gcoQUEUE_Commit(
     IN gctBOOL Stall
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("Queue=0x%x", Queue);
 
     /* Verify the arguments. */
@@ -272,22 +271,11 @@ gcoQUEUE_Commit(
         }
 
         /* Submit the worker. */
-        gcoSubmitWorker(Buffer, worker);
-
-        /* Wait for the execution to complete. */
-        if (Stall)
-        {
-            gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
-        }
+        gcoSubmitWorker(Buffer, worker, Stall);
     }
 
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
 }
 #endif  /*  (gcdENABLE_3D || gcdENABLE_2D) */

@@ -893,6 +893,60 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoCleanupWorker(
+    gcoBUFFER Buffer
+   )
+{
+    gctUINT32 i = 0;
+    gcoQUEUE queue = gcvNULL;
+    gcoWorkerInfo * Worker = gcvNULL;
+    gcoCommitWorker *commitWorker = gcvNULL;
+
+    if (!Buffer)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    Worker = gcoGetWorker(gcvNULL, Buffer, gcvTRUE);
+    if (!Worker)
+    {
+        return gcvSTATUS_INVALID_REQUEST;
+    }
+
+    queue = Worker->queue;
+
+    Worker->queue = gcvNULL;
+    gcoSubmitWorker(Buffer, Worker, gcvFALSE);
+
+    gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL, Worker->signal, gcvINFINITE));
+    Worker->queue = queue;
+
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Worker->signal, gcvTRUE));
+
+    commitWorker = Buffer->commitWorker;
+
+    for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
+    {
+        Worker = commitWorker->workerFifo[i];
+
+        if(Worker->buffer == Buffer)
+        {
+            if (Worker->commit)
+            {
+                gcmPRINT("%s, worker has buffer to be committed, sync error!\n", __FUNCTION__);
+            }
+
+            gcoFreeWorkerDelta(Worker);
+
+            Worker->stateDelta = gcvNULL;
+            Worker->buffer = gcvNULL;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
 gcoWorkerInfo*
 gcoCreateWorker(
     gcoOS Os,
@@ -1069,13 +1123,19 @@ gcoFreeWorker(
 gctBOOL
 gcoSubmitWorker(
     gcoBUFFER Buffer,
-    gcoWorkerInfo* Worker
+    gcoWorkerInfo* Worker,
+    gctBOOL Stall
     )
 {
     Worker->buffer = Buffer;
     Worker->commit = gcvTRUE;
 
     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->commitWorker->startSignal, gcvTRUE));
+
+    if (Stall)
+    {
+       gcmVERIFY_OK(gcoHARDWARE_Stall(Buffer->hardware));
+    }
 
     return gcvTRUE;
 }
@@ -1202,11 +1262,21 @@ gcoBufferCommitWorker(
                 break;
             }
 
+            if (!currWorker->queue)
+            {
+                currWorker->commit = gcvFALSE;
+
+                gcmVERIFY_OK(gcoOS_Signal(gcvNULL, currWorker->signal, gcvTRUE));
+                commitWorker->workerHead = (commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo);
+
+                break;
+            }
+
             if (currWorker->queue->head)
             {
                 gcoWorkerInfo *nextWorker = commitWorker->workerFifo[(commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo)];
 
-                while (nextWorker != currWorker && nextWorker->buffer == currWorker->buffer &&
+                while (nextWorker != currWorker && nextWorker->queue && nextWorker->buffer == currWorker->buffer &&
                        nextWorker->commit == gcvTRUE && nextWorker->emptyBuffer == gcvTRUE)
                 {
                     /* Merge all queue events into current worker */
@@ -2004,8 +2074,6 @@ gcoBUFFER_Destroy(
         commitWorker->workerRef--;
         workerRef = commitWorker->workerRef;
 
-        gcoResumeWorker(Buffer);
-
         if (workerRef < 0)
         {
             gcmPRINT("%s: worker reference(%d) has fatal error !\n", __FUNCTION__, workerRef);
@@ -2034,9 +2102,17 @@ gcoBUFFER_Destroy(
             gcvNULL, commitWorker->workerThread
             ));
 
+            gcoResumeWorker(Buffer);
+
             gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, commitWorker->suspendMutex));
 
             gcmVERIFY_OK(gcoOS_Free(gcvNULL, commitWorker));
+        }
+        else
+        {
+            gcoCleanupWorker(Buffer);
+
+            gcoResumeWorker(Buffer);
         }
     }
 
@@ -2643,7 +2719,7 @@ gcoBUFFER_Commit(
     }
 
     /* Submit the worker. */
-    gcoSubmitWorker(Buffer, worker);
+    gcoSubmitWorker(Buffer, worker, gcvFALSE);
 
     return gcvSTATUS_OK;
 }
