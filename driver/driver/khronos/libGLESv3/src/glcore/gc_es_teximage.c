@@ -210,6 +210,8 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RG_EXT, GL_RG_EXT, GL_FLOAT, 4, GL_TRUE },
     { GL_RG_EXT, GL_RG_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
     { GL_RG_EXT, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
+
+    { GL_BGRA_EXT, GL_BGRA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
 };
 
 
