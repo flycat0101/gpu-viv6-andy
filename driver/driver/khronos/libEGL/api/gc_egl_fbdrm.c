@@ -4946,9 +4946,9 @@ static struct eglFbPlatform fbdrmBackend =
 struct eglFbPlatform* getFbDrmBackend()
 {
     /*In case need for legacy FB*/
-    char *p = getenv("FB_LEGACY");
+    char *p = getenv("FB_DRM_MODESET");
 
-    if (!p && IsDRMModesetAvailable())
+    if (!p && strcmp(p, "0") && IsDRMModesetAvailable())
     {
         return &fbdrmBackend;
     }
