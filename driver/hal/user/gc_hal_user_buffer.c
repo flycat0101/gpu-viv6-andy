@@ -792,7 +792,6 @@ gcoFreeWorkerDelta(
 
 gceSTATUS
 gcoCreateWorkerDelta(
-    gcoBUFFER Buffer,
     gcoWorkerInfo * Worker,
     gcsSTATE_DELTA_PTR *Delta,
     gctBOOL  Exchange
@@ -811,12 +810,6 @@ gcoCreateWorkerDelta(
     if (Worker->hardwareType != gcvHARDWARE_2D)
     {
         pDelta = *Delta;
-
-        if (Buffer != Worker->buffer && Worker->stateDelta)
-        {
-           gcoFreeWorkerDelta(Worker);
-           Worker->stateDelta = gcvNULL;
-        }
 
         if (!Worker->stateDelta)
         {
@@ -871,6 +864,11 @@ gcoCreateWorkerDelta(
                 gcoOS_ZeroMemory(pointer, delta->recordSize);
                 delta->recordArray = gcmPTR_TO_UINT64(pointer);
             }
+        }
+        else if (pDelta->id < Worker->stateDelta->id)
+        {
+            gcsSTATE_DELTA_PTR delta = Worker->stateDelta;
+            gcoOS_ZeroMemory(gcmUINT64_TO_PTR(delta->mapEntryID), delta->mapEntryIDSize);
         }
 
         Worker->stateDelta->id = pDelta->id;
@@ -937,9 +935,6 @@ gcoCleanupWorker(
                 gcmPRINT("%s, worker has buffer to be committed, sync error!\n", __FUNCTION__);
             }
 
-            gcoFreeWorkerDelta(Worker);
-
-            Worker->stateDelta = gcvNULL;
             Worker->buffer = gcvNULL;
         }
     }
@@ -1312,7 +1307,7 @@ gcoBufferCommitWorker(
                 {
                     deltaWorker->hardwareType = currWorker->hardwareType;
 
-                    gcoCreateWorkerDelta(currWorker->buffer, deltaWorker, &currWorker->stateDelta, gcvFALSE);
+                    gcoCreateWorkerDelta(deltaWorker, &currWorker->stateDelta, gcvFALSE);
                 }
 
                 MergeStateDelta(deltaWorker->stateDelta, currWorker->stateDelta);
@@ -2678,7 +2673,7 @@ gcoBUFFER_Commit(
         worker->context       = Context;
         worker->contexts      = Contexts;
 
-        gcoCreateWorkerDelta(Buffer, worker, StateDelta, gcvTRUE);
+        gcoCreateWorkerDelta(worker, StateDelta, gcvTRUE);
 
         /* Advance the offset for next commit. */
         newOffset = commandBuffer->offset + Buffer->info.reservedTail;
