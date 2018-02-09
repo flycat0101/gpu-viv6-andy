@@ -2,6 +2,7 @@
 
 export BUILD_OPTION_EGL_API_FB=0
 export BUILD_OPTION_EGL_API_DFB=0
+export BUILD_OPTION_X11_DRI3=0
 export BUILD_OPTION_EGL_API_DRI=1
 export BUILD_OPTION_EGL_API_NULLWS=0
 ./driver_build_sample.sh $*
