@@ -3478,6 +3478,9 @@ struct _gcoHAL
 
     gcoDUMP                 dump;
 
+    gctPOINTER              commitMutex;
+    gctPOINTER              commitWorker;
+
 #if gcdFRAME_DB
     gctINT                  frameDBIndex;
     gcsHAL_FRAME_INFO       frameDB[gcdFRAME_DB];

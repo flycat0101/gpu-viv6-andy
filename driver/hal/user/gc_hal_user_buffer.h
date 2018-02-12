@@ -287,6 +287,16 @@ typedef struct _gcoWorkerInfo
 }
 gcoWorkerInfo;
 
+gceSTATUS
+gcoSuspendWorker(
+    gcoBUFFER Buffer
+    );
+
+gceSTATUS
+gcoResumeWorker(
+    gcoBUFFER Buffer
+    );
+
 gcoWorkerInfo*
 gcoGetWorker(
     gcoQUEUE Queue,

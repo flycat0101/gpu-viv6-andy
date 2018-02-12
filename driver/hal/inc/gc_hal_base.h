@@ -256,8 +256,6 @@ typedef struct _gcsTLS
 
     /* Driver tls. */
     gcsDRIVER_TLS_PTR           driverTLS[gcvTLS_KEY_COUNT];
-
-    gctPOINTER                  commitWorker;
 }
 gcsTLS;
 

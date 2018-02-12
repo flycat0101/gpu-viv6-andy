@@ -460,6 +460,8 @@ gcoHAL_ConstructEx(
 
         gcoOS_ZeroMemory(hal, gcmSIZEOF(struct _gcoHAL));
 
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &hal->commitMutex));
+
         /* Initialize the object. */
         hal->object.type = gcvOBJ_HAL;
 
@@ -560,6 +562,11 @@ OnError:
     /* Roll back. */
     if ((hal != gcvNULL) && created)
     {
+        if (hal->commitMutex)
+        {
+            gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, hal->commitMutex));
+        }
+
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, hal));
     }
 
@@ -601,6 +608,11 @@ gcoHAL_DestroyEx(
     {
         gcmONERROR(gcoDUMP_Destroy(Hal->dump));
         Hal->dump = gcvNULL;
+    }
+
+    if (Hal->commitMutex)
+    {
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Hal->commitMutex));
     }
 
     /* Free the gcoHAL object. */
