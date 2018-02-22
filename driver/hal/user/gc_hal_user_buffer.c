@@ -2052,19 +2052,11 @@ gcoBUFFER_Destroy(
     /* Stop the worker thread. */
     if (commitWorker)
     {
-        gctUINT32 workerRef;
-
         gcoSuspendWorker(Buffer);
 
         commitWorker->workerRef--;
-        workerRef = commitWorker->workerRef;
 
-        if (workerRef < 0)
-        {
-            gcmPRINT("%s: worker reference(%d) has fatal error !\n", __FUNCTION__, workerRef);
-        }
-
-        if (!workerRef)
+        if (!commitWorker->workerRef)
         {
             /* Set thread's stop signal. */
             gcmASSERT(commitWorker->stopSignal != gcvNULL);
