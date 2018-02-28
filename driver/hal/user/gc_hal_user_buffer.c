@@ -736,54 +736,49 @@ gcoFreeWorkerDelta(
     gcoWorkerInfo * Worker
     )
 {
-    if (!Worker->stateDelta)
+#if gcdENABLE_3D || gcdENABLE_2D
+    gctUINT_PTR mapEntryID;
+    gcsSTATE_DELTA_PTR delta;
+    gctUINT_PTR mapEntryIndex;
+    gcsSTATE_DELTA_RECORD_PTR recordArray;
+
+    delta = Worker->stateDelta;
+    if (!delta)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-#if gcdENABLE_3D || gcdENABLE_2D
-    /* 2D indpendent HW doesn't need context. */
-    if (Worker->hardwareType != gcvHARDWARE_2D)
+    mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
+    mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
+    recordArray = gcmUINT64_TO_PTR(delta->recordArray);
+
+    if (mapEntryID > 0)
     {
-        gctUINT_PTR mapEntryID;
-        gcsSTATE_DELTA_PTR delta;
-        gctUINT_PTR mapEntryIndex;
-        gcsSTATE_DELTA_RECORD_PTR recordArray;
-
-        delta = Worker->stateDelta;
-
-        mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
-        mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
-        recordArray = gcmUINT64_TO_PTR(delta->recordArray);
-
-        if (mapEntryID > 0)
-        {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                gcvNULL,
-                mapEntryID
-                ));
-        }
-
-        if (mapEntryIndex > 0)
-        {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                gcvNULL,
-                mapEntryIndex
-                ));
-        }
-
-        if (recordArray > 0)
-        {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                gcvNULL,
-                recordArray
-                ));
-        }
-
         gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-            gcvNULL, delta
+            gcvNULL,
+            mapEntryID
             ));
     }
+
+    if (mapEntryIndex > 0)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+            gcvNULL,
+            mapEntryIndex
+            ));
+    }
+
+    if (recordArray > 0)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+            gcvNULL,
+            recordArray
+            ));
+    }
+
+    gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+        gcvNULL, delta
+        ));
 #endif
 
     return gcvSTATUS_OK;
@@ -1085,19 +1080,7 @@ gcoFreeWorker(
 
     if (Worker->queue)
     {
-        gcsChunkHead_PTR p;
-
-        while (Worker->queue->chunks != gcvNULL)
-        {
-            /* Unlink the first chunk. */
-            p = Worker->queue->chunks;
-            Worker->queue->chunks = p->next;
-
-            /* Free the memory. */
-            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, p));
-        }
-
-        gcmVERIFY_OK(gcoOS_Free(Os, Worker->queue));
+        gcmVERIFY_OK(gcoQUEUE_Destroy(Worker->buffer, Worker->queue));
     }
 
     if (Worker->stateDelta)
