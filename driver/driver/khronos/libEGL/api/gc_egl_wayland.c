@@ -61,6 +61,7 @@ struct wl_egl_window
     struct wl_egl_buffer * buffers;
     int nr_buffers;
     int next;
+    int enable_tile_status;
 
     int indequeue;
 
@@ -947,9 +948,13 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dy = 0;
 
     surface = buffer->info.surface;
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-        !surface->tileStatusDisabled[0], surface->compressed,
-        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+
+    if(window->enable_tile_status)
+    {
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+            !surface->tileStatusDisabled[0], surface->compressed,
+            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    }
 
     gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
@@ -1432,11 +1437,13 @@ _BindWindow(
             if (texMode >= VEGL_DIRECT_RENDERING_FC_NOCC)
             {
                 renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+                window->enable_tile_status = 1;
             }
 
             if (texMode == VEGL_DIRECT_RENDERING)
             {
                 renderMode = VEGL_DIRECT_RENDERING;
+                window->enable_tile_status = 1;
             }
 #    endif
         }
@@ -1444,7 +1451,8 @@ _BindWindow(
 #  endif
 
         {
-            char *p;
+            char *p, *dir, *path;
+            int ret = 0;
             p = getenv("GPU_VIV_EXT_RESOLVE");
 
             if (p && p[0] == '0')
@@ -1457,6 +1465,18 @@ _BindWindow(
             if (p && p[0] == '1')
             {
                 renderMode = VEGL_INDIRECT_RENDERING;
+            }
+
+            dir = getenv("XDG_RUNTIME_DIR");
+            path = malloc(strlen(dir) + 40);
+            strcpy(path, dir);
+            strcat(path, "/use-g2d-renderer");
+            ret = access(path, F_OK);
+            free(path);
+            if (ret == 0 && renderMode > VEGL_DIRECT_RENDERING_NOFC)
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+                window->enable_tile_status = 0;
             }
         }
 
