@@ -1248,9 +1248,12 @@ gcoBufferCommitWorker(
                 gcoWorkerInfo *nextWorker = commitWorker->workerFifo[(commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo)];
 
                 while (nextWorker != currWorker && nextWorker->commit == gcvTRUE &&
-                       nextWorker->buffer == currWorker->buffer && nextWorker->queue &&
+                       nextWorker->buffer == currWorker->buffer &&
                        nextWorker->emptyBuffer == gcvTRUE)
                 {
+                    gcoOS_MemoryBarrier(gcvNULL, nextWorker->queue);
+                    if (!nextWorker->queue) break;
+
                     /* Merge all queue events into current worker */
                     currWorker->queue->tail->next = gcmPTR_TO_UINT64(nextWorker->queue->head);
 
