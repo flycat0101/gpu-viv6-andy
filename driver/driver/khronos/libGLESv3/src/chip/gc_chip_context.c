@@ -1828,7 +1828,7 @@ __glChipCreateContext(
     ** - For ES30 GTF, limit MAX_RENDERBUFFER_SIZE to spec minimum required value to speed up submission
     ** - ES30 conform requires at least 256 vs uniforms and 224 ps ones.
     */
-    if (gc->apiVersion == __GL_API_VERSION_ES30 && chipCtx->patchId == gcvPATCH_GTFES30)
+    if (gc->apiVersion <= __GL_API_VERSION_ES30 && chipCtx->patchId == gcvPATCH_GTFES30)
     {
         /* Reduce FBO size to shorten CTS time */
         constants->maxTextureSize = 2048;
