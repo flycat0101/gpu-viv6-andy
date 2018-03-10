@@ -531,7 +531,10 @@ clfExecuteCommandReadBuffer(
         }
         gcoCL_InvalidateMemoryCache(buffer->u.buffer.node, src, readBuffer->cb);
 
-        gcoOS_MemCopy(readBuffer->ptr, src, readBuffer->cb);
+        if (readBuffer->ptr != src)
+        {
+            gcoOS_MemCopy(readBuffer->ptr, src, readBuffer->cb);
+        }
 
         gcmDUMP(gcvNULL,
                 "@[memory.read 0x%08X 0x%08X]",
@@ -625,7 +628,11 @@ clfExecuteCommandReadBufferRect(
         {
             src = srcFirstByte + row*bufferRowPitch + slice*bufferSlicePitch;
             dst = dstFirstByte + row*hostRowPitch + slice*hostSlicePitch;
-            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+
+            if (src != dst)
+            {
+                gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            }
 
             gcmDUMP(gcvNULL,
                     "@[memory.read 0x%08X 0x%08X]",
@@ -713,7 +720,10 @@ clfExecuteCommandWriteBuffer(
         offset      = writeBuffer->offset;
         logicalAddress = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + offset);
 
-        gcoOS_MemCopy(logicalAddress, ptr, cb);
+        if (logicalAddress != ptr)
+        {
+            gcoOS_MemCopy(logicalAddress, ptr, cb);
+        }
 
         gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
 
@@ -862,7 +872,11 @@ clfExecuteCommandWriteBufferRect(
         {
             src = srcFirstByte + row*hostRowPitch + slice*hostSlicePitch;
             dst = dstFirstByte + row*bufferRowPitch + slice*bufferSlicePitch;
-            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+
+            if (src != dst)
+            {
+                gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            }
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
@@ -1721,7 +1735,7 @@ clfExecuteCommandMapBuffer(
 
     /* Anyway, we need to sync the content of the memory when mapping is called. */
     if ((buffer->flags & CL_MEM_USE_HOST_PTR) &&
-        (buffer->host != gcvNULL))
+        (buffer->host != gcvNULL) && (buffer->host != buffer->u.buffer.logical))
     {
         gctSIZE_T   orig[3], area[3];
         orig[0] = orig[1] = orig[2] = 0;
@@ -1918,7 +1932,7 @@ clfExecuteCommandUnmapMemObject(
         {
             /* Sync from host if necessary. */
             if ((memObj->flags & CL_MEM_USE_HOST_PTR) &&
-                (memObj->host != gcvNULL) &&
+                (memObj->host != gcvNULL) && (memObj->host != memObj->u.buffer.logical) &&
                 (memObj->mapFlag & CL_MAP_WRITE))
             {
                 /* Host writting done, Sync host to device. */
