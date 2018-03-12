@@ -595,6 +595,9 @@ _TranslateFormat(
         case HAL_PIXEL_FORMAT_NV12_G1_TILED:
         case HAL_PIXEL_FORMAT_NV12_G2_TILED:
         case HAL_PIXEL_FORMAT_NV12_G2_TILED_COMPRESSED:
+        case HAL_PIXEL_FORMAT_P010:
+        case HAL_PIXEL_FORMAT_P010_TILED:
+        case HAL_PIXEL_FORMAT_P010_TILED_COMPRESSED:
 #endif
             return gcvSURF_NV12;
 #endif
