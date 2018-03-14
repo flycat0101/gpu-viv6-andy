@@ -345,6 +345,7 @@ clfExecuteHWCopy(
         case clvCOMMAND_READ_BUFFER:
             {
                 clsCommandReadBuffer_PTR readBuffer = gcvNULL;
+                gctPOINTER      src = gcvNULL;
 
                 readBuffer  = &Command->u.readBuffer;
                 srcBuffer = readBuffer->buffer;
@@ -355,13 +356,16 @@ clfExecuteHWCopy(
                 srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + readBuffer->offset;
                 gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
 
-                /* flush and invalid user ptr cache */
-                gcoCL_FlushMemory(gcvNULL, readBuffer->ptr, size);
+                src = (gctPOINTER) (gcmPTR2INT(srcBuffer->u.buffer.logical) + readBuffer->offset);
+                if (src == readBuffer->ptr)
+                {
+                    EVENT_SET_GPU_RUNNING(Command, engine);
+                    gcoCL_InvalidateMemoryCache(gcvNULL, readBuffer->ptr, size);
+                    return gcvSTATUS_OK;
+                }
 
                 gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
-
-                EVENT_SET_GPU_RUNNING(Command, engine);
-                gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
+                gcoCL_FlushMemory(gcvNULL, (gctPOINTER)readBuffer->ptr, size);
             }
             break;
 
@@ -373,70 +377,20 @@ clfExecuteHWCopy(
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
 
-                /*src address */
-                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+                gcoCL_FlushMemory(gcvNULL, (gctPOINTER)writeBuffer->ptr, size);
+
+                logical = (gctPOINTER) (gcmPTR2INT(dstBuffer->u.buffer.logical) + writeBuffer->offset);
+                if (logical == writeBuffer->ptr)
                 {
-                    gctPHYS_ADDR physical = 0;
-                    gctUINT   bytes = dstBuffer->u.buffer.allocatedSize;
-
-                    if(dstBuffer->tmpNode)
-                    {
-                        gctUINT32 physical;
-
-                        gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
-                        gcoCL_FreeMemory((gctPHYS_ADDR)(gctUINTPTR_T) physical,
-                                         (gctPOINTER)dstBuffer->tmpNode->logical,
-                                         dstBuffer->u.buffer.allocatedSize,
-                                         dstBuffer->tmpNode
-                                         );
-
-                        dstBuffer->tmpNode = gcvNULL;
-                    }
-
-                    gcmONERROR(gcoCL_AllocateMemory(&bytes,
-                                                    &physical,
-                                                    &logical,
-                                                    &dstBuffer->tmpNode,
-                                                    0));
-                }
-                else
-                {
-                    if(dstBuffer->tmpNode == gcvNULL)
-                    {
-                        gctUINT         bytes = dstBuffer->u.buffer.allocatedSize;
-                        gctPHYS_ADDR    physical = 0;
-
-                        gcmONERROR(gcoCL_AllocateMemory(&bytes,
-                                                        &physical,
-                                                        &logical,
-                                                        &dstBuffer->tmpNode,
-                                                        0));
-                    }
-
-                    gcoCL_MemWaitAndGetFence(dstBuffer->tmpNode, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_READ);
+                    EVENT_SET_CPU_RUNNING(Command);
+                    return gcvSTATUS_OK;
                 }
 
-                /*Src address */
-                gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&srcPhysical,gcvNULL, gcvNULL, gcvNULL);
-                logical = dstBuffer->tmpNode->logical;
-                gcoOS_MemCopy(logical,writeBuffer->ptr,writeBuffer->cb);
-
-                gcmDUMP_BUFFER(gcvNULL,
-                               "memory",
-                               gcmPTR2INT(srcPhysical),
-                               (gctPOINTER)writeBuffer->ptr,
-                               0,
-                               writeBuffer->cb);
+                gcmONERROR(gcoCL_WrapUserMemory((gctPOINTER)writeBuffer->ptr, size, gcvFALSE, &srcPhysical, &node));
 
                 /* dst address */
                 dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + writeBuffer->offset;
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine);
-                EVENT_SET_GPU_RUNNING(Command, engine);
-
-                node0 = dstBuffer->u.buffer.node;
-                node1 = dstBuffer->tmpNode;
-                gcoCL_MemWaitAndGetFence(node0, engine, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
-                gcoCL_MemWaitAndGetFence(node1, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_READ);
             }
             break;
 
@@ -456,18 +410,19 @@ clfExecuteHWCopy(
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine2);
 
                 engine = PRIORITY_ENGINE(engine1, engine2);
-                EVENT_SET_GPU_RUNNING(Command, engine);
 
                 node0 = srcBuffer->u.buffer.node;
                 node1 = dstBuffer->u.buffer.node;
-                gcoCL_MemWaitAndGetFence(node0, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
-                gcoCL_MemWaitAndGetFence(node1, engine, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_WRITE);
+                gcsSURF_NODE_GetFence(node0, engine, gcvFENCE_TYPE_READ);
+                gcsSURF_NODE_GetFence(node1, engine, gcvFENCE_TYPE_WRITE);
             }
             break;
 
         default:
             gcmONERROR(gcvSTATUS_INVALID_OBJECT);
     }
+
+    EVENT_SET_GPU_RUNNING(Command, engine);
 
     gcmONERROR(gcoCL_MemBltCopy(srcPhysical, dstPhysical, size, engine));
 
@@ -501,8 +456,12 @@ clfExecuteCommandReadBuffer(
 
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
-    /* Tmp disable HW copy for read buffer before resolve wrap node issue */
-    hwCopy = gcvFALSE;
+    /* Need align with cortex-a53/72 cache line size */
+    if ((gcmPTR2INT(readBuffer->ptr) & 0x3F)
+       || (readBuffer->cb & 0x3F))
+    {
+        hwCopy = gcvFALSE;
+    }
 
     /*Try Hardware Copy*/
     if(hwCopy)
@@ -664,7 +623,6 @@ clfExecuteCommandWriteBuffer(
     gctINT          status = CL_SUCCESS;
     gctPOINTER      logicalAddress;
     gctBOOL         hwCopy = gcvFALSE;
-    gctBOOL          fenceBack = gcvFALSE;
     gcmHEADER_ARG("Command=0x%x", Command);
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
@@ -674,23 +632,6 @@ clfExecuteCommandWriteBuffer(
     writeBuffer = &Command->u.writeBuffer;
     buffer      = writeBuffer->buffer;
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
-
-
-    fenceBack = gcoCL_MemIsFenceBack(buffer->u.buffer.node, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL)  &&
-                    gcoCL_MemIsFenceBack(buffer->u.buffer.node, gcvENGINE_BLT, gcvFENCE_TYPE_ALL);
-
-   /* HwCopy will first copy to a tmpNode and do blit ,
-     If dest Mem 's fence is back, we choose cpu copy to  reduce the bandwidth
-   */
-    if(fenceBack)
-    {
-        hwCopy = gcvFALSE;
-    }
-
-    if(buffer->flags & CL_MEM_USE_HOST_PTR)
-    {
-        hwCopy = hwCopy && (!(gcmPTR2INT(buffer->u.buffer.logical) & 0xFF));
-    }
 
      /*Try Hardware Copy*/
     if (hwCopy)
@@ -922,16 +863,6 @@ clfExecuteCommandCopyBuffer(
     copyBuffer  = &Command->u.copyBuffer;
     srcBuffer   = copyBuffer->srcBuffer;
     dstBuffer   = copyBuffer->dstBuffer;
-
-    if(srcBuffer->flags & CL_MEM_USE_HOST_PTR)
-    {
-        hwCopy = hwCopy && (!(gcmPTR2INT(srcBuffer->u.buffer.logical) & 0xFF));
-    }
-
-    if(dstBuffer->flags & CL_MEM_USE_HOST_PTR)
-    {
-        hwCopy = hwCopy && (!(gcmPTR2INT(dstBuffer->u.buffer.logical) & 0xFF));
-    }
 
     if (hwCopy)
     {
