@@ -5508,6 +5508,72 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**  gcoOS_MemoryBarrier
+**  Make sure the CPU has executed everything up to this point and the data got
+**  written to the specified pointer.
+**  ARGUMENTS:
+**
+**      gcoOS Os
+**          Pointer to gcoOS object.
+**
+**      gctPOINTER Logical
+**          Logical address to flush.
+**
+*/
+gceSTATUS
+gcoOS_MemoryBarrier(
+    IN gcoOS Os,
+    IN gctPOINTER Logical
+    )
+{
+    gcmHEADER_ARG("Logical=0x%x", Logical);
+
+#if defined(IMX) && !defined(AARCH64)
+    gcsHAL_INTERFACE iface;
+    gceSTATUS status;
+
+    gcoOS_ZeroMemory(&iface, sizeof(iface));
+
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_CACHE;
+    iface.u.Cache.operation = gcvCACHE_MEMORY_BARRIER;
+    iface.u.Cache.node = 0;
+    iface.u.Cache.logical = gcmPTR_TO_UINT64(Logical);
+    iface.u.Cache.bytes = 1;
+
+    /* Call kernel service. */
+    gcmONERROR(gcoOS_DeviceControl(
+        gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface)
+        ));
+
+#elif defined(IMX) && defined(AARCH64)
+    __asm__ __volatile__ ("dsb sy" : : : "memory");
+#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
+    __asm__ __volatile__ ("dsb" : : : "memory");
+    /*
+     * As recommended by TI, in order to push the stale data out
+     * we need to have strongly ordered access between dsb and isb
+     */
+    *(volatile unsigned *)Address = *(volatile unsigned *)Address;
+    __asm__ __volatile__ ("isb" : : : "memory");
+#endif
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+#if defined(IMX) && !defined(AARCH64)
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+#endif
+}
+
 /*----------------------------------------------------------------------------*/
 /*----- Profiling ------------------------------------------------------------*/
 /*----------------------------------------------------------------------------*/
