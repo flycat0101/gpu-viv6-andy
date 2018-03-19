@@ -22,6 +22,8 @@
 #define MAP_TO_DEVICE 0
 #endif
 
+#define HW_COPY_SIZE  8092
+
 #if cldTUNING
 void clfSortHaarRects(gctPOINTER Destination, gctPOINTER Source, gctSIZE_T Size)
 {
@@ -458,6 +460,7 @@ clfExecuteCommandReadBuffer(
 
     /* Need align with cortex-a53/72 cache line size */
     if ((gcmPTR2INT(readBuffer->ptr) & 0x3F)
+       || (readBuffer->cb < HW_COPY_SIZE)
        || (readBuffer->cb & 0x3F))
     {
         hwCopy = gcvFALSE;
@@ -632,6 +635,11 @@ clfExecuteCommandWriteBuffer(
     writeBuffer = &Command->u.writeBuffer;
     buffer      = writeBuffer->buffer;
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
+
+    if (writeBuffer->cb < HW_COPY_SIZE)
+    {
+        hwCopy = gcvFALSE;
+    }
 
      /*Try Hardware Copy*/
     if (hwCopy)
@@ -863,6 +871,11 @@ clfExecuteCommandCopyBuffer(
     copyBuffer  = &Command->u.copyBuffer;
     srcBuffer   = copyBuffer->srcBuffer;
     dstBuffer   = copyBuffer->dstBuffer;
+
+    if (copyBuffer->cb < HW_COPY_SIZE)
+    {
+        hwCopy = gcvFALSE;
+    }
 
     if (hwCopy)
     {
