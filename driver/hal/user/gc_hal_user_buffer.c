@@ -1283,7 +1283,7 @@ gcoBufferCommitWorker(
                                     currWorker->contexts,
                                     currWorker->queue);
 
-            if (currWorker->stateDelta && !currWorker->emptyBuffer)
+            if ((currWorker->hardwareType != gcvHARDWARE_2D) && currWorker->stateDelta && !currWorker->emptyBuffer)
             {
                 if (deltaWorker->stateDelta == gcvNULL)
                 {
