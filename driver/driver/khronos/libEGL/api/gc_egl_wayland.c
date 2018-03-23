@@ -1242,6 +1242,14 @@ _BindWindow(
         do
         {
             EGLBoolean formatSupported = EGL_FALSE;
+            gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+
+            gcoHAL_GetHardwareType(gcvNULL, &hwType);
+            if (hwType == gcvHARDWARE_VG)
+            {
+                /* 2D VG does not support direct rendering */
+                break;
+            }
 
             if (Surface->config.samples > 1)
             {
@@ -1647,8 +1655,11 @@ _SynchronousPost(
     )
 {
     struct wl_egl_window *window = Surface->hwnd;
+    gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
-    if (window->nr_buffers == 1)
+    gcoHAL_GetHardwareType(gcvNULL, &hwType);
+
+    if (window->nr_buffers == 1 || hwType == gcvHARDWARE_VG)
     {
         return EGL_TRUE;
     }
