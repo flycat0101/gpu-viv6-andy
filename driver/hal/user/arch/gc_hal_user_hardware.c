@@ -3824,6 +3824,13 @@ gcoHARDWARE_DetectProcess(
             gcvFALSE
         },
         {
+            gcvPATCH_ANDROID_CTS_OPENGLPERF,
+            /* android.openglperf.cts */
+            "\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x90\x8f\x9a\x91\x98\x93\x8f\x9a"
+            "\x8d\x99\xd1\x9c\x8b\x8c",
+            gcvFALSE
+        },
+        {
             gcvPATCH_ANDROID_CTS_MEDIA,
             /* "com.android.cts.media" */
             "\x9c\x90\x92\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x9c\x8b\x8c\xd1"
