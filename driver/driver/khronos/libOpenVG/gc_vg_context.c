@@ -1004,6 +1004,13 @@ veglSetContext(
 #endif
             }
 
+            /*Destroy the vg target */
+#if gcdGC355_PROFILER
+            gcoVG_SetTarget(thread->context->vg, 0, 0, 0, gcvNULL, gcvORIENTATION_TOP_BOTTOM);
+#else
+            gcoVG_SetTarget(thread->context->vg, gcvNULL, gcvORIENTATION_TOP_BOTTOM);
+#endif
+
             /* Reset the context. */
             thread->context = gcvNULL;
         }
