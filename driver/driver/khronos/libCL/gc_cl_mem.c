@@ -3071,6 +3071,8 @@ clCreateBuffer(
                     (chipModel == gcv3000 && (chipRevision != 0x5514 && chipRevision != 0x5451));
 
     if ((Flags & CL_MEM_USE_HOST_PTR)
+         /* Size must be aligned with cortex-A53/72 cache line if hostptr is cacheable */
+         && ((!(Size & 0x3F)) || (Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV))
          && !(gcmPTR2INT(HostPtr) & 0x3F)
          && !disableByChip)
     {
