@@ -32,14 +32,14 @@ LOCAL_CFLAGS := \
     -DLOG_TAG=\"gralloc-adp\"
 
 LOCAL_C_INCLUDES := \
-    external/libdrm/vivante \
-    external/libdrm/include/drm \
+    $(IMX_PATH)/libdrm-imx/vivante \
+    $(IMX_PATH)/libdrm-imx/include/drm \
     external/drm_gralloc
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
-    libdrm \
+    libdrm_android \
     libdrm_vivante \
     libgralloc_drm
 
@@ -55,13 +55,13 @@ LOCAL_CFLAGS := \
     -DLOG_TAG=\"gralloc-viv\"
 
 LOCAL_C_INCLUDES := \
-    external/libdrm/vivante \
-    external/libdrm/include/drm
+    $(IMX_PATH)/libdrm-imx/vivante \
+    $(IMX_PATH)/libdrm-imx/include/drm \
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
-    libdrm \
+    libdrm_android \
     libdrm_vivante
 
 endif

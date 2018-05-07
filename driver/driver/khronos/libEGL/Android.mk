@@ -82,12 +82,12 @@ endif
 
 ifeq ($(DRM_GRALLOC),1)
 LOCAL_C_INCLUDES += \
-	external/libdrm/vivante \
-	external/libdrm/include/drm \
+	$(IMX_PATH)/libdrm-imx/vivante \
+	$(IMX_PATH)/libdrm-imx/include/drm \
 	$(AQROOT)/driver/android/gralloc_drm
 
 LOCAL_SHARED_LIBRARIES += \
-	libdrm \
+	libdrm_android \
 	libdrm_vivante
 
 LOCAL_CFLAGS += \
