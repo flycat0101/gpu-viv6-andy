@@ -697,6 +697,7 @@ gckGALDEVICE_Construct(
     device->args = *Args;
 
     gckDEBUGFS_Initialize(device);
+    resource_manager_init(device);
 
     if (IrqLine != -1)
     {
@@ -1216,6 +1217,7 @@ gckGALDEVICE_Destroy(
         gcmkVERIFY_OK(gckOS_Destroy(Device->os));
 
         gckDEBUGFS_Terminate();
+	resource_manager_exit();
 
         free(Device);
     }

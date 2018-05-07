@@ -43,6 +43,9 @@ SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_qnx.o
 SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_device.o
 SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_math.o
 SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_debugfs.o
+SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_resource_manager_buf.o
+SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_resource_manager_info.o
+SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/kernel/gc_hal_kernel_resource_manager.o
 EXTRA_SRCVPATH += $(driver_root)/hal/os/qnx/kernel
 
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
