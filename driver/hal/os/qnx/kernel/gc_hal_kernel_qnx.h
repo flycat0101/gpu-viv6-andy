@@ -37,7 +37,6 @@
 #include "gc_hal_kernel.h"
 #include "gc_hal_kernel_device.h"
 #include "gc_hal_kernel_os.h"
-#include "gc_hal_kernel_debugfs.h"
 #include "gc_hal_kernel_resource_manager.h"
 #include "gc_hal_kernel_buffer.h"
 #include "../inc/gc_hal_common_qnx.h"
