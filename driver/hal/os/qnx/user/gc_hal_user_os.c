@@ -1242,8 +1242,15 @@ gcoOS_GetTLS(
 
         gcoOS_ZeroMemory(tls, gcmSIZEOF(gcsTLS));
 
-        /* The default hardware type is 2D */
-        tls->currentType = gcvHARDWARE_2D;
+
+        /* Assign default hardware type. */
+        if (gcPLS.hal)
+        {
+            tls->currentType = gcPLS.hal->defaultHwType;
+        } else {
+            /* The default hardware type is 2D */
+            tls->currentType = gcvHARDWARE_2D;
+        }
 
         res = pthread_setspecific(gcProcessKey, tls);
 
