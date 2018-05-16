@@ -114,6 +114,7 @@ endif
 LOCAL_MODULE         := libEGL_$(GPU_VENDOR)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

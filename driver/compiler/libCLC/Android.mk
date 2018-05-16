@@ -26,6 +26,7 @@ LOCAL_MODULE         := libCLC
 LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_PREBUILT)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -38,6 +39,7 @@ LOCAL_MODULE         := libLLVM_viv
 LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_PREBUILT)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -66,6 +68,7 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_MODULE         := libclCommon
 LOCAL_MODULE_TAGS    := optional
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -111,6 +114,7 @@ endif
 
 LOCAL_MODULE         := libclCompiler
 LOCAL_MODULE_TAGS    := optional
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -152,6 +156,7 @@ endif
 
 LOCAL_MODULE         := libclPreprocessor
 LOCAL_MODULE_TAGS    := optional
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -340,6 +345,7 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_MODULE         := libLLVM_viv
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -392,6 +398,7 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_MODULE         := libCLC
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

@@ -52,6 +52,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_MODULE         := libv_gralloc
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_STATIC_LIBRARY)
 
 
@@ -105,6 +106,7 @@ endif
 LOCAL_MODULE         := gralloc_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

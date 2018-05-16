@@ -73,5 +73,6 @@ endif
 LOCAL_MODULE         := hwcomposer_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 

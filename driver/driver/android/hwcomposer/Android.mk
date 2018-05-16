@@ -60,6 +60,7 @@ LOCAL_MODULE         := hwcomposer_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_PATH    := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

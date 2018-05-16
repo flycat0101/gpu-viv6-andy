@@ -126,6 +126,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -155,6 +156,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE         := libOpenVXU
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -201,6 +203,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE         := libOpenVXC
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

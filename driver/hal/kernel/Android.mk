@@ -63,6 +63,7 @@ LOCAL_MODULE_SUFFIX := .ko
 LOCAL_MODULE_TAGS   := optional
 LOCAL_MODULE_CLASS  := SHARED_LIBRARIES
 LOCAL_STRIP_MODULE  := false
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_PREBUILT)
 
 include $(AQROOT)/copy_installed_module.mk

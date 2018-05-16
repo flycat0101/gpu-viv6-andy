@@ -38,5 +38,6 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_MODULE         := libhalarchuser_vg
 LOCAL_MODULE_TAGS    := optional
+LOCAL_VENDOR_MODULE  := true
 include $(BUILD_STATIC_LIBRARY)
 

@@ -37,10 +37,10 @@ LOCAL_SHARED_LIBRARIES := \
     liblog
 
 LOCAL_MODULE_RELATIVE_PATH := hw
-LOCAL_PROPRIETARY_MODULE   := false
 
 LOCAL_MODULE               := vulkan.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS          := optional
 LOCAL_PRELINK_MODULE       := false
+LOCAL_VENDOR_MODULE        := true
 include $(BUILD_SHARED_LIBRARY)
 
