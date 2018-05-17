@@ -17,11 +17,7 @@
 #define __NEXT_MSG_ID__     004068
 
 #if (defined(UNDER_CE) || defined(__QNXNTO__) || defined(LINUX))
-#if (0 || defined(ANDROID))
-#define MAP_TO_DEVICE 0
-#else
 #define MAP_TO_DEVICE 1
-#endif
 #else
 #define MAP_TO_DEVICE 0
 #endif
