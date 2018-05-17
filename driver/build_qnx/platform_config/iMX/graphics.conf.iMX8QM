@@ -7,115 +7,111 @@ begin khronos
     vg-dlls = libGAL.so libEGL_viv.so libOpenVG_viv.so
     glesv2-sc-dlls = libGLSLC.so
     gpu-dlls = libGalcore.so
+
   end egl display
 
   begin wfd device 1
-    # Choose ONE wfd-dlls line that matches your hardware.
+   # Choose ONE wfd-dlls line that matches your hardware.
 
-    # iMX8DV CPU board - HDMI display using SiI9022A/IT6263 converter chips
-    wfd-dlls = libwfdcfg-imx8dv-hdmi-sii9022a.so libWFDimx8dpu.so
+   # iMX8QM CPU board - HDMI display using IT6263 converter chips
+   wfd-dlls = libwfdcfg-imx-it6263-adv7535.so libWFDimx8dpu.so
+# Display output setting.
+# Each DPU can provide output for up to two displays.
+# Use these options to enable/disable selected ports.
+# Only enabled output ports can be used by the Screen graphic subsystem.
+# Possible values for port configuration:
+#        0 .. port disabled
+#        1 .. port enabled
+# Setting for WFD port 1 (DPU0/HDMI)
+  wfd-port-dpu0-hdmi = 0
+# Setting for WFD port 2 (DPU0/LVDS)
+  wfd-port-dpu0-lvds = 1
+# Setting for WFD port 3 (DPU0/MIPI)
+  wfd-port-dpu0-mipi = 1
+# Setting for WFD port 4 (DPU1/LVDS)
+  wfd-port-dpu1-lvds = 1
+# Setting for WFD port 5 (DPU1/MIPI)
+  wfd-port-dpu1-mipi = 1
+  
+# Information about the gpu cores of the iMX8QM chip. 
+# These values are used by the gpu driver during driver initialization.
+  device-base-address = 2147483648
+  gpu-physBase        = 2147483648
+  gpu-physSize        = 2147483648
+  gpu-gpuProfiler     = 0
+  gpu-powerManagement = 0
+  gpu-irq-3D          = 96
+  gpu-reg-base-3D     = 1393557504
+  gpu-reg-size-3D     = 262144
+  gpu-irq-3D1         = 97
+  gpu-reg-base-3D1    = 1410334720
+  gpu-reg-size-3D1    = 262144
+  hasPL310            = 0
 
-    # Display output setting.
-    # Each DPU has two outputs. These outputs are connected
-    # directly to an output port. Only enabled output ports
-    # can be used.
-    # Use 1 to enable port, 0 to disable port.
-    # WFD port 1 - DPU0/LCD
-    wfd-port-dpu0-lcd = 1
-    # WFD port 2 - DPU0/LVDS
-    wfd-port-dpu0-lvds = 0
-    # WFD port 3 - DPU1/LVDS0
-    wfd-port-dpu1-lvds0 = 0
-    # WFD port 4 - DPU1/LVDS1
-    wfd-port-dpu1-lvds1 = 0
+# Enable monitoring GPU h/w status and set report interval.
+# The following information is reported at given interval (in seconds)
+# irq count
+# message count (at kernel side)
+# h/w status registers
+   # gpu-heartbeat-interval = 10
 
-    # enable monitoring GPU h/w status and set report interval
-    # the following information is reported at given interval (in seconds)
-    # irq count
-    # message count (at kernel side)
-    # h/w status registers
-    # gpu-heartbeat-interval = 10
+# GPU driver contiguous memory pool sizes in MB
+# Large values have better performance but longer startup time.
+# Small values have a variety of performance impacts at run time.
+   # gpu-contiguousMB   = 238   # maximum (254 - internalPoolMB)
+   gpu-contiguousMB   = 64      # recommended
+   # gpu-contiguousMB   = 2     # minimum
 
-    # GPU driver contiguous memory pool sizes in MB
-    # Large values have better performance but longer startup time.
-    # Small values have a variety of performance impacts at run time.
-    # gpu-contiguousMB   = 238   # maximum (254 - internalPoolMB)
-    gpu-contiguousMB   = 64      # recommended
-    # gpu-contiguousMB   = 2     # minimum
+# Other memory pools (no need to change these)
+   gpu-internalPoolMB = 16
+   gpu-sharedPoolMB   = 2
 
-    # Other memory pools (no need to change these)
-    gpu-internalPoolMB = 16
-    gpu-sharedPoolMB   = 2
+# Use only the contiguous memory pool (for debugging).
+# true means no virtual memory allocations.
+# false means that additional virtual memory will be allocated when
+# the contiguous pool is full.
+  gpu-contiguousOnly = false
 
-    # ===============================================================================
+# Abort when GPU contiguous memory exhausted instead of allocating
+# additional virtual memory (for debugging).  Default is off.
+# DO NOT ENABLE THIS.
+  # gpu-contiguousAbort = true
 
-    device-base-address = 2147483648
+# Report GPU contiguous memory usage statistics (current and minimum
+# free space) to slog every N seconds.  A value of 0 disables this feature.
+# Also logs when a new minimum level of free space is reached.  Default 0.
+  # gpu-slogUsageInterval = 10
 
-    gpu-physBase        = 2147483648
-    gpu-physSize        = 2147483648
-    gpu-gpuProfiler     = 0
-    gpu-powerManagement = 0
+# GPU power management:  If enabled, the GPU will control GPU power
+# at the PMU according to GPU load.  If disabled, the driver will
+# assume GPU power is already on, and will fail if it is not (e.g.
+# because u-boot disabled GPU at startup).  Default false.
+   gpu-pm-enable = true
 
-    gpu-irq-3D          = 96
-    gpu-reg-base-3D     = 1393557504
-    gpu-reg-size-3D     = 262144
+# Limit power management to "power on" only.  The GPU driver will
+# complete the GPU power-on sequence, but will not power off.
+# If the VPU is in use this option must be enabled because the
+# GPU and VPU share a power supply.  Default false.
+   gpu-pm-force-power-on = true
 
-    gpu-irq-3D1         = 97
-    gpu-reg-base-3D1    = 1410334720
-    gpu-reg-size-3D1    = 262144
+# GPU power management:  If enabled (1), the GPU will control GPU power
+# states internal to the GPU core according to GPU load.  Default 0.
+# Cannot be enabled when using GPU profiling.
+   gpu-powerManagement = 0
 
-    hasPL310            = 0
-
-    # ===============================================================================
-
-
-    # Use only the contiguous memory pool (for debugging).
-    # true means no virtual memory allocations.
-    # false means that additional virtual memory will be allocated when
-    # the contiguous pool is full.
-    gpu-contiguousOnly = false
-
-    # Abort when GPU contiguous memory exhausted instead of allocating
-    # additional virtual memory (for debugging).  Default is off.
-    # DO NOT ENABLE THIS.
-    # gpu-contiguousAbort = true
-
-    # Report GPU contiguous memory usage statistics (current and minimum
-    # free space) to slog every N seconds.  A value of 0 disables this feature.
-    # Also logs when a new minimum level of free space is reached.  Default 0.
-    # gpu-slogUsageInterval = 10
-
-    # GPU power management:  If enabled, the GPU will control GPU power
-    # at the PMU according to GPU load.  If disabled, the driver will
-    # assume GPU power is already on, and will fail if it is not (e.g.
-    # because u-boot disabled GPU at startup).  Default false.
-    gpu-pm-enable = true
-
-    # Limit power management to "power on" only.  The GPU driver will
-    # complete the GPU power-on sequence, but will not power off.
-    # If the VPU is in use this option must be enabled because the
-    # GPU and VPU share a power supply.  Default false.
-    gpu-pm-force-power-on = true
-
-    # GPU power management:  If enabled (1), the GPU will control GPU power
-    # states internal to the GPU core according to GPU load.  Default 0.
-    # Cannot be enabled when using GPU profiling.
-    gpu-powerManagement = 0
-
-    # Options to control what debug build of driver writes to slog
-    debug-alloc = 0      # Logs memory allocations
-    debug-buffer = 0     # Logs first 8 words of each buffer
-    debug-cscgamma = 0   # Logs CSC/Gamma correction activity
-    debug-dpu = 0        # Logs DPU activity (except pipeline and port)
-    debug-isr = 0        # Logs IRQ statistics
-    debug-lvds = 0       # Logs LVDS and LDB setup
-    debug-mipi = 0       # Logs LVDS and LDB setup
-    debug-pipeline = 0   # Logs pipeline activity
-    debug-port = 0       # Logs port activity
-    debug-register = 0   # Logs register activity to tracelog (not slog!)
-    debug-resize = 0     # Logs resizer (IPU IC PP) activity
-    debug-trace = 0      # Logs entry into each WFD function
-    debug-misc = 0       # Logs everything else
+# Options to control what debug build of driver writes to slog
+   debug-alloc = 0      # Logs memory allocations
+   debug-buffer = 0     # Logs first 8 words of each buffer
+   debug-cscgamma = 0   # Logs CSC/Gamma correction activity
+   debug-dpu = 0        # Logs DPU activity (except pipeline and port)
+   debug-isr = 0        # Logs IRQ statistics
+   debug-lvds = 0       # Logs LVDS and LDB setup
+   debug-mipi = 0       # Logs MIPI  setup
+   debug-pipeline = 0   # Logs pipeline activity
+   debug-port = 0       # Logs port activity
+   debug-register = 0   # Logs register activity to tracelog (not slog!)
+   debug-trace = 0      # Logs entry into each WFD function
+   debug-misc = 0       # Logs everything else
 
   end wfd device
 
@@ -124,7 +120,6 @@ end khronos
 begin winmgr
   begin globals
     blit-config = vivante
-    # blit-config = sw
     blits-logsize = 4096
   end globals
 
@@ -138,71 +133,91 @@ begin winmgr
     # video-mode = 1920 x 1080 @ 60
     # video-mode = 1920 x 720 @ 60
     # video-mode = 1280 x 1024 @ 75
-    # video-mode = 1280 x 1024 @ 75
+    # video-mode = 1280 x 1024 @ 60
     # video-mode = 1280 x 720 @ 60
     # video-mode = 1152 x 864 @ 75
-    #  video-mode = 1024 x 768 @ 75
-    video-mode = 1024 x 768 @ 60
+    # video-mode = 1024 x 768 @ 75
+     video-mode = 1024 x 768 @ 60
     # video-mode = 800 x 600 @ 75
     # video-mode = 800 x 600 @ 60
     # video-mode = 640 x 480 @ 75
     # video-mode = 640 x 480 @ 60
     # video-mode = 720 x 400 @ 70
-    background = 0xF0FFF0
+
   end display
 
   begin display 2
     video-mode = 1920 x 1080 @ 60
-    video-mode = 1024 x 768 @ 60
   end display
-
+  
   begin display 3
+    # Modes supported by mipi-dsi module
     video-mode = 1920 x 1080 @ 60
-    video-mode = 1024 x 768 @ 60
+    # video-mode = 1280 x 1024 @ 60
+    # video-mode = 1280 x 1024 @ 75
+    # video-mode = 1152 x 864 @ 75
+    # video-mode = 800 x 600 @ 75
+    # video-mode = 640 x 480 @ 75
   end display
-
+  
   begin display 4
     video-mode = 1920 x 1080 @ 60
-    video-mode = 1024 x 768 @ 60
   end display
 
+  begin display 5
+    # Modes supported by mipi-dsi module
+    video-mode = 1920 x 1080 @ 60
+    # video-mode = 1280 x 1024 @ 60
+    # video-mode = 1280 x 1024 @ 75
+    # video-mode = 1152 x 864 @ 75
+    # video-mode = 800 x 600 @ 75
+    # video-mode = 640 x 480 @ 75
+  end display
+  
+  
   begin class framebuffer
     display = internal
-    pipeline = 3
+    pipeline = 2
     format = rgba8888
     usage = vivante
-    # usage = sw
   end class
 
   # For display #2
   begin class framebuffer2
     display = 2
+    pipeline = 4
+    format = rgba8888
+    usage = vivante
+  end class
+  
+  # For display #3
+  begin class framebuffer3
+    display = 3
+    pipeline = 2
+    format = rgba8888
+    usage = vivante
+  end class
+  
+  # For display #4
+  begin class framebuffer4
+    display = 4
+    pipeline = 8
+    format = rgba8888
+    usage = vivante
+  end class
+
+  # For display #5
+  begin class framebuffer5
+    display = 5
     pipeline = 6
     format = rgba8888
     usage = vivante
   end class
 
-  # For display #3
-  begin class framebuffer3
-    display = 3
-    pipeline = 9
-    format = rgba8888
-    usage = vivante
-  end class
-
-  # For display #4
-  begin class framebuffer4
-    display = 4
-    pipeline = 12
-    format = rgba8888
-    usage = vivante
-  end class
-
-# begin mtouch
-# Choose ONE of the different mtouch drivers available
-#    driver =  egalax
-#    driver =  devi
-#    driver =  focaltech
-# end mtouch
+begin mtouch
+    driver = devi
+    options = height=1080,width=1920
+    display=1
+end mtouch
 
 end winmgr
