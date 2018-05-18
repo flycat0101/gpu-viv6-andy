@@ -37,7 +37,7 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
-#define GC_WL_MAX_SWAP_INTERVAL     10
+#define GC_WL_MAX_SWAP_INTERVAL     1
 #define GC_WL_MIN_SWAP_INTERVAL     0
 
 #define WL_EGL_NUM_BACKBUFFERS          3
