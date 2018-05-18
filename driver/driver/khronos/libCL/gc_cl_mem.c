@@ -361,13 +361,12 @@ clfExecuteHWCopy(
                 src = (gctPOINTER) (gcmPTR2INT(srcBuffer->u.buffer.logical) + readBuffer->offset);
                 if (src == readBuffer->ptr)
                 {
-                    EVENT_SET_GPU_RUNNING(Command, engine);
-                    gcoCL_InvalidateMemoryCache(gcvNULL, readBuffer->ptr, size);
+                    EVENT_SET_CPU_RUNNING(Command);
                     return gcvSTATUS_OK;
                 }
 
                 gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
-                gcoCL_FlushMemory(gcvNULL, (gctPOINTER)readBuffer->ptr, size);
+                gcsSURF_NODE_GetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ);
             }
             break;
 
@@ -393,6 +392,8 @@ clfExecuteHWCopy(
                 /* dst address */
                 dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + writeBuffer->offset;
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine);
+
+                gcsSURF_NODE_GetFence(dstBuffer->u.buffer.node, engine, gcvFENCE_TYPE_WRITE);
             }
             break;
 
@@ -472,6 +473,12 @@ clfExecuteCommandReadBuffer(
         if (gcmIS_ERROR(clfExecuteHWCopy(Command)))
         {
             hwCopy = gcvFALSE;
+        }
+        else
+        {
+            /* need wait for fence before invalidate cpu cache */
+            gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_ALL);
+            gcoCL_InvalidateMemoryCache(gcvNULL, readBuffer->ptr, readBuffer->cb);
         }
     }
 
