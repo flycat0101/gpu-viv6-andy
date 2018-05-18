@@ -843,6 +843,8 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     egl_surface->indequeue = 0;
     buffer->state = BUFFER_STATE_DEQUEUED;
+    window->attached_width  = window->width;
+    window->attached_height = window->height;
     return buffer;
 }
 
@@ -2223,6 +2225,9 @@ struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window)
     egl_surface->type   = gcvSURF_BITMAP;
     egl_surface->swap_interval = 1;
     egl_surface->commit_signal = 1;
+
+    window->attached_width  = window->width;
+    window->attached_height = window->height;
 
     pthread_mutex_init(&egl_surface->commit_mutex, NULL);
 
