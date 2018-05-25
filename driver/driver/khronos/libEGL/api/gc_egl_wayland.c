@@ -50,7 +50,6 @@ struct wl_egl_display
     struct wl_viv * wl_viv;
     struct wl_registry * registry;
     struct wl_event_queue * wl_queue;
-    struct wl_event_queue * commit_queue;
 };
 
 struct wl_egl_surface
@@ -76,8 +75,10 @@ struct wl_egl_surface
     /* number of buffers can commit to compositor. */
     int32_t commit_signal;
     pthread_mutex_t commit_mutex;
+    struct wl_event_queue * commit_queue;
 
     struct wl_surface * wl_surface_wrapper;
+    struct wl_display * wl_dpy_wrapper;
     struct wl_list link;
 };
 
@@ -321,7 +322,6 @@ wl_egl_display_create(struct wl_display *wl_dpy)
 
     display->wl_dpy   = wl_dpy;
     display->wl_queue = wl_display_create_queue(wl_dpy);
-    display->commit_queue = wl_display_create_queue(wl_dpy);
     display->registry = wl_display_get_registry(wl_dpy);
 
     wl_proxy_set_queue((struct wl_proxy *)display->registry, display->wl_queue);
@@ -368,7 +368,7 @@ wl_egl_display_destroy(struct wl_egl_display *display)
                 pthread_mutex_lock(&egl_surface->commit_mutex);
                 while (buffer->frame_callback && ret != -1)
                 {
-                    ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+                    ret = dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
                 }
                 pthread_mutex_unlock(&egl_surface->commit_mutex);
             }
@@ -380,13 +380,10 @@ wl_egl_display_destroy(struct wl_egl_display *display)
     pthread_mutex_unlock(&egl_window_mutex);
 
     roundtrip_queue(display->wl_dpy, display->wl_queue);
-    roundtrip_queue(display->wl_dpy, display->commit_queue);
 
     wl_registry_destroy(display->registry);
     wl_viv_destroy(display->wl_viv);
     wl_event_queue_destroy(display->wl_queue);
-
-    wl_event_queue_destroy(display->commit_queue);
 
     free(display);
 }
@@ -897,7 +894,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     struct wl_egl_surface *egl_surface = window->driver_private;
     struct wl_egl_display *display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
-    struct wl_event_queue *commit_queue = display->commit_queue;
+    struct wl_event_queue *commit_queue = egl_surface->commit_queue;
     int x, y, width, height;
     int ret = 0;
 
@@ -907,7 +904,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     /* Make sure previous frame with this buffer is done. */
     while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+        ret = dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -1154,7 +1151,7 @@ _SetSwapInterval(
 /******************************************************************************/
 /* Window. */
 
-struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window);
+struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window,  struct wl_egl_display * display);
 
 static EGLBoolean
 _ConnectWindow(
@@ -1173,10 +1170,10 @@ _ConnectWindow(
     egl_surface = window->driver_private;
     if(egl_surface == gcvNULL)
     {
-        egl_surface = wl_egl_surface_create(window);
+        egl_surface = wl_egl_surface_create(window, Display->localInfo);
     }
-    egl_surface->display = Display->localInfo;
 
+    gcmASSERT(egl_surface != gcvNULL);
     gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
     wl_egl_window_set_format(window, gcvSURF_BITMAP, Surface->renderTargetFormat);
 
@@ -2090,7 +2087,7 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
             pthread_mutex_lock(&egl_surface->commit_mutex);
             while (buffer->frame_callback && ret != -1)
             {
-                ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+                ret = dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
             }
             pthread_mutex_unlock(&egl_surface->commit_mutex);
         }
@@ -2108,6 +2105,7 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
     egl_surface->signature = 0;
 
     wl_proxy_wrapper_destroy(egl_surface->wl_surface_wrapper);
+    wl_proxy_wrapper_destroy(egl_surface->wl_dpy_wrapper);
     pthread_mutex_destroy(&egl_surface->commit_mutex);
 
     free(egl_surface);
@@ -2197,7 +2195,7 @@ destroy_window_callback(void *data)
 	}
 }
 
-struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window)
+struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window, struct wl_egl_display * display)
 {
     struct wl_egl_surface *egl_surface = NULL;
     char *p;
@@ -2211,8 +2209,7 @@ struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window)
     }
 
     memset(egl_surface, 0, sizeof (struct wl_egl_surface));
-    egl_surface->wl_surface_wrapper = wl_proxy_create_wrapper(window->surface);
-	egl_surface->wl_win = window;
+    egl_surface->wl_win = window;
     egl_surface->wl_win->driver_private = egl_surface;
     egl_surface->wl_win->destroy_window_callback = destroy_window_callback;
     egl_surface->wl_win->resize_callback = resize_callback;
@@ -2225,6 +2222,33 @@ struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window)
     egl_surface->type   = gcvSURF_BITMAP;
     egl_surface->swap_interval = 1;
     egl_surface->commit_signal = 1;
+    egl_surface->display = display;
+
+    egl_surface->commit_queue = wl_display_create_queue(display->wl_dpy);
+    if (!egl_surface->commit_queue)
+    {
+       gcmPRINT("wl_display_create_queue failed");
+       goto cleanup_surf;
+    }
+
+    egl_surface->wl_dpy_wrapper = wl_proxy_create_wrapper(display->wl_dpy);
+    if (!egl_surface->wl_dpy_wrapper)
+    {
+        gcmPRINT("wl_proxy_create_wrapper wl_dpy_wrapper failed");
+        goto cleanup_queue;
+    }
+    wl_proxy_set_queue((struct wl_proxy *)egl_surface->wl_dpy_wrapper,
+                      egl_surface->commit_queue);
+
+    egl_surface->wl_surface_wrapper = wl_proxy_create_wrapper(window->surface);
+
+    if (!egl_surface->wl_surface_wrapper)
+    {
+        gcmPRINT("wl_proxy_create_wrapper wl_surface_wrapper failed");
+        goto cleanup_dpy_wrapper;
+    }
+    wl_proxy_set_queue((struct wl_proxy *)egl_surface->wl_surface_wrapper,
+                      egl_surface->commit_queue);
 
     window->attached_width  = window->width;
     window->attached_height = window->height;
@@ -2260,6 +2284,15 @@ struct wl_egl_surface *wl_egl_surface_create(struct wl_egl_window *window)
     }
 
     return egl_surface;
+
+cleanup_dpy_wrapper:
+    wl_proxy_wrapper_destroy(egl_surface->wl_dpy_wrapper);
+cleanup_queue:
+    wl_event_queue_destroy(egl_surface->commit_queue);
+cleanup_surf:
+    free(egl_surface);
+
+    return NULL;
 }
 
 static int create_pixmap_content(struct wl_egl_pixmap *pixmap)
