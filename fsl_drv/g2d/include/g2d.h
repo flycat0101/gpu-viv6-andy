@@ -167,6 +167,8 @@ struct g2d_surface
 
     //rotation degree
     enum g2d_rotation rot;
+
+    int deinterlace;
 };
 
 struct g2d_surface_pair
@@ -202,6 +204,7 @@ int g2d_disable(void *handle, enum g2d_cap_mode cap);
 int g2d_cache_op(struct g2d_buf *buf, enum g2d_cache_mode op);
 struct g2d_buf *g2d_alloc(int size, int cacheable);
 struct g2d_buf *g2d_buf_from_fd(int fd);
+int g2d_buf_export_fd(struct g2d_buf *);
 struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size);
 int g2d_free(struct g2d_buf *buf);
 

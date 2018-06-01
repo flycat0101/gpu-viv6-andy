@@ -3412,6 +3412,12 @@ OnError:
     return NULL;
 }
 
+int g2d_buf_export_fd(struct g2d_buf *buf)
+{
+    return G2D_STATUS_NOT_SUPPORTED;
+}
+
+
 #if defined(LINUX)
 #if !defined(ANDROID)
 /* ------------------------
