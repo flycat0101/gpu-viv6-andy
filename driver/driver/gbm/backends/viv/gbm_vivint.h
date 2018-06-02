@@ -42,6 +42,8 @@ struct gbm_viv_bo
     uint64_t modifier;
     int32_t fd;
     int32_t ts_fd;
+
+    gcoSURF render_surface;
 };
 
 struct gbm_viv_buffer
@@ -54,7 +56,7 @@ struct gbm_viv_buffer
         FREE              /* free */
     } status;
     uint32_t               bpp;
-    gcoSURF                render_surface;
+
     struct gbm_viv_surface *surf;
 };
 

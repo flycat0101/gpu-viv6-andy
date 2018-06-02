@@ -482,12 +482,14 @@ gbm_CancelDisplayBackbuffer(
 {
     int i;
     struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) Window);
+    struct gbm_viv_bo *viv_bo = NULL;
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
 
     for (i = 0; i < surf->buffer_count; i++)
     {
-        if (surf->buffers[i].render_surface == Surface)
+        viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+        if (viv_bo->render_surface == Surface)
         {
             surf->buffers[i].status = FREE;
             break;
@@ -778,12 +780,14 @@ gbm_GetDisplayBackbufferEx(
 {
     int i;
     struct gbm_viv_surface * surf = (struct gbm_viv_surface *)Window;
+    struct gbm_viv_bo *viv_bo = NULL;
 
     for (i = 0; i < surf->buffer_count; i++)
     {
         if (surf->buffers[i].status == FREE)
         {
-            *surface = surf->buffers[i].render_surface;
+            viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+            *surface = viv_bo->render_surface;
             surf->buffers[i].status = USED_BY_EGL;
             *Offset  = 0;
             *X       = 0;
