@@ -46,6 +46,7 @@ POST_CLEAN=$(RM_HOST) $(LOCAL_INSTALL)/*$(NAME)*
 ifeq ($(CPU),aarch64)
 AARCH64 = 1
 CCFLAGS += -DAARCH64
+LIBS += stringsa64S
 endif
 
 # If GCC version 4.4/4.7 not found, we are on SDP7 (GCC 5.4+)
