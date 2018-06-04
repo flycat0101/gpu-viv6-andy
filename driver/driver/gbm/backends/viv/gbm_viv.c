@@ -564,7 +564,7 @@ create_dumb(
         gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
-    surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CMA_LIMIT);
+    surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CMA_LIMIT | gcvSURF_CACHE_MODE_128);
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
     gcmONERROR(gbm_viv_get_hal_format(format, &gc_format));
     gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_DEFAULT, &rtSurf));
