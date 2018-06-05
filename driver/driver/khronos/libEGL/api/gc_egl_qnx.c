@@ -1809,7 +1809,6 @@ _GetWindowSize(
     gceSTATUS status;
     gctINT width;
     gctINT height;
-    gceSURF_FORMAT format;
     gceSURF_TYPE   type;
 
     /* Get shortcut. */
@@ -1824,10 +1823,9 @@ _GetWindowSize(
                                    &width, &height,
                                    gcvNULL,
                                    gcvNULL,
-                                   &format,
+                                   gcvNULL,
                                    &type);
 
-    (void) format;
     (void) type;
 
     if (gcmIS_ERROR(status))

@@ -3977,47 +3977,6 @@ gckOS_CopyToUserData(
     return gcvSTATUS_OK;
 }
 
-/*******************************************************************************
-**
-**  gckOS_WriteMemory
-**
-**  Write data to a memory.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
-**      gctPOINTER Address
-**          Address of the memory to write to.
-**
-**      gctUINT32 Data
-**          Data for register.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gckOS_WriteMemory(
-    IN gckOS Os,
-    IN gctPOINTER Address,
-    IN gctUINT32 Data
-    )
-{
-    gcmkHEADER_ARG("Os=0x%X Address=0x%X Data=%u", Os, Address, Data);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_ARGUMENT(Address != gcvNULL);
-
-    /* Write memory. */
-    *(gctUINT32 *)Address = Data;
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-
 gceSTATUS
 gckOS_ReadMappedPointer(
     IN gckOS Os,

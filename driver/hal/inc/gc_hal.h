@@ -532,6 +532,20 @@ gckOS_WriteRegisterEx(
     IN gctUINT32 Data
     );
 
+#ifdef __QNXNTO__
+static gcmINLINE gceSTATUS
+gckOS_WriteMemory(
+    IN gckOS Os,
+    IN gctPOINTER Address,
+    IN gctUINT32 Data
+    )
+{
+    /* Write memory. */
+    *(gctUINT32 *)Address = Data;
+    return gcvSTATUS_OK;
+}
+
+#else
 /* Write data to a 32-bit memory location. */
 gceSTATUS
 gckOS_WriteMemory(
@@ -539,6 +553,7 @@ gckOS_WriteMemory(
     IN gctPOINTER Address,
     IN gctUINT32 Data
     );
+#endif
 
 /* Map physical memory into the process space. */
 gceSTATUS
