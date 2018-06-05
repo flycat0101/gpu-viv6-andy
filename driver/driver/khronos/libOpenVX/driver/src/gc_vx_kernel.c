@@ -2919,7 +2919,8 @@ VX_INTERNAL_API vx_bool vxoKernel_IsUnique(vx_kernel kernel)
 
     for (i = 0u; i < context->targetCount; i++)
     {
-        for (k = 0u; k < context->targetTable[i].kernelCount; k++)
+        /*[bug20118]: change to the full searching range*/
+        for (k = 0; k < VX_MAX_KERNEL_COUNT; k++)
         {
             if (context->targetTable[i].kernelTable[k].enabled
                 && context->targetTable[i].kernelTable[k].enumeration == kernel->enumeration)
@@ -3051,7 +3052,8 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnumFromTarget(vx_context context, vx_t
 
     if (target == VX_NULL || !target->enabled) return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
 
-    for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
+    /*[bug20118]: change to the full searching range*/
+    for (kernelIndex = 0; kernelIndex < VX_MAX_KERNEL_COUNT; kernelIndex++)
     {
         if (target->kernelTable[kernelIndex].enumeration == kernelEnum)
         {

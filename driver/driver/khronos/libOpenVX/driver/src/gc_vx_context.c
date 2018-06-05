@@ -1165,12 +1165,15 @@ VX_PRIVATE_API void vxoContext_GetUniqueKernelTable(vx_context context, OUT vx_k
 
     for (targetIndex = 0; targetIndex < context->targetCount; targetIndex++)
     {
-        vx_target target = &context->targetTable[targetIndex];
-
-        for (kernelndex = 0; kernelndex < target->kernelCount; kernelndex++)
+        /*[bug20118]: change to the full searching range*/
+        for (kernelndex = 0; kernelndex < VX_MAX_KERNEL_COUNT; kernelndex++)
         {
             vx_bool alreadyExisted = vx_false_e;
             vx_kernel kernel = &context->targetTable[targetIndex].kernelTable[kernelndex];
+
+            /*[bug20118]: search the enabled table entry, including the first kernel which is invalid but enabled*/
+            if(kernel->enabled == vx_false_e)
+                continue;
 
             for (uniqueKernelIndex = 0; uniqueKernelIndex < uniqueKernelTableSize; uniqueKernelIndex++)
             {

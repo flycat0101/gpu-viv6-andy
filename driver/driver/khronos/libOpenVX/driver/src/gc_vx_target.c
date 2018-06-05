@@ -57,13 +57,16 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
         if (status != VX_SUCCESS)
             return status;
 
-        if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount++;
-        target->kernelCount++;
-        target->base.context->kernelCount++;
+        /*[bug20118]: vxFinalizeKernel will also increase uniqueKernelCount, so uniqueKernelCount will be increased twice.*/
+        /*if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount++;*/
 
         status = vxFinalizeKernel(&target->kernelTable[index]);
         if (status != VX_SUCCESS)
             return status;
+
+        /*[bug20118]: increase counter after return success from vxFinalizeKernel*/
+        target->kernelCount++;
+        target->base.context->kernelCount++;
     }
 
     /* ToDo : Add more specific return status check */
@@ -83,11 +86,13 @@ VX_PRIVATE_API vx_status vxDeinitializeTarget(vx_target target)
 
     vxmASSERT(target);
 
-    for (index = 0; index < target->kernelCount; index++)
+    /*[bug20118]: change to the full searching range*/
+    for (index = 0; index < VX_MAX_KERNEL_COUNT; index++)
     {
         vx_kernel kernel = &target->kernelTable[index];
 
-        if (!kernel->enabled || kernel->enumeration == VX_KERNEL_INVALID) continue;
+        /*[bug20118]: remove the first kernel which is invalid but enabled*/
+        if (!kernel->enabled) continue;
 
         kernel->enabled = vx_false_e;
 
@@ -96,8 +101,9 @@ VX_PRIVATE_API vx_status vxDeinitializeTarget(vx_target target)
         if (vxoKernel_InternalRelease(&kernel) != VX_SUCCESS) return VX_FAILURE;
     }
 
-    target->kernelCount = 0;
+    /*[bug20118]: first substraction, then reset target->kernelCount*/
     target->base.context->kernelCount -= target->kernelCount;
+    target->kernelCount = 0;
 
     return VX_SUCCESS;
 }
@@ -130,7 +136,8 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
 
     if (vxIsSameString(targetName, VX_DEFAULT_TARGET_NAME, VX_MAX_TARGET_NAME)) return VX_ERROR_NOT_SUPPORTED;
 
-    for (index = 0; index < target->kernelCount; index++)
+    /*[bug20118]: full searching range*/
+    for (index = 0; index < VX_MAX_KERNEL_COUNT; index++)
     {
         vx_char         kernelFullName[VX_MAX_KERNEL_NAME+1] = {'\0'};
         vx_char_ptr     kernelNamePtr;
@@ -138,6 +145,9 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
 #if defined(OPENVX_USE_VARIANTS)
         vx_char_ptr     variantNamePtr;
 #endif
+        /*[bug20118]: search the enabled and valid table entry*/
+        if(target->kernelTable[index].enabled == vx_false_e
+            || target->kernelTable[index].enumeration == VX_KERNEL_INVALID) continue;
 
         strncpy(kernelFullName, target->kernelTable[index].name, VX_MAX_KERNEL_NAME);
 
@@ -321,7 +331,8 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
     vxmASSERT(name);
     vxmASSERT(funcPtr);
 
-    for (index = target->kernelCount;index < VX_MAX_KERNEL_COUNT; index++)
+    /*[bug20118]: full searching range*/
+    for (index = 0;index < VX_MAX_KERNEL_COUNT; index++)
     {
         vx_kernel kernel = &(target->kernelTable[index]);
 
@@ -347,6 +358,9 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
             }
 
             target->kernelCount++;
+             
+            /*[bug20118]: need to increase the counter in context*/
+            target->base.context->kernelCount++;
             return kernel;
         }
     }
@@ -367,7 +381,8 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
     vxmASSERT(name);
     vxmASSERT(flexibleFuncPtr);
 
-    for (index = target->kernelCount;index < VX_MAX_KERNEL_COUNT; index++)
+    /*[bug20118]: full searching range*/
+    for (index = 0;index < VX_MAX_KERNEL_COUNT; index++)
     {
         vx_kernel kernel = &(target->kernelTable[index]);
 
@@ -394,6 +409,9 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
             kernel->tilingFunction = flexibleFuncPtr;
 
             target->kernelCount++;
+
+            /*[bug20118]: need to increase the counter in context*/
+            target->base.context->kernelCount++;
             return kernel;
         }
     }
@@ -712,7 +730,8 @@ VX_PRIVATE_API vx_uint32 vxoTarget_GetIndex(vx_target target)
 
     vxmASSERT(target);
 
-    for (index = 0; index < target->base.context->kernelCount; index++)
+    /*[bug20118]: should be target->base.context->targetCount*/
+    for (index = 0; index < target->base.context->targetCount; index++)
     {
         if (target == &target->base.context->targetTable[index]) return index;
     }
@@ -784,6 +803,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attri
     vx_uint32           targetIndex;
     vx_uint32           kernelIndex;
     vx_kernel_info_t *  kernelTable;
+    vx_uint32           kernelTableSize; /*[bug20118]: add variable*/
 
     if (!vxoReference_IsValidAndSpecific((vx_reference)target, (vx_type_e)VX_TYPE_TARGET))
     {
@@ -822,11 +842,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attri
 
             kernelTable = (vx_kernel_info_t *)ptr;
 
-            for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
+            /*[bug20118]: change to the full searching range*/
+            kernelTableSize = 0;
+            for (kernelIndex = 0; kernelIndex < VX_MAX_KERNEL_COUNT; kernelIndex++)
             {
-                kernelTable[kernelIndex].enumeration = target->kernelTable[kernelIndex].enumeration;
+                /*[bug20118]: search the enabled table entry, including the first kernel which is invalid but enabled*/
+                if(target->kernelTable[kernelIndex].enabled == vx_false_e)
+                    continue;
 
-                vxStrCopySafe(kernelTable[kernelIndex].name, VX_MAX_KERNEL_NAME, target->kernelTable[kernelIndex].name);
+                kernelTable[kernelTableSize].enumeration = target->kernelTable[kernelIndex].enumeration;
+
+                vxStrCopySafe(kernelTable[kernelTableSize].name, VX_MAX_KERNEL_NAME, target->kernelTable[kernelIndex].name);
+                kernelTableSize++;
             }
             break;
 
@@ -846,8 +873,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target 
 
     if (!vxoReference_IsValidAndSpecific(&target->base, (vx_type_e)VX_TYPE_TARGET)) return VX_ERROR_INVALID_REFERENCE;
 
-    for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
+    /*[bug20118]: full searching range*/
+    for (kernelIndex = 0; kernelIndex < VX_MAX_KERNEL_COUNT; kernelIndex++)
     {
+        /*[bug20118]: search the enabled and valid table entry*/
+        if(target->kernelTable[kernelIndex].enabled == vx_false_e
+          || target->kernelTable[kernelIndex].enumeration == VX_KERNEL_INVALID)
+            continue;
+
         if (node->kernel->enumeration == target->kernelTable[kernelIndex].enumeration)
         {
             node->targetIndex = vxoTarget_GetIndex(target);
