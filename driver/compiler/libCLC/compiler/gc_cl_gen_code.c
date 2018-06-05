@@ -27655,32 +27655,41 @@ IN clsROPERAND *Offset
   offset = Offset;
 
   do {
+     clsLOPERAND lOperand[1];
+     clsCOMPONENT_SELECTION reversedComponentSelection;
+
      if(!columnROperand->isReg) { /*constant*/
-       gctREG_INDEX constantReg;
-       clsLOPERAND constantOperand[1];
-       clsCOMPONENT_SELECTION reversedComponentSelection;
+         gctREG_INDEX constantReg;
 
-       constantReg = clNewTempRegs(Compiler,
-                                   gcGetDataTypeRegSize(ResType),
-                                   ResType.elementType);
-       clsLOPERAND_InitializeTempReg(Compiler,
-                                     constantOperand,
-                                     clvQUALIFIER_NONE,
-                                     ResType,
-                                     constantReg);
+         constantReg = clNewTempRegs(Compiler,
+                                     gcGetDataTypeRegSize(ResType),
+                                     ResType.elementType);
+         clsLOPERAND_InitializeTempReg(Compiler,
+                                       lOperand,
+                                       clvQUALIFIER_NONE,
+                                       ResType,
+                                       constantReg);
+     }
+     else if(!clIsDefaultComponentSelection(&columnROperand->u.reg.componentSelection)) { /* columnROperand is a reg */
+         clsIOPERAND intermIOperand[1];
+         clsIOPERAND_New(Compiler, intermIOperand, columnROperand->dataType);
+         clsLOPERAND_InitializeUsingIOperand(lOperand, intermIOperand);
 
-       status = _ConvLOperandToSuperTarget(Compiler,
-                                           constantOperand,
-                                           &superTarget,
-                                           &reversedComponentSelection);
-       if(gcmIS_ERROR(status)) return status;
+         status = clGenAssignCode(Compiler,
+                                  LineNo,
+                                  StringNo,
+                                  lOperand,
+                                  columnROperand);
+         if (gcmIS_ERROR(status)) return status;
+         clsROPERAND_InitializeUsingIOperand(columnROperand, intermIOperand);
      }
-     else {
-        status = _ConvROperandToSuperTarget(Compiler,
-                                            columnROperand,
-                                            &superTarget);
-        if(gcmIS_ERROR(status)) return status;
-     }
+     else clsLOPERAND_InitializeUsingROperand(lOperand, columnROperand);
+
+     status = _ConvLOperandToSuperTarget(Compiler,
+                                         lOperand,
+                                         &superTarget,
+                                         &reversedComponentSelection);
+     if(gcmIS_ERROR(status)) return status;
 
      status = _ConvNormalROperandToSuperSource(Compiler,
                                                LineNo,
