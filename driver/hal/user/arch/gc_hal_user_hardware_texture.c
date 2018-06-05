@@ -5201,7 +5201,7 @@ gcoHARDWARE_ProgramTexture(
         if (semaStall)
         {
             gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                      && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                      || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);

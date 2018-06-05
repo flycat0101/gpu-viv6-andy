@@ -18220,7 +18220,7 @@ gcoHARDWARE_FillFromTileStatus(
     if (Hardware->config->gpuCoreCount > 1)
     {
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* Invalidate the tile status cache. */
         *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -18548,7 +18548,7 @@ gcoHARDWARE_FillFromTileStatus(
 
 
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* Invalidate the tile status cache. */
         *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -18638,7 +18638,7 @@ _FlushTileStatusCache(
     gcmASSERT(Hardware->PEStates->colorStates.target[0].sliceNum == 1);
 
     gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-              && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+              || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
     /* Get physical base address. */
     if (Hardware->features[gcvFEATURE_MC20])
@@ -19443,7 +19443,7 @@ _FlushAndDisableTileStatus(
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1)))))));
 
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* No multiSlice support when tile status enabled for now.*/
         gcmASSERT(SurfView->numSlices == 1);
@@ -22442,7 +22442,7 @@ gcoHARDWARE_MultiGPUCacheFlush(
     gcmVERIFY_ARGUMENT(Hardware->constructType != gcvHARDWARE_2D);
 
     gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-              && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+              || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
     /* Semaphore. */
     *memory++
@@ -22815,7 +22815,7 @@ gceSTATUS gcoHARDWARE_FlushL2Cache(
     else
     {
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* Idle the pipe. */
         gcmONERROR(
@@ -23413,7 +23413,7 @@ gcoHARDWARE_ProgramResolve(
     if (Hardware->config->gpuCoreCount > 1)
     {
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* Flush both caches. */
         *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -23702,7 +23702,7 @@ gcoHARDWARE_ProgramResolve(
 
 
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
-                  && Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
+                  || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
 
         /* Flush both caches. */
         *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
