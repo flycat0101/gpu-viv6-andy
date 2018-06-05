@@ -903,10 +903,6 @@ _UpdateCounters(
         iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_READ_ALL_PROFILE_REGISTERS_PART1;
 
-        gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
-        if (context != 0)
-            iface.u.RegisterProfileData_part1.context = context;
-
         /* Call the kernel. */
         for (coreId = 0; coreId < Profiler->coreCount; coreId++)
         {
@@ -915,6 +911,10 @@ _UpdateCounters(
             gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
             /* Set it to TLS to find correct command queue. */
             gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+
+            gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
+            if (context != 0)
+                iface.u.RegisterProfileData_part1.context = context;
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
@@ -927,10 +927,6 @@ _UpdateCounters(
         iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_READ_ALL_PROFILE_REGISTERS_PART2;
 
-        gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
-        if (context != 0)
-            iface.u.RegisterProfileData_part2.context = context;
-
         /* Call the kernel. */
         for (coreId = 0; coreId < Profiler->coreCount; coreId++)
         {
@@ -939,6 +935,10 @@ _UpdateCounters(
             gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
             /* Set it to TLS to find correct command queue. */
             gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+
+            gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
+            if (context != 0)
+                iface.u.RegisterProfileData_part2.context = context;
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
@@ -1223,8 +1223,6 @@ gcoPROFILER_Enable(
         gctUINT32 coreId;
         gctUINT32 originalCoreIndex;
 
-        gcoHAL_ConfigPowerManagement(gcvFALSE);
-
         /* enable profiler in kernel. */
         iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_SET_PROFILE_SETTING;
@@ -1239,6 +1237,8 @@ gcoPROFILER_Enable(
             gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
             /* Set it to TLS to find correct command queue. */
             gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+
+            gcoHAL_ConfigPowerManagement(gcvFALSE);
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
@@ -1336,11 +1336,6 @@ gcoPROFILER_Begin(
             iface.ignoreTLS = gcvFALSE;
             iface.command = gcvHAL_READ_ALL_PROFILE_REGISTERS_PART1;
 
-            /* Call kernel service. */
-            gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
-            if (context != 0)
-                iface.u.RegisterProfileData_part1.context = context;
-
             for (coreId = 0; coreId < Profiler->coreCount; coreId++)
             {
                 gctUINT32 coreIndex;
@@ -1348,6 +1343,10 @@ gcoPROFILER_Begin(
                 gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
                 /* Set it to TLS to find correct command queue. */
                 gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+
+                gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
+                if (context != 0)
+                    iface.u.RegisterProfileData_part1.context = context;
 
                 /* Call the kernel. */
                 gcmONERROR(gcoOS_DeviceControl(gcvNULL,
@@ -1359,11 +1358,6 @@ gcoPROFILER_Begin(
             iface.ignoreTLS = gcvFALSE;
             iface.command = gcvHAL_READ_ALL_PROFILE_REGISTERS_PART2;
 
-            /* Call kernel service. */
-            gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
-            if (context != 0)
-                iface.u.RegisterProfileData_part2.context = context;
-
             for (coreId = 0; coreId < Profiler->coreCount; coreId++)
             {
                 gctUINT32 coreIndex;
@@ -1371,6 +1365,10 @@ gcoPROFILER_Begin(
                 gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
                 /* Set it to TLS to find correct command queue. */
                 gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+
+                gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
+                if (context != 0)
+                    iface.u.RegisterProfileData_part2.context = context;
 
                 /* Call the kernel. */
                 gcmONERROR(gcoOS_DeviceControl(gcvNULL,
