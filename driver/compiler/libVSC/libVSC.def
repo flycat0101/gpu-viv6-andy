@@ -36,6 +36,12 @@ EXPORTS
 	gcLoadCLSingleKernel
     gcLinkKernel
     gcFreeProgramState
+    gcInitializeLibFile
+    gcFinalizeLibFile
+    gcSHADER_WriteShaderToFile
+    gcSHADER_ReadShaderFromFile
+    gcSHADER_WriteBufferToFile
+    gcSHADER_ReadBufferFromFile
     gcSHADER_IsHaltiCompiler
     gcSHADER_IsES31Compiler
     gcSHADER_IsDual16Shader

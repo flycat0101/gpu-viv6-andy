@@ -684,6 +684,20 @@ typedef struct _VSC_SHADER_RECOMPILER_PARAM
     VSC_RECOMPILER_CONFIG             cfg;
 }VSC_SHADER_RECOMPILER_PARAM, *PVSC_SHADER_RECOMPILER_PARAM;
 
+gceSTATUS
+gcSHADER_WriteBufferToFile(
+    IN gctSTRING buffer,
+    IN gctUINT32 bufferSize,
+    IN gctSTRING ShaderName
+    );
+
+gceSTATUS
+gcSHADER_ReadBufferFromFile(
+    IN gctSTRING    ShaderName,
+    OUT gctSTRING    *buf,
+    OUT gctUINT *bufSize
+    );
+
 END_EXTERN_C();
 
 #endif /*__gc_vsc_drvi_interface_h_ */

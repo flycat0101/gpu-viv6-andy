@@ -106,6 +106,7 @@ KLC    **/
   return Success;
 }
 
+#define _USE_FILE_LOCK_FOR_RD_WR   1
 #define RESOURCE_DIRECTORY "/driver/openGL/libCL/frontend/llvm/bin/lib/clang/2.8"
 
 static char *_IncludePaths[] = {
@@ -266,6 +267,29 @@ _Flength(gctFILE Fptr)
 // returns ptr to buffer: success
 //         NULL: failure
 // The buffer should be freed after use
+#if _USE_FILE_LOCK_FOR_RD_WR
+gctSTRING
+_LoadFileToBuffer(cloCOMPILER Compiler, gctUINT StringNo, const char *FName)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSTRING buffer = gcvNULL;
+    gctUINT bufferSize = 0;
+
+    status = gcSHADER_ReadBufferFromFile((char *)FName,
+                                         &buffer,
+                                         &bufferSize);
+    if(gcmIS_ERROR(status)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        0,
+                                        StringNo,
+                                        clvREPORT_ERROR,
+                                        "Read file \"%s\" error",
+                                        FName));
+   }
+   if(buffer) buffer[bufferSize] = '\0';
+   return buffer;
+}
+#else
 char *
 _LoadFileToBuffer(cloCOMPILER Compiler, gctUINT StringNo, const char *FName)
 {
@@ -389,6 +413,7 @@ _LoadFileToBuffer(cloCOMPILER Compiler, gctUINT StringNo, const char *FName)
     gcoOS_Close(gcvNULL, fptr);
     return source;
 }
+#endif
 
 gceSTATUS
 Clang_Preprocess_Hardcoded(cloCOMPILER Compiler,
@@ -430,6 +455,7 @@ unsigned *pped_count)
   Langopts.LaxVectorConversions = 1;
   char tmpdir[_cldFILENAME_MAX];
 
+  gcInitializeLibFile();
   if(clmHasRightLanguageVersion(Compiler, _cldCL1Dot2)) {
      Langopts.OpenCLVersion = (char *) "120";
   }
@@ -680,14 +706,11 @@ unsigned *pped_count)
                               tmpfile_name);
            break;
         }
-#ifdef _DEBUG
-        cloCOMPILER_Report(Compiler,
-                           0,
-                           i,
-                           clvREPORT_INFO,
-                           "GENERATED TMP FILE NAME %s",
-                           tmpfile_name);
-#endif
+#if _USE_FILE_LOCK_FOR_RD_WR
+        status = gcSHADER_WriteBufferToFile((char *)source[i],
+                                            gcoOS_StrLen(source[i], gcvNULL),
+                                            tmpfile_name);
+#else
         status = gcoOS_Open(gcvNULL,
                             tmpfile_name,
                             gcvFILE_CREATE,
@@ -707,6 +730,7 @@ unsigned *pped_count)
                              gcoOS_StrLen(source[i], gcvNULL),
                              source[i]);
         gcoOS_Close(gcvNULL, fptr);
+#endif
         if(gcmIS_ERROR(status)) {
            cloCOMPILER_Report(Compiler,
                               0,
@@ -730,6 +754,14 @@ unsigned *pped_count)
                               tmpoutputfile_name);
            break;
         }
+#ifdef _DEBUG
+        cloCOMPILER_Report(Compiler,
+                           0,
+                           i,
+                           clvREPORT_INFO,
+                           "Name of temp output file for preporocessed input: %s\n",
+                           tmpoutputfile_name);
+#endif
         Frontendopts.OutputFile = tmpoutputfile_name;
 
         // Execute the frontend actions.
@@ -811,6 +843,7 @@ OnError:
     status = gcvSTATUS_INVALID_DATA;
   }
 
+  gcFinalizeLibFile();
   // Our error handler depends on the Diagnostics object, which we're
   // potentially about to delete. Uninstall the handler now so that any
   // later errors use the default handling behavior instead.
