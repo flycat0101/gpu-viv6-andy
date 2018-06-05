@@ -1039,10 +1039,9 @@ __glChipIsFramebufferComplete(
         /*
         ** As ES30 SPEC required, both depth and stencil attach point must refer to same image.
         ** For ES20, SPEC implicitly indicates implementation cannot support the combination,
-        ** And our HW indeed didn't support it. But we already claimed supporting OES_stencilx
-        ** extension and need pass conform test, so we should allow the case.
+        ** And our HW indeed didn't support it.
         */
-        if (gc->apiVersion == __GL_API_VERSION_ES30 && depthObjSet && stencilObjSet)
+        if (depthObjSet && stencilObjSet)
         {
             if ((depthObjType != stencilObjType) ||
                 (depthObjName != stencilObjName))
