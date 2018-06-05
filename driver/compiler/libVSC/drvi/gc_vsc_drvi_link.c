@@ -1765,7 +1765,7 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
     gctUINT                    i;
 
     /* So far, check the per-vertex attributes for VX only. */
-    if (pShader->shaderKind == VIR_SHADER_VERTEX)
+    if (VIR_Shader_IsES11Compiler(pShader) && pShader->shaderKind == VIR_SHADER_VERTEX)
     {
         VIR_Shader_CreateAttributeAliasList(pShader);
         pArrayList = VIR_Shader_GetAttributeAliasList(pShader);
