@@ -1372,7 +1372,8 @@ eglCreateContext(
 
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, context));
 
-        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+        /* when failed to allocate resources for createContext, should set the EGL_BAD_ALLOC error here. */
+        veglSetEGLerror(thread,  EGL_BAD_ALLOC);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
