@@ -1417,9 +1417,10 @@ _SplitVariables(
 
     if (VIR_Type_IsBaseTypeStruct(Shader, type))
     {
+        upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
+
         if (VIR_Type_isArray(type))
         {
-            upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
             errCode = _SplitArrayVariable(Shader,
                                           VariableSym,
                                           VariableSym,
@@ -1510,10 +1511,10 @@ _SplitOutputs(
 
     if (VIR_Type_IsBaseTypeStruct(Shader, type))
     {
+        upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
+
         if (VIR_Type_isArray(type))
         {
-            upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
-
             errCode = _SplitArrayVariable(Shader,
                                           OutputSym,
                                           OutputSym,
