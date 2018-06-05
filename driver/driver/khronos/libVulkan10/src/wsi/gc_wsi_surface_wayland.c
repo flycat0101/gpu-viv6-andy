@@ -890,6 +890,7 @@ static VkResult __CommitPresentCommand(
     __vkCommandBuffer *cmd;
     __vkStateBuffer *stateBuffer;
     uint32_t stateBufCount;
+    __vk_CommitInfo *pCommits[__VK_MAX_COMMITS_POOL_COUNT] = {gcvNULL};
     __vk_CommitInfo commitInfo;
 
     cmd = (__vkCommandBuffer *)sc->cmdBuf;
@@ -903,7 +904,9 @@ static VkResult __CommitPresentCommand(
     commitInfo.stateSize  = stateBuffer->bufOffset;
     commitInfo.statePipe  = stateBuffer->bufPipe;
 
-    __VK_ONERROR(__vk_CommitStateBuffers(queue, &commitInfo, 1));
+    pCommits[0] = &commitInfo;
+
+    __VK_ONERROR(__vk_CommitStateBuffers(queue, pCommits, 0, 1));
 
 #if __VK_NEW_DEVICE_QUEUE
     __vk_QueueWaitIdle(queue);

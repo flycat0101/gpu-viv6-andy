@@ -699,24 +699,31 @@ OnError:
 
 VkResult __vk_CommitStateBuffers(
     VkQueue queue,
-    __vk_CommitInfo* pCommits,
+    __vk_CommitInfo** pCommits,
+    uint32_t curPoolIndex,
     uint32_t commitCount
     )
 {
     __vkDevQueue *devQueue = (__vkDevQueue *)queue;
     VkResult result = VK_SUCCESS;
-    uint32_t i;
+    uint32_t icommits;
+    uint32_t icommitPool;
 
-    for (i = 0; i < commitCount; i++)
+    for (icommitPool = 0; icommitPool <= curPoolIndex; ++icommitPool)
     {
-        uint32_t *states;
-        uint32_t stateSize = pCommits[i].stateSize;
+        VkBool32 bLast = (icommitPool == curPoolIndex);
+        uint32_t count = bLast ? commitCount : (__VK_MAX_COMMITS << icommitPool);
+        for (icommits = 0; icommits < count; icommits++)
+        {
+            uint32_t *states;
+            uint32_t stateSize = pCommits[icommitPool][icommits].stateSize;
 
-        states = (uint32_t *)__vk_QueueGetSpace(devQueue, stateSize);
-        __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-        __VK_MEMCOPY(states, pCommits[i].stateStart, stateSize);
+            states = (uint32_t *)__vk_QueueGetSpace(devQueue, stateSize);
+            __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            __VK_MEMCOPY(states, pCommits[icommitPool][icommits].stateStart, stateSize);
 
-        __vk_QueueReleaseSpace(devQueue, stateSize);
+            __vk_QueueReleaseSpace(devQueue, stateSize);
+        }
     }
 
     __VK_ONERROR(__vk_QueueCommit(devQueue));
@@ -972,6 +979,28 @@ OnError:
 
 #endif
 
+__VK_INLINE VkResult __vk_AllocateCommits(
+    __vk_CommitInfo **pCommits,
+    __vkDevQueue *devQueue,
+    uint32_t index
+    )
+{
+    uint32_t maxCommitCount = __VK_MAX_COMMITS << index;
+    __VK_SET_ALLOCATIONCB(&devQueue->pDevContext->memCb);
+
+    *pCommits = (__vk_CommitInfo *)__VK_ALLOC(
+        (maxCommitCount * sizeof(__vk_CommitInfo)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
+
+    if (!*pCommits)
+    {
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    __VK_MEMZERO(*pCommits, (maxCommitCount * sizeof(__vk_CommitInfo)));
+
+    return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     VkQueue queue,
     uint32_t submitCount,
@@ -980,22 +1009,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     )
 {
     __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-    __vk_CommitInfo *pCommits = gcvNULL;
+    __vk_CommitInfo *pCommits[__VK_MAX_COMMITS_POOL_COUNT] = {gcvNULL};
     uint32_t isub, icmd, istate, iexe;
     VkResult result = VK_SUCCESS;
-    uint32_t maxCommitCount = __VK_MAX_COMMITS;
+    uint32_t icommitPool = 0;
 
     __VK_SET_ALLOCATIONCB(&devQueue->pDevContext->memCb);
 
-retry:
-    pCommits = (__vk_CommitInfo *)__VK_ALLOC(
-        (maxCommitCount * sizeof(__vk_CommitInfo)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-
-    if (!pCommits)
-    {
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-    }
-    __VK_MEMZERO(pCommits, (maxCommitCount * sizeof(__vk_CommitInfo)));
+    /* Allocate pCommits */
+    __vk_AllocateCommits(&pCommits[icommitPool], devQueue, icommitPool);
 
     for (isub = 0; isub < submitCount; isub++)
     {
@@ -1046,22 +1068,20 @@ retry:
                     /* Add commit for current state buffer chunk */
                     if (stateSize)
                     {
-                        pCommits[icommits].stateStart = stateStart;
-                        pCommits[icommits].stateSize  = stateSize;
-                        pCommits[icommits].statePipe  = statePipe;
+                        pCommits[icommitPool][icommits].stateStart = stateStart;
+                        pCommits[icommitPool][icommits].stateSize  = stateSize;
+                        pCommits[icommitPool][icommits].statePipe  = statePipe;
 
                         icommits++;
-                        if (icommits >= maxCommitCount)
+                        if (icommits >= ((uint32_t)__VK_MAX_COMMITS << icommitPool))
                         {
-                            maxCommitCount <<= 1;
-                            /* rollback: the extra wait semaphore in command buffer no need rollback,
-                            ** them has the same HW fence address */
-                            /* free memory */
-                            __VK_FREE(pCommits);
-                            /* reset state */
-                            cmd->state = __VK_CMDBUF_STATE_EXECUTABLE;
-                            pCommits = VK_NULL_HANDLE;
-                            goto retry;
+                            /* move to next slot */
+                            icommitPool++;
+                            __VK_ASSERT(icommitPool < __VK_MAX_COMMITS_POOL_COUNT);
+
+                            /* Allocate pCommits */
+                            __vk_AllocateCommits(&pCommits[icommitPool], devQueue, icommitPool);
+                            icommits = 0;
                         }
                     }
 
@@ -1084,22 +1104,20 @@ retry:
 
                     for (isecState = 0; isecState < secStateBufCount; isecState++)
                     {
-                        pCommits[icommits].stateStart = secStateBuffer->bufStart;
-                        pCommits[icommits].stateSize  = secStateBuffer->bufOffset;
-                        pCommits[icommits].statePipe  = secStateBuffer->bufPipe;
+                        pCommits[icommitPool][icommits].stateStart = secStateBuffer->bufStart;
+                        pCommits[icommitPool][icommits].stateSize  = secStateBuffer->bufOffset;
+                        pCommits[icommitPool][icommits].statePipe  = secStateBuffer->bufPipe;
 
                         icommits++;
-                        if (icommits >= maxCommitCount)
+                        if (icommits >= ((uint32_t)__VK_MAX_COMMITS << icommitPool))
                         {
-                            maxCommitCount <<= 1;
-                            /* rollback: the extra wait semaphore in command buffer no need rollback,
-                            ** them has the same HW fence address */
-                            /* free memory */
-                            __VK_FREE(pCommits);
-                            /* reset state */
-                            cmd->state = __VK_CMDBUF_STATE_EXECUTABLE;
-                            pCommits = VK_NULL_HANDLE;
-                            goto retry;
+                            /* move to next slot */
+                            icommitPool++;
+                            __VK_ASSERT(icommitPool < __VK_MAX_COMMITS_POOL_COUNT);
+
+                            /* Allocate pCommits */
+                            __vk_AllocateCommits(&pCommits[icommitPool], devQueue, icommitPool);
+                            icommits = 0;
                         }
 
                         secStateBuffer = secStateBuffer->next;
@@ -1111,9 +1129,9 @@ retry:
                 /* Add commit for current state buffer final chunk */
                 if (stateSize)
                 {
-                    pCommits[icommits].stateStart = stateStart;
-                    pCommits[icommits].stateSize  = stateSize;
-                    pCommits[icommits].statePipe  = statePipe;
+                    pCommits[icommitPool][icommits].stateStart = stateStart;
+                    pCommits[icommitPool][icommits].stateSize  = stateSize;
+                    pCommits[icommitPool][icommits].statePipe  = statePipe;
 
                     icommits++;
                 }
@@ -1126,14 +1144,17 @@ retry:
 #endif
 
             /* Commit all the remaining commits for this command buffer */
-            if (icommits)
+            if (icommitPool || icommits)
             {
-                result = __vk_CommitStateBuffers(queue, pCommits, icommits);
+                result = __vk_CommitStateBuffers(queue, pCommits, icommitPool, icommits);
                 if (result != VK_SUCCESS)
                 {
                     goto vk_OnError;
                 }
+
+                /* reset state */
                 icommits = 0;
+                icommitPool = 0;
             }
 #if __VK_RESOURCE_INFO
             __vk_utils_dumpCmdOutputRes(cmd);
@@ -1151,7 +1172,13 @@ retry:
     result = __vk_CommitSubmitFence(queue, fence);
 
 vk_OnError:
-    __VK_FREE(pCommits);
+    for (icommitPool = 0; icommitPool < __VK_MAX_COMMITS_POOL_COUNT; ++icommitPool)
+    {
+        if (pCommits[icommitPool])
+        {
+            __VK_FREE(pCommits[icommitPool]);
+        }
+    }
     return result;
 }
 
