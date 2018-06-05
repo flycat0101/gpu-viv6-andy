@@ -412,12 +412,9 @@ _InitializeContextBuffer(
     index += StateInitFunction(Hardware, InitInfo, index, 0x028C8 >> 2, 0x00000000, 1);
     index += StateInitFunction(Hardware, InitInfo, index, 0x028CC >> 2, 0x00000000, 1);
 
-    if (!Hardware->vg20)
-    {
-        /* Latest TS control register has reset
-           field in it - can't cache that. */
-        index += StateInitFunction(Hardware, InitInfo, index, 0x028D0 >> 2, 0x00000000, 1);
-    }
+    /* Latest TS control register has reset
+       field in it - can't cache that. */
+    index += StateInitFunction(Hardware, InitInfo, index, 0x028D0 >> 2, 0x00000000, 1);
 
     index += StateInitFunction(Hardware, InitInfo, index, 0x028D4 >> 2, 0x00000000, 1);
     index += StateInitFunction(Hardware, InitInfo, index, 0x028D8 >> 2, 0x00000000, 1);
