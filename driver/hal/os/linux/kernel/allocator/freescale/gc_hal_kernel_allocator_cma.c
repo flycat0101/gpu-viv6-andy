@@ -62,7 +62,6 @@
 #include <asm/atomic.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
-#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
@@ -165,6 +164,7 @@ _CMAFSLAlloc(
     }
 
     Mdl->priv = mdl_priv;
+    Mdl->dmaHandle = mdl_priv->physical;
     atomic_add(NumPages, &priv->cmasize);
 
     gcmkFOOTER_NO();
@@ -417,16 +417,12 @@ _CMAFSLMapUser(
         }
 
         gcmkERR_BREAK(_CMAFSLMmap(Allocator, Mdl, Cacheable, 0, Mdl->numPages, vma));
+        MdlMap->vmaAddr = userLogical;
+        MdlMap->cacheable = Cacheable;
         MdlMap->vma = vma;
     }
     while (gcvFALSE);
     up_write(&current->mm->mmap_sem);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        MdlMap->vmaAddr = userLogical;
-        MdlMap->cacheable = Cacheable;
-    }
 
 OnError:
     if (gcmIS_ERROR(status) && userLogical)

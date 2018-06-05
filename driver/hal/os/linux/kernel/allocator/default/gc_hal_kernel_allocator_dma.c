@@ -166,6 +166,7 @@ _DmaAlloc(
     gcmkHEADER_ARG("Mdl=%p NumPages=0x%zx Flags=0x%x", Mdl, NumPages, Flags);
 
     gcmkONERROR(gckOS_Allocate(os, sizeof(struct mdl_dma_priv), (gctPOINTER *)&mdlPriv));
+    mdlPriv->kvaddr = gcvNULL;
 
 #if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
     if (Flags & gcvALLOC_FLAG_4GB_ADDR)
@@ -187,7 +188,7 @@ _DmaAlloc(
     if ((os->device->baseAddress & 0x80000000) != (mdlPriv->dmaHandle & 0x80000000))
     {
         mdlPriv->dmaHandle = (mdlPriv->dmaHandle & ~0x80000000)
-                            | (os->device->baseAddress & 0x80000000);
+                           | (os->device->baseAddress & 0x80000000);
     }
 #endif
 
@@ -450,8 +451,6 @@ _DmaMapUser(
         struct vm_area_struct *vma = find_vma(current->mm, (unsigned long)userLogical);
         if (vma == gcvNULL)
         {
-            up_write(&current->mm->mmap_sem);
-
             gcmkTRACE_ZONE(
                 gcvLEVEL_INFO, gcvZONE_OS,
                 "%s(%d): find_vma error",
@@ -603,7 +602,8 @@ _DmaAlloctorInit(
      * DMA allocator is only used for NonPaged memory
      * when NO_DMA_COHERENT is not defined.
      */
-    allocator->capability = gcvALLOC_FLAG_DMABUF_EXPORTABLE
+    allocator->capability = gcvALLOC_FLAG_CONTIGUOUS
+                          | gcvALLOC_FLAG_DMABUF_EXPORTABLE
 #if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
                           | gcvALLOC_FLAG_4GB_ADDR
 #endif
