@@ -8988,19 +8988,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-            /* add instruction "intrinsic vecget" */
-            if (dstVirSym && SPV_ID_SYM_OFFSET_ACCESSVECCOMPBYVARIABLE(spv->operands[0]))
-            {
-                VIR_Swizzle param0swizzle;
-                VIR_Symbol  *vecIdxSym = gcvNULL;
-                gcmASSERT(VIR_SYM_VARIABLE == SPV_ID_SYM_VECTOR_OFFSET_TYPE(spv->operands[0]));
-                vecIdxSym = VIR_Shader_GetSymFromId(virShader, SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->operands[0]));
-                gcmASSERT(dstVirSym && VIR_Type_isVector(VIR_Symbol_GetType(dstVirSym)));    /* first parameter should be vector type */
-                gcmASSERT(vecIdxSym && VIR_Type_isScalar(VIR_Symbol_GetType(vecIdxSym)));    /* second parameter should be scalar */
-                param0swizzle = VIR_Swizzle_GenSwizzleByComponentCount(VIR_GetTypeComponents(VIR_Symbol_GetTypeId(dstVirSym)));
-                __spvGenerateInstrinsicVecGet(spv, dstVirScalarSym, dstVirSym, param0swizzle, vecIdxSym, VIR_SWIZZLE_XXXX);
-            }
-            else if (SPV_ID_SYM_PER_VERTEX(spvOperand))
+            if (SPV_ID_SYM_PER_VERTEX(spvOperand))
             {
                 __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_PER_VERTEX);
 

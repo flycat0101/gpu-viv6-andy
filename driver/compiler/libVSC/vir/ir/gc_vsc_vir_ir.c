@@ -13940,11 +13940,11 @@ VIR_Operand_EvaluateOffsetByAccessChain(
 
                 if(vectorIndexType == VIR_SYM_VARIABLE)
                 {
-                    /* special case : variable is used as index of vector variable while the baseSymbol is not vector,
+                    /* special case : variable is used as index of vector variable while the baseSymbol(input/output) is not vector,
                      * like gl_in[0].gl_Position[gl_InvocationID] ; type of gl_Position is vec4
                      * use vecget/vecset after load/store
                      */
-                    if ((i != 0) && (i == AccessChainLength-1))
+                    if (isSymArrayedPerVertex(BaseSymbol) && (i != 0) && (i == AccessChainLength-1))
                     {
                         /* not support packed type */
                         gcmASSERT((!VIR_TypeId_isPacked(VIR_Type_GetIndex(type))) && VIR_GetTypeComponents(VIR_Type_GetIndex(type)) <= 16);
@@ -13954,7 +13954,7 @@ VIR_Operand_EvaluateOffsetByAccessChain(
                     }
                     else
                     {
-                        /* if baseSym is vector, create an array to copy value from vector */
+                        /* create an array to copy value from vector */
                         VIR_TypeId arrayTypeId;
                         VIR_SymId arraySymId;
                         VIR_Instruction* arrayInitializationInst;
