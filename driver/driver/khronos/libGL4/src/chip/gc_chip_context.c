@@ -1354,7 +1354,7 @@ __glChipGetDeviceConstants(
     shaderCaps->maxWorkGroupCount[0] = 65535;
     shaderCaps->maxWorkGroupCount[1] = 65535;
     shaderCaps->maxWorkGroupCount[2] = 65535;
-    shaderCaps->maxWorkGroupSize[0] = 128;
+    shaderCaps->maxWorkGroupSize[0] = 256;
     shaderCaps->maxWorkGroupSize[1] = 128;
     shaderCaps->maxWorkGroupSize[2] = 64;
     shaderCaps->maxWorkGroupInvocation = 2048;
