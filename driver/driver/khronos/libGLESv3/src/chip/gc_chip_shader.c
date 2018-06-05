@@ -4090,6 +4090,7 @@ gcChipProgramBuildBindingInfo(
             input->fieldIndex = GetATTRFieldIndex(attribute);
             input->isPosition = gcmATTRIBUTE_isPosition(attribute);
             input->isDirectPosition = gcmATTRIBUTE_isDirectPosition(attribute);
+            input->isLocationSetByDriver = gcmATTRIBUTE_isLocSetByDriver(attribute);
             gcmONERROR(gcATTRIBUTE_GetLocation(attribute, &input->location));
             gcmONERROR(gcATTRIBUTE_GetPrecision(attribute, &input->precision));
             gcmONERROR(gcATTRIBUTE_IsPerPatch(attribute, &input->isPerPatch));
@@ -4124,11 +4125,13 @@ gcChipProgramBuildBindingInfo(
             input->refByStage[firstStage] = GL_TRUE;
 
             /* Set attribute location. */
-            if (bGLSL1_0 && program->hasAliasedAttrib && index > 0)
+            if (input->isLocationSetByDriver && index > 0)
             {
                 for ( locationIndex = 0; (gctINT)locationIndex < index;)
                 {
-                    if (input->location != -1 && program->attribLocation[locationIndex].pInput->location == input->location)
+                    if (input->location != -1 &&
+                        program->attribLocation[locationIndex].pInput->isLocationSetByDriver &&
+                        program->attribLocation[locationIndex].pInput->location == input->location)
                     {
                         bAliased = gcvTRUE;
                         break;
@@ -4183,7 +4186,7 @@ gcChipProgramBuildBindingInfo(
 
             input = program->attribLocation[i].pInput;
 
-            if (input->location != -1 && !(bGLSL1_0 && program->hasAliasedAttrib))
+            if (input->location != -1 && !(input->isLocationSetByDriver))
             {
                 /* Test for overflow. */
                 if (input->location + (GLuint)input->size > gc->constants.shaderCaps.maxUserVertAttributes)
@@ -7133,7 +7136,7 @@ __glChipCreateProgram(
     program->inMaxNameLen         = 0;
     program->inputs               = gcvNULL;
 
-    program->hasAliasedAttrib     = gcvFALSE;
+    program->mayHasAliasedAttrib  = gcvFALSE;
     program->attribBinding        = gcvNULL;
     program->attribLinkage        = gcvNULL;
     program->attribLocation       = gcvNULL;
@@ -7639,7 +7642,7 @@ __glChipLinkProgram(
     /* set attribute location */
     vsBinary = masterPgInstance->binaries[__GLSL_STAGE_VS];
 
-    if (vsBinary && gcShader_IsES11Compiler(vsBinary) && program->hasAliasedAttrib)
+    if (vsBinary && gcShader_IsES11Compiler(vsBinary) && program->mayHasAliasedAttrib)
     {
         __GLchipSLBinding *binding;
         for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
@@ -8522,7 +8525,7 @@ __glChipBindAttributeLocation(
         /* Check aliased attrib */
         else if (binding->index == (GLint)index)
         {
-            program->hasAliasedAttrib = gcvTRUE;
+            program->mayHasAliasedAttrib = gcvTRUE;
         }
     }
 

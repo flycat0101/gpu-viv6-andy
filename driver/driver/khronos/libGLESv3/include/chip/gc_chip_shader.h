@@ -361,6 +361,7 @@ typedef struct __GLchipSLInputRec
     gctBOOL             isPerPatch;
     gctBOOL             isSampleIn;
     gctBOOL             isDirectPosition;
+    gctBOOL             isLocationSetByDriver;
 } __GLchipSLInput;
 
 typedef struct __GLchipSLLocationRec
@@ -656,7 +657,7 @@ struct __GLchipSLProgramRec
     GLuint                              inMaxNameLen;
     __GLchipSLInput*                    inputs;
 
-    gctBOOL                             hasAliasedAttrib;
+    gctBOOL                             mayHasAliasedAttrib;
     __GLchipSLBinding*                  attribBinding;
     __GLchipSLLocation*                 attribLocation;
     /* The table maps app visible location to program attrib index */
