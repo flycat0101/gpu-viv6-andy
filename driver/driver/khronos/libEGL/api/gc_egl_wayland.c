@@ -770,6 +770,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     if (window->nr_buffers > 1)
     {
+        int loop = 0;
         for (;;)
         {
             int current = window->next;
@@ -786,13 +787,20 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
                 break;
             }
 
-            ret = dispatch_queue(wl_dpy, wl_queue, 5);
+            if (loop > 2)
+            {
+                ret = roundtrip_queue(wl_dpy, wl_queue);
+                loop = 0;
+            }
+            else
+                ret = dispatch_queue(wl_dpy, wl_queue, 5);
 
             if (ret == -1)
             {
                 buffer = NULL;
                 break;
             }
+            loop++;
         }
     }
     else
