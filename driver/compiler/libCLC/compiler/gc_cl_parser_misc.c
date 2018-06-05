@@ -1638,6 +1638,11 @@ IN gctBOOL IsVectorConstructor
     return gcvSTATUS_OK;
 }
 
+#define _clmIsFieldDeclEqual(Fld, Arg)  \
+    ((clmDECL_IsIntegerType(Fld) && clmDECL_IsIntegerType(Arg) && \
+      clmDECL_IsScalar(Fld) && clmDECL_IsScalar(Arg)) || \
+     clsDECL_IsEqual((Fld), (Arg)))
+
 static gceSTATUS
 _CheckStructOrUnionMemberMatch(
 IN cloCOMPILER Compiler,
@@ -1683,7 +1688,7 @@ IN cloIR_EXPR  *Operand
         for (fieldName = slsDLINK_LIST_First(&Decl->dataType->u.fieldSpace->names, clsNAME);
             (slsDLINK_NODE *)fieldName != &Decl->dataType->u.fieldSpace->names;
             fieldName = slsDLINK_NODE_Next(&fieldName->node, clsNAME)) {
-            if (clsDECL_IsEqual(&fieldName->decl, &operand->decl)) {
+            if (_clmIsFieldDeclEqual(&fieldName->decl, &operand->decl)) {
                 operand = slsDLINK_NODE_Next(&operand->base.node, struct _cloIR_EXPR);
                 matched = gcvTRUE;
                 break;
@@ -1693,7 +1698,7 @@ IN cloIR_EXPR  *Operand
             }
         }
     }
-    else matched = clsDECL_IsEqual(Decl, &operand->decl);
+    else matched = _clmIsFieldDeclEqual(Decl, &operand->decl);
 
 OnError:
     if(matched) {
@@ -8604,6 +8609,40 @@ IN gctINT TokenType
     return subscript;
 }
 
+gceSTATUS
+cloIR_EXPR_Clone(
+IN cloCOMPILER Compiler,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN cloIR_EXPR Source,
+OUT cloIR_EXPR * Result
+)
+{
+    gceSTATUS  status = gcvSTATUS_OK;
+    cloIR_EXPR result = Source;
+    cloIR_VARIABLE variable;
+
+    switch(cloIR_OBJECT_GetType(&Source->base)) {
+    case clvIR_VARIABLE:
+        gcmONERROR(cloIR_VARIABLE_Construct(Compiler,
+                                            LineNo,
+                                            StringNo,
+                                            ((cloIR_VARIABLE) &Source->base)->name,
+                                            &variable));
+
+        result = &variable->exprBase;
+        break;
+
+    default:
+        /* Need to do for other object types */
+        break;
+    }
+
+OnError:
+    if(Result) *Result = result;
+    return status;    
+}
+
 clsDeclOrDeclList *
 clParseFieldSelectionDesignator(
 IN cloCOMPILER Compiler,
@@ -8615,17 +8654,24 @@ IN gctINT TokenType
     gceSTATUS status;
     clsDESIGNATION_SCOPE *designationScope;
     clsDeclOrDeclList *fieldSelection = gcvNULL;
+    cloIR_EXPR lhs;
     gctPOINTER pointer;
 
     gcmASSERT(DesignatorList);
     switch(TokenType) {
     case T_EOF:
         /* append field selection to lhs */
-    gcmASSERT(DesignatorList);
-    fieldSelection = DesignatorList;
-    fieldSelection->lhs = clParseFieldSelectionExpr(Compiler,
-                            fieldSelection->lhs,
-                            FieldSelection);
+        gcmASSERT(DesignatorList);
+        fieldSelection = DesignatorList;
+        gcmONERROR(cloIR_EXPR_Clone(Compiler,
+                                    FieldSelection->lineNo,
+                                    FieldSelection->stringNo,
+                                    fieldSelection->lhs,
+                                    &lhs)); 
+
+        fieldSelection->lhs = clParseFieldSelectionExpr(Compiler,
+                                                        lhs,
+                                                        FieldSelection);
         break;
 
     case '{':
@@ -8635,22 +8681,29 @@ IN gctINT TokenType
         gcmASSERT(designationScope);
         if(!designationScope) return DesignatorList;
         status = cloCOMPILER_Allocate(Compiler,
-                      (gctSIZE_T)sizeof(clsDeclOrDeclList),
-                      (gctPOINTER *) &pointer);
+                                      (gctSIZE_T)sizeof(clsDeclOrDeclList),
+                                      (gctPOINTER *) &pointer);
 
         if (gcmIS_ERROR(status)) return gcvNULL;
 
         (void) gcoOS_ZeroMemory(pointer, sizeof(clsDeclOrDeclList));
         fieldSelection = pointer;
+        gcmONERROR(cloIR_EXPR_Clone(Compiler,
+                                    FieldSelection->lineNo,
+                                    FieldSelection->stringNo,
+                                    designationScope->designation,
+                                    &lhs));
+         
         fieldSelection->lhs = clParseFieldSelectionExpr(Compiler,
-                            designationScope->designation,
-                            FieldSelection);
+                                                        lhs,
+                                                        FieldSelection);
         break;
 
     default:
         gcmASSERT(0);
         break;
     }
+OnError:
     return fieldSelection;
 }
 
