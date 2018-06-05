@@ -4046,6 +4046,9 @@ gcChipProgramBuildBindingInfo(
         gctBOOL bGLSL1_0 = (firstStage == __GLSL_STAGE_VS)
                          ? gcShader_IsES11Compiler(pBinaries[firstStage])
                          : gcvFALSE;
+        gctUINT locationIndex = 0;
+        gctUINT aliasedIndex = 0;
+        gctUINT aliasedCount = 0;
 
         /* Allocate the array for the vertex attributes. */
         bytes = program->inCount * sizeof(__GLchipSLInput);
@@ -4058,6 +4061,7 @@ gcChipProgramBuildBindingInfo(
             gcATTRIBUTE attribute;
             gctBOOL enable = gcvFALSE;
             gctUINT nameLen = 0;
+            gctBOOL bAliased = gcvFALSE;
 
             gcmONERROR(gcSHADER_GetAttribute(pBinaries[firstStage], i, &attribute));
             /* skip NULL inputs, do not know why NULL one was reported by HAL */
@@ -4119,18 +4123,52 @@ gcChipProgramBuildBindingInfo(
             }
             input->refByStage[firstStage] = GL_TRUE;
 
-            /* expand the attribute, if it is a matrix, to basic types */
-            for (j = 0; j < input->size; ++j, ++index)
+            /* Set attribute location. */
+            if (bGLSL1_0 && program->hasAliasedAttrib && index > 0)
             {
-                if (i < activeUserInputCount && index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes * MAX_ALIASED_ATTRIB_COUNT)
+                for ( locationIndex = 0; (gctINT)locationIndex < index;)
+                {
+                    if (input->location != -1 && program->attribLocation[locationIndex].pInput->location == input->location)
+                    {
+                        bAliased = gcvTRUE;
+                        break;
+                    }
+
+                    locationIndex += program->attribLocation[locationIndex].pInput->size;
+                }
+            }
+
+            /* expand the attribute, if it is a matrix, to basic types */
+            for (j = 0; j < input->size; ++j)
+            {
+                if (i < activeUserInputCount && index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes)
                 {
                     gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Too many attributes\n"));
                     gcmTRACE(gcvLEVEL_ERROR, "LinkShaders: Too many attributes");
                     gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
                 }
-                /* Set attribute location. */
+
+                if (bAliased)
+                {
+                    /* Current attriLocation is not a list, we just use a array and only support
+                    ** one aliased attribute for each slot.
+                    ** the data structure is:
+                    ** 
+                    ** ------------------------------------------
+                    **| 0~15 attribute slot| 16~31 aliased attrib|
+                    ** ------------------------------------------
+                    */
+                    aliasedIndex = j + gc->constants.shaderCaps.maxVertAttributes + locationIndex;
+                    gcmASSERT( program->attribLocation[aliasedIndex].pInput == gcvNULL);
+
+                    program->attribLocation[aliasedIndex].pInput = input;
+                    program->attribLocation[aliasedIndex].index  = (GLint)j;
+                    continue;
+                }
+
                 program->attribLocation[index].pInput = input;
                 program->attribLocation[index].index  = (GLint)j;
+                ++index;
             }
         }
 
@@ -4168,7 +4206,6 @@ gcChipProgramBuildBindingInfo(
                     }
 
                     /* Assign the binding. */
-
                     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(__GLchipSLLinkage), (gctPOINTER *)&attribLinkage));
                     attribLinkage->attribLocation = (GLuint)(i + j);
                     attribLinkage->next = gcvNULL;
@@ -4185,63 +4222,67 @@ gcChipProgramBuildBindingInfo(
             for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
             {
                 /* Walk all attribute locations. */
-                for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
+                for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes; ++i)
                 {
-                    /* Ignore if location is unavailable or not the start of an array. */
-                    if ((!program->attribLocation[i].pInput) || (program->attribLocation[i].index != 0))
+                    for ( aliasedCount = 0; aliasedCount < MAX_ALIASED_ATTRIB_COUNT; ++aliasedCount)
                     {
-                        continue;
-                    }
-
-                    if (program->attribLocation[i].assigned)
-                    {
-                        continue;
-                    }
-
-                    input = program->attribLocation[i].pInput;
-
-                    if (gcmIS_SUCCESS(gcoOS_StrCmp(binding->name, input->name)))
-                    {
-                        /* Test for overflow. */
-                        if (binding->index + (GLuint)input->size > gc->constants.shaderCaps.maxUserVertAttributes)
+                        aliasedIndex = i + aliasedCount * gc->constants.shaderCaps.maxVertAttributes;
+                        /* Ignore if location is unavailable or not the start of an array. */
+                        if ((!program->attribLocation[aliasedIndex].pInput) || (program->attribLocation[aliasedIndex].index != 0))
                         {
-                            gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s overflows\n", input->name));
-                            gcmTRACE(gcvLEVEL_ERROR, "Binding for %s overflows.", binding->name);
-                            gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
+                            continue;
                         }
 
-                        /* Copy the binding. */
-                        for (j = 0; j < input->size; ++j)
+                        if (program->attribLocation[aliasedIndex].assigned)
                         {
-                            __GLchipSLLinkage* attribLinkage = gcvNULL;
+                            continue;
+                        }
+                        input = program->attribLocation[aliasedIndex].pInput;
 
-                            /*
-                            **    Make sure the binding is not yet taken.
-                            **    Binding more than one attribute name to the same location is referred to as
-                            **    aliasing, and is not permitted in OpenGL ES Shading Language 3.00 or later vertex
-                            **    shaders. LinkProgram will fail when this condition exists. However, aliasing
-                            **    is possible in OpenGL ES Shading Language 1.00 vertex shaders.
-                            **
-                            */
-                            if (!bGLSL1_0 && program->attribLinkage[binding->index + j])
+                        if (gcmIS_SUCCESS(gcoOS_StrCmp(binding->name, input->name)))
+                        {
+                            /* Test for overflow. */
+                            if (binding->index + (GLuint)input->size > gc->constants.shaderCaps.maxUserVertAttributes)
                             {
-                                gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied.", input->name));
-                                gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", binding->name);
+                                gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s overflows\n", input->name));
+                                gcmTRACE(gcvLEVEL_ERROR, "Binding for %s overflows.", binding->name);
                                 gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
                             }
 
-                            /* Assign the binding. */
-                            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(__GLchipSLLinkage), (gctPOINTER *)&attribLinkage));
-                            attribLinkage->attribLocation = (GLuint)(i + j);
-                            attribLinkage->next = gcvNULL;
+                            /* Copy the binding. */
+                            for (j = 0; j < input->size; ++j)
+                            {
+                                __GLchipSLLinkage* attribLinkage = gcvNULL;
 
-                            attribLinkage->next = program->attribLinkage[binding->index + j];
-                            program->attribLinkage[binding->index + j] = attribLinkage;
+                                /*
+                                **    Make sure the binding is not yet taken.
+                                **    Binding more than one attribute name to the same location is referred to as
+                                **    aliasing, and is not permitted in OpenGL ES Shading Language 3.00 or later vertex
+                                **    shaders. LinkProgram will fail when this condition exists. However, aliasing
+                                **    is possible in OpenGL ES Shading Language 1.00 vertex shaders.
+                                **
+                                */
+                                if (!bGLSL1_0 && program->attribLinkage[binding->index + j])
+                                {
+                                    gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied.", input->name));
+                                    gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", binding->name);
+                                    gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
+                                }
 
-                            program->attribLocation[i + j].assigned = GL_TRUE;
+                                /* Assign the binding. */
+                                gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(__GLchipSLLinkage), (gctPOINTER *)&attribLinkage));
+                                attribLinkage->attribLocation = (GLuint)(i + j);
+
+                                attribLinkage->next = gcvNULL;
+
+                                attribLinkage->next = program->attribLinkage[binding->index + j];
+                                program->attribLinkage[binding->index + j] = attribLinkage;
+
+                                program->attribLocation[aliasedIndex + j].assigned = GL_TRUE;
+                            }
+                            input->location = binding->index;
+                            break;
                         }
-                        input->location = binding->index;
-                        break;
                     }
                 }
             }
@@ -7140,7 +7181,7 @@ __glChipCreateProgram(
 
     program->attribLocation = pointer;
 
-    for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes; ++i)
+    for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
     {
         program->attribLocation[i].pInput = gcvNULL;
     }
@@ -8526,6 +8567,8 @@ __glChipGetAttributeLocation(
     GLuint i;
     gctSIZE_T nameLen = 0;
     gctSIZE_T arrayIdx = 0;
+    gctUINT aliasedCount = 0;
+    gctUINT attribIndex = 0;
     GLboolean isArray = GL_FALSE;
     __GLchipSLProgram *program = (__GLchipSLProgram *)programObject->privateData;
 
@@ -8546,14 +8589,24 @@ __glChipGetAttributeLocation(
 
         for(attribLinkage = program->attribLinkage[i]; attribLinkage != gcvNULL; attribLinkage = attribLinkage->next)
         {
-            /* See if the attribute matches the requested name. */
-            if (nameLen == (gctSIZE_T)program->attribLocation[attribLinkage->attribLocation].pInput->nameLen &&
-                (!isArray || program->attribLocation[attribLinkage->attribLocation].pInput->isArray) &&
-                gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribLinkage->attribLocation].pInput->name, nameLen))
-                )
+            for (aliasedCount = 0; aliasedCount < MAX_ALIASED_ATTRIB_COUNT; ++aliasedCount)
             {
-                gcmFOOTER_ARG("return=%d", i);
-                return i + (GLuint)arrayIdx;
+                attribIndex = attribLinkage->attribLocation + aliasedCount * gc->constants.shaderCaps.maxVertAttributes;
+
+                if (!program->attribLocation[attribIndex].pInput)
+                {
+                    continue;
+                }
+
+                /* See if the attribute matches the requested name. */
+                if (nameLen == (gctSIZE_T)program->attribLocation[attribIndex].pInput->nameLen &&
+                    (!isArray || program->attribLocation[attribIndex].pInput->isArray) &&
+                    gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribIndex].pInput->name, nameLen))
+                    )
+                {
+                    gcmFOOTER_ARG("return=%d", i);
+                    return i + (GLuint)arrayIdx;
+                }
             }
         }
     }
