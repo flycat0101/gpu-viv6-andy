@@ -2408,6 +2408,8 @@ gckKERNEL_Dispatch(
         }
         else
         {
+            gctUINT32 i;
+
             status = gckCOMMAND_Commit(Kernel->command,
                 Interface->u.Commit.contexts[0] ?
                 gcmNAME_TO_PTR(Interface->u.Commit.contexts[0]) : gcvNULL,
@@ -2437,8 +2439,6 @@ gckKERNEL_Dispatch(
 
             if (Interface->u.Commit.count > 1 && Interface->engine == gcvENGINE_RENDER)
             {
-                gctUINT32 i;
-
                 for (i = 1; i < Interface->u.Commit.count; i++)
                 {
                     gceHARDWARE_TYPE type = Interface->hardwareType;
@@ -2471,6 +2471,25 @@ gckKERNEL_Dispatch(
                     if (status != gcvSTATUS_INTERRUPTED)
                     {
                         gcmkONERROR(status);
+                    }
+                }
+            }
+
+            for (i = 0; i < Interface->u.Commit.count; i++)
+            {
+                gceHARDWARE_TYPE type = Interface->hardwareType;
+                gckKERNEL kernel = Device->map[type].kernels[i];
+
+                if  ((kernel->hardware->options.gpuProfiler == gcvTRUE) &&
+                     (kernel->profileEnable == gcvTRUE))
+                {
+                    gcmkONERROR(gckCOMMAND_Stall(kernel->command, gcvTRUE));
+                    
+                    if (kernel->command->currContext)
+                    {
+                        gcmkONERROR(gckHARDWARE_UpdateContextProfile(
+                                    kernel->hardware,
+                                    kernel->command->currContext));
                     }
                 }
             }
