@@ -183,7 +183,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     ** fit the local memory size requirement.
     */
     pVscHwCfg->defaultWorkGroupSize                  = 128;
-    pVscHwCfg->maxWorkGroupSize                      = gcmMIN(threadCount, 1024);
+    pVscHwCfg->maxWorkGroupSize                      = gcmMIN(threadCount, 128);
     pVscHwCfg->minWorkGroupSize                      = 1;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0              = IS_HW_SUPPORT(gcvFEATURE_HALTI0);

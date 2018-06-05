@@ -633,27 +633,7 @@ clGetDeviceInfo(
     case CL_DEVICE_MAX_WORK_GROUP_SIZE:
         /*retParamSize = gcmSIZEOF(Device->deviceInfo.maxWorkGroupSize);
         retParamPtr = &Device->deviceInfo.maxWorkGroupSize;*/
-        {
-            char *env = gcvNULL;
-            static gctINT isOpencvMode = -1;
-            if (isOpencvMode == -1)
-            {
-                if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_CL_OPENCV", &env))
-                    && env
-                    && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
-                {
-                    isOpencvMode = 1;
-                }
-                else
-                {
-                    isOpencvMode = 0;
-                }
-            }
-            if (isOpencvMode == 1)
-                retValue_size_t[0] = 256;
-            else
-                retValue_size_t[0] = Device->deviceInfo.maxWorkGroupSize;
-        }
+        retValue_size_t[0] = Device->deviceInfo.maxWorkGroupSize;
         retParamSize = gcmSIZEOF(retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
