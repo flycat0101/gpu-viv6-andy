@@ -41,7 +41,7 @@ struct gbm_viv_bo
     uint32_t type;
     uint64_t modifier;
     int32_t fd;
-    uint32_t tileStatusOffset;
+    int32_t ts_fd;
 };
 
 struct gbm_viv_buffer

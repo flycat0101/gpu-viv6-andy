@@ -32,9 +32,6 @@ CFLAGS += -fPIC -Werror
 
 CFLAGS += -I../../main \
           -I$(AQROOT)/hal/inc \
-          -I$(AQROOT)/hal/user \
-          -I$(AQROOT)/hal/os/linux/user \
-          -I$(AQROOT)/compiler/libVSC/include \
           -I$(AQROOT)/sdk/inc \
           -I$(AQROOT)/driver/khronos/libEGL/inc \
           -I$(ROOTFS)/usr/include/libdrm

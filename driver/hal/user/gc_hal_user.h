@@ -4465,6 +4465,12 @@ gcoHARDWARE_QueryCompression(
 #endif /* gcdENABLE_3D */
 
 gceSTATUS
+gcoHARDWARE_MapCompressionFormat(
+    IN  gctUINT32 InputFormat,
+    OUT gctUINT32 *OutputFormat
+);
+
+gceSTATUS
 gcoHARDWARE_GetSpecialHintData(
     IN gcoHARDWARE Hardware,
     OUT gctINT * Hint

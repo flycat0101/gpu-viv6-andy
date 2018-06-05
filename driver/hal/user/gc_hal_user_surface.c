@@ -2556,25 +2556,50 @@ gcoSURF_QueryVidMemNode(
     IN gcoSURF Surface,
     OUT gctUINT32 * Node,
     OUT gcePOOL * Pool,
-    OUT gctSIZE_T_PTR Bytes
+    OUT gctSIZE_T_PTR Bytes,
+    OUT gctUINT32 * TsNode,
+    OUT gcePOOL * TsPool,
+    OUT gctSIZE_T_PTR TsBytes
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
+
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
-    gcmVERIFY_ARGUMENT(Node != gcvNULL);
-    gcmVERIFY_ARGUMENT(Pool != gcvNULL);
-    gcmVERIFY_ARGUMENT(Bytes != gcvNULL);
 
     /* Return the video memory attributes. */
-    *Node = Surface->node.u.normal.node;
-    *Pool = Surface->node.pool;
-    *Bytes = Surface->node.size;
+    if (Node)
+    {
+        *Node = Surface->node.u.normal.node;
+    }
+    if (Pool)
+    {
+        *Pool = Surface->node.pool;
+    }
+    if (Bytes)
+    {
+        *Bytes = Surface->node.size;
+    }
+#if gcdENABLE_3D
+    if (TsNode)
+    {
+        *TsNode = Surface->tileStatusNode.u.normal.node;
+    }
+    if (TsPool)
+    {
+        *TsPool = Surface->tileStatusNode.pool;
+    }
+    if (TsBytes)
+    {
+        *TsBytes = Surface->tileStatusNode.size;
+    }
+#endif
 
     /* Success. */
-    gcmFOOTER_ARG("*Node=0x%x *Pool=%d *Bytes=%d", *Node, *Pool, *Bytes);
-    return gcvSTATUS_OK;
+    gcmFOOTER();
+    return status;
 }
 
 
@@ -3231,6 +3256,30 @@ OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
+}
+
+gceSTATUS
+gcoSURF_UpdateMetadata(
+    IN gcoSURF Surface,
+    IN gctINT TsFD
+    )
+{
+    gctUINT32 compressFmt;
+    gcsHAL_INTERFACE iface = {0};
+
+    gcoHARDWARE_MapCompressionFormat(Surface->compressFormat, &compressFmt);
+
+    iface.command = gcvHAL_SET_VIDEO_MEMORY_METADATA;
+    iface.u.SetVidMemMetadata.node              = Surface->node.u.normal.node;
+    iface.u.SetVidMemMetadata.readback          = 0;
+    iface.u.SetVidMemMetadata.ts_fd             = TsFD;
+    iface.u.SetVidMemMetadata.fc_enabled        = !Surface->tileStatusDisabled[0];
+    iface.u.SetVidMemMetadata.fc_value          = Surface->fcValue[0];
+    iface.u.SetVidMemMetadata.fc_value_upper    = Surface->fcValueUpper[0];
+    iface.u.SetVidMemMetadata.compressed        = Surface->compressed;
+    iface.u.SetVidMemMetadata.compress_format   = compressFmt;
+
+    return gcoHAL_Call(gcvNULL, &iface);
 }
 
 #endif /* gcdENABLE_3D */

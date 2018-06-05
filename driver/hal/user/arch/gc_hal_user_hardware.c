@@ -14,6 +14,7 @@
 #include "gc_hal_user_hardware_precomp.h"
 #include "gc_hal_user.h"
 #include "gc_hal_user_brush.h"
+#include "gc_hal_metadata.h"
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 #include "gc_feature_database.h"
@@ -23999,7 +24000,6 @@ OnError:
     return status;
 }
 
-
 /*
 ** We must make sure below format definiton is exact same.
 ** 7:4
@@ -27030,8 +27030,58 @@ OnError:
     return status;
 }
 
-
 #endif
+
+gceSTATUS
+gcoHARDWARE_MapCompressionFormat(
+    IN  gctUINT32 InputFormat,
+    OUT gctUINT32 *OutputFormat
+)
+{
+    if (!OutputFormat)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    switch (InputFormat)
+    {
+    case 0x0:
+        *OutputFormat = _VIV_CFMT_ARGB4;
+        break;
+    case 0x1:
+        *OutputFormat = _VIV_CFMT_A1R5G5B5;
+        break;
+    case 0x2:
+        *OutputFormat = _VIV_CFMT_R5G6B5;
+        break;
+    case 0x3:
+        *OutputFormat = _VIV_CFMT_ARGB8;
+        break;
+    case 0x4:
+        *OutputFormat = _VIV_CFMT_XRGB8;
+        break;
+    case 0x5:
+        *OutputFormat = _VIV_CFMT_Z24S8;
+        break;
+    case 0x6:
+        *OutputFormat = _VIV_CFMT_Z24;
+        break;
+    case 0x7:
+        *OutputFormat = _VIV_CFMT_VAA16;
+        break;
+    case 0x8:
+        *OutputFormat = _VIV_CFMT_Z16;
+        break;
+    case 0x9:
+        *OutputFormat = _VIV_CFMT_S8;
+        break;
+    default:
+        *OutputFormat = _VIV_CFMT_MAX;
+        break;
+    }
+
+    return gcvSTATUS_OK;
+}
 
 gceSTATUS
 gcoHARDWARE_GetProductName(

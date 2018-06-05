@@ -2582,6 +2582,9 @@ gckVIDMEM_NODE_Allocate(
 
     node = pointer;
 
+    node->metadata.magic = VIV_VIDMEM_METADATA_MAGIC;
+    node->metadata.ts_fd = -1;
+
     node->node = VideoNode;
     node->kernel = Kernel;
     node->type = Type;
@@ -3122,7 +3125,6 @@ OnError:
     gcmkFOOTER();
     return status;
 }
-
 
 typedef struct _gcsVIDMEM_NODE_FDPRIVATE
 {

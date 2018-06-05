@@ -2446,7 +2446,10 @@ gcoSURF_QueryVidMemNode(
     IN gcoSURF Surface,
     OUT gctUINT32 * Node,
     OUT gcePOOL * Pool,
-    OUT gctSIZE_T_PTR Bytes
+    OUT gctSIZE_T_PTR Bytes,
+    OUT gctUINT32 * TsNode,
+    OUT gcePOOL * TsPool,
+    OUT gctSIZE_T_PTR TsBytes
     );
 
 /* Set the color type of the surface. */
@@ -2950,6 +2953,12 @@ gcoSURF_WrapUserMultiBuffer(
     IN gctUINT BufferOffset[3],
     IN gctUINT32 Flag,
     OUT gcoSURF * Surface
+    );
+
+gceSTATUS
+gcoSURF_UpdateMetadata(
+    IN gcoSURF Surface,
+    IN gctINT TsFD
     );
 
 #define MAX_SURF_MIX_SRC_NUM 64

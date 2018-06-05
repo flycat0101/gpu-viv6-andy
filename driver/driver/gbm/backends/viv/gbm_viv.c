@@ -31,7 +31,6 @@
 #include "gbm_vivint.h"
 #include "gbmint.h"
 #include "gc_hal_priv.h"
-#include "gc_hal_user.h"
 #include <gc_egl_common.h>
 
 #define VIV_BACKEND_NAME "viv"
@@ -391,8 +390,9 @@ gbm_viv_bo_import(
     bo->base.gbm = gbm;
     bo->type = type;
     bo->fd = -1;
+    bo->ts_fd = -1;
 
-    if(type == GBM_BO_IMPORT_FD || type == GBM_BO_IMPORT_WL_BUFFER)
+    if (type == GBM_BO_IMPORT_FD || type == GBM_BO_IMPORT_WL_BUFFER)
     {
         if (!gbm_viv_is_format_supported(gbm, fd_data->format, usage))
         {
@@ -444,7 +444,18 @@ gbm_viv_bo_import(
         }
     }
 
-    bo->modifier = (tiling == gcvSUPERTILED) ? DRM_FORMAT_MOD_VIVANTE_SUPER_TILED : DRM_FORMAT_MOD_LINEAR;
+    /*TODO: Query from KMS to set modifier=DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC */
+    switch (tiling)
+    {
+    case gcvSUPERTILED:
+        bo->base.width  = gcmALIGN(bo->base.width , 64);
+        bo->base.height = gcmALIGN(bo->base.height, 64);
+        bo->modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC;
+        break;
+    default:
+        bo->modifier = DRM_FORMAT_MOD_LINEAR;
+        break;
+    }
 
     return &bo->base;
 
@@ -559,7 +570,7 @@ create_dumb(
     bo->base.handle.u32 = create_arg.handle;
     bo->size = create_arg.size;
     bo->fd = -1;
-    bo->tileStatusOffset = create_arg.pitch * height;
+    bo->ts_fd = -1;
 
     if (gbm_viv_bo_map_fd(bo) == NULL)
         goto destroy_dumb;
@@ -774,6 +785,12 @@ gbm_viv_bo_destroy(struct gbm_bo *_bo)
             close(bo->fd);
             bo->fd = -1;
         }
+
+        if (bo->ts_fd >= 0)
+        {
+            close(bo->ts_fd);
+            bo->ts_fd = -1;
+        }
     }
 
     free(bo);
@@ -825,32 +842,56 @@ gbm_viv_create_buffers(
     const unsigned int count
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT xalignment = 0;
     int i;
-    uint32_t alligned_width = 0;
+    char *p;
+    uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
     gceSURF_FORMAT gc_format;
     gceSURF_TYPE surfType = gcvSURF_BITMAP;
+    struct gbm_viv_device *dev = gbm_viv_device(surf->base.gbm);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmASSERT(!count || modifiers);
+
+    /* It's acceptable to create an image with INVALID modifier in the list,
+    * but it cannot be on the only modifier (since it will certainly fail
+    * later). While we could easily catch this after modifier creation, doing
+    * the check here is a convenient debug check likely pointing at whatever
+    * interface the client is using to build its modifier list.
+    */
+    if (count == 1 && modifiers[0] == DRM_FORMAT_MOD_INVALID)
+    {
+        fprintf(stderr, "Only invalid modifier specified\n");
+        errno = EINVAL;
+    }
+
+    modifier = _select_modifier(modifiers, count, &modifier);
+    p = getenv("GBM_SET_FORMAT_MOD_SUPER_TILED");
+    if (p && p[0] == '1')
+    {
+        modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
+    }
+    p = getenv("GBM_SET_FORMAT_MOD_LINEAR");
+    if (p && p[0] == '1')
+    {
+        modifier = DRM_FORMAT_MOD_LINEAR;
+    }
 
     gcmONERROR(gbm_viv_get_hal_format(format, &gc_format));
-    gcmONERROR(gcoSURF_GetAlignment(gcvSURF_BITMAP, gc_format, NULL, &xalignment, NULL));
-    alligned_width = gcmALIGN_NP2(width, xalignment);
 
     for (i = 0; i < surf->buffer_count; i++)
     {
         gcoSURF rtSurf = gcvNULL;
-
-        surf->buffers[i].bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, modifiers, count);
-        if (!surf->buffers[i].bo)
-        {
-            gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-        }
+        struct gbm_viv_bo *bo = NULL;
+        gctUINT32 node, tsNode = 0;
+        uint32_t handle;
+        gctINT32 fd;
+        int ret;
 
         surf->buffers[i].surf = surf;
         surf->buffers[i].status = FREE;
         gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-        switch (gbm_viv_bo_get_modifier(surf->buffers[i].bo))
+        switch (modifier)
         {
         case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
             surfType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
@@ -864,40 +905,58 @@ gbm_viv_create_buffers(
             surf->extResolve = gcvSTATUS_FALSE;
             surfType =  gcvSURF_BITMAP;
         }
-        surfType |= gcvSURF_CACHE_MODE_128;
+        /* TODO: Query from KMS to set gcvSURF_CACHE_MODE_128 bit */
+        surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128);
 
-        gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_USER, &rtSurf));
+        gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_DEFAULT, &rtSurf));
         surf->buffers[i].render_surface = rtSurf;
-
-        gcmONERROR(gcoSURF_SetBuffer(rtSurf,
-                                     surfType,
-                                     gc_format,
-                                     (gctUINT)surf->buffers[i].bo->stride,
-                                     gbm_viv_bo(surf->buffers[i].bo)->map,
-                                     ~0U));
-        gcmONERROR(gcoSURF_SetWindow(rtSurf,
-                                     0,
-                                     0,
-                                     width,
-                                     height));
-
-        if (surfType | gcvSURF_RENDER_TARGET)
+        if ((surfType & 0xFF) != gcvSURF_BITMAP)
         {
-            gcmONERROR(gcoSURF_SetFlags(rtSurf,
-                                        gcvSURF_FLAG_CONTENT_YINVERTED,
-                                        gcvTRUE));
-
-            if (surfType == gcvSURF_RENDER_TARGET)
-            {
-                /* Calculate tile status buffer addresses, this path can't work, disable it. */
-                gcmONERROR(gcoSURF_AppendTileStatus(rtSurf));
-#if gcdENABLE_3D
-                rtSurf->compressFormat = 3;
-#endif
-            }
-
-            gcmONERROR(gcoSURF_Lock(rtSurf, gcvNULL, gcvNULL));
+            gcoSURF_SetFlags(rtSurf,
+                             gcvSURF_FLAG_CONTENT_YINVERTED,
+                             gcvTRUE);
         }
+        gcmONERROR(gcoSURF_Lock(rtSurf, gcvNULL, gcvNULL));
+
+
+        bo = calloc(1, sizeof *bo);
+        if (bo == NULL)
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+        surf->buffers[i].bo = &bo->base;
+
+        bo->base.gbm = surf->base.gbm;
+        bo->base.format = format;
+        bo->modifier = modifier;
+
+        gcmONERROR(
+            gcoSURF_GetAlignedSize(rtSurf,
+                                   &bo->base.width,
+                                   &bo->base.height,
+                                   (gctINT_PTR)&bo->base.stride));
+        bo->size = bo->base.height * bo->base.stride;
+
+        gcmONERROR(
+            gcoSURF_QueryVidMemNode(rtSurf,
+                                    &node, gcvNULL, gcvNULL,
+                                    &tsNode, gcvNULL, gcvNULL));
+
+        gcmONERROR(gcoHAL_ExportVideoMemory(node, O_RDWR, &fd));
+        bo->fd = fd;
+        if (tsNode)
+        {
+            gcmONERROR(gcoHAL_ExportVideoMemory(tsNode, O_RDWR, &fd));
+            bo->ts_fd = fd;
+        }
+
+        ret = drmPrimeFDToHandle(dev->base.fd, bo->fd, &handle);
+        if (ret)
+        {
+            fprintf(stderr, "DRM_IOCTL_PRIME_FD_TO_HANDLE failed (fd=%u)\n", bo->fd);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        bo->base.handle.u32 = handle;
     }
 
     return gcvSTATUS_OK;
@@ -962,24 +1021,6 @@ OnError:
     return NULL;
 }
 
-static void
-_sync_tilestatus_buffer(
-   struct gbm_viv_bo *_bo,
-   gcoSURF       surface
-   )
-{
-#if gcdENABLE_3D
-    gctPOINTER tileStatusLogical = {0};
-    int size = surface->tileStatusNode.size;
-    tileStatusLogical = surface->tileStatusNode.logical + surface->tileStatusNode.bufferOffset;
-
-    if (tileStatusLogical && size > 0)
-    {
-        memcpy(_bo->map + _bo->tileStatusOffset, tileStatusLogical, size);
-    }
-#endif
-}
-
 static struct gbm_bo *
 gbm_viv_surface_lock_front_buffer(
     struct gbm_surface *surface
@@ -999,10 +1040,7 @@ gbm_viv_surface_lock_front_buffer(
             bo = surf->buffers[i].bo;
             viv_bo = gbm_viv_bo(bo);
 
-            if (viv_bo->modifier == DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC)
-            {
-                _sync_tilestatus_buffer(viv_bo, surf->buffers[i].render_surface);
-            }
+            gcoSURF_UpdateMetadata(surf->buffers[i].render_surface, viv_bo->ts_fd);
         }
     }
 
@@ -1070,9 +1108,6 @@ gbm_viv_surface_destroy(
         }
     }
 
-    /* Flush hardware to scheduled surface free to takeplace */
-    gcoHAL_Commit(gcvNULL, gcvTRUE);
-
     for (i = 0; i < surf->buffer_count; i++)
     {
         if (surf->buffers[i].bo != NULL)
@@ -1081,6 +1116,9 @@ gbm_viv_surface_destroy(
             surf->buffers[i].bo = NULL;
         }
     }
+
+    /* Flush hardware to scheduled surface free to takeplace */
+    gcoHAL_Commit(gcvNULL, gcvTRUE);
 
     free(surf);
 

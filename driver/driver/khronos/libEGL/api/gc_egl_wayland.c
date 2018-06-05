@@ -110,6 +110,7 @@ struct wl_egl_buffer
         gcoSURF surface;
         gceHARDWARE_TYPE hwType;
         gctINT32 fd;
+        gctINT32 ts_fd;
     } info;
 
     EGLint age;
@@ -451,6 +452,11 @@ buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t t
         close(buffer->info.fd);
         buffer->info.fd = -1;
     }
+    if (buffer->info.ts_fd >= 0)
+    {
+        close(buffer->info.ts_fd);
+        buffer->info.ts_fd = -1;
+    }
 
     /* Switch to hardware type when buffer allocation. */
     gcoHAL_GetHardwareType(gcvNULL, &hwType);
@@ -579,32 +585,25 @@ wl_egl_buffer_create(struct wl_egl_window *window,
         gcoSURF_QueryVidMemNode(surface,
                                 &buffer->info.node,
                                 &buffer->info.pool,
-                                &buffer->info.size));
+                                &buffer->info.size,
+                                &buffer->info.tsNode,
+                                &buffer->info.tsPool,
+                                &buffer->info.tsSize
+                                ));
 
     gcmONERROR(gcoHAL_ExportVideoMemory(buffer->info.node, O_RDWR, &fd));
-
     buffer->info.fd = fd;
-
-    gcmONERROR(
-        gcoHAL_NameVideoMemory(buffer->info.node,
-                               &buffer->info.node));
-
-#if gcdENABLE_3D
-    buffer->info.tsNode = surface->tileStatusNode.u.normal.node;
-    buffer->info.tsPool = surface->tileStatusNode.pool;
-    buffer->info.tsSize = surface->tileStatusNode.size;
+    gcmONERROR(gcoHAL_NameVideoMemory(buffer->info.node, &buffer->info.node));
 
     if (buffer->info.tsNode)
     {
+        gcmONERROR(gcoHAL_ExportVideoMemory(buffer->info.tsNode, O_RDWR, &fd));
+        buffer->info.ts_fd = fd;
+
         gcmONERROR(
             gcoHAL_NameVideoMemory(buffer->info.tsNode,
                                    &buffer->info.tsNode));
     }
-#else
-    buffer->info.tsNode = 0;
-    buffer->info.tsPool = gcvPOOL_UNKNOWN;
-    buffer->info.tsSize = 0;
-#endif
 
     buffer->info.width      = width;
     buffer->info.height     = height;
@@ -697,6 +696,11 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
             close(buffer->info.fd);
             buffer->info.fd = -1;
         }
+        if (buffer->info.ts_fd >= 0)
+        {
+            close(buffer->info.ts_fd);
+            buffer->info.ts_fd = -1;
+        }
 
         /* Switch to hardware type when buffer allocation. */
         gcoHAL_GetHardwareType(gcvNULL, &hwType);
@@ -744,7 +748,7 @@ static int wl_egl_window_set_format(struct wl_egl_window *window,
         return -EINVAL;
     }
 
-    window->type   = Type | gcvSURF_DMABUF_EXPORTABLE;
+    window->type   = Type | gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
     window->format = Format;
     return 0;
 }
@@ -817,8 +821,8 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     if (buffer->info.surface)
     {
         /* check resize. */
-        if (buffer->info.width  != window->width ||
-            buffer->info.height != window->height||
+        if (buffer->info.width  != window->width  ||
+            buffer->info.height != window->height ||
             buffer->info.format != window->format)
         {
             /* The buffer must not be in compositor (ie, QUEUED state). */
@@ -947,6 +951,8 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
         !surface->tileStatusDisabled[0], surface->compressed,
         surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+
+    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
     wl_surface_attach(window->surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(window->surface, x, y, width, height);
@@ -2029,6 +2035,7 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     for (i = 0; i < window->nr_buffers; ++i)
     {
         window->buffers[i].info.fd = -1;
+        window->buffers[i].info.ts_fd = -1;
     }
 
     wl_egl_window_register(window);
@@ -2392,49 +2399,40 @@ veglCreateWaylandBufferFromImage(
     buffer->info.width  = Image->image.u.wlbuffer.width;
     buffer->info.height = Image->image.u.wlbuffer.height;
     fd = Image->image.u.wlbuffer.fd;
+    surface = Image->image.surface;
 
     gcmASSERT((fd >= 0));
 
     gcmONERROR(
-        gcoSURF_GetAlignedSize(Image->image.surface,
+        gcoSURF_GetAlignedSize(surface,
                                gcvNULL,
                                gcvNULL,
                                &buffer->info.stride));
 
     gcmONERROR(
-       gcoSURF_QueryVidMemNode(Image->image.surface,
-                               &buffer->info.node,
-                               &buffer->info.pool,
-                               &buffer->info.size));
-
-    buffer->info.fd = fd;
-
-    gcmONERROR(
-        gcoSURF_GetFormat(Image->image.surface,
+        gcoSURF_GetFormat(surface,
                           &buffer->info.type,
                           &buffer->info.format));
 
-    surface = Image->image.surface;
+    gcmONERROR(
+        gcoSURF_QueryVidMemNode(surface,
+                                &buffer->info.node,
+                                &buffer->info.pool,
+                                &buffer->info.size,
+                                &buffer->info.tsNode,
+                                &buffer->info.tsPool,
+                                &buffer->info.tsSize
+                                ));
 
-#if gcdENABLE_3D
-    buffer->info.tsNode = surface->tileStatusNode.u.normal.node;
-    buffer->info.tsPool = surface->tileStatusNode.pool;
-    buffer->info.tsSize = surface->tileStatusNode.size;
+    buffer->info.fd = fd;
+    gcmONERROR(gcoHAL_NameVideoMemory(buffer->info.node, &buffer->info.node));
 
     if (buffer->info.tsNode)
     {
-        gcmONERROR(
-            gcoHAL_NameVideoMemory(buffer->info.tsNode,
-                                   &buffer->info.tsNode));
+        gcmONERROR(gcoHAL_ExportVideoMemory(buffer->info.tsNode, O_RDWR, &fd));
+        buffer->info.ts_fd = fd;
+        gcmONERROR(gcoHAL_NameVideoMemory(buffer->info.tsNode, &buffer->info.tsNode));
     }
-#else
-    buffer->info.tsNode = 0;
-    buffer->info.tsPool = gcvPOOL_UNKNOWN;
-    buffer->info.tsSize = 0;
-#endif
-
-    gcmONERROR(
-        gcoHAL_NameVideoMemory(buffer->info.node, &buffer->info.node));
 
     wl_buf = buffer->wl_buf =
         wl_viv_create_buffer(display->wl_viv,

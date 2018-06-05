@@ -409,6 +409,7 @@ EXPORTS
 
     gcoSURF_FlushTileStatus
     gcoSURF_AppendTileStatus
+	gcoSURF_UpdateMetadata
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
