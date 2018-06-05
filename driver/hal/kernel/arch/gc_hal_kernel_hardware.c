@@ -13839,24 +13839,6 @@ gckHARDWARE_EnterQueryClock(
 {
     gceSTATUS status;
     gctUINT64 mcStart, shStart;
-    gctBOOL acquired = gcvFALSE;
-
-    while (!acquired)
-    {
-        gcmkONERROR(
-            gckOS_AcquireMutex(Hardware->os, Hardware->powerMutex, gcvINFINITE));
-        acquired = gcvTRUE;
-
-        if (Hardware->chipPowerState != gcvPOWER_ON)
-        {
-            /* Release mutex and try power on. */
-            gckOS_ReleaseMutex(Hardware->os, Hardware->powerMutex);
-            acquired = gcvFALSE;
-
-            gcmkONERROR(
-                gckHARDWARE_SetPowerManagementState(Hardware, gcvPOWER_ON_AUTO));
-        }
-    }
 
     gcmkONERROR(gckOS_GetTime(&mcStart));
     gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00438, 0));
@@ -13875,11 +13857,6 @@ gckHARDWARE_EnterQueryClock(
     }
 
 OnError:
-    if (acquired)
-    {
-        gckOS_ReleaseMutex(Hardware->os, Hardware->powerMutex);
-    }
-
     return status;
 }
 

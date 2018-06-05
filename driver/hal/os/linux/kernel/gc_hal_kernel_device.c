@@ -2126,6 +2126,17 @@ gckGALDEVICE_QueryFrequency(
 
             mcStart[i] = shStart[i] = 0;
 
+            if (Device->args.powerManagement)
+            {
+                gcmkONERROR(gckHARDWARE_SetPowerManagement(
+                    hardware, gcvFALSE
+                    ));
+            }
+
+            gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+                hardware, gcvPOWER_ON_AUTO
+                ));
+
             gckHARDWARE_EnterQueryClock(hardware,
                                         &mcStart[i], &shStart[i]);
         }
@@ -2147,6 +2158,13 @@ gckGALDEVICE_QueryFrequency(
         if (Device->kernels[i] && mcStart[i])
         {
             hardware = Device->kernels[i]->hardware;
+
+            if (Device->args.powerManagement)
+            {
+                gcmkONERROR(gckHARDWARE_SetPowerManagement(
+                    hardware, gcvTRUE
+                    ));
+            }
 
             gckHARDWARE_ExitQueryClock(hardware,
                                        mcStart[i], shStart[i],
