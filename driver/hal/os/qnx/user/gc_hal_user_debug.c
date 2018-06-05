@@ -660,6 +660,10 @@ _Print(
 
     /* Print message to buffer. */
     n = gcmVSPRINTF(buffer + i, sizeof(buffer) - i, Message, Arguments);
+    if (n > (int)sizeof(buffer) - i)
+    {
+        n = (int)sizeof(buffer) - i;
+    }
     buffer[sizeof(buffer) - 1] = '\0';
 
     if ((n <= 0) || (buffer[i + n - 1] != '\n'))
