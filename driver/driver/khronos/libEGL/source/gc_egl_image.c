@@ -1090,7 +1090,7 @@ static struct
 {
     int fourcc;
     gceSURF_FORMAT format;
-    gctUINT32 modifer;  /* modifier.*/
+    gctUINT32 modiferBits;  /* modifier.*/
 }
 _FormatTable[] =
 {
@@ -1877,12 +1877,14 @@ veglQueryDmaBufFormats(
     EGLint *num_formats
     )
 {
+    gceSTATUS       status = gcvSTATUS_OK;
+
 #ifdef LINUX
     VEGLThreadData  thread;
     VEGLDisplay     dpy;
-    gceSTATUS       status;
-    gctUINT         formatCount = 0;
-    gctUINT         i = 0;
+    gctSIZE_T       i;
+    EGLint          fmtCount = 0;
+    EGLint          fmtIndex = 0;
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -1914,95 +1916,40 @@ veglQueryDmaBufFormats(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Get format Count */
-    for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
-    {
-        /* Now, we only support super tiled format.*/
-        if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT)
-        {
-            formatCount++;
-        }
-    }
-
-    if (max_formats < 0)
+    if (max_formats < 0 || !num_formats)
     {
         veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-    else if (max_formats == 0)
+
+    if (max_formats > 0 && !formats)
     {
-        gcmASSERT(num_formats);
-        *num_formats = formatCount;
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-    else
+
+    /* Get format Count */
+    for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
     {
-        if (formats)
+        /* Now, we only support super tiled format.*/
+        if (_FormatTable[i].modiferBits != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT)
         {
-            for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
+            fmtCount++;
+
+            if (fmtIndex < max_formats)
             {
-                if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT)
-                {
-                    formats[i] = _FormatTable[i].fourcc;
-                }
+                formats[fmtIndex++] = _FormatTable[i].fourcc;
             }
-        }
-        else
-        {
-            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
 
-    /* Success */
-    return EGL_TRUE;
+    *num_formats = fmtCount;
+
 OnError:
 #endif
-    return EGL_FALSE;
+
+    return gcmIS_ERROR(status) ? EGL_FALSE : EGL_TRUE;
 }
-
-#ifdef LINUX
-static EGLBoolean
-_QueryDmaBufModifiers(
-    gctUINT formatIndex,
-    EGLint *num_modifiers,
-    EGLuint64KHR *modifiers
-    )
-{
-    EGLint modifierCount = 0;
-    gctUINT32 modifier = _FormatTable[formatIndex].modifer;
-    const gctUINT32 modifierBitTable[] = {
-        __DRM_FORMAT_MOD_VIVANTE_TILED_BIT,
-        __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT,
-        __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT,
-        __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT
-        };
-    gctUINT i = 0;
-
-    /* Compute modifier num or fill modifier.*/
-    for (i = 0; i < gcmCOUNTOF(modifierBitTable); ++i)
-    {
-        if (modifier & modifierBitTable[i])
-        {
-            if (num_modifiers)
-            {
-                modifierCount++;
-            }
-            else
-            {
-                gcmASSERT(modifiers);
-                modifiers[i] = _ModiferTable[i];
-            }
-        }
-    }
-
-    if (num_modifiers)
-    {
-        *num_modifiers = modifierCount;
-    }
-
-    return EGL_TRUE;
-}
-#endif
 
 static EGLBoolean
 veglQueryDmaBufModifiers(
@@ -2014,12 +1961,15 @@ veglQueryDmaBufModifiers(
     EGLint *num_modifiers
     )
 {
+    gceSTATUS       status = gcvSTATUS_OK;
+
 #ifdef LINUX
-    VEGLThreadData     thread;
-    VEGLDisplay        dpy;
-    gceSTATUS          status;
-    gctUINT            formatCount = 0;
-    gctUINT            i = 0;
+    VEGLThreadData  thread;
+    VEGLDisplay     dpy;
+    gctSIZE_T       i = 0;
+    gctUINT32       modifierBits  = 0;
+    EGLint          modifierCount = 0;
+    EGLint          modifierIndex = 0;
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -2031,7 +1981,7 @@ veglQueryDmaBufModifiers(
             __FUNCTION__, __LINE__
             );
 
-        return EGL_FALSE;
+        gcmONERROR(gcvSTATUS_INVALID_OBJECT);
     }
 
     /* Test for valid EGLDisplay structure. */
@@ -2051,51 +2001,62 @@ veglQueryDmaBufModifiers(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Get format Count */
-    formatCount = gcmCOUNTOF(_FormatTable);
+    if (max_modifiers < 0 || !num_modifiers)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (max_modifiers > 0 && !modifiers)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
 
     /* Check format */
-    for (i = 0; i < formatCount; ++i)
+    for (i = 0; i < gcmCOUNTOF(_FormatTable); ++i)
     {
-        if (_FormatTable[i].modifer != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT &&
+        if (_FormatTable[i].modiferBits != __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT &&
             format == _FormatTable[i].fourcc)
+        {
+            modifierBits = _FormatTable[i].modiferBits;
             break;
+        }
     }
 
-    if (i >= formatCount)
+    if (i >= gcmCOUNTOF(_FormatTable))
     {
         veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (max_modifiers < 0)
+    /* Compute modifier num or fill modifier.*/
+    for (i = 0; i < gcmCOUNTOF(_ModiferTable); ++i)
     {
-        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-    else if (max_modifiers == 0)
-    {
-        gcmASSERT(num_modifiers);
-        _QueryDmaBufModifiers(i, num_modifiers, gcvNULL);
-    }
-    else
-    {
-        if (modifiers)
+        if (modifierBits & (1 << i))
         {
-            _QueryDmaBufModifiers(i, gcvNULL, modifiers);
-        }
-        else
-        {
-            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            modifierCount++;
+
+            if (modifierIndex < max_modifiers)
+            {
+                modifiers[modifierIndex] = _ModiferTable[i];
+
+                if (external_only)
+                {
+                    external_only[modifierIndex] = EGL_FALSE;
+                }
+
+                modifierIndex++;
+            }
         }
     }
 
-    /* Success */
-    return EGL_TRUE;
+    *num_modifiers = modifierCount;
+
 OnError:
 #endif
-    return EGL_FALSE;
+
+    return gcmIS_ERROR(status) ? EGL_FALSE : EGL_TRUE;
 }
 
 /* EGL 1.5 */

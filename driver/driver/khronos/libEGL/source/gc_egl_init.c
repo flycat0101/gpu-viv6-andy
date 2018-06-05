@@ -60,6 +60,7 @@ static struct eglExtension extensions[] =
     {"EGL_KHR_gl_texture_cubemap_image",        EGL_TRUE },
     {"EGL_KHR_gl_renderbuffer_image",           EGL_TRUE },
     {"EGL_EXT_image_dma_buf_import",            EGL_FALSE},
+    {"EGL_EXT_image_dma_buf_import_modifiers",  EGL_FALSE},
     {"EGL_KHR_lock_surface",                    EGL_TRUE },
     {"EGL_KHR_create_context",                  EGL_TRUE },
     {"EGL_KHR_surfaceless_context",             EGL_TRUE },
@@ -92,6 +93,7 @@ _GenExtension(
 
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
+    extensions[VEGL_EXTID_EXT_image_dma_buf_import_modifiers].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
         Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV ||

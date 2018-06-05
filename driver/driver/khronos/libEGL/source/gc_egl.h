@@ -653,6 +653,7 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_KHR_gl_texture_cubemap_image,
     VEGL_EXTID_KHR_gl_renderbuffer_image,
     VEGL_EXTID_EXT_image_dma_buf_import,
+    VEGL_EXTID_EXT_image_dma_buf_import_modifiers,
     VEGL_EXTID_KHR_lock_surface,
     VEGL_EXTID_KHR_create_context,
     VEGL_EXTID_KHR_surfaceless_context,
@@ -670,7 +671,6 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_KHR_partial_update,
     VEGL_EXTID_EXT_swap_buffers_with_damage,
     VEGL_EXTID_KHR_swap_buffers_with_damage,
-    VEGL_EXTID_EXT_image_dma_buf_import_modifiers,
 
     VEGL_EXTID_COUNT,
 }
