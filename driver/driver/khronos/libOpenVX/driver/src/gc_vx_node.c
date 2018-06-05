@@ -988,7 +988,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseNode(vx_node *node)
 {
-    return vxoNode_Release(node);
+    if((*node)->base.type == VX_TYPE_NODE)
+    {
+        return vxoNode_Release(node);
+    }
+    else
+    {
+        return vxoReference_Release((vx_reference *)node, VX_TYPE_ERROR, VX_REF_INTERNAL);
+    }
 }
 
 VX_API_ENTRY vx_status  VX_API_CALL vxRemoveNode(vx_node *node)
