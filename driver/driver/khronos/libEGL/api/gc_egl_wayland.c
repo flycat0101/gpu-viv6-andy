@@ -267,6 +267,12 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
     }
 }
 
+static void
+registry_handle_global_remove(void *data, struct wl_registry *wl_registry,
+                              uint32_t name)
+{
+}
+
 static const struct wl_registry_listener registry_listener = {
     /**
      * global - announce global object
@@ -280,7 +286,24 @@ static const struct wl_registry_listener registry_listener = {
      * given name is now available, and it implements the given version
      * of the given interface.
      */
-    registry_handle_global
+    registry_handle_global,
+
+    /*
+     * global_remove - announce removal of global object
+     *
+     * Notify the client of removed global objects.
+     *
+     * This event notifies the client that the global identified by
+     * name is no longer available. If the client bound to the global
+     * using the bind request, the client should now destroy that
+     * object.
+     *
+     * The object remains valid and requests to the object will be
+     * ignored until the client destroys it, to avoid races between the
+     * global going away and a client sending a request to it.
+     * @param name numeric name of the global object
+     */
+    registry_handle_global_remove
 };
 
 static struct wl_egl_display *
