@@ -1046,7 +1046,14 @@ _GetGenericDrmBufferBaseType(
     /* TODO: Get base type. */
     if (Buffer->usage & GRALLOC_USAGE_TILED_VIV)
     {
-        *BaseType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+        if (Buffer->usage & GRALLOC_USAGE_TS_VIV)
+        {
+            *BaseType = gcvSURF_RENDER_TARGET;
+        }
+        else
+        {
+            *BaseType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+        }
     }
     else
     {
