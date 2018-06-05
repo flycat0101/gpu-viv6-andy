@@ -106,7 +106,7 @@ KLC    **/
   return Success;
 }
 
-#define _USE_FILE_LOCK_FOR_RD_WR   1
+#define _USE_FILE_LOCK_FOR_RD_WR   0
 #define RESOURCE_DIRECTORY "/driver/openGL/libCL/frontend/llvm/bin/lib/clang/2.8"
 
 static char *_IncludePaths[] = {
