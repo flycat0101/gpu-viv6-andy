@@ -39,6 +39,7 @@ struct gbm_viv_bo
     uint32_t size;
     void *map;
     uint32_t type;
+    uint64_t modifier;
     int32_t fd;
 };
 
@@ -63,6 +64,7 @@ struct gbm_viv_surface
     struct gbm_viv_buffer buffers[GBM_MAX_BUFFER];
     gctINT buffer_count;
     uint32_t bpp;
+    gctBOOL extResolve;
 };
 
 struct

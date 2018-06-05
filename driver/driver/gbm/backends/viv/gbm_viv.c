@@ -18,6 +18,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -25,13 +26,19 @@
 
 #include <fcntl.h>
 #include <xf86drm.h>
+#include <drm_fourcc.h>
 
 #include "gbm_vivint.h"
 #include "gbmint.h"
+#include "gc_hal_priv.h"
 
 #include <gc_egl_common.h>
 
 #define VIV_BACKEND_NAME "viv"
+
+#ifndef DRM_FORMAT_MOD_INVALID
+#define DRM_FORMAT_MOD_INVALID ((1ULL<<56) - 1)
+#endif
 
 #ifndef DRM_FORMAT_MOD_LINEAR
 #define DRM_FORMAT_MOD_LINEAR 0
@@ -56,6 +63,7 @@ gbm_viv_query_attrib_from_image(
     gctINT *height,
     gctINT *stride,
     gceSURF_FORMAT *format,
+    gceTILING *tiling,
     void **pixel,
     uint32_t *handle
     )
@@ -108,6 +116,11 @@ gbm_viv_query_attrib_from_image(
                 gcmONERROR(gcoSURF_GetAlignedSize(surface, gcvNULL, gcvNULL, stride));
             }
 
+            if (tiling != gcvNULL)
+            {
+                gcmONERROR(gcoSURF_GetTiling(surface, tiling));
+            }
+
             if (pixel != gcvNULL)
             {
                 if(image->type == KHR_IMAGE_PIXMAP)
@@ -145,6 +158,7 @@ uint32_t gbm_viv_query_waylandbuffer(
     int32_t * Height,
     int32_t *Stride,
     int32_t *Format,
+    gceTILING *Tiling,
     int * Fd
     )
 {
@@ -174,6 +188,11 @@ uint32_t gbm_viv_query_waylandbuffer(
         gcmONERROR(gcoSURF_GetAlignedSize(buffer->surface, &wx, &hx, Stride));
     }
 
+    if (Tiling)
+    {
+        gcmONERROR(gcoSURF_GetTiling(buffer->surface, Tiling));
+    }
+
     if (Fd)
     {
         *Fd = buffer->fd;
@@ -193,6 +212,7 @@ uint32_t gbm_viv_query_waylandbuffer(
     int32_t * Height,
     int32_t *Stride,
     int32_t *Format,
+    gceTILING *Tiling,
     int * Fd
     )
 {
@@ -334,9 +354,10 @@ gbm_viv_bo_import(
     struct gbm_viv_bo *bo = NULL;
     struct drm_prime_handle prime_handle;
     struct gbm_import_fd_data wl_fd_data={0};
+    gceTILING tiling = 0;
     int ret;
 
-    if (type == GBM_BO_IMPORT_EGL_IMAGE)
+    if (type == GBM_BO_IMPORT_WL_BUFFER)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -345,7 +366,8 @@ gbm_viv_bo_import(
     if (type == GBM_BO_IMPORT_WL_BUFFER)
     {
         int32_t w,h,stride,fd,format;
-        if (gbm_viv_query_waylandbuffer(buffer, &w, &h, &stride, &format, &fd))
+
+        if (gbm_viv_query_waylandbuffer(buffer, &w, &h, &stride, &format, &tiling, &fd))
         {
             wl_fd_data.fd = (int)fd;
             wl_fd_data.width = (uint32_t)w;
@@ -353,7 +375,9 @@ gbm_viv_bo_import(
             gbm_viv_get_gbm_format((gceSURF_FORMAT)format, &wl_fd_data.format);
             wl_fd_data.stride = (uint32_t)stride;
             fd_data = &wl_fd_data;
-        } else {
+        }
+        else
+        {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
@@ -379,8 +403,7 @@ gbm_viv_bo_import(
         ret = drmIoctl(dev->base.fd, DRM_IOCTL_PRIME_FD_TO_HANDLE, &prime_handle);
         if (ret)
         {
-            fprintf(stderr, "DRM_IOCTL_PRIME_FD_TO_HANDLE failed "
-                    "(fd=%u)\n", prime_handle.fd);
+            fprintf(stderr, "DRM_IOCTL_PRIME_FD_TO_HANDLE failed (fd=%u)\n", prime_handle.fd);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
         bo->base.handle.u32 = prime_handle.handle;
@@ -403,9 +426,10 @@ gbm_viv_bo_import(
             gctINT height;
             gctINT stride;
             gceSURF_FORMAT format;
-            void *pixel;
+            void *pixel = gcvNULL;
             uint32_t handle;
-            gcmONERROR(gbm_viv_query_attrib_from_image(buffer, &width, &height, &stride, &format, &pixel, &handle));
+
+            gcmONERROR(gbm_viv_query_attrib_from_image(buffer, &width, &height, &stride, &format, &tiling, &pixel, &handle));
             bo->base.handle.u32 = handle;
             bo->base.width = width;
             bo->base.height = height;
@@ -413,15 +437,18 @@ gbm_viv_bo_import(
             bo->base.format = format;
             bo->size = height * stride;
             bo->map = pixel;
-        } else {
+        }
+        else
+        {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
 
+    bo->modifier = (tiling == gcvSUPERTILED) ? DRM_FORMAT_MOD_VIVANTE_SUPER_TILED : DRM_FORMAT_MOD_LINEAR;
+
     return &bo->base;
 
 OnError:
-
     if (bo)
     {
         free(bo);
@@ -553,14 +580,62 @@ gbm_viv_bo_create(
     const unsigned int count
     )
 {
-    if (modifiers)
+    struct gbm_bo *_bo = NULL;
+    struct gbm_viv_bo *bo = NULL;
+    uint64_t preferredMod = DRM_FORMAT_MOD_LINEAR;
+    uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
+    uint64_t i = 0;
+
+    if (count)
+        assert(modifiers);
+#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
+    preferredMod = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
+#endif
+
+    /* It's acceptable to create an image with INVALID modifier in the list,
+    * but it cannot be on the only modifier (since it will certainly fail
+    * later). While we could easily catch this after modifier creation, doing
+    * the check here is a convenient debug check likely pointing at whatever
+    * interface the client is using to build its modifier list.
+    */
+    if (count == 1 && modifiers[0] == DRM_FORMAT_MOD_INVALID)
+    {
+        fprintf(stderr, "Only invalid modifier specified\n");
+        errno = EINVAL;
+    }
+
+    /*Find preffered modifier exists in the list */
+    for (i = 0; i < count; i++)
+    {
+        if (modifiers[i] == preferredMod)
+        {
+            modifier  = preferredMod;
+            break;
+        }
+    }
+
+#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
+    switch(modifier)
+    {
+    case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
+        width = gcmALIGN(width, 64);
+        height = gcmALIGN(height, 64);
+        break;
+    case DRM_FORMAT_MOD_VIVANTE_TILED:
+        width = gcmALIGN(width, 4);
+        height = gcmALIGN(height, 4);
+        break;
+    }
+#endif
+
+    _bo = create_dumb(gbm, width, height, format, usage);
+    if (_bo == NULL)
     {
         return NULL;
     }
-    else
-    {
-        return create_dumb(gbm, width, height, format, usage);
-    }
+    bo = gbm_viv_bo(_bo);
+    bo->modifier = modifier;
+    return _bo;
 }
 
 static int
@@ -576,7 +651,13 @@ gbm_viv_bo_get_handle_for_plane(
     int plane
     )
 {
+    /* Preserve legacy behavior if plane is 0 */
     union gbm_bo_handle ret;
+
+    if (plane == 0)
+    {
+        return _bo->handle;
+    }
     ret.s32 = -1;
 
     errno = ENOSYS;
@@ -591,7 +672,9 @@ gbm_viv_bo_get_stride(
 {
     /* Preserve legacy behavior if plane is 0 */
     if (plane == 0)
+    {
         return _bo->stride;
+    }
 
     errno = ENOSYS;
     return 0;
@@ -610,7 +693,9 @@ gbm_viv_bo_get_offset(
 static uint64_t
 gbm_viv_bo_get_modifier(struct gbm_bo *_bo)
 {
-    return DRM_FORMAT_MOD_LINEAR;
+    struct gbm_viv_bo *bo = gbm_viv_bo(_bo);
+
+    return bo->modifier;
 }
 
 static void
@@ -679,7 +764,9 @@ gbm_viv_create_buffers(
     uint32_t width,
     uint32_t height,
     uint32_t format,
-    uint32_t usage
+    uint32_t usage,
+    const uint64_t *modifiers,
+    const unsigned int count
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -687,6 +774,7 @@ gbm_viv_create_buffers(
     int i;
     uint32_t alligned_width = 0;
     gceSURF_FORMAT gc_format;
+    gceSURF_TYPE surfType = gcvSURF_BITMAP;
 
     gcmONERROR(gbm_viv_get_hal_format(format, &gc_format));
     gcmONERROR(gcoSURF_GetAlignment(gcvSURF_BITMAP, gc_format, NULL, &xalignment, NULL));
@@ -694,30 +782,63 @@ gbm_viv_create_buffers(
 
     for (i = 0; i < surf->buffer_count; i++)
     {
-        gcoSURF rtSurf = gcvNULL;
-        struct gbm_bo *bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, 0, 0);
-
-        if (!bo)
+        surf->buffers[i].bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, modifiers, count);
+        if (!surf->buffers[i].bo)
         {
             gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
         }
-        surf->buffers[i].bo = bo;
-
-        gcmONERROR(gcoSURF_WrapUserMemory(
-            gcvNULL,
-            width,
-            height,
-            bo->stride,
-            1,
-            gcvSURF_BITMAP,
-            gc_format,
-            gbm_viv_bo_get_fd(bo),
-            gcvALLOC_FLAG_DMABUF,
-            &rtSurf));
 
         surf->buffers[i].surf = surf;
-        surf->buffers[i].render_surface = rtSurf;
         surf->buffers[i].status = FREE;
+        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+
+#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
+        switch (gbm_viv_bo_get_modifier(surf->buffers[i].bo))
+        {
+        case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
+            surfType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+            surf->extResolve = gcvSTATUS_TRUE;
+            break;
+        case DRM_FORMAT_MOD_VIVANTE_TILED:
+            surfType = gcvSURF_TEXTURE;
+            break;
+        default:
+            surf->extResolve = gcvSTATUS_FALSE;
+            surfType = gcvSURF_BITMAP;
+        }
+
+        /* Newer Cores support SUPERTILE as native format. Need to map in order to get tiled surface */
+        if (gbm_viv_bo_get_modifier(surf->buffers[i].bo) == DRM_FORMAT_MOD_VIVANTE_TILED && surfType == gcvSURF_TEXTURE)
+        {
+            gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, gcvSURF_TEXTURE, gc_format,
+                                         gcvPOOL_USER, &surf->buffers[i].render_surface));
+            gcmONERROR(gcoSURF_MapUserSurface(surf->buffers[i].render_surface,
+                                              0, gbm_viv_bo(surf->buffers[i].bo)->map,
+                                              gcvINVALID_ADDRESS));
+        }
+        else
+#endif
+        {
+            gcmONERROR(gcoSURF_ConstructWrapper(NULL, &surf->buffers[i].render_surface));
+            gcmONERROR(gcoSURF_SetBuffer(surf->buffers[i].render_surface,
+                                         surfType,
+                                         gc_format,
+                                         (gctUINT)surf->buffers[i].bo->stride,
+                                         gbm_viv_bo(surf->buffers[i].bo)->map, ~0U));
+            gcmONERROR(gcoSURF_SetWindow(surf->buffers[i].render_surface,
+                                         0,
+                                         0,
+                                         width,
+                                         height));
+        }
+
+        if (surfType | gcvSURF_RENDER_TARGET)
+        {
+            gcmVERIFY_OK(
+                        gcoSURF_SetFlags(surf->buffers[i].render_surface,
+                                         gcvSURF_FLAG_CONTENT_YINVERTED,
+                                         gcvTRUE));
+        }
     }
 
     return gcvSTATUS_OK;
@@ -756,7 +877,7 @@ gbm_viv_surface_create(
     gceSTATUS status;
     uint32_t usage = GBM_BO_USE_SCANOUT;
     struct gbm_viv_surface *surf = calloc(1, sizeof(*surf));
-    if (!surf || modifiers)
+    if (!surf)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -769,7 +890,7 @@ gbm_viv_surface_create(
     surf->base.flags = flags;
 
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
-        format, usage));
+        format, usage, modifiers, count));
 
     return &surf->base;
 

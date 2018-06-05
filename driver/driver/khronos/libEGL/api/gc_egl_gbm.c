@@ -480,7 +480,23 @@ gbm_CancelDisplayBackbuffer(
     IN gctINT Y
     )
 {
-    return gcvSTATUS_NOT_SUPPORTED;
+    int i;
+    struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) Window);
+
+    gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
+
+    for (i = 0; i < surf->buffer_count; i++)
+    {
+        if (surf->buffers[i].render_surface == Surface)
+        {
+            surf->buffers[i].status = FREE;
+            break;
+        }
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -763,21 +779,20 @@ gbm_GetDisplayBackbufferEx(
     int i;
     struct gbm_viv_surface * surf = (struct gbm_viv_surface *)Window;
 
-    for (i = 0; i < surf->buffer_count; i++) {
-       if (surf->buffers[i].status == FREE) {
-           *surface = surf->buffers[i].render_surface;
-           surf->buffers[i].status = USED_BY_EGL;
-           *Offset  = 0;
-           *X       = 0;
-           *Y       = 0;
-           break;
-       }
+    for (i = 0; i < surf->buffer_count; i++)
+    {
+        if (surf->buffers[i].status == FREE)
+        {
+            *surface = surf->buffers[i].render_surface;
+            surf->buffers[i].status = USED_BY_EGL;
+            *Offset  = 0;
+            *X       = 0;
+            *Y       = 0;
+            break;
+        }
     }
 
-    if(!surface)
-        return gcvSTATUS_OUT_OF_RESOURCES;
-
-    return gcvSTATUS_OK;
+    return (*surface) ? gcvSTATUS_OK : gcvSTATUS_OUT_OF_RESOURCES;
 }
 
 gceSTATUS
@@ -979,14 +994,86 @@ gbm_SetWindowFormat(
     IN gceSURF_FORMAT Format
     )
 {
-    /*
-     * Possiable types:
-     *   gcvSURF_BITMAP
-     *   gcvSURF_RENDER_TARGET
-     *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
-     *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
-     */
-    return gcvSTATUS_NOT_SUPPORTED;
+    struct _GBMDisplay* display;
+    gceSTATUS status;
+    gctINT width;
+    gctINT height;
+    gceSURF_FORMAT format;
+    gceSURF_TYPE type;
+    gctINT bitsPerPixel;
+    gceTILING tiling = gcvINVALIDTILED;
+    gcoSURF tmpSurface = gcvNULL;
+    struct gbm_viv_surface *win;
+
+    if (Display == NULL || Window == NULL)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    display = _FindDisplay(Display);
+    if (display == NULL)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    win = (struct gbm_viv_surface *)Window;
+    if (!win->extResolve)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    /* Get Window info. */
+    status = gbm_GetWindowInfoEx(Display,
+                                 (PlatformWindowType) Window,
+                                 gcvNULL, gcvNULL,
+                                 &width, &height,
+                                 &bitsPerPixel,
+                                 gcvNULL,
+                                 &format,
+                                 &type);
+
+    if (gcmIS_ERROR(status))
+    {
+        /* Bad native window. */
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    if (Format != format)
+    {
+        /* Can not change format. */
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    switch ((int)Type)
+    {
+    case gcvSURF_RENDER_TARGET:
+        return gcvSTATUS_NOT_SUPPORTED;
+
+    case gcvSURF_RENDER_TARGET_NO_TILE_STATUS:
+            status = gcoSURF_Construct(gcvNULL,
+                                   width, height, 1,
+                                   gcvSURF_RENDER_TARGET | gcvSURF_NO_VIDMEM,
+                                   format,
+                                   gcvPOOL_DEFAULT,
+                                   &tmpSurface);
+
+        if (gcmIS_SUCCESS(status))
+        {
+            gcoSURF_GetTiling(tmpSurface, &tiling);
+            gcoSURF_Destroy(tmpSurface);
+        }
+        break;
+
+    case gcvSURF_BITMAP:
+        return gcvSTATUS_NOT_SUPPORTED;
+        break;
+
+    default:
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    display->tiling = tiling;
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -2051,7 +2138,7 @@ _BindWindow(
                                                gcvSURF_RENDER_TARGET_NO_TILE_STATUS,
                                                reqFormat);
 
-                if (gcmIS_SUCCESS(status))
+                if (Surface->config.depthSize == 0 && gcmIS_SUCCESS(status))
                 {
                     /* Should use direct rendering with fc-fill. */
                     renderMode = VEGL_DIRECT_RENDERING_FCFILL;
@@ -2071,7 +2158,7 @@ _BindWindow(
             }
         }
         while (gcvFALSE);
-#   endif
+#endif
 
         if ((renderMode == VEGL_INDIRECT_RENDERING) &&
             ((type != gcvSURF_BITMAP) || (info->type != gcvSURF_BITMAP)))
@@ -2527,7 +2614,7 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    return EGL_FALSE;
+    return EGL_TRUE;
 }
 
 /******************************************************************************/

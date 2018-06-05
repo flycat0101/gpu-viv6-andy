@@ -542,11 +542,6 @@ gbm_surface_create_with_modifiers(struct gbm_device *gbm,
                                   const uint64_t *modifiers,
                                   const unsigned int count)
 {
-   if ((count && !modifiers) || (modifiers && !count)) {
-      errno = EINVAL;
-      return NULL;
-   }
-
    return gbm->surface_create(gbm, width, height, format, 0,
                               modifiers, count);
 }
