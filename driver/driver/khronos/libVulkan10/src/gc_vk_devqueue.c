@@ -784,6 +784,9 @@ VkResult __vk_QueueCommit(
                            0,
                            dumpBytes);
         }
+
+        /* Dump the commit. */
+        gcmDUMP(gcvNULL, "@[commit]");
 #endif
 
         /* Advance the offset for next commit. */
