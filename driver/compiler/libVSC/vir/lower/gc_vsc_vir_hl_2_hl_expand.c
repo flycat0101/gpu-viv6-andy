@@ -2497,14 +2497,9 @@ _ReplaceSymWithFirstElementSym(
         if (VIR_Symbol_isUniform(elementSym) &&
             VIR_Symbol_GetUniformKind(elementSym) == VIR_UNIFORM_PUSH_CONSTANT)
         {
-            /* SPIV generates constIndexing for field access(will change)
-             * skip cases which symbole type are array/matrix/vector.
-             * The value of constindexing may not be continuous for the size/element numbers while
-             * elementSymId is continous*/
+            /* SPIV generates constIndexing for field access(will change) */
             if (VIR_Operand_GetIsConstIndexing(Operand) &&
-                !VIR_Type_isArray(VIR_Symbol_GetType(elementSym)) &&
-                !VIR_Type_isMatrix(VIR_Symbol_GetType(elementSym)) &&
-                !VIR_Type_isVector(VIR_Symbol_GetType(elementSym)))
+                !VIR_Type_isArray(VIR_Symbol_GetType(elementSym)))
             {
                 elementSymId += VIR_Operand_GetConstIndexingImmed(Operand);
                 VIR_Operand_SetIsConstIndexing(Operand, gcvFALSE);
