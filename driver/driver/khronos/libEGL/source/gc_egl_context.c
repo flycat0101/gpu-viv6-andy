@@ -17,6 +17,12 @@
 #  define GPU_VENDOR "VIVANTE"
 #endif
 
+#if defined(ANDROID)
+/* Android wrapper expect EGL 1.4 */
+#  define EGL_MINOR_VERSION 4
+#else
+#  define EGL_MINOR_VERSION 5
+#endif
 
 #define _GC_OBJ_ZONE    gcdZONE_EGL_CONTEXT
 
@@ -1086,10 +1092,12 @@ eglCreateContext(
 
             case EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_KHR:
                 /* According to EGL Spec:
-                ** This attribute is supported only for OpenGL and OpenGL ES contexts.
+                ** This attribute is supported only for OpenGL and OpenGL ES contexts of EGL 1.5 version.
                 */
-                if (thread->api != EGL_OPENGL_API &&
-                    thread->api != EGL_OPENGL_ES_API)
+                if ((thread->api != EGL_OPENGL_API &&
+                    thread->api != EGL_OPENGL_ES_API) ||
+                    (thread->api == EGL_OPENGL_ES_API &&
+                    EGL_MINOR_VERSION == 4))
                 {
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
