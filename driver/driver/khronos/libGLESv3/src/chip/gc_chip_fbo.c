@@ -469,9 +469,15 @@ gcChipFboSyncFromShadow(
             {
                 __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
                 __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+                __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
 
                 if ((texInfo->eglImage.image) ||
-                    (texInfo->direct.source))
+                    (texInfo->direct.source)  ||
+                    (gc->texture.shared->refcount > 1 &&
+                     fmtMapInfo &&
+                     (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE | __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE))
+                    )
+                   )
                 {
                     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
                                                                texObj,
