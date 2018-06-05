@@ -292,7 +292,7 @@ gcoVX_InvokeThreadWalker(
     /* Route to hardware. */
     gcmONERROR(gcoHARDWARE_InvokeThreadWalkerCL(gcvNULL, Info));
 
-    if (currentApi != gcvAPI_OPENCL)
+    if (currentApi != gcvAPI_OPENCL && currentApi != 0 )
     {
         /* Restore HAL API. */
         gcmONERROR(gcoHARDWARE_SetAPI(gcvNULL, currentApi));
