@@ -10595,6 +10595,28 @@ _VIR_RA_LS_GetColorFromActiveLR(
 
             if (_VIR_RA_A0EnoughChannels(pRA, lrEnable))
             {
+                /* reset shift according to lrEnable's smallest channel
+                 * shift value from final released Active LR may not correct such as
+                 * lrEnable is .xy and .x is already released
+                 * if shift of previous released Active LR is 1 which releases .y and
+                 * make _VIR_RA_A0EnoughChannels true in this case */
+                if ((lrEnable & VIR_ENABLE_X) == 1)
+                {
+                    shift = 0;
+                }
+                else if ((lrEnable & VIR_ENABLE_Y) == 1)
+                {
+                    shift = 1;
+                }
+                else if ((lrEnable & VIR_ENABLE_Z) == 1)
+                {
+                    shift = 2;
+                }
+                else if ((lrEnable & VIR_ENABLE_W) == 1)
+                {
+                    shift = 3;
+                }
+
                 _VIR_RA_MakeColor(0, shift, &curColor);
                 break;
             }
@@ -10849,7 +10871,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
         }
     }
 
-    _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst) + 1);
+    _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
 
     return retValue;
 }
