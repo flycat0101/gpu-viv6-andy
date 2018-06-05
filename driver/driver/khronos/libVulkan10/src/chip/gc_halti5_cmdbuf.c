@@ -3676,6 +3676,7 @@ void halti5_helper_setSamplerStates(
 
     __vkDeviceMemory *txDescriptorNode;
     uint32_t physical;
+    VkFormatProperties* pFormatProperties = gcvNULL;
 #if __VK_ENABLETS
     int32_t tsSlotIndex = -1;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -3689,6 +3690,32 @@ void halti5_helper_setSamplerStates(
 
     physical += TX_HW_DESCRIPTOR_MEM_SIZE * borderColorIdx;
 
+    __VK_ASSERT(imgv != gcvNULL);
+    pFormatProperties = &g_vkFormatInfoTable[imgv->formatInfo->residentImgFormat].formatProperties;
+
+    if (!(pFormatProperties->linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    {
+        hwSamplerCtrl0 |= ((((gctUINT32) (hwSamplerCtrl0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+        hwSamplerCtrl0 |= ((((gctUINT32) (hwSamplerCtrl0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:13) - (0 ? 14:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:13) - (0 ?
+ 14:13) + 1))))))) << (0 ? 14:13))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 14:13) - (0 ? 14:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:13) - (0 ?
+ 14:13) + 1))))))) << (0 ? 14:13)));
+        hwSamplerCtrl0 |= ((((gctUINT32) (hwSamplerCtrl0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ? 12:11))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ? 12:11)));
+#if (defined(DEBUG)||defined(_DEBUG))
+        if (hwSamplerCtrl0 != samplerDesc->halti5.hwSamplerCtrl0)
+        {
+            __VK_PRINT("texture format is not filterable, invalid input from app\n");
+        }
+#endif
+    }
 
     __vkCmdLoadSingleHWState(commandBuffer,
         s_TxHwRegisters[txHwRegisterIdx].samplerCtrl0Reg + hwSamplerNo, VK_FALSE,

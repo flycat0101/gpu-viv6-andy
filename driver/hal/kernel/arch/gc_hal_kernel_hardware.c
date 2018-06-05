@@ -12150,9 +12150,12 @@ gckHARDWARE_PrepareFunctions(
         gctPHYS_ADDR_T physical = 0;
         gctUINT32 flags = gcvALLOC_FLAG_CONTIGUOUS;
 
-#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+#if defined(CONFIG_ZONE_DMA32)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
         flags |= gcvALLOC_FLAG_4GB_ADDR;
 #endif
+#endif
+
         /* Allocate mmu command buffer within 32bit space */
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
