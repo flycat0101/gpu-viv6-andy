@@ -278,6 +278,7 @@
     gcSHADER_GoVIRPass;
     gcSHADER_SetDebugInfo;
     gcSHADER_GetDebugInfo;
+	gcSHADER_SetAttrLocationByDriver;
 
     gcATTRIBUTE_GetName;
     gcATTRIBUTE_GetNameEx;

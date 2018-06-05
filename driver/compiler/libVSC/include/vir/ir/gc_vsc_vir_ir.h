@@ -2625,6 +2625,8 @@ typedef enum VIR_SYMFLAG
 
     VIR_SYMFLAG_VECTORIZED_OUT                  = 0x08000000, /* This input/output has been vectorized into
                                                                      a new one */
+    VIR_SYMFLAG_LOC_SET_BY_DRIVER               = 0x10000000, /* The location is set by driver. */
+
     /* Function flags */
     VIR_SYMFLAG_ISKERNEL                        = 0x00020000, /* is kernel function */
     VIR_SYMFLAG_ISMAIN                          = 0x00040000, /* is main function */

@@ -1617,6 +1617,9 @@ typedef enum _gceATTRIBUTE_Flag
     gcATTRIBUTE_COMPILERGEN         = 0x80000,
 
     gcATTRIBUTE_ISDIRECTPOSITION    = 0x100000,
+
+    /* The location is set by driver. */
+    gcATTRIBUTE_LOC_SET_BY_DRIVER   = 0x200000,
 } gceATTRIBUTE_Flag;
 
 #define gcmATTRIBUTE_isTexture(att)             (((att)->flags_ & gcATTRIBUTE_ISTEXTURE) != 0)
@@ -1640,6 +1643,7 @@ typedef enum _gceATTRIBUTE_Flag
 #define gcmATTRIBUTE_isStaticallyUsed(att)      (((att)->flags_ & gcATTRIBUTE_ISSTATICALLYUSED) != 0)
 #define gcmATTRIBUTE_isCompilerGen(att)         (((att)->flags_ & gcATTRIBUTE_COMPILERGEN) != 0)
 #define gcmATTRIBUTE_isUseAsInterpolate(att)    (((att)->flags_ & gcATTRIBUTE_ISUSEASINTERPOLATE) != 0)
+#define gcmATTRIBUTE_isLocSetByDriver(att)      (((att)->flags_ & gcATTRIBUTE_LOC_SET_BY_DRIVER) != 0)
 
 #define gcmATTRIBUTE_SetIsTexture(att, v)   \
         ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_ISTEXTURE) | \
@@ -1723,6 +1727,10 @@ typedef enum _gceATTRIBUTE_Flag
 #define gcmATTRIBUTE_SetIsUseAsInterpolate(att,v )  \
         ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_ISUSEASINTERPOLATE) | \
                           ((v) == gcvFALSE ? 0 : gcATTRIBUTE_ISUSEASINTERPOLATE))
+
+#define gcmATTRIBUTE_SetLocSetByDriver(att, v)  \
+        ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_LOC_SET_BY_DRIVER) | \
+                          ((v) == gcvFALSE ? 0 : gcATTRIBUTE_LOC_SET_BY_DRIVER))
 
 /* Forwarded declaration */
 typedef struct _gcSHADER *              gcSHADER;
@@ -1829,6 +1837,7 @@ struct _gcATTRIBUTE
 #define GetATTRComponentShaderModes(a)      ((a)->componentShadeMode)
 #define GetATTRComponentShaderMode(a, i)    ((a)->componentShadeMode[i])
 #define GetATTRLocation(a)                  ((a)->location)
+#define SetATTRLocation(a, l)               (GetATTRLocation(a) = (l))
 #define GetATTRFieldIndex(a)                ((a)->fieldIndex)
 #define GetATTRNameLength(a)                ((a)->nameLength)
 #define GetATTRName(a)                      ((a)->name)

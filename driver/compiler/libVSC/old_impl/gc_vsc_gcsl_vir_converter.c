@@ -4250,7 +4250,10 @@ _ConvShaderAttribute2Vir(
                         : 0) |
                     (gcmATTRIBUTE_isCompilerGen(Attribute)
                         ? VIR_SYMFLAG_COMPILER_GEN
-                        : 0);
+                        : 0) |
+                    (gcmATTRIBUTE_isLocSetByDriver(Attribute)
+                        ? VIR_SYMFLAG_LOC_SET_BY_DRIVER
+                        : 0)                        ;
 
     if (sym->flags & VIR_SYMFLAG_ALWAYSUSED)
     {

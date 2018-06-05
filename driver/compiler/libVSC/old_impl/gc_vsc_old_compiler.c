@@ -25374,6 +25374,50 @@ gcSHADER_GetDebugInfo(
     return NULL;
 }
 
+gceSTATUS
+gcSHADER_SetAttrLocationByDriver(
+    IN gcSHADER             Shader,
+    IN gctCHAR*             Name,
+    IN gctINT               Location
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gcATTRIBUTE             attribute = gcvNULL;
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+    gcmASSERT(Name != gcvNULL && Location >= 0);
+
+    gcmONERROR(gcSHADER_GetAttributeByName(Shader,
+                                           Name,
+                                           gcoOS_StrLen(Name, gcvNULL),
+                                           &attribute));
+    /* Not found. */
+    if (attribute == gcvNULL)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_NAME_NOT_FOUND;
+    }
+
+    /* Location mismatch. */
+    if (GetATTRLocation(attribute) != -1            &&
+        !gcmATTRIBUTE_isLocSetByDriver(attribute)   &&
+        GetATTRLocation(attribute) != Location)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_MISMATCH;
+    }
+
+    /* Update the location. */
+    SetATTRLocation(attribute, Location);
+    gcmATTRIBUTE_SetLocSetByDriver(attribute, gcvTRUE);
+    gcSHADER_AddInputLocation(Shader, Location, 1);
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
+}
+
 static gctBOOL
 _AnalyzeFunctions(
     IN gcSHADER Shader,

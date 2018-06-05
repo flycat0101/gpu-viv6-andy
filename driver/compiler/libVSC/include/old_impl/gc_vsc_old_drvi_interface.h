@@ -7994,6 +7994,13 @@ gcSHADER_GetDebugInfo(
     IN gcSHADER             Shader
     );
 
+gceSTATUS
+gcSHADER_SetAttrLocationByDriver(
+    IN gcSHADER             Shader,
+    IN gctCHAR*             Name,
+    IN gctINT               Location
+    );
+
 gctBOOL
 gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(
     IN gceLAYOUT_QUALIFIER         Qualifier
