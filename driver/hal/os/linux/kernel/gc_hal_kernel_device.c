@@ -705,6 +705,13 @@ static int gc_clk_show(struct seq_file* m, void* data)
         {
             gckHARDWARE hardware = device->kernels[i]->hardware;
 
+#if gcdENABLE_VG
+            if (i == gcvCORE_VG)
+            {
+                continue;
+            }
+#endif
+
             if (hardware->mcClk)
             {
                 seq_printf(m, "gpu%d mc clock: %d HZ.\n", i, hardware->mcClk);
@@ -2098,7 +2105,7 @@ gckGALDEVICE_QueryFrequency(
 {
     gctUINT64 mcStart[gcvCORE_COUNT], shStart[gcvCORE_COUNT];
     gctUINT32 mcClk[gcvCORE_COUNT], shClk[gcvCORE_COUNT];
-    gckKERNEL kernel;
+    gckHARDWARE hardware = gcvNULL;
     gceSTATUS status;
     gctUINT i;
 
@@ -2106,12 +2113,20 @@ gckGALDEVICE_QueryFrequency(
 
     for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
     {
+#if gcdENABLE_VG
+        if (i == gcvCORE_VG)
+        {
+            continue;
+        }
+#endif
+
         if (Device->kernels[i])
         {
-            kernel = Device->kernels[i];
+            hardware = Device->kernels[i]->hardware;
+
             mcStart[i] = shStart[i] = 0;
 
-            gckHARDWARE_EnterQueryClock(kernel->hardware,
+            gckHARDWARE_EnterQueryClock(hardware,
                                         &mcStart[i], &shStart[i]);
         }
     }
@@ -2120,17 +2135,25 @@ gckGALDEVICE_QueryFrequency(
 
     for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
     {
+        mcClk[i] = shClk[i] = 0;
+
+#if gcdENABLE_VG
+        if (i == gcvCORE_VG)
+        {
+            continue;
+        }
+#endif
+
         if (Device->kernels[i] && mcStart[i])
         {
-            kernel = Device->kernels[i];
-            mcClk[i] = shClk[i] = 0;
+            hardware = Device->kernels[i]->hardware;
 
-            gckHARDWARE_ExitQueryClock(kernel->hardware,
+            gckHARDWARE_ExitQueryClock(hardware,
                                        mcStart[i], shStart[i],
                                        &mcClk[i], &shClk[i]);
 
-            kernel->hardware->mcClk = mcClk[i];
-            kernel->hardware->shClk = shClk[i];
+            hardware->mcClk = mcClk[i];
+            hardware->shClk = shClk[i];
         }
     }
 
