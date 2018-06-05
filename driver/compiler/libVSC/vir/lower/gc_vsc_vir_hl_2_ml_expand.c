@@ -1859,9 +1859,9 @@ static VIR_PatternMatchInst _intrinVecGetPatInst0[] = {
 static VIR_PatternReplaceInst _intrinVecGetRepInst0[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_two, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_three, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_two, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_three, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
@@ -1894,8 +1894,8 @@ static VIR_PatternMatchInst _intrinVecGetPatInst1[] = {
 static VIR_PatternReplaceInst _intrinVecGetRepInst1[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_two, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_two, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg2 } }, /*label1*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
@@ -1921,7 +1921,7 @@ static VIR_PatternMatchInst _intrinVecGetPatInst2[] = {
 
 static VIR_PatternReplaceInst _intrinVecGetRepInst2[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
