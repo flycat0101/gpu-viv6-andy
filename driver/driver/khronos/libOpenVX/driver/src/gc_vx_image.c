@@ -2415,15 +2415,55 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
             }
 
             /* reclaim previous and set new handlers for this image */
-            for (p = 0; p < image->planeCount; p++)
+            if (new_ptrs == NULL)
             {
-                if (new_ptrs == NULL)
+                for (p = 0; p < image->planeCount; p++)
+                {
                     image->memory.logicals[p] = 0;
+                }
+            }
+            else
+            {
+                vx_uint8* ptr = gcvNULL;
+
+                if (image->importType == VX_MEMORY_TYPE_HOST)
+                {
+                    vx_context context = vxGetContext((vx_reference)image);
+
+#if defined(WIN32)
+                    for (p = 0; p < image->planeCount; p++)
+                    {
+                        if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                        {
+                            gcoVX_FreeMemory((gcsSURF_NODE_PTR)image->memory.nodePtrs[p]);
+                            image->memory.nodePtrs[p] = VX_NULL;
+
+                            context->memoryCount--;
+
+                        }
+                        /* offset is non zero if this is a subimage of some image */
+                        ptr = (vx_uint8*)new_ptrs[p];
+                        image->memory.logicals[p] = ptr;
+                    }
+#else
+                    vxoMemory_FreeWrappedMemory(context, &image->memory);
+                    for (p = 0; p < image->planeCount; p++)
+                    {
+                        /* offset is non zero if this is a subimage of some image */
+                        ptr = (vx_uint8*)new_ptrs[p];
+                        image->memory.logicals[p] = ptr;
+                    }
+                    vxoMemory_WrapUserMemory(context, &image->memory);
+#endif
+                }
                 else
                 {
-                    /* offset is non zero if this is a subimage of some image */
-                    vx_uint8* ptr = (vx_uint8*)new_ptrs[p];
-                    image->memory.logicals[p] = ptr;
+                    for (p = 0; p < image->planeCount; p++)
+                    {
+                        /* offset is non zero if this is a subimage of some image */
+                        ptr = (vx_uint8*)new_ptrs[p];
+                        image->memory.logicals[p] = ptr;
+                    }
                 }
             }
 
