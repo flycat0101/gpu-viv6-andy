@@ -146,6 +146,26 @@ VX_INTERNAL_API vx_node vxCopyImageNode(vx_graph graph, vx_image input, vx_image
         (vx_reference)output
     };
 
+    /* if parameter is created as vitual image, rewrite the elements of image as non-vitual image in the node */
+    if(input->base.isVirtual == gcvTRUE)
+    {
+        gcmASSERT(output->base.isVirtual == gcvFALSE);
+        input->format = output->format;
+        input->planeCount = output->planeCount;
+        input->memory.planeCount = output->memory.planeCount;
+        input->width = output->width;
+        input->height = output->height;
+    }
+    if(output->base.isVirtual == gcvTRUE)
+    {
+        gcmASSERT(input->base.isVirtual == gcvFALSE);
+        output->format = input->format;
+        output->planeCount = input->planeCount;
+        output->memory.planeCount = input->memory.planeCount;
+        output->width = input->width;
+        output->height = input->height;
+    }
+
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_COPY_IMAGE, parameters, vxmLENGTH_OF(parameters));
 }
 

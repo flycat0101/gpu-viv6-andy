@@ -599,9 +599,10 @@ _select_modifier(
     uint64_t * selectModifier
     )
 {
+    unsigned int i;
     enum modifier_priority prio = MODIFIER_PRIORITY_INVALID;
 
-    for (int i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
         switch (modifiers[i])
         {
