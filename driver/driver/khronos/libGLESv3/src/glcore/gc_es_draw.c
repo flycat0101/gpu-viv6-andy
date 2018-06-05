@@ -908,7 +908,7 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
 
     if (!(vertexArray->multidrawIndirect || vertexArray->drawIndirect))
     {
-        GLsizeiptr endBytes;
+        khronos_usize_t endBytes;
         __GLbufferObject *boundIdxObj = __glGetBoundBufObj(gc, __GL_ELEMENT_ARRAY_BUFFER_INDEX);
         GLuint indexCount = vertexArray->indexCount;
 
@@ -928,9 +928,9 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                 break;
             }
 
-            endBytes = (GLsizeiptr)(indexCount * sizeofIndex + __GL_PTR2UINT(vertexArray->indices));
+            endBytes = (khronos_usize_t)(indexCount * sizeofIndex + __GL_PTR2UINT(vertexArray->indices));
 
-            if (endBytes > boundIdxObj->size)
+            if (endBytes > (khronos_usize_t)boundIdxObj->size)
             {
                 ret = GL_FALSE;
             }
@@ -963,9 +963,9 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                         if (pAttribBinding->divisor)
                         {
                             remain = (instanceCount % pAttribBinding->divisor) ? 1 : 0;
-                            endBytes = pAttrib->relativeOffset + pAttribBinding->offset + ((instanceCount / pAttribBinding->divisor) + remain - 1) *  pAttribBinding->stride +
-                                __glUtilCalculateStride(pAttrib->size, pAttrib->type);
-                            if (endBytes > boundVBObj->size)
+                            endBytes = (khronos_usize_t)(pAttrib->relativeOffset + pAttribBinding->offset + ((instanceCount / pAttribBinding->divisor) + remain - 1) *  pAttribBinding->stride +
+                                __glUtilCalculateStride(pAttrib->size, pAttrib->type));
+                            if (endBytes > (khronos_usize_t)boundVBObj->size)
                             {
                                 ret = GL_FALSE;
                                 break;
@@ -973,9 +973,9 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                         }
                         else
                         {
-                            endBytes = pAttrib->relativeOffset + pAttribBinding->offset + (vertexArray->end - 1) * pAttribBinding->stride +
-                                __glUtilCalculateStride(pAttrib->size, pAttrib->type);
-                            if (endBytes > boundVBObj->size)
+                            endBytes = (khronos_usize_t)(pAttrib->relativeOffset + pAttribBinding->offset + (vertexArray->end - 1) * pAttribBinding->stride +
+                                __glUtilCalculateStride(pAttrib->size, pAttrib->type));
+                            if (endBytes > (khronos_usize_t)boundVBObj->size)
                             {
                                 ret = GL_FALSE;
                                 break;
