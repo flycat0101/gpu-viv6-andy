@@ -735,13 +735,9 @@ gcoHARDWARE_QueryTileSize(
 gceSTATUS
 gcoHARDWARE_QueryTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gctUINT Width,
-    IN gctUINT Height,
+    IN gcoSURF Surface,
     IN gctSIZE_T Bytes,
-    IN gctBOOL vMsaa,
-    IN gctBOOL isMsaa,
-    IN gctINT bpp,
-    OUT gctSIZE_T_PTR Size,
+    OUT gctSIZE_T_PTR TsSize,
     OUT gctUINT_PTR Alignment,
     OUT gctUINT32_PTR Filler
     );

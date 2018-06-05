@@ -6553,8 +6553,8 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gctUINT Width, Height
-**          Width and height of the surface.
+**      gcoSURF Surface
+**          Pointer to surface.
 **
 **      gctSZIE_T Bytes
 **          Size of the surface in bytes.
@@ -6575,24 +6575,19 @@ OnError:
 gceSTATUS
 gcoHARDWARE_QueryTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gctUINT Width,
-    IN gctUINT Height,
+    IN gcoSURF Surface,
     IN gctSIZE_T Bytes,
-    IN gctBOOL edgeAA,
-    IN gctBOOL isMsaa,
-    IN gctINT bpp,
     OUT gctSIZE_T_PTR Size,
     OUT gctUINT_PTR Alignment,
     OUT gctUINT32_PTR Filler
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT width, height;
     gctBOOL is2BitPerTile;
 
-    gcmHEADER_ARG("Hardware=0x%x Width=%d Height=%d Bytes=%zu Size=0x%x "
-                  "Alignment=0x%x Filler=0x%x",
-                  Hardware, Width, Height, Bytes, Size, Alignment, Filler);
+    gcmHEADER_ARG("Hardware=%p Surface=%p Bytes=%zu Size=%p "
+                  "Alignment=%p Filler=%p",
+                  Hardware, Surface, Bytes, Size, Alignment, Filler);
 
     gcmGETHARDWARE(Hardware);
 
@@ -6613,9 +6608,11 @@ gcoHARDWARE_QueryTileStatus(
     &&  (Hardware->config->chipRevision > 2)
     )
     {
+        gctUINT width, height;
+
         /* Compute the aligned number of tiles for the surface. */
-        width  = gcmALIGN(Width, 4) >> 2;
-        height = gcmALIGN(Height, 4) >> 2;
+        width  = gcmALIGN(Surface->alignedW, 4) >> 2;
+        height = gcmALIGN(Surface->alignedH, 4) >> 2;
 
         /* Return the linear size. */
         *Size = gcmALIGN(width * height * 4 / 8, 256);
@@ -6625,37 +6622,26 @@ gcoHARDWARE_QueryTileStatus(
         gctUINT alignment = (Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
                               (Hardware->resolveAlignmentX * Hardware->resolveAlignmentY)) * 4;
 
-        /* Assume 128B cache mode, every 128B->4bit */
-        if (DEFAULT_CACHE_MODE == gcvCACHE_128)
-        {
-            *Size = gcmALIGN (Bytes >> 8, alignment);
-        }
-        else if (DEFAULT_CACHE_MODE == gcvCACHE_256)
-        {
-            *Size = gcmALIGN (Bytes >> 9, alignment);
-        }
+        /* Every cache (128B or 256B) -> 4bit */
+        *Size = (Surface->cacheMode == gcvCACHE_256) ? (Bytes >> 9) : (Bytes >> 8);
+
+        /* Align the tile status. */
+        *Size = gcmALIGN(*Size, alignment);
     }
     else
     {
         gctUINT32 alignment = (Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
                                 (Hardware->resolveAlignmentX * Hardware->resolveAlignmentY)) * 4;
 
-        if ((Width == 0) && (Height == 0))
-        {
-            *Size = Bytes / 16 / 4;
-        }
-        else
-        {
-            /* Return the linear size. */
-            *Size = is2BitPerTile ? (Bytes >> 8) : (Bytes >> 7);
-        }
+        /* Return the linear size. */
+        *Size = is2BitPerTile ? (Bytes >> 8) : (Bytes >> 7);
 
-        if (isMsaa)
+        if (Surface->isMsaa)
         {
             if (Hardware->features[gcvFEATURE_FAST_MSAA] || Hardware->features[gcvFEATURE_SMALL_MSAA])
             {
                 gcmASSERT(is2BitPerTile);
-                *Size = *Size >> 2;
+                *Size >>= 2;
             }
         }
 
@@ -6671,8 +6657,7 @@ gcoHARDWARE_QueryTileStatus(
 
     if (Filler != gcvNULL)
     {
-        *Filler = ((Hardware->features[gcvFEATURE_COMPRESSION_DEC400]) ||
-                    edgeAA ||
+        *Filler = ((Hardware->features[gcvFEATURE_COMPRESSION_DEC400]) || Surface->vMsaa ||
                     ((Hardware->config->chipModel == gcv500) && (Hardware->config->chipRevision > 2))
                   )
                   ? 0xFFFFFFFF
@@ -6685,6 +6670,7 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
 
 gceSTATUS
 gcoHARDWARE_QuerySamplerBase(

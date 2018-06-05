@@ -440,14 +440,16 @@ gcoSURF_AllocateTileStatus(
         Surface->vMsaa = gcvFALSE;
     }
 
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE) &&
+        (Surface->cacheMode == gcvCACHE_NONE))
+    {
+        Surface->cacheMode = DEFAULT_CACHE_MODE;
+    }
+
     /* Query the linear size for the tile status buffer. */
     status = gcoHARDWARE_QueryTileStatus(gcvNULL,
-                                         Surface->alignedW,
-                                         Surface->alignedH,
+                                         Surface,
                                          Surface->sliceSize,
-                                         Surface->vMsaa,
-                                         Surface->isMsaa,
-                                         Surface->bitsPerPixel,
                                          &sliceBytes,
                                          &alignment,
                                          &Surface->tileStatusFiller);
@@ -530,8 +532,6 @@ gcoSURF_AllocateTileStatus(
             Surface->TSDirty = gcvFALSE;
         }
 
-        Surface->cacheMode = DEFAULT_CACHE_MODE;
-
         for (i = 0; i < Surface->requestD; i++)
         {
             Surface->tileStatusDisabled[i] = gcvFALSE;
@@ -565,12 +565,8 @@ gcoSURF_AllocateTileStatus(
         {
             /* Query the linear size for the tile status buffer. */
             status = gcoHARDWARE_QueryTileStatus(gcvNULL,
-                                                 0,
-                                                 0,
+                                                 Surface,
                                                  Surface->hzNode.size,
-                                                 gcvFALSE,
-                                                 Surface->isMsaa,
-                                                 0,
                                                  &bytes,
                                                  &alignment,
                                                  gcvNULL);

@@ -133,12 +133,8 @@ _ClearTileStatus(
     /* Query the tile status size. */
     gcmONERROR(
         gcoHARDWARE_QueryTileStatus(Hardware,
-                                    Surface->alignedW,
-                                    Surface->alignedH,
+                                    Surface,
                                     Surface->size,
-                                    Surface->vMsaa,
-                                    Surface->isMsaa,
-                                    Surface->bitsPerPixel,
                                     &bytes,
                                     gcvNULL,
                                     &fillColor));
@@ -790,7 +786,6 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
     )
 {
     gceSTATUS status;
-    gctBOOL is2BitPerTile;
 
     /* Source source parameters. */
     gcsRECT rect;
@@ -806,7 +801,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
     gcsPOINT clearSize;
 
     /* Tile status surface parameters. */
-    gctUINT32 bytes;
+    gctSIZE_T bytes;
     gctUINT32 fillColor;
     gctUINT   stride;
     gctBOOL   multiPipe;
@@ -863,33 +858,15 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
         status = gcvSTATUS_NOT_SUPPORTED;
         goto OnError;
     }
+
     multiPipe = (Surface->tiling & gcvTILING_SPLIT_BUFFER) || Hardware->multiPipeResolve;
     /* Get bytes per pixel. */
     bytesPerPixel = Surface->formatInfo.bitsPerPixel / 8;
 
-    /* Check tile status size. */
-    is2BitPerTile = Hardware->features[gcvFEATURE_TILE_STATUS_2BITS];
-
     /* Query the tile status size for one 64x64 supertile. */
-    if (Hardware->features[gcvFEATURE_128BTILE])
-    {
-        gcmASSERT(Surface->cacheMode != gcvCACHE_NONE);
-
-        bytes = 64 * 64 * bytesPerPixel / (Surface->cacheMode == gcvCACHE_128 ? 256 : 512);
-    }
-    else
-    {
-        bytes     = 64 * 64 * bytesPerPixel / (is2BitPerTile ? 256 : 128);
-    }
-
-    if (Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
-    {
-        gcoHARDWARE_QueryTileStatus(Hardware, 0, 0, 0, Surface->vMsaa, Surface->isMsaa, 0, gcvNULL, gcvNULL, &fillColor);
-    }
-    else
-    {
-        fillColor = is2BitPerTile ? 0x55555555 : 0x11111111;
-    }
+    gcmONERROR(gcoHARDWARE_QueryTileStatus(Hardware, Surface,
+                                           64 * 64 * bytesPerPixel,
+                                           &bytes, gcvNULL, &fillColor));
 
     if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
     {
