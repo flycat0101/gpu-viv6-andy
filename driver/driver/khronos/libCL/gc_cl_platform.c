@@ -240,6 +240,10 @@ clfGetDefaultPlatformID(
 
         clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->hwCfg), CL_INVALID_VALUE);
         clmONERROR(gcoHAL_GetPatchID(gcvNULL, &clgDefaultPlatform->patchId), CL_INVALID_VALUE);
+        
+        /* initialize back-end caps in case front-end is skipped for shader-binary only  */
+        *gcGetHWCaps() = clgDefaultPlatform->hwCfg;
+        
         gcmRESTORE_HW();
     }
 

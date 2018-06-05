@@ -607,10 +607,9 @@ clBuildProgram(
 
     platform = Program->context->platform;
 
-    clmONERROR(clfLoadCompiler(platform), CL_BUILD_PROGRAM_FAILURE);
-
     if (Program->binary == gcvNULL)
     {
+        clmONERROR(clfLoadCompiler(platform), CL_BUILD_PROGRAM_FAILURE);
         status = (*platform->compiler11)(gcvNULL,
                                        0,
                                        Program->source,
