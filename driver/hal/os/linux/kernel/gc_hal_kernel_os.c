@@ -94,7 +94,7 @@
     do { \
         if (unlikely(!!(x))) \
         { \
-            gcmkPRINT("[galcore]: BUG ON @ %s(%d)", __func__, __LINE__); \
+            printk("[galcore]: BUG ON @ %s(%d)\n", __func__, __LINE__); \
             dump_stack(); \
         } \
     } while (0)
