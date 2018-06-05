@@ -31,7 +31,7 @@
 #include "gbm_vivint.h"
 #include "gbmint.h"
 #include "gc_hal_priv.h"
-
+#include "gc_hal_user.h"
 #include <gc_egl_common.h>
 
 #define VIV_BACKEND_NAME "viv"
@@ -523,7 +523,8 @@ create_dumb(
     uint32_t width,
     uint32_t height,
     uint32_t format,
-    uint32_t usage
+    uint32_t usage,
+    uint64_t modifier
     )
 {
     struct gbm_viv_device *dev = gbm_viv_device(gbm);
@@ -541,6 +542,11 @@ create_dumb(
     create_arg.width = width;
     create_arg.height = height;
 
+    if (modifier == DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC)
+    {
+        /*Alloc more buffer for tile status info */
+        create_arg.height = height + (height + 255)/256;
+    }
     ret = drmIoctl(dev->base.fd, DRM_IOCTL_MODE_CREATE_DUMB, &create_arg);
     if (ret)
         goto free_bo;
@@ -553,6 +559,7 @@ create_dumb(
     bo->base.handle.u32 = create_arg.handle;
     bo->size = create_arg.size;
     bo->fd = -1;
+    bo->tileStatusOffset = create_arg.pitch * height;
 
     if (gbm_viv_bo_map_fd(bo) == NULL)
         goto destroy_dumb;
@@ -569,6 +576,56 @@ free_bo:
     return NULL;
 }
 
+enum modifier_priority {
+   MODIFIER_PRIORITY_INVALID = 0,
+   MODIFIER_PRIORITY_LINEAR,
+   MODIFIER_PRIORITY_TILED,
+   MODIFIER_PRIORITY_SUPER_TILED,
+   MODIFIER_PRIORITY_SUPER_TILED_FC,
+};
+
+const uint64_t priority_to_modifier[] = {
+   [MODIFIER_PRIORITY_INVALID] = DRM_FORMAT_MOD_INVALID,
+   [MODIFIER_PRIORITY_LINEAR] = DRM_FORMAT_MOD_LINEAR,
+   [MODIFIER_PRIORITY_TILED] = DRM_FORMAT_MOD_VIVANTE_TILED,
+   [MODIFIER_PRIORITY_SUPER_TILED] = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED,
+   [MODIFIER_PRIORITY_SUPER_TILED_FC] = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC,
+};
+
+static uint64_t
+_select_modifier(
+    const uint64_t *modifiers,
+    const unsigned int count,
+    uint64_t * selectModifier
+    )
+{
+    enum modifier_priority prio = MODIFIER_PRIORITY_INVALID;
+
+    for (int i = 0; i < count; i++)
+    {
+        switch (modifiers[i])
+        {
+        case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC:
+            prio = gcmMAX(prio, MODIFIER_PRIORITY_SUPER_TILED_FC);
+            break;
+        case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
+            prio = gcmMAX(prio, MODIFIER_PRIORITY_SUPER_TILED);
+            break;
+        case DRM_FORMAT_MOD_VIVANTE_TILED:
+            prio = gcmMAX(prio, MODIFIER_PRIORITY_TILED);
+            break;
+        case DRM_FORMAT_MOD_LINEAR:
+            prio = gcmMAX(prio, MODIFIER_PRIORITY_LINEAR);
+             break;
+        case DRM_FORMAT_MOD_INVALID:
+        default:
+            break;
+        }
+    }
+
+    return priority_to_modifier[prio];
+}
+
 static struct gbm_bo *
 gbm_viv_bo_create(
     struct gbm_device *gbm,
@@ -582,15 +639,10 @@ gbm_viv_bo_create(
 {
     struct gbm_bo *_bo = NULL;
     struct gbm_viv_bo *bo = NULL;
-    uint64_t preferredMod = DRM_FORMAT_MOD_LINEAR;
     uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
-    uint64_t i = 0;
+    char *p;
 
-    if (count)
-        assert(modifiers);
-#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
-    preferredMod = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
-#endif
+    gcmASSERT(!count && modifiers);
 
     /* It's acceptable to create an image with INVALID modifier in the list,
     * but it cannot be on the only modifier (since it will certainly fail
@@ -604,20 +656,24 @@ gbm_viv_bo_create(
         errno = EINVAL;
     }
 
-    /*Find preffered modifier exists in the list */
-    for (i = 0; i < count; i++)
+    modifier = _select_modifier(modifiers, count, &modifier);
+
+    p = getenv("GBM_SET_FORMAT_MOD_SUPER_TILED");
+    if (p && p[0] == '1')
     {
-        if (modifiers[i] == preferredMod)
-        {
-            modifier  = preferredMod;
-            break;
-        }
+        modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
     }
 
-#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
-    switch(modifier)
+    p = getenv("GBM_SET_FORMAT_MOD_LINEAR");
+    if (p && p[0] == '1')
+    {
+        modifier = DRM_FORMAT_MOD_LINEAR;
+    }
+
+    switch (modifier)
     {
     case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
+    case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC:
         width = gcmALIGN(width, 64);
         height = gcmALIGN(height, 64);
         break;
@@ -626,9 +682,8 @@ gbm_viv_bo_create(
         height = gcmALIGN(height, 4);
         break;
     }
-#endif
 
-    _bo = create_dumb(gbm, width, height, format, usage);
+    _bo = create_dumb(gbm, width, height, format, usage, modifier);
     if (_bo == NULL)
     {
         return NULL;
@@ -782,6 +837,8 @@ gbm_viv_create_buffers(
 
     for (i = 0; i < surf->buffer_count; i++)
     {
+        gcoSURF rtSurf = gcvNULL;
+
         surf->buffers[i].bo = gbm_viv_bo_create(surf->base.gbm, alligned_width, height, format, usage, modifiers, count);
         if (!surf->buffers[i].bo)
         {
@@ -792,52 +849,52 @@ gbm_viv_create_buffers(
         surf->buffers[i].status = FREE;
         gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-#if defined(DRM_FORMAT_MOD_VIVANTE_SUPER_TILED)
         switch (gbm_viv_bo_get_modifier(surf->buffers[i].bo))
         {
         case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
             surfType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
             surf->extResolve = gcvSTATUS_TRUE;
             break;
-        case DRM_FORMAT_MOD_VIVANTE_TILED:
-            surfType = gcvSURF_TEXTURE;
+        case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC:
+            surfType = gcvSURF_RENDER_TARGET;
+            surf->extResolve = gcvSTATUS_TRUE;
             break;
         default:
             surf->extResolve = gcvSTATUS_FALSE;
-            surfType = gcvSURF_BITMAP;
+            surfType =  gcvSURF_BITMAP;
         }
+        surfType |= gcvSURF_CACHE_MODE_128;
 
-        /* Newer Cores support SUPERTILE as native format. Need to map in order to get tiled surface */
-        if (gbm_viv_bo_get_modifier(surf->buffers[i].bo) == DRM_FORMAT_MOD_VIVANTE_TILED && surfType == gcvSURF_TEXTURE)
-        {
-            gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, gcvSURF_TEXTURE, gc_format,
-                                         gcvPOOL_USER, &surf->buffers[i].render_surface));
-            gcmONERROR(gcoSURF_MapUserSurface(surf->buffers[i].render_surface,
-                                              0, gbm_viv_bo(surf->buffers[i].bo)->map,
-                                              gcvINVALID_ADDRESS));
-        }
-        else
-#endif
-        {
-            gcmONERROR(gcoSURF_ConstructWrapper(NULL, &surf->buffers[i].render_surface));
-            gcmONERROR(gcoSURF_SetBuffer(surf->buffers[i].render_surface,
-                                         surfType,
-                                         gc_format,
-                                         (gctUINT)surf->buffers[i].bo->stride,
-                                         gbm_viv_bo(surf->buffers[i].bo)->map, ~0U));
-            gcmONERROR(gcoSURF_SetWindow(surf->buffers[i].render_surface,
-                                         0,
-                                         0,
-                                         width,
-                                         height));
-        }
+        gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_USER, &rtSurf));
+        surf->buffers[i].render_surface = rtSurf;
+
+        gcmONERROR(gcoSURF_SetBuffer(rtSurf,
+                                     surfType,
+                                     gc_format,
+                                     (gctUINT)surf->buffers[i].bo->stride,
+                                     gbm_viv_bo(surf->buffers[i].bo)->map,
+                                     ~0U));
+        gcmONERROR(gcoSURF_SetWindow(rtSurf,
+                                     0,
+                                     0,
+                                     width,
+                                     height));
 
         if (surfType | gcvSURF_RENDER_TARGET)
         {
-            gcmVERIFY_OK(
-                        gcoSURF_SetFlags(surf->buffers[i].render_surface,
-                                         gcvSURF_FLAG_CONTENT_YINVERTED,
-                                         gcvTRUE));
+            gcmONERROR(gcoSURF_SetFlags(rtSurf,
+                                        gcvSURF_FLAG_CONTENT_YINVERTED,
+                                        gcvTRUE));
+
+            if (surfType == gcvSURF_RENDER_TARGET)
+            {
+                /* Calculate tile status buffer addresses, this path can't work, disable it. */
+                gcmONERROR(gcoSURF_AppendTileStatus(rtSurf));
+
+                rtSurf->compressFormat = 3;
+            }
+
+            gcmONERROR(gcoSURF_Lock(rtSurf, gcvNULL, gcvNULL));
         }
     }
 
@@ -848,6 +905,7 @@ OnError:
     {
         if (surf->buffers[i].render_surface)
         {
+            gcoSURF_Unlock(surf->buffers[i].render_surface, gcvNULL);
             gcoSURF_Destroy(surf->buffers[i].render_surface);
         }
 
@@ -902,6 +960,22 @@ OnError:
     return NULL;
 }
 
+static void
+_sync_tilestatus_buffer(
+   struct gbm_viv_bo *_bo,
+   gcoSURF       surface
+   )
+{
+    gctPOINTER tileStatusLogical = {0};
+    int size = surface->tileStatusNode.size;
+    tileStatusLogical = surface->tileStatusNode.logical + surface->tileStatusNode.bufferOffset;
+
+    if (tileStatusLogical && size > 0)
+    {
+        memcpy(_bo->map + _bo->tileStatusOffset, tileStatusLogical, size);
+    }
+}
+
 static struct gbm_bo *
 gbm_viv_surface_lock_front_buffer(
     struct gbm_surface *surface
@@ -909,6 +983,8 @@ gbm_viv_surface_lock_front_buffer(
 {
     struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
     struct gbm_bo *bo = NULL;
+    struct gbm_viv_bo *viv_bo = NULL;
+
     int i;
 
     for (i = 0; i < surf->buffer_count; i++)
@@ -917,6 +993,12 @@ gbm_viv_surface_lock_front_buffer(
         {
             surf->buffers[i].status = LOCKED_BY_CLIENT;
             bo = surf->buffers[i].bo;
+            viv_bo = gbm_viv_bo(bo);
+
+            if (viv_bo->modifier == DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC)
+            {
+                _sync_tilestatus_buffer(viv_bo, surf->buffers[i].render_surface);
+            }
         }
     }
 
@@ -978,6 +1060,7 @@ gbm_viv_surface_destroy(
     {
         if (surf->buffers[i].render_surface != NULL)
         {
+            gcoSURF_Unlock(surf->buffers[i].render_surface, gcvNULL);
             gcoSURF_Destroy(surf->buffers[i].render_surface);
             surf->buffers[i].render_surface = NULL;
         }

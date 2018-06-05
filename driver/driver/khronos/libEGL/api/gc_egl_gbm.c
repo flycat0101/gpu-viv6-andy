@@ -1047,8 +1047,6 @@ gbm_SetWindowFormat(
     switch ((int)Type)
     {
     case gcvSURF_RENDER_TARGET:
-        return gcvSTATUS_NOT_SUPPORTED;
-
     case gcvSURF_RENDER_TARGET_NO_TILE_STATUS:
             status = gcoSURF_Construct(gcvNULL,
                                    width, height, 1,

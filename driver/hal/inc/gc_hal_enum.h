@@ -620,6 +620,7 @@ typedef enum _gceSURF_TYPE
     gcvSURF_NO_HZ                   = 0x100000,
     gcvSURF_3D                      = 0x200000, /* It's 3d surface */
     gcvSURF_DMABUF_EXPORTABLE       = 0x400000, /* master node can be exported as dma-buf fd */
+    gcvSURF_CACHE_MODE_128          = 0x800000,
 
     gcvSURF_TEXTURE_LINEAR               = gcvSURF_TEXTURE
                                          | gcvSURF_LINEAR,

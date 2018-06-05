@@ -483,6 +483,11 @@ gcoSURF_AllocateTileStatus(
         allocFlags |= gcvALLOC_FLAG_SECURITY;
     }
 
+    if (Surface->hints & gcvSURF_DMABUF_EXPORTABLE)
+    {
+        allocFlags |= gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+    }
+
     /* Copy filler. */
     Surface->hzTileStatusFiller = Surface->tileStatusFiller;
 
@@ -1799,7 +1804,12 @@ _AllocateSurface(
                             : gcvTILED)
                          : gcvLINEAR
                          ;
+
     Surface->cacheMode  = gcvCACHE_NONE;
+    if (Surface->hints & gcvSURF_CACHE_MODE_128)
+    {
+        Surface->cacheMode  = gcvCACHE_128;
+    }
 
     /* Set aligned surface size. */
     Surface->alignedW = Surface->allocedW;
