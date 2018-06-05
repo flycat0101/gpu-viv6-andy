@@ -984,7 +984,7 @@ gcChipResidentTextureLevel(
             }
         }
 
-        if (buf && (mipmap->width * mipmap->height * mipmap->depth))
+        if (buf && ((mipmap->width * mipmap->height * mipmap->depth) != 0))
         {
             gctSIZE_T rowStride = 0;
             gctSIZE_T imgHeight = (gctSIZE_T)mipmap->height;

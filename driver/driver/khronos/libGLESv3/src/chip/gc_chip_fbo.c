@@ -651,7 +651,7 @@ __glChipFramebufferTexture(
     gcmONERROR(gcChipFBOSyncAttachment(gc, preAttach));
     mipmap = texObj ? &texObj->faceMipmap[face][level] : gcvNULL;
 
-    if (mipmap && (mipmap->width * mipmap->height * mipmap->depth))
+    if (mipmap && ((mipmap->width * mipmap->height * mipmap->depth) != 0))
     {
         __GLchipContext         *chipCtx        = CHIP_CTXINFO(gc);
         __GLchipTextureInfo     *texInfo        = (__GLchipTextureInfo*)texObj->privateData;
