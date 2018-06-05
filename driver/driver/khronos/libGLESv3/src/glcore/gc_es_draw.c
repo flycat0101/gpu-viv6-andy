@@ -897,8 +897,11 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
 {
     GLboolean ret = GL_TRUE;
     __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
-
-    if (__glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled)
+    /* According to Spec: robust buffer access can be enable by creating a context with robust access enabled through
+    ** the window system binding APIs. Otherwise, should report a GL error in out-of-bounds situation
+    */
+    if (gc->imports.robustAccess && 
+        __glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled)
     {
         return GL_TRUE;
     }

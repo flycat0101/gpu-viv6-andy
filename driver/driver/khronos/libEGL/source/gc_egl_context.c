@@ -1004,6 +1004,7 @@ eglCreateContext(
     {
         EGLint i = 0;
         EGLBoolean needCheckRobustAndVersion = EGL_FALSE;
+        EGLBoolean setRobustAccess = EGL_FALSE;
 
         for (i = 0; attrib_list[i] != EGL_NONE; i += 2)
         {
@@ -1063,6 +1064,7 @@ eglCreateContext(
                             if (flags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR)
                             {
                                 needCheckRobustAndVersion = EGL_TRUE;
+                                setRobustAccess = EGL_TRUE;
                             }
                             break;
                         default:
@@ -1170,6 +1172,11 @@ eglCreateContext(
             {
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+
+            if (setRobustAccess)
+            {
+                robustAccess = EGL_TRUE;
             }
         }
     }
