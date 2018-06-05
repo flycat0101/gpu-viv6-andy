@@ -37,18 +37,6 @@ static clsINTRINSIC_BUILTIN_FUNCTION IntrinsicBuiltinFunctions[] =
 {
     /* Intrinsic builtin functions */
 
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float4",     T_FLOAT4, 1, {T_FLOAT4},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float8",     T_FLOAT8, 1, {T_FLOAT8},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float16",    T_FLOAT16, 1, {T_FLOAT16},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float4",     T_FLOAT4, 1, {T_FLOAT4},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float8",     T_FLOAT8, 1, {T_FLOAT8},  {0}, {0}, 1},
-    {clvEXTENSION_NONE,  "acos",              gceINTRIN_source, "_viv_acos_float16",    T_FLOAT16, 1, {T_FLOAT16},  {0}, {0}, 1},
     {clvEXTENSION_NONE,  "mad_sat",           gceINTRIN_source, "_viv_madsat_long",   T_LONG,  3, {T_LONG,  T_LONG,  T_LONG},  {0}, {0}, 1},
     {clvEXTENSION_NONE,  "mad_sat",           gceINTRIN_source, "_viv_madsat_ulong",  T_ULONG, 3, {T_ULONG, T_ULONG, T_ULONG}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "mad_sat",           gceINTRIN_source, "_viv_madsat_long2",   T_LONG2,  3, {T_LONG2,  T_LONG2,  T_LONG2},  {0}, {0}, 1},
