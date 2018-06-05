@@ -825,8 +825,7 @@ gceSTATUS gcfVX_GetInfo(
     }
 
     Context->params.xmax = (Context->params.xmax > 0) ? Context->params.xmax : globel->width;
-    Context->params.xstep = Context->params.xstep;
-    Context->params.ystep = (Context->params.ystep > 0) ?Context->params.ystep : 0;
+    Context->params.xstep = (Context->params.xstep > 0) ? Context->params.xstep : 1;
 
     Context->params.ymax = (Context->params.ymax > 0) ? Context->params.ymax : globel->height;
     Context->params.ystep = (Context->params.ystep > 0) ? Context->params.ystep : 1;
