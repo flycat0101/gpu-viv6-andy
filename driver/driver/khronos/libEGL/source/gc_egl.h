@@ -1120,7 +1120,7 @@ typedef struct
     EGLDisplay (* GetDisplay_post)(EGLNativeDisplayType display_id, EGLDisplay ret_dpy);
     EGLBoolean (* Initialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
     EGLBoolean (* Terminate)(EGLDisplay dpy);
-    const char * (* QueryString_pre)(EGLDisplay dpy, EGLint name);
+    const char * (* QueryString_post)(EGLDisplay dpy, EGLint name, const char* str);
     EGLBoolean (* GetConfigs_pre)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
     EGLBoolean (* ChooseConfig_pre)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
     EGLBoolean (* GetConfigAttrib_post)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
@@ -1142,7 +1142,7 @@ typedef struct
     EGLBoolean (* DestroyContext)(EGLDisplay dpy, EGLContext ctx);
     EGLBoolean (* MakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
     EGLContext (* GetCurrentContext_post)(EGLContext ret_ctx);
-    EGLSurface (* GetCurrentSurface_post)(EGLint readdraw, EGLSurface ret_furface);
+    EGLSurface (* GetCurrentSurface_post)(EGLint readdraw, EGLSurface ret_surface);
     EGLDisplay (* GetCurrentDisplay_post)(EGLDisplay ret_dpy);
     EGLBoolean (* QueryContext_pre)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
     EGLBoolean (* WaitGL)(void);
@@ -1175,7 +1175,7 @@ typedef struct
     EGLSyncKHR (* CreateSyncKHR_post)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list, EGLSyncKHR ret_sync);
     EGLBoolean (* DestroySyncKHR)(EGLDisplay dpy, EGLSyncKHR sync);
     EGLint     (* ClientWaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout);
-    EGLBoolean (* GetSyncAttribKHR_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value);
+    EGLBoolean (* GetSyncAttribKHR_pre)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value);
 
     /* EGL_KHR_wait_sync. */
     EGLint     (* WaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags);
@@ -1214,7 +1214,7 @@ typedef struct
     void (* GetProcAddress_post)(const char *procname, __eglMustCastToProperFunctionPointerType func);
 
     EGLint     (* GetError_post)(EGLint err);
-    const char * (* QueryString_post)(EGLDisplay dpy, EGLint name, const char* str);
+    const char * (* QueryString_pre)(EGLDisplay dpy, EGLint name);
     EGLBoolean (* GetConfigs_post)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
     EGLBoolean (* ChooseConfig_post)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
     EGLBoolean (* QuerySurface_post)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
@@ -1234,7 +1234,7 @@ typedef struct
 
     /* EGL_KHR_fence_sync*/
     EGLSyncKHR (* CreateSyncKHR_pre)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
-    EGLBoolean (* GetSyncAttribKHR_pre)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value);
+    EGLBoolean (* GetSyncAttribKHR_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value);
 
     /* EGL_EXT_platform_base. */
     EGLDisplay (* GetPlatformDisplayEXT_pre)(EGLenum platform, void *native_display, const EGLint *attrib_list);

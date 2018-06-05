@@ -1278,7 +1278,7 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetDisplay_post,
     LOG_eglInitialize,
     LOG_eglTerminate,
-    LOG_eglQueryString_pre,
+    LOG_eglQueryString_post,
     LOG_eglGetConfigs_pre,
     LOG_eglChooseConfig_pre,
     LOG_eglGetConfigAttrib_post,
@@ -1329,7 +1329,7 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglCreateSyncKHR_post,
     LOG_eglDestroySyncKHR,
     LOG_eglClientWaitSyncKHR,
-    LOG_eglGetSyncAttribKHR_post,
+    LOG_eglGetSyncAttribKHR_pre,
     /* EGL_KHR_wait_sync. */
     LOG_eglWaitSyncKHR,
     /* EGL_KHR_reusable_sync. */
@@ -1361,7 +1361,7 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetProcAddress_post,
 
     LOG_eglGetError_post,
-    LOG_eglQueryString_post,
+    LOG_eglQueryString_pre,
     LOG_eglGetConfigs_post,
     LOG_eglChooseConfig_post,
     LOG_eglQuerySurface_post,
@@ -1378,14 +1378,15 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglCreateImageKHR_pre,
     /* EGL_KHR_fence_sync. */
     LOG_eglCreateSyncKHR_pre,
-    LOG_eglGetSyncAttribKHR_pre,
+    LOG_eglGetSyncAttribKHR_post,
     /* EGL_EXT_platform_base. */
     LOG_eglGetPlatformDisplayEXT_pre,
     LOG_eglCreatePlatformWindowSurfaceEXT_pre,
     LOG_eglCreatePlatformPixmapSurfaceEXT_pre,
 };
 
-char *veglFunctionNames[] = {
+char *veglTraceFuncNames[] = {
+    /* EGL 1.4 */
     "eglGetError",
     "eglGetDisplay",
     "eglInitialize",
@@ -1452,15 +1453,18 @@ char *veglFunctionNames[] = {
     "eglCreatePlatformPixmapSurfaceEXT",
     /* EGL_KHR_partial_update */
     "eglSetDamageRegionKHR"
+    "eglSwapBuffersWithDamageKHR",
+    "eglSwapBuffersWithDamageEXT",
+    /* EGL_EXT_image_dma_buf_import_modifiers */
+    "eglQueryDmaBufFormatsEXT",
+    "eglQueryDmaBufModifiersEXT"
 };
 
 
 /* EGL Tracer Dispatch Function Table */
 eglTracerDispatchTableStruct veglTracerDispatchTable = {0};
 
-/* Note: GLES3 Tracer only support 34 EGL1.4 APIs + 2 EGLImage APIs (not include pre functions)*/
-const int veglTracerDispatchTableSize = 36;
-
+const int veglTracerDispatchTableSize = sizeof(veglTraceFuncNames) / sizeof(char *);
 
 EGLBoolean veglInitTracerDispatchTable()
 {
@@ -1489,9 +1493,9 @@ EGLBoolean veglInitTracerDispatchTable()
             if (trlib  == gcvNULL)
             {
 #if defined(_WIN32) || defined(_WIN32_WCE)
-                fprintf(stderr, "Failed to open libGLES_vlogger.dll!\n");
+                gcoOS_Print("Failed to open libGLES_vlogger.dll!\n");
 #else
-                fprintf(stderr, "Failed to open libGLES_vlogger.so!\n");
+                gcoOS_Print("Failed to open libGLES_vlogger.so!\n");
 #endif
                 return EGL_FALSE;
             }
@@ -1500,7 +1504,7 @@ EGLBoolean veglInitTracerDispatchTable()
             {
                 trApiName[0] = '\0';
                 gcoOS_StrCatSafe(trApiName, 80, "TR_");
-                gcoOS_StrCatSafe(trApiName, 80, veglFunctionNames[i]);
+                gcoOS_StrCatSafe(trApiName, 80, veglTraceFuncNames[i]);
                 status =  gcoOS_GetProcAddress(gcvNULL, trlib, trApiName, &funcPtr);
 
                 if (status == gcvSTATUS_OK)
@@ -1509,7 +1513,7 @@ EGLBoolean veglInitTracerDispatchTable()
                 }
                 else
                 {
-                    fprintf(stderr, "Failed to initialize veglTracerDispatchTable: %s!\n", veglFunctionNames[i]);
+                    gcoOS_Print("Failed to initialize veglTracerDispatchTable: %s!\n", veglTraceFuncNames[i]);
                     ((void *(*))(&veglTracerDispatchTable))[i] = gcvNULL;
                     ret = EGL_FALSE;
                 }

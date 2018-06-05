@@ -588,6 +588,8 @@ _SetTraceMode(
 {
     static gctBOOL Once = gcvFALSE;
 
+    gcoOS_LockPLS();
+
     if (!Once)
     {
         gctSTRING tracemode = gcvNULL;
@@ -623,7 +625,7 @@ _SetTraceMode(
         Once = gcvTRUE;
     }
 
-    return;
+     gcoOS_UnLockPLS();
 }
 
 
@@ -735,7 +737,6 @@ veglGetPlatformDisplay(
     gcoOS_GetEnv(gcvNULL, "VIV_EGL_PLATFORM", &platEnv);
 
     gcoOS_LockPLS();
-    _SetTraceMode();
 
     /* Add Necessary signal handlers */
     /* Add signal handler for SIGFPE when error no is zero. */
@@ -1760,6 +1761,8 @@ eglInitialize(
     VEGLThreadData thread;
     VEGLDisplay dpy;
     gcmHEADER_ARG("Dpy=0x%x", Dpy);
+
+    _SetTraceMode();
 
     gcmDUMP_API("${EGL eglInitialize 0x%08X}", Dpy);
     VEGL_TRACE_API(Initialize)(Dpy, major, minor);
