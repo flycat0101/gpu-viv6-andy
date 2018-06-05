@@ -1786,12 +1786,20 @@ _FillInFeatureTable(
 
     Features[gcvFEATURE_GENERIC_ATTRIB] = database->REG_Generics;
 
-    Features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT] = database->REG_CorrectAutoDisable1;
-
-    Features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT_WIDTH] = database->REG_CorrectAutoDisableCountWidth;
+    /*
+    ** For blt engine clear, HW may change tileMode from REQUEST64 to FAST_CLEAR,
+    ** which means fast clear value re-work for this tile, and in logic, the counter
+    ** of autoDisable should do "counter--", But HW only has operation "counter++"
+    ** and don't do such thing. So, the autoClear feature was in fact not correct
+    ** in this situation
+    */
+    if (!database->REG_BltEngine)
+    {
+        Features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT] = database->REG_CorrectAutoDisable1;
+        Features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT_WIDTH] = database->REG_CorrectAutoDisableCountWidth;
+    }
 
     Features[gcvFEATURE_8K_RT] = database->REG_Render8K;
-
     Features[gcvFEATURE_HALTI3] = database->REG_Halti3;
 
     Features[gcvFEATURE_EEZ] = database->REG_EEZ;
@@ -16445,14 +16453,8 @@ _EnableTileStatus(
 
     /* Cannot auto disable TS for compressed case, because the TS buffer
     ** contains info for compress.
-    ** For blt engine clear, HW may change tileMode from REQUEST64 to FAST_CLEAR,
-    ** which means fast clear value re-work for this tile, and in logic, the counter
-    ** of autoDisable should do "counter--", But HW only has operation "counter++"
-    ** and don't do such thing, so, we need reset counter or disable autoDisable optimization
-    ** in this situation
     */
     autoDisable = ((Surface->compressed == gcvFALSE) &&
-                   !Hardware->features[gcvFEATURE_BLT_ENGINE] &&
                    ((Hardware->features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT_WIDTH]) ||
                     ((Hardware->features[gcvFEATURE_CORRECT_AUTO_DISABLE_COUNT]) &&
                      (tileCount < (1 << 20))
