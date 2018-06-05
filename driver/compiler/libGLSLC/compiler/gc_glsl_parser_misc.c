@@ -6533,59 +6533,37 @@ slParseArrayDataType(
 {
     slsDATA_TYPE *dataType = gcvNULL;
     gctINT       arrayLength;
+    gceSTATUS    status;
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x ArrayLengthExpr=0x%x",
                   Compiler, DataType, ArrayLengthExpr);
 
-    if (!sloCOMPILER_IsHaltiVersion(Compiler)) {
-        gctINT lineNo;
-        gctINT stringNo;
-
-        if(ArrayLengthExpr) {
-           lineNo = ArrayLengthExpr->base.lineNo;
-           stringNo = ArrayLengthExpr->base.stringNo;
-        }
-        else {
-           lineNo = sloCOMPILER_GetCurrentLineNo(Compiler);
-           stringNo = sloCOMPILER_GetCurrentStringNo(Compiler);
-        }
-        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                        lineNo,
-                                        stringNo,
-                                        slvREPORT_ERROR,
-                                        "invalid forming of array type from '%s'",
-                                        _GetTypeName(DataType->type)));
+    if(!ArrayLengthExpr) {
+       arrayLength = -1;
     }
     else {
-        gceSTATUS status;
+       status = _EvaluateExprToArrayLength(Compiler,
+                                           ArrayLengthExpr,
+                                           gcvTRUE,
+                                           gcvTRUE,
+                                           &arrayLength);
 
-        if(!ArrayLengthExpr) {
-           arrayLength = -1;
-        }
-        else {
-           status = _EvaluateExprToArrayLength(Compiler,
-                                               ArrayLengthExpr,
-                                               gcvTRUE,
-                                               gcvTRUE,
-                                               &arrayLength);
+       if (gcmIS_ERROR(status))
+       {
+           gcmFOOTER_ARG("<return>=0x%x", dataType);
+           return dataType;
+       }
+    }
 
-           if (gcmIS_ERROR(status))
-           {
-               gcmFOOTER_ARG("<return>=0x%x", dataType);
-               return dataType;
-           }
-        }
+    status = sloCOMPILER_CreateArrayDataType(Compiler,
+                                             DataType,
+                                             arrayLength,
+                                             &dataType);
 
-        status = sloCOMPILER_CreateArrayDataType(Compiler,
-                                                 DataType,
-                                                 arrayLength,
-                                                 &dataType);
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER_ARG("<return>=0x%x", dataType);
-            return dataType;
-        }
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=0x%x", dataType);
+        return dataType;
     }
 
     gcmFOOTER_ARG("<return>=0x%x", dataType);
@@ -11765,6 +11743,17 @@ slParseNonArrayParameterDecl(
         return gcvNULL;
     }
 
+    if (!sloCOMPILER_IsHaltiVersion(Compiler) && slsDATA_TYPE_IsArray(DataType) && Identifier != gcvNULL) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        Identifier->lineNo,
+                                        Identifier->stringNo,
+                                        slvREPORT_ERROR,
+                                        "invalid forming of array type from '%s'",
+                                        _GetTypeName(DataType->type)));
+
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
     if (slsDATA_TYPE_IsVoid(DataType) && Identifier == gcvNULL)
     {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -11833,6 +11822,18 @@ slParseArrayParameterDecl(
                                             slvREPORT_ERROR,
                                             "unspecified array size in parameter declaration"));
         }
+
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    if (!sloCOMPILER_IsHaltiVersion(Compiler) && slsDATA_TYPE_IsArray(DataType) && Identifier != gcvNULL) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        Identifier->lineNo,
+                                        Identifier->stringNo,
+                                        slvREPORT_ERROR,
+                                        "invalid forming of array type from '%s'",
+                                        _GetTypeName(DataType->type)));
 
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
@@ -11996,6 +11997,18 @@ slParseFullySpecifiedType(
 
     if (DataType == gcvNULL)
     {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    if (!sloCOMPILER_IsHaltiVersion(Compiler) && slsDATA_TYPE_IsArray(DataType)) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        sloCOMPILER_GetCurrentLineNo(Compiler),
+                                        sloCOMPILER_GetCurrentStringNo(Compiler),
+                                        slvREPORT_ERROR,
+                                        "invalid forming of array type from '%s'",
+                                        _GetTypeName(DataType->type)));
+
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
     }
@@ -14972,11 +14985,23 @@ slParseTypeSpecifiedFieldDeclList(
         return;
     }
 
+    if (!sloCOMPILER_IsHaltiVersion(Compiler) && slsDATA_TYPE_IsArray(DataType)) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        sloCOMPILER_GetCurrentLineNo(Compiler),
+                                        sloCOMPILER_GetCurrentStringNo(Compiler),
+                                        slvREPORT_ERROR,
+                                        "invalid forming of array type from '%s'",
+                                        _GetTypeName(DataType->type)));
+
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmONERROR(status);
+    }
+
     if(slsQUALIFIERS_KIND_ISNOT(&DataType->qualifiers, slvQUALIFIERS_FLAG_PRECISION) &&
        slsQUALIFIERS_KIND_ISNOT(&DataType->qualifiers, slvQUALIFIERS_FLAG_NONE)) {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                        0,
-                                        0,
+                                        sloCOMPILER_GetCurrentLineNo(Compiler),
+                                        sloCOMPILER_GetCurrentStringNo(Compiler),
                                         slvREPORT_ERROR,
                                         "type qualifier other than precision qualifier is specified for a field declaration."));
     }
@@ -15255,6 +15280,17 @@ slParseArrayListParameterDecl(
         gcmONERROR(status);
     }
 
+    if (!sloCOMPILER_IsHaltiVersion(Compiler) && slsDATA_TYPE_IsArray(DataType)) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        Identifier->lineNo,
+                                        Identifier->stringNo,
+                                        slvREPORT_ERROR,
+                                        "invalid forming of array type from '%s'",
+                                        _GetTypeName(DataType->type)));
+
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmONERROR(status);
+    }
     if (gcmIS_ERROR(_CheckErrorForArraysOfArraysLengthValue(Compiler, LengthList, gcvFALSE)))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
