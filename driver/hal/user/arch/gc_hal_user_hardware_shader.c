@@ -182,7 +182,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
     **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
     */
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_CL_PEAKWORKGROUPSIZE", &env))
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_OPENCV_WORKGROUPSIZE", &env))
         && env
         && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
     {
