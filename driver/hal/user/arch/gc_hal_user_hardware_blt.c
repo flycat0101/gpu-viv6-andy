@@ -4050,7 +4050,93 @@ gcoHARDWARE_3DBlitTileFill(
 #endif
 
     /* Flush tile status buffer */
-    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    if (!Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX] &&
+        Hardware->features[gcvFEATURE_BLT_ENGINE])
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x502E) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x502E, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x502B) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x502B, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x502E) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x502E, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+    }
+    else
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -4076,6 +4162,7 @@ gcoHARDWARE_3DBlitTileFill(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+    }
 
     /* lock surface on the execute engine */
     gcsSURF_NODE_Lock(&DstSurf->node, CurrentEngine, gcvNULL, gcvNULL);

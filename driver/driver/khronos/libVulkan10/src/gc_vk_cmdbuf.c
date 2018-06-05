@@ -642,16 +642,24 @@ VkResult __vk_InsertSemaphoreSignals(
     uint32_t stateSize;
     uint32_t i;
     VkResult result = VK_SUCCESS;
+#if __VK_ENABLETS
+    VkBool32 bltTileCache = ((!devQueue->pDevContext->database->PE_TILE_CACHE_FLUSH_FIX)
+        && devQueue->pDevContext->database->REG_BltEngine);
+#endif
 
     fenceAddress = memory->devAddr;
 
-    stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE + (6 * semaphoreCount * sizeof(uint32_t));
+    stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) + (6 * semaphoreCount * sizeof(uint32_t));
 
     states = (uint32_t *)__vk_QueueGetSpace(devQueue, stateSize);
 
     __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
+#if __VK_ENABLETS
+    __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+#else
     __vkCmdLoadFlush3DHWStates(&states);
+#endif
 
     for (i = 0; i < semaphoreCount; i++)
     {
@@ -811,13 +819,17 @@ VkResult __vk_InsertSemaphoreSignals(
     uint32_t stateSize;
     uint32_t i;
     VkResult result = VK_SUCCESS;
+#if __VK_ENABLETS
+    VkBool32 bltTileCache = ((!devQueue->pDevContext->database->PE_TILE_CACHE_FLUSH_FIX)
+        && devQueue->pDevContext->database->REG_BltEngine);
+#endif
 
     /* Use the current thread's gcoHARDWARE object */
     __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
 
     fenceAddress = memory->devAddr;
 
-    stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE + (6 * semaphoreCount * sizeof(uint32_t));
+    stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) + (6 * semaphoreCount * sizeof(uint32_t));
 
     __VK_ONERROR(gcoBUFFER_Reserve(
         hardware->engine[gcvENGINE_RENDER].buffer,
@@ -829,7 +841,11 @@ VkResult __vk_InsertSemaphoreSignals(
 
     states = (uint32_t *)gcmUINT64_TO_PTR(reserve->lastReserve);
 
+#if __VK_ENABLETS
+    __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+#else
     __vkCmdLoadFlush3DHWStates(&states);
+#endif
 
     for (i = 0; i < semaphoreCount; i++)
     {
@@ -921,12 +937,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueWaitIdle(
 {
     __vkDevQueue *devQueue = (__vkDevQueue *)queue;
     gcoHARDWARE hardware = gcvNULL;
-    uint32_t flushCmds[__VK_3D_FLUSH_PIPE_DMA_SIZE / sizeof(uint32_t)];
+    uint32_t flushCmds[__VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t)];
     uint32_t *states = flushCmds;
     uint32_t stateSize = 0;
     uint32_t statePipe;
     gcoCMDBUF reserve;
     VkResult result = VK_SUCCESS;
+#if __VK_ENABLETS
+    VkBool32 bltTileCache = ((!cmd->devCtx->database->PE_TILE_CACHE_FLUSH_FIX)
+            && cmd->devCtx->database->REG_BltEngine);
+#endif
 
     /* Use the current thread's gcoHARDWARE object */
     __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
@@ -936,15 +956,22 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueWaitIdle(
     /* Add the appropriate flush to the command buffer. */
     if (statePipe == gcvPIPE_2D)
     {
-        stateSize = __VK_2D_FLUSH_PIPE_DMA_SIZE / sizeof(uint32_t);
-
+        stateSize = __VK_2D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t);
+#if __VK_ENABLETS
+        __vkCmdLoadFlush2DHWStates(bltTileCache, &states);
+#else
         __vkCmdLoadFlush2DHWStates(&states);
+#endif
     }
     else if (statePipe == gcvPIPE_3D)
     {
-        stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE / sizeof(uint32_t);
+        stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t);
 
+#if __VK_ENABLETS
+        __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+#else
         __vkCmdLoadFlush3DHWStates(&states);
+#endif
     }
 
     if (stateSize)
@@ -2983,12 +3010,16 @@ void __vk_CmdPipeFlush(
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     uint32_t pipe = cmd->stateBufferTail->bufPipe;
+#if __VK_ENABLETS
+    VkBool32 bltTileCache = ((!cmd->devCtx->database->PE_TILE_CACHE_FLUSH_FIX)
+            && cmd->devCtx->database->REG_BltEngine);
+#endif
 
     /* Add the appropriate flush to the command buffer. */
     if (pipe == gcvPIPE_2D)
     {
         uint32_t *states = NULL;
-        uint32_t requestSize = __VK_2D_FLUSH_PIPE_DMA_SIZE / sizeof(uint32_t);
+        uint32_t requestSize = __VK_2D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx) / sizeof(uint32_t);
 
         if (bypassDmaFunctions)
         {
@@ -2999,11 +3030,15 @@ void __vk_CmdPipeFlush(
             __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
         }
 
+#if __VK_ENABLETS
+        __vkCmdLoadFlush2DHWStates(bltTileCache, &states);
+#else
         __vkCmdLoadFlush2DHWStates(&states);
+#endif
 
         if (bypassDmaFunctions)
         {
-            cmd->stateBufferTail->bufOffset += __VK_2D_FLUSH_PIPE_DMA_SIZE;
+            cmd->stateBufferTail->bufOffset += __VK_2D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx);
         }
         else
         {
@@ -3013,7 +3048,7 @@ void __vk_CmdPipeFlush(
     else if (pipe == gcvPIPE_3D)
     {
         uint32_t *states = NULL;
-        uint32_t requestSize = __VK_3D_FLUSH_PIPE_DMA_SIZE / sizeof(uint32_t);
+        uint32_t requestSize = __VK_3D_FLUSH_PIPE_DMA_SIZE((cmd->devCtx)) / sizeof(uint32_t);
 
         if (bypassDmaFunctions)
         {
@@ -3024,11 +3059,15 @@ void __vk_CmdPipeFlush(
             __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
         }
 
+#if __VK_ENABLETS
+        __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+#else
         __vkCmdLoadFlush3DHWStates(&states);
+#endif
 
         if (bypassDmaFunctions)
         {
-            cmd->stateBufferTail->bufOffset += __VK_3D_FLUSH_PIPE_DMA_SIZE;
+            cmd->stateBufferTail->bufOffset += __VK_3D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx);
         }
         else
         {
@@ -3075,13 +3114,13 @@ void __vk_CmdAquireBuffer(
         {
             bPipeSelectNeeded = VK_TRUE;
             bPipeFlushNeeded  = VK_TRUE;
-            pipeSelectFlushDMASize = __VK_PIPE_SELECT_DMA_SIZE + __VK_2D_FLUSH_PIPE_DMA_SIZE;
+            pipeSelectFlushDMASize = __VK_PIPE_SELECT_DMA_SIZE + __VK_2D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx);
         }
         else if (cmd->stateBufferTail->bufPipe == gcvPIPE_3D)
         {
             bPipeSelectNeeded = VK_TRUE;
             bPipeFlushNeeded  = VK_TRUE;
-            pipeSelectFlushDMASize = __VK_PIPE_SELECT_DMA_SIZE + __VK_3D_FLUSH_PIPE_DMA_SIZE;
+            pipeSelectFlushDMASize = __VK_PIPE_SELECT_DMA_SIZE + __VK_3D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx);
         }
         else
         {
