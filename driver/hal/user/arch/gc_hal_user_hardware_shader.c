@@ -195,9 +195,10 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
         gcmASSERT(pVscHwCfg->maxCoreCount == 1);
         maxWorkGroupSize = 32;
     }
-    pVscHwCfg->initWorkGroupSizeToCalcRegCount       =
-    pVscHwCfg->maxWorkGroupSize                      =
-    pVscHwCfg->minWorkGroupSize                      = maxWorkGroupSize;
+    maxWorkGroupSize = gcmMIN(threadCount, 128);
+    pVscHwCfg->initWorkGroupSizeToCalcRegCount       = 128;
+    pVscHwCfg->maxWorkGroupSize                      = maxWorkGroupSize;
+    pVscHwCfg->minWorkGroupSize                      = 1;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0              = IS_HW_SUPPORT(gcvFEATURE_HALTI0);
     pVscHwCfg->hwFeatureFlags.hasHalti1              = IS_HW_SUPPORT(gcvFEATURE_HALTI1);

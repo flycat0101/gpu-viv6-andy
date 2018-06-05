@@ -273,9 +273,10 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
         gcmASSERT(pVscHwCfg->maxCoreCount == 1);
         maxWorkGroupSize = 32;
     }
-    pVscHwCfg->initWorkGroupSizeToCalcRegCount       =
-    pVscHwCfg->maxWorkGroupSize                      =
-    pVscHwCfg->minWorkGroupSize                      = maxWorkGroupSize;
+    maxWorkGroupSize = gcmMIN(database->ThreadCount, 128);
+    pVscHwCfg->initWorkGroupSizeToCalcRegCount       = 128;
+    pVscHwCfg->maxWorkGroupSize                      = maxWorkGroupSize;
+    pVscHwCfg->minWorkGroupSize                      = 1;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0 = database->REG_Halti0;
     pVscHwCfg->hwFeatureFlags.hasHalti1 = database->REG_Halti1;
