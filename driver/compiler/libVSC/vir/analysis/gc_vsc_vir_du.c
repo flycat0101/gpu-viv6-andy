@@ -1593,7 +1593,7 @@ static gctUINT _HFUNC_UsageInstLSB8(const void* pKey)
 {
     VIR_USAGE_KEY*     pUsageKey = (VIR_USAGE_KEY*)pKey;
 
-    return ((gctUINT)(gctUINTPTR_T)pUsageKey->pUsageInst & 0xFF);
+    return ((gctUINT)(gctUINTPTR_T)pUsageKey->pUsageInst >> 2);
 }
 
 static gctBOOL _HKCMP_UsageKeyEqual(const void* pHashKey1, const void* pHashKey2)
