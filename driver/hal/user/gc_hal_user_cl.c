@@ -1174,9 +1174,13 @@ gcoCL_QueryDeviceInfo(
     gceCHIPMODEL  chipModel = gcv200;
     gctUINT32 chipRevision = 0;
     gctBOOL chipEnableEP = gcvFALSE;
+    VSC_HW_CONFIG hwCfg;
+    
     gcmHEADER();
     gcmASSERT(DeviceInfo != gcvNULL);
 
+    gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
+    
     gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
     /* Number of shader cores and threads */
     gcmONERROR(
@@ -1203,7 +1207,7 @@ gcoCL_QueryDeviceInfo(
     DeviceInfo->maxWorkItemSizes[0]   = gcmMIN(threadCount, 1024);
     DeviceInfo->maxWorkItemSizes[1]   = gcmMIN(threadCount, 1024);
     DeviceInfo->maxWorkItemSizes[2]   = gcmMIN(threadCount, 1024);
-    DeviceInfo->maxWorkGroupSize      = gcmMIN(threadCount, 256);
+    DeviceInfo->maxWorkGroupSize      = hwCfg.maxWorkGroupSize;
 
     if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_ENHANCEMENTS2))
     {
