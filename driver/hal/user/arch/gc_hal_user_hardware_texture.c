@@ -2930,7 +2930,9 @@ gcoHARDWARE_BindTextureTS(
                 /* Can't find the slot */
                 if (texTSSlot == -1)
                 {
+#if gcdDEBUG_OPTION
                     gcmPRINT("texture TS has to be disabled as out of slots");
+#endif
                     gcmONERROR(gcoHARDWARE_DisableTileStatus(Hardware, &texView, gcvTRUE));
                     enableTexTS = gcvFALSE;
                 }
