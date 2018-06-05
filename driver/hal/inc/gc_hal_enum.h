@@ -1533,9 +1533,10 @@ gceFILTER_PASS_TYPE;
 /* Endian hints. */
 typedef enum _gceENDIAN_HINT
 {
-    gcvENDIAN_NO_SWAP = 0,
-    gcvENDIAN_SWAP_WORD,
-    gcvENDIAN_SWAP_DWORD
+    gcvENDIAN_NO_SWAP    = 0,
+    gcvENDIAN_SWAP_WORD  = 1,
+    gcvENDIAN_SWAP_DWORD = 2,
+    gcvENDIAN_SWAP_QWORD = 3,
 }
 gceENDIAN_HINT;
 

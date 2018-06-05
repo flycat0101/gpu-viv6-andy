@@ -526,44 +526,6 @@ _ConvertBlitFormat(
     return gcvSTATUS_OK;
 }
 
-static gctUINT32
-_GetEndianControl(
-    IN gcoHARDWARE Hardware,
-    IN gctUINT32 hwFormat
-    )
-{
-    gctUINT32 endianCtrl = 0x0;
-
-    if (Hardware->bigEndian)
-    {
-        switch (hwFormat)
-        {
-        case 0x00:
-        case 0x01:
-        case 0x02:
-        case 0x03:
-        case 0x04:
-        case 0x18:
-        case 0x1C:
-            endianCtrl = 0x1;
-            break;
-        case 0x16:
-        case 0x17:
-        case 0x19:
-        case 0x1A:
-        case 0x25:
-        case 0x26:
-        case 0x27:
-            endianCtrl = 0x2;
-            break;
-        default:
-            break;
-        }
-    }
-
-    return endianCtrl;
-}
-
 static void
 _ConfigMSAA(
     IN gcsSAMPLES *SampleInfo,
@@ -1479,7 +1441,7 @@ gcoHARDWARE_3DBlitBlt(
     }
 
     bScale = (srcSurf->sampleInfo.x != dstSurf->sampleInfo.x) || (srcSurf->sampleInfo.y != dstSurf->sampleInfo.y);
-    if((bSrcFake || bDstFake)                                         &&
+    if ((bSrcFake || bDstFake)                                 &&
         (srcSurfFmt != dstSurf->format                         ||
          (bScale && srcDownsampleMode != gcvMSAA_DOWNSAMPLE_SAMPLE))
        )
@@ -1793,12 +1755,12 @@ gcoHARDWARE_3DBlitBlt(
  12:12) + 1))))))) << (0 ? 12:12)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:1) - (0 ?
  2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
- 2:1))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, srcFormat)) & ((gctUINT32) ((((1 ?
+ 2:1))) | (((gctUINT32) ((gctUINT32) (srcSurf->formatInfo.endian) & ((gctUINT32) ((((1 ?
  2:1) - (0 ? 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
  2:1)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
  4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
- 4:3))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, dstFormat)) & ((gctUINT32) ((((1 ?
+ 4:3))) | (((gctUINT32) ((gctUINT32) (dstSurf->formatInfo.endian) & ((gctUINT32) ((((1 ?
  4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
  4:3)));
 
@@ -2124,6 +2086,20 @@ gcoHARDWARE_3DBlitBlt(
 
     if (srcFastClear)
     {
+        gctUINT32 fcValue      = srcSurf->fcValue[SrcView->firstSlice];
+        gctUINT32 fcValueUpper = srcSurf->fcValueUpper[SrcView->firstSlice];
+
+        switch (srcSurf->formatInfo.endian)
+        {
+        case 0x1:
+        case 0x2:
+            fcValue      = gcmBSWAP32(fcValue);
+            fcValueUpper = gcmBSWAP32(fcValueUpper);
+            break;
+        default:
+            break;
+        }
+
         /* BltSrcTileStatusAddress. */
         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -2171,7 +2147,7 @@ gcoHARDWARE_3DBlitBlt(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, srcSurf->fcValue[SrcView->firstSlice] );
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, fcValue );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -2199,7 +2175,7 @@ gcoHARDWARE_3DBlitBlt(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, srcSurf->fcValueUpper[SrcView->firstSlice] );
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, fcValueUpper );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -3516,8 +3492,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5011, Info->clearValue[0] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5011, Hardware->bigEndian ?
+ gcmBSWAP32(Info->clearValue[0]) : Info->clearValue[0] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3541,8 +3517,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5012, Info->clearValue[1] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5012, Hardware->bigEndian ?
+ gcmBSWAP32(Info->clearValue[1]) : Info->clearValue[1] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3567,8 +3543,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5013, Info->clearBitMask );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5013, Hardware->bigEndian ?
+ gcmBSWAP32(Info->clearBitMask) : Info->clearBitMask );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3592,8 +3568,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5014, Info->clearBitMaskUpper );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5014, Hardware->bigEndian ?
+ gcmBSWAP32(Info->clearBitMaskUpper) : Info->clearBitMaskUpper );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3727,8 +3703,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500F, Info->fcClearValue[0] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500F, Hardware->bigEndian ?
+ gcmBSWAP32(Info->fcClearValue[0]) : Info->fcClearValue[0] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3752,8 +3728,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5010, Info->fcClearValue[1] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5010, Hardware->bigEndian ?
+ gcmBSWAP32(Info->fcClearValue[1]) : Info->fcClearValue[1] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3778,8 +3754,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, Info->fcClearValue[0] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, Hardware->bigEndian ?
+ gcmBSWAP32(Info->fcClearValue[0]) : Info->fcClearValue[0] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -3803,8 +3779,8 @@ gcoHARDWARE_3DBlitClear(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, Info->fcClearValue[1] );
-    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, Hardware->bigEndian ?
+ gcmBSWAP32(Info->fcClearValue[1]) : Info->fcClearValue[1] );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
     }
@@ -4180,7 +4156,8 @@ gcoHARDWARE_3DBlitTileFill(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500F, DstSurf->fcValue[DstView->firstSlice];
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500F, Hardware->bigEndian ?
+ gcmBSWAP32(DstSurf->fcValue[DstView->firstSlice]) : DstSurf->fcValue[DstView->firstSlice];
  );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -4207,7 +4184,8 @@ gcoHARDWARE_3DBlitTileFill(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5010, DstSurf->fcValueUpper[DstView->firstSlice] );
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5010, Hardware->bigEndian ?
+ gcmBSWAP32(DstSurf->fcValueUpper[DstView->firstSlice]) : DstSurf->fcValueUpper[DstView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -5311,12 +5289,12 @@ gcoHARDWARE_3DBlitMipMap(
  ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:1) - (0 ?
  2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
- 2:1))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, srcFormat)) & ((gctUINT32) ((((1 ?
+ 2:1))) | (((gctUINT32) ((gctUINT32) (srcSurf->formatInfo.endian) & ((gctUINT32) ((((1 ?
  2:1) - (0 ? 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
  2:1)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
  4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
- 4:3))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, destFormat)) & ((gctUINT32) ((((1 ?
+ 4:3))) | (((gctUINT32) ((gctUINT32) (dstSurf->formatInfo.endian) & ((gctUINT32) ((((1 ?
  4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
  4:3)));
 
@@ -5431,6 +5409,20 @@ gcoHARDWARE_3DBlitMipMap(
 
     if (srcFastClear)
     {
+        gctUINT32 fcValue      = srcSurf->fcValue[SliceIdx];
+        gctUINT32 fcValueUpper = srcSurf->fcValueUpper[SliceIdx];
+
+        switch (srcSurf->formatInfo.endian)
+        {
+        case 0x1:
+        case 0x2:
+            fcValue      = gcmBSWAP32(fcValue);
+            fcValueUpper = gcmBSWAP32(fcValueUpper);
+            break;
+        default:
+            break;
+        }
+
         /* BltSrcTileStatusAddress. */
         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -5478,7 +5470,7 @@ gcoHARDWARE_3DBlitMipMap(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, srcSurf->fcValue[SliceIdx] );
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500D, fcValue );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -5506,7 +5498,7 @@ gcoHARDWARE_3DBlitMipMap(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, srcSurf->fcValueUpper[SliceIdx] );
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x500E, fcValueUpper );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 

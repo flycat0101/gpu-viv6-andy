@@ -3045,6 +3045,12 @@ gcoHARDWARE_BindTextureTS(
 
             sampleTSClearValue = surface->fcValue[0];
             sampleTSClearValueUpper = surface->fcValueUpper[0];
+            if (surface->formatInfo.endian != gcvENDIAN_NO_SWAP)
+            {
+                sampleTSClearValue = gcmBSWAP32(sampleTSClearValue);
+                sampleTSClearValueUpper = gcmBSWAP32(sampleTSClearValueUpper);
+            }
+
             gcmGETHARDWAREADDRESS(surface->tileStatusNode, sampleTSBuffer);
             gcmGETHARDWAREADDRESS(surface->node, sampleTexBaseBuffer);
 

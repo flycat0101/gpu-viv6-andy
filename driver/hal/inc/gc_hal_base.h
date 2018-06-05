@@ -2313,6 +2313,9 @@ typedef struct _gcsSURF_FORMAT_INFO
     /* sRGB format. */
     gctBOOL                     sRGB;
 
+    /* How GPU read from big-endian host memory */
+    gceENDIAN_HINT              endian;
+
     /* Format components. */
     gcuPIXEL_FORMAT_CLASS       u;
 

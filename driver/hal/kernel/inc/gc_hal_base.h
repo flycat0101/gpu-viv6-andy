@@ -164,6 +164,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor         */ \
     gcvNULL,         /* accessLock         */ \
     gcvNULL,         /* GL FE compiler lock*/ \
@@ -193,6 +194,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor         */ \
     gcvNULL,         /* accessLock         */ \
     gcvNULL,         /* GL FE compiler lock*/ \
@@ -222,6 +224,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor        */ \
     gcvNULL,         /* accessLock        */ \
 }
@@ -2351,6 +2354,9 @@ typedef struct _gcsSURF_FORMAT_INFO
 
     /* sRGB format. */
     gctBOOL                     sRGB;
+
+    /* How GPU read from big-endian host memory */
+    gceENDIAN_HINT              endian;
 
     /* Format components. */
     gcuPIXEL_FORMAT_CLASS       u;

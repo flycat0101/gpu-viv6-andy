@@ -145,7 +145,7 @@ static struct _gcsSURF_FORMAT_INFO formatPalettized[] =
 {
     {
         gcmNameFormat(INDEX1), gcvFORMAT_CLASS_INDEX, gcvFORMAT_DATATYPE_INDEX, gcmNON_COMPRESSED_BPP_ENTRY(1),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 1 }, {0}, {0}, {0}, {0}, {0}}}, {{{ 0, 1 }, {0}, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_INDEX8, gcmINVALID_TEXTURE_FORMAT_ENTRY,
@@ -153,7 +153,7 @@ static struct _gcsSURF_FORMAT_INFO formatPalettized[] =
 
     {
         gcmNameFormat(INDEX4), gcvFORMAT_CLASS_INDEX, gcvFORMAT_DATATYPE_INDEX, gcmNON_COMPRESSED_BPP_ENTRY(4),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 4 }, {0}, {0}, {0}, {0}, {0}}}, {{{ 0, 4 }, {0}, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_INDEX8, gcmINVALID_TEXTURE_FORMAT_ENTRY,
@@ -161,7 +161,7 @@ static struct _gcsSURF_FORMAT_INFO formatPalettized[] =
 
     {
         gcmNameFormat(INDEX8), gcvFORMAT_CLASS_INDEX, gcvFORMAT_DATATYPE_INDEX, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}}, {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY,
@@ -170,7 +170,7 @@ static struct _gcsSURF_FORMAT_INFO formatPalettized[] =
 #if gcdVG_ONLY
     {
         gcmNameFormat(INDEX2), gcvFORMAT_CLASS_INDEX, gcvFORMAT_DATATYPE_INDEX, gcmNON_COMPRESSED_BPP_ENTRY(2),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 2 }, {0}, {0}, {0}, {0}, {0}}}, {{{ 0, 2 }, {0}, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_INDEX8, gcmINVALID_TEXTURE_FORMAT_ENTRY,
@@ -185,7 +185,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 {
     {
         gcmNameFormat(A2R2G2B2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 6, 2 }, { 4, 2 }, { 2, 2 }, { 0, 2 }, {0}, {0}}},
         {{{ 6, 2 }, { 4, 2 }, { 2, 2 }, { 0, 2 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -194,7 +194,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R3G3B2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -203,7 +203,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A8R3G3B2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
         {{{ 8, 8 }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -212,7 +212,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 12, 4 | gcvCOMPONENT_DONTCARE }, { 8, 4 }, { 4, 4 }, { 0, 4 }, {0}, {0}}},
         {{{ 12, 4 | gcvCOMPONENT_DONTCARE }, { 8, 4 }, { 4, 4 }, { 0, 4 }, {0}, {0}}},
         gcvSURF_X4R4G4B4, 0x00, baseComponents_rgba,
@@ -221,7 +221,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 12, 4 }, { 8, 4 }, { 4, 4 }, { 0, 4 }, {0}, {0}}},
         {{{ 12, 4 }, { 8, 4 }, { 4, 4 }, { 0, 4 }, {0}, {0}}},
         gcvSURF_A4R4G4B4, 0x01, baseComponents_rgba,
@@ -230,7 +230,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R4G4B4A4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 4 }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
         {{{ 0, 4 }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
         gcvSURF_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -239,7 +239,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X1R5G5B5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 15, 1 | gcvCOMPONENT_DONTCARE }, { 10, 5 }, { 5, 5 }, { 0, 5 }, {0}, {0}}},
         {{{ 15, 1 | gcvCOMPONENT_DONTCARE }, { 10, 5 }, { 5, 5 }, { 0, 5 }, {0}, {0}}},
         gcvSURF_X1R5G5B5, 0x02, baseComponents_rgba,
@@ -248,7 +248,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A1R5G5B5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 15, 1 }, { 10, 5 }, { 5, 5 }, { 0, 5 }, {0}, {0}}},
         {{{ 15, 1 }, { 10, 5 }, { 5, 5 }, { 0, 5 }, {0}, {0}}},
         gcvSURF_A1R5G5B5, 0x03, baseComponents_rgba,
@@ -257,7 +257,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R5G5B5A1), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 1 }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
         {{{ 0, 1 }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
         gcvSURF_A1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -266,7 +266,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R5G6B5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 11, 5 }, { 5, 6 }, { 0, 5 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 11, 5 }, { 5, 6 }, { 0, 5 }, {0}, {0}}},
         gcvSURF_R5G6B5, 0x04, baseComponents_rgba,
@@ -275,7 +275,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -284,7 +284,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, 0x05, baseComponents_rgba,
@@ -293,7 +293,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -302,7 +302,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R8G8B8A8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 24, 8 }, { 16, 8 }, { 8, 8 }, {0}, {0}}},
         {{{ 0, 8 }, { 24, 8 }, { 16, 8 }, { 8, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -311,7 +311,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(G8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 24, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -320,7 +320,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R8G8B8G8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 16, 8 }, { 24, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -329,7 +329,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X2R10G10B10), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 | gcvCOMPONENT_DONTCARE}, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
         {{{ 30, 2 | gcvCOMPONENT_DONTCARE}, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -338,7 +338,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A2R10G10B10), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 }, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
         {{{ 30, 2 }, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
         gcvSURF_A2R10G10B10, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -347,7 +347,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R10G10B10A2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
         {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
         gcvSURF_R10G10B10A2, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -356,7 +356,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X12R12G12B12), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_QWORD,
         {{{ 36, 12 | gcvCOMPONENT_DONTCARE }, { 24, 12 }, { 12, 12 }, { 0, 12 }, {0}, {0}}},
         {{{ 36, 12 | gcvCOMPONENT_DONTCARE }, { 24, 12 }, { 12, 12 }, { 0, 12 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -365,7 +365,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A12R12G12B12), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_QWORD,
         {{{ 36, 12 }, { 24, 12 }, { 12, 12 }, { 0, 12 }, {0}, {0}}},
         {{{ 36, 12 }, { 24, 12 }, { 12, 12 }, { 0, 12 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -374,7 +374,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(X16R16G16B16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 32, 16 }, { 16, 16 }, { 0, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 32, 16 }, { 16, 16 }, { 0, 16 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -383,7 +383,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A16R16G16B16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 }, { 32, 16 }, { 16, 16 }, { 0, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 32, 16 }, { 16, 16 }, { 0, 16 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -392,7 +392,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(A32R32G32B32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 64, 32 }, { 32, 32 }, { 0, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 64, 32 }, { 32, 32 }, { 0, 32 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -401,7 +401,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R8G8B8X8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 24, 8}, { 16, 8}, { 8, 8}, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 24, 8}, { 16, 8}, { 8, 8}, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -410,7 +410,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R5G5B5X1), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 1 | gcvCOMPONENT_DONTCARE }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
         {{{ 0, 1 | gcvCOMPONENT_DONTCARE }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
         gcvSURF_A1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -419,7 +419,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
 
     {
         gcmNameFormat(R4G4B4X4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 4 | gcvCOMPONENT_DONTCARE }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
         {{{ 0, 4 | gcvCOMPONENT_DONTCARE }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
         gcvSURF_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -434,7 +434,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 {
     {
         gcmNameFormat(A4B4G4R4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 12, 4 }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
         {{{ 12, 4 }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
         gcvSURF_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -443,7 +443,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A1B5G5R5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 15, 1 }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
         {{{ 15, 1 }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
         gcvSURF_A1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -452,7 +452,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B5G6R5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 5 }, { 5, 6 }, { 11, 5 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 5 }, { 5, 6 }, { 11, 5 }, {0}, {0}}},
         gcvSURF_R5G6B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -461,7 +461,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B8G8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -470,7 +470,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B16G16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -479,7 +479,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X8B8G8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -488,7 +488,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A8B8G8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -497,7 +497,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A2B10G10R10), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -506,7 +506,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X16B16G16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -515,7 +515,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A16B16G16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -524,7 +524,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B32G32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -533,7 +533,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X32B32G32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -542,7 +542,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A32B32G32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -551,7 +551,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B4G4R4A4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 4 }, { 4, 4 }, { 8, 4 }, { 12, 4 }, {0}, {0}}},
         {{{ 0, 4 }, { 4, 4 }, { 8, 4 }, { 12, 4 }, {0}, {0}}},
         gcvSURF_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -560,7 +560,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B5G5R5A1), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 1 }, { 1, 5 }, { 6, 5 }, { 11, 5 }, {0}, {0}}},
         {{{ 0, 1 }, { 1, 5 }, { 6, 5 }, { 11, 5 }, {0}, {0}}},
         gcvSURF_A1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -569,7 +569,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B8G8R8X8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -578,7 +578,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B8G8R8A8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}}},
         {{{ 0, 8 }, { 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -587,7 +587,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B10G10R10A2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 2 }, { 2, 10 }, { 12, 10 }, { 22, 10 }, {0}, {0}}},
         {{{ 0, 2 }, { 2, 10 }, { 12, 10 }, { 22, 10 }, {0}, {0}}},
         gcvSURF_B10G10R10A2, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -596,7 +596,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X4B4G4R4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 12, 4 | gcvCOMPONENT_DONTCARE }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
         {{{ 12, 4 | gcvCOMPONENT_DONTCARE }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
         gcvSURF_X4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -605,7 +605,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X1B5G5R5), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 15, 1 | gcvCOMPONENT_DONTCARE }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
         {{{ 15, 1 | gcvCOMPONENT_DONTCARE }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
         gcvSURF_X1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -614,7 +614,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B4G4R4X4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 4 | gcvCOMPONENT_DONTCARE }, { 4, 4 }, { 8, 4 }, { 12, 4 }, {0}, {0}}},
         {{{ 0, 4 | gcvCOMPONENT_DONTCARE }, { 4, 4 }, { 8, 4 }, { 12, 4 }, {0}, {0}}},
         gcvSURF_X4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -623,7 +623,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B5G5R5X1), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 1 | gcvCOMPONENT_DONTCARE }, { 1, 5 }, { 6, 5 }, { 11, 5 }, {0}, {0}}},
         {{{ 0, 1 | gcvCOMPONENT_DONTCARE }, { 1, 5 }, { 6, 5 }, { 11, 5 }, {0}, {0}}},
         gcvSURF_X1R5G5B5, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -632,7 +632,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X2B10G10R10), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 | gcvCOMPONENT_DONTCARE }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         {{{ 30, 2 | gcvCOMPONENT_DONTCARE }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         gcvSURF_X2B10G10R10, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -641,7 +641,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(B8G8R8_SNORM), gcvFORMAT_CLASS_RGBA,gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -650,7 +650,7 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(X8B8G8R8_SNORM), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -659,17 +659,17 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
 
     {
         gcmNameFormat(A8B8G8R8_SNORM), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8B8G8R8, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
-    /* patch format for sRGB rendering to get better precison on cores without half float rendering*/
+    /* patch format for sRGB rendering to get better precision on cores without half float rendering*/
     {
         gcmNameFormat(A8B12G12R12_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 8 }, { 0, 12 }, { 12, 12 }, { 32, 12 }, {0}, {0}}},
         {{{ 48, 8 }, { 0, 12 }, { 12, 12 }, { 32, 12 }, {0}, {0}}},
         gcvSURF_A8B12G12R12_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -685,7 +685,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 {
     {
         gcmNameFormat(DXT1), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A1R5G5B5, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -693,7 +693,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(DXT2), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -701,7 +701,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(DXT3), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -709,7 +709,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(DXT4), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -717,7 +717,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(DXT5), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -725,7 +725,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(CXV8U8), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 1, 1, 16,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -733,7 +733,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(ETC1), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_X8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -741,7 +741,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(R11_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_R11_EAC, 0x03 << 12, baseComponents_rgba, gcvFALSE
@@ -749,7 +749,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(SIGNED_R11_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_SIGNED_R11_EAC, 0x0D << 12, baseComponents_rgba, gcvFALSE
@@ -757,7 +757,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(RG11_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_RG11_EAC, 0x04 << 12, baseComponents_rgba, gcvFALSE
@@ -765,7 +765,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(SIGNED_RG11_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_SIGNED_RG11_EAC, 0x05 << 12, baseComponents_rgba, gcvFALSE
@@ -773,7 +773,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(RGB8_ETC2), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_RGB8_ETC2, 0x00 << 12, baseComponents_rgba, gcvTRUE
@@ -781,7 +781,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(SRGB8_ETC2), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_SRGB, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_SRGB8_ETC2, (0x00 << 12) | (1 << 18), baseComponents_rgba, gcvTRUE
@@ -789,7 +789,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(RGB8_PUNCHTHROUGH_ALPHA1_ETC2), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, 0x01 << 12, baseComponents_rgba, gcvTRUE
@@ -797,7 +797,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(SRGB8_PUNCHTHROUGH_ALPHA1_ETC2), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_SRGB, 4, 4, 4, 64,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2, (0x01 << 12) | (1 << 18), baseComponents_rgba, gcvTRUE
@@ -805,7 +805,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(RGBA8_ETC2_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_RGBA8_ETC2_EAC, 0x02 << 12, baseComponents_rgba, gcvTRUE
@@ -813,7 +813,7 @@ static struct _gcsSURF_FORMAT_INFO formatCompressed[] =
 
     {
         gcmNameFormat(SRGB8_ALPHA8_ETC2_EAC), gcvFORMAT_CLASS_COMPRESSED, gcvFORMAT_DATATYPE_SRGB, 8, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_SRGB8_ALPHA8_ETC2_EAC, (0x02 << 12) | (1 << 18), baseComponents_rgba, gcvTRUE
@@ -827,7 +827,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 {
     {
         gcmNameFormat(YUY2), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 8, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         {{{ 16, 8 }, { 8, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         gcvSURF_YUY2, 0x07, baseComponents_rgba,
@@ -836,7 +836,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(UYVY), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 0, 8 }, { 16, 8 }, {0}, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 16, 8 }, {0}, {0}, {0}}},
         gcvSURF_UYVY, 0x07, baseComponents_rgba,
@@ -845,7 +845,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(YV12), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 2, 2, 48,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -854,7 +854,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(I420), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 2, 2, 48,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -863,7 +863,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV12), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 2, 2, 48,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -872,7 +872,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV21), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 2, 2, 48,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -881,7 +881,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV16), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -890,7 +890,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV61), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -899,7 +899,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(YVYU), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 24, 8 }, { 8, 8 }, {0}, {0}, {0}}},
         {{{ 16, 8 }, { 24, 8 }, { 8, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -908,7 +908,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(VYUY), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 16, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 24, 8 }, { 16, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -917,7 +917,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(AYUV), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -926,7 +926,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(YUV420_10_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -935,7 +935,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(YUV420_TILE_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 64, 64, 6144,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -944,7 +944,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(YUV420_TILE_10_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 64, 64, 7680,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -953,7 +953,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV12_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -962,7 +962,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV21_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -971,7 +971,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV16_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 20, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -980,7 +980,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(NV61_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 20, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -989,7 +989,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(P010), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 8, 2, 240,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
         {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1000,7 +1000,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
     /* Just for format query in new 355VG core, not actually rendering usage for 3D core. */
     {
         gcmNameFormat(AYUY2), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1009,7 +1009,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(ANV12), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1018,7 +1018,7 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
 
     {
         gcmNameFormat(ANV16), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1034,7 +1034,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 {
     {
         gcmNameFormat(D16), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         gcvSURF_D16, 0x0, baseComponents_rgba,
@@ -1043,7 +1043,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(D24S8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24S8, 0x1, baseComponents_rgba,
@@ -1052,7 +1052,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(D32), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24X8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1061,7 +1061,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(D24X8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 8, 24 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24X8, 0x1, baseComponents_rgba,
@@ -1070,17 +1070,16 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(D32F), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24X8, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_S8D32F_2_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
-
     {
         gcmNameFormat(S8D32F), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_FLOAT32_UINT, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 32, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 0, 32 }, { 32, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24S8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1089,7 +1088,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(S8D32F_1_G32R32F), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_FLOAT32_UINT, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 32, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 0, 32 }, { 32, 32 }, {0}, {0}, {0}, {0}}},
         gcvSURF_S8D32F_1_G32R32F, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1098,7 +1097,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(S8D32F_2_A8R8G8B8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_FLOAT32_UINT, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 32 }, { 32, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 0, 32 }, { 32, 32 }, {0}, {0}, {0}, {0}}},
         gcvSURF_S8D32F_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1107,7 +1106,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(D24S8_1_A8R8G8B8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24S8_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1116,7 +1115,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(S8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_X24S8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1125,7 +1124,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(X24S8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_X24S8, 0x1, baseComponents_rgba,
@@ -1134,7 +1133,7 @@ static struct _gcsSURF_FORMAT_INFO formatDepth[] =
 
     {
         gcmNameFormat(X24S8_1_A8R8G8B8), gcvFORMAT_CLASS_DEPTH, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 24 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvSURF_D24S8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1150,7 +1149,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 {
     {
         gcmNameFormat(A4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(4),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 4 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 4 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1161,7 +1160,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1172,7 +1171,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A12), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(12),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 12 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 12 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1183,7 +1182,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1194,7 +1193,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1205,7 +1204,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A1), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(1),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 1 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 1 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1216,7 +1215,7 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
 
     {
         gcmNameFormat(A8_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         gcvSURF_A8_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1231,7 +1230,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 {
     {
         gcmNameFormat(L4), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(4),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 4 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 4 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1240,7 +1239,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 
     {
         gcmNameFormat(L8), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1249,7 +1248,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 
     {
         gcmNameFormat(L12), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(12),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1258,7 +1257,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 
     {
         gcmNameFormat(L16), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1267,7 +1266,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 
     {
         gcmNameFormat(L32), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1276,7 +1275,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
 
     {
         gcmNameFormat(L1), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(1),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 1 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 1 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1291,7 +1290,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 {
     {
         gcmNameFormat(A4L4), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 4, 4 }, { 0, 4 }, {0}, {0}, {0}, {0}}},
         {{{ 4, 4 }, { 0, 4 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1300,7 +1299,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 
     {
         gcmNameFormat(A2L6), gcvFORMAT_CLASS_LUMINANCE,gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 6, 2 }, { 0, 6 }, {0}, {0}, {0}, {0}}},
         {{{ 6, 2 }, { 0, 6 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1309,7 +1308,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 
     {
         gcmNameFormat(A8L8), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         {{{ 8, 8 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1318,7 +1317,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 
     {
         gcmNameFormat(A4L12), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 12, 4 }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         {{{ 12, 4 }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1327,7 +1326,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 
     {
         gcmNameFormat(A12L12), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 12, 12 }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         {{{ 12, 12 }, { 0, 12 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1336,7 +1335,7 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
 
     {
         gcmNameFormat(A16L16), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         {{{ 16, 16 }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1351,7 +1350,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 {
     {
         gcmNameFormat(L6V5U5), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 10, 6 }, { 5, 5 }, { 0, 5 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 10, 6 }, { 5, 5 }, { 0, 5 },
@@ -1362,7 +1361,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(V8U8), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 },
@@ -1373,7 +1372,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(X8L8V8U8), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 },
@@ -1384,7 +1383,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(Q8W8V8U8), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 },
           { 24, 8 }, { 16, 8 }}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 },
@@ -1395,7 +1394,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(A2W10V10U10), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 10, 10 }, { 0, 10 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 20, 10 }}},
         {{{ 30, 2 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 10, 10 }, { 0, 10 },
@@ -1406,7 +1405,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(V16U16), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 16, 16 }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 16, 16 }, { 0, 16 },
@@ -1417,7 +1416,7 @@ static struct _gcsSURF_FORMAT_INFO formatBump[] =
 
     {
         gcmNameFormat(Q16W16V16U16), gcvFORMAT_CLASS_BUMP, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 16, 16 }, { 0, 16 },
           { 48, 16 }, { 32, 16 }}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, { 16, 16 }, { 0, 16 },
@@ -1434,7 +1433,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 {
     {
         gcmNameFormat(R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -1445,7 +1444,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
@@ -1456,7 +1455,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(G8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G8R8_1_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1465,7 +1464,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X8G8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1474,7 +1473,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(A8R8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 }, { 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 8, 8 }, { 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1483,7 +1482,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -1494,7 +1493,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -1505,7 +1504,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(G16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1514,7 +1513,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X16G16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1523,7 +1522,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(A16R16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -1534,7 +1533,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -1545,7 +1544,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -1556,7 +1555,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(G32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1565,7 +1564,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(X32G32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1574,7 +1573,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(A32R32), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 }, { 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 }, { 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1583,7 +1582,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(RG16), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 8, 8 }, { 0, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1592,7 +1591,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(R8_SNORM), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -1603,7 +1602,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(G8R8_SNORM), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1612,7 +1611,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(R8_1_X8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         gcvSURF_R8_1_X8R8G8B8, 0x05, baseComponents_r001,
@@ -1621,7 +1620,7 @@ static struct _gcsSURF_FORMAT_INFO formatRGB2[] =
 
     {
         gcmNameFormat(G8R8_1_X8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 16, 8 }, { 8, 8 }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
         gcvSURF_G8R8_1_X8R8G8B8, 0x05, baseComponents_rg01,
@@ -1636,7 +1635,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 {
     {
         gcmNameFormat(R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -1647,7 +1646,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -1658,7 +1657,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16F_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1667,7 +1666,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X16G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16F_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1676,7 +1675,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(B16G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16F_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1685,7 +1684,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X16B16G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16F_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1694,7 +1693,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16B16G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16F_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1703,7 +1702,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -1714,7 +1713,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -1725,7 +1724,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32F_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1734,7 +1733,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X32G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32F_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1743,7 +1742,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(B32G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32F_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1752,7 +1751,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X32B32G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32F_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1761,7 +1760,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32B32G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32F_4_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1770,7 +1769,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1781,7 +1780,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(L16F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1790,7 +1789,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16L16F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         {{{ 16, 16 }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1799,7 +1798,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -1810,7 +1809,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -1821,7 +1820,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(L32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1830,7 +1829,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
      {
         gcmNameFormat(A32L32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 32, 32 }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1839,7 +1838,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 }, { 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 }, { 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_A32B32G32R32F_4_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1848,7 +1847,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(E5B9G9R9), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT_E5B9G9R9, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 27, 5 }, { 18, 9 }, { 9, 9 }, { 0, 9 }, {0}, {0}}},
         {{{ 27, 5 }, { 18, 9 }, { 9, 9 }, { 0, 9 }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1857,7 +1856,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
          gcmNameFormat(B10G11R11F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT_B10G11R11F, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 22, 10 }, { 11, 11 }, { 0, 11 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 22, 10 }, { 11, 11 }, { 0, 11 }, {0}, {0}}},
         gcvSURF_B10G11R11F_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -1869,7 +1868,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
     */
     {
         gcmNameFormat(X16B16G16R16F_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16F_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1878,7 +1877,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16B16G16R16F_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16F_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1887,7 +1886,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A16B16G16R16F_2_G16R16F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_A16B16G16R16F_2_G16R16F, 0x12, baseComponents_rgba,
@@ -1896,7 +1895,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(G32R32F_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32F_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1905,7 +1904,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X32B32G32R32F_2_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32F_2_G32R32F, 0x15, baseComponents_rgba,
@@ -1914,7 +1913,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32B32G32R32F_2_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32F_2_G32R32F, 0x15, baseComponents_rgba,
@@ -1923,7 +1922,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(X32B32G32R32F_4_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        4, 1, 0, gcvFALSE,
+        4, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32F_4_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1932,7 +1931,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32B32G32R32F_4_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        4, 1, 0, gcvFALSE,
+        4, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32F_4_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1941,7 +1940,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(R16F_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -1950,10 +1949,9 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
         gcvSURF_R16F_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvTRUE
     },
 
-
     {
         gcmNameFormat(G16R16F_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16F_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1963,7 +1961,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(B16G16R16F_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT16, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16F_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1972,7 +1970,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(R32F_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -1983,7 +1981,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(B32G32R32F_3_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        3, 1, 0, gcvFALSE,
+        3, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32F_3_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -1992,27 +1990,27 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
          gcmNameFormat(B10G11R11F_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_FLOAT_B10G11R11F, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 22, 10 }, { 11, 11 }, { 0, 11 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 22, 10 }, { 11, 11 }, { 0, 11 }, {0}, {0}}},
         gcvSURF_B10G11R11F_1_A8R8G8B8, 0x06, baseComponents_rgba,
         gcvSURF_B10G11R11F_1_A8R8G8B8, 0x07, baseComponents_rgba, gcvTRUE
     },
 
-     {
+    {
         gcmNameFormat(A32F_1_R32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A32F_1_R32F, 0x0A<< 12, baseComponents_rgba, gcvFALSE
-     },
+    },
 
-      {
+    {
         gcmNameFormat(L32F_1_R32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2021,7 +2019,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
 
     {
         gcmNameFormat(A32L32F_1_G32R32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         {{{ 32, 32 }, { 0, 32 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2038,7 +2036,7 @@ static struct _gcsSURF_FORMAT_INFO formatSRGB[] =
 {
     {
         gcmNameFormat(SBGR8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SRGB, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2048,7 +2046,7 @@ static struct _gcsSURF_FORMAT_INFO formatSRGB[] =
     {
 
         gcmNameFormat(A8_SBGR8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SRGB, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2057,7 +2055,7 @@ static struct _gcsSURF_FORMAT_INFO formatSRGB[] =
 
     {
         gcmNameFormat(X8_SBGR8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SRGB, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2065,7 +2063,7 @@ static struct _gcsSURF_FORMAT_INFO formatSRGB[] =
     },
     {
         gcmNameFormat(A8_SRGB8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SRGB, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_A8_SRGB8, 0x06, baseComponents_rgba,
@@ -2074,7 +2072,7 @@ static struct _gcsSURF_FORMAT_INFO formatSRGB[] =
 
     {
         gcmNameFormat(X8_SRGB8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SRGB, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 16, 8 }, { 8, 8 }, { 0, 8 }, {0}, {0}}},
         gcvSURF_X8_SRGB8, 0x05, baseComponents_rgb1,
@@ -2089,7 +2087,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 {
     {
         gcmNameFormat(R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -2100,7 +2098,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(8),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -2111,7 +2109,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -2122,7 +2120,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -2133,7 +2131,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -2144,7 +2142,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -2155,7 +2153,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
@@ -2166,7 +2164,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G8R8I_1_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2175,7 +2173,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
@@ -2186,7 +2184,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G8R8UI_1_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2195,7 +2193,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -2206,7 +2204,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16I_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2215,7 +2213,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -2226,7 +2224,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2235,7 +2233,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -2246,7 +2244,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32I_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2255,7 +2253,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -2266,7 +2264,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32UI_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2275,7 +2273,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8G8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8G8R8I_1_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2284,7 +2282,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B8G8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8I_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2293,7 +2291,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8G8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8G8R8UI_1_A4R4G4B4, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2302,7 +2300,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B8G8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2311,7 +2309,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16G16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16I_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2320,7 +2318,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16I_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2329,7 +2327,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16G16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 16 | gcvCOMPONENT_DONTCARE }, { 16, 16 }, { 32, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2338,7 +2336,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(48),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16UI_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2347,7 +2345,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32I_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2356,7 +2354,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B32G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32I_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2365,7 +2363,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 32 | gcvCOMPONENT_DONTCARE }, { 32, 32 }, { 64, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32UI_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2374,7 +2372,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B32G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32UI_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2383,7 +2381,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8B8G8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8I_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2392,7 +2390,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A8B8G8R8I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8B8G8R8I_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2401,7 +2399,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8B8G8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2410,7 +2408,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A8B8G8R8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8B8G8R8UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2419,7 +2417,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16I_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2428,7 +2426,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16I_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2437,7 +2435,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16UI_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2446,7 +2444,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16UI_2_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2455,7 +2453,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32I_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2464,7 +2462,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32I_4_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2473,7 +2471,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32UI_3_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2482,7 +2480,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32UI_4_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
@@ -2491,17 +2489,17 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A2B10G10R10UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         gcvSURF_A2B10G10R10UI_1_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A2B10G10R10UI_1_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
-    /*Multi-layer surface definiton, we will move to a separate table later*/
+    /*Multi-layer surface definition, we will move to a separate table later*/
     {
         gcmNameFormat(G32R32I_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32I_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2510,7 +2508,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G32R32I_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32I_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2519,7 +2517,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G32R32UI_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32UI_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2528,7 +2526,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G32R32UI_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 32, 32 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G32R32UI_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2537,7 +2535,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16I_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 0, 0, gcvFALSE,
+        2, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16I_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2546,7 +2544,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16I_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16I_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2555,7 +2553,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16I_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16I_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2564,7 +2562,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16I_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16I_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2573,7 +2571,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16UI_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16UI_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2582,7 +2580,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X16B16G16R16UI_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_X16B16G16R16UI_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2591,7 +2589,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16UI_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16UI_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2600,7 +2598,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A16B16G16R16UI_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         {{{ 48, 16 }, { 0, 16 }, { 16, 16 }, { 32, 16 }, {0}, {0}}},
         gcvSURF_A16B16G16R16UI_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2609,7 +2607,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32I_2_G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32I_2_G32R32I, 0x15, baseComponents_rgba,
@@ -2618,7 +2616,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32I_2_G32R32I), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32I_2_G32R32I, 0x15, baseComponents_rgba,
@@ -2627,7 +2625,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32I_2_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, gcvTRUE, gcvFALSE, gcvFALSE,
+        2, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32I_2_G32R32F, 0x15, baseComponents_rgba,
@@ -2636,7 +2634,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32I_3_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        3, 1, 0, gcvFALSE,
+        3, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32I_3_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2645,7 +2643,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32I_4_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        4, 1, 0, gcvFALSE,
+        4, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32I_4_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2654,7 +2652,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32UI_2_G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32UI_2_G32R32UI, 0x15, baseComponents_rgba,
@@ -2663,7 +2661,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32UI_2_G32R32UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32UI_2_G32R32UI, 0x15, baseComponents_rgba,
@@ -2672,7 +2670,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32UI_2_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        2, gcvTRUE, gcvFALSE, gcvFALSE,
+        2, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32UI_2_G32R32F, 0x15, baseComponents_rgba,
@@ -2681,7 +2679,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32B32G32R32UI_3_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        3, 1, 0, gcvFALSE,
+        3, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_X32B32G32R32UI_3_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2690,7 +2688,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A32B32G32R32UI_4_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(128),
-        4, 1, 0, gcvFALSE,
+        4, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         {{{ 96, 32 }, { 0, 32 }, { 32, 32 }, { 64, 32 }, {0}, {0}}},
         gcvSURF_A32B32G32R32UI_4_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2699,7 +2697,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A2B10G10R10UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         {{{ 30, 2 }, { 0, 10 }, { 10, 10 }, { 20, 10 }, {0}, {0}}},
         gcvSURF_A2B10G10R10UI_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2708,7 +2706,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A8B8G8R8I_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8B8G8R8I_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2717,7 +2715,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(A8B8G8R8UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 24, 8 }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_A8B8G8R8UI_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2726,7 +2724,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R8I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -2738,7 +2736,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(R8UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 },
@@ -2747,10 +2745,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
         gcvSURF_R8UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
     },
 
-
     {
         gcmNameFormat(R16I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -2761,7 +2758,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
      {
          gcmNameFormat(R16UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-         1, 1, 0, gcvFALSE,
+         1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
            { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 },
@@ -2772,7 +2769,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
      {
          gcmNameFormat(R32I_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-         1, gcvTRUE, gcvFALSE, gcvFALSE,
+         1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_NO_SWAP,
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
            { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -2783,7 +2780,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
      {
          gcmNameFormat(R32UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-         1, gcvTRUE, gcvFALSE, gcvFALSE,
+         1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_NO_SWAP,
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
            { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 },
@@ -2792,10 +2789,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
          gcvSURF_R32UI_1_A8R8G8B8, 0x07, baseComponents_rgba, gcvFALSE
      },
 
-
      {
          gcmNameFormat(X8R8I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-         1, 1, 0, gcvFALSE,
+         1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
          {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
            { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
@@ -2804,10 +2800,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
          gcvSURF_X8R8I_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
      },
 
-
      {
          gcmNameFormat(X8R8UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-         1, 1, 0, gcvFALSE,
+         1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
          {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
            { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 },
@@ -2816,29 +2811,27 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
          gcvSURF_X8R8UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
      },
 
-
      {
          gcmNameFormat(G8R8I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-         1, gcvTRUE, gcvFALSE, gcvFALSE,
+         1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_WORD,
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
          gcvSURF_G8R8I_1_A4R4G4B4, 0x01, baseComponents_rgba,
          gcvSURF_G8R8I_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
      },
 
-     {
-         gcmNameFormat(G8R8UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-         1, gcvTRUE, gcvFALSE, gcvFALSE,
-         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
-         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
-         gcvSURF_G8R8UI_1_A4R4G4B4, 0x01, baseComponents_rgba,
-         gcvSURF_G8R8UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
-     },
-
+    {
+        gcmNameFormat(G8R8UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_WORD,
+        {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
+        {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
+        gcvSURF_G8R8UI_1_A4R4G4B4, 0x01, baseComponents_rgba,
+        gcvSURF_G8R8UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
+    },
 
     {
         gcmNameFormat(X16R16I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -2847,10 +2840,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
         gcvSURF_X16R16I_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
     },
 
-
     {
         gcmNameFormat(X16R16UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 16, 16 | gcvCOMPONENT_DONTCARE }, { 0, 16 },
@@ -2859,11 +2851,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
         gcvSURF_X16R16UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
     },
 
-
-
     {
         gcmNameFormat(G16R16I_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16I_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2872,17 +2862,16 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(G16R16UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 16, 16 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_G16R16UI_1_A8R8G8B8, 0x06, baseComponents_rgba,
         gcvSURF_G16R16UI_1_A8R8G8B8, 0x07, baseComponents_rgba, gcvFALSE
     },
 
-
     {
         gcmNameFormat(X32R32I_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -2893,7 +2882,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X32R32UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 32, 32 | gcvCOMPONENT_DONTCARE }, { 0, 32 },
@@ -2902,10 +2891,9 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
         gcvSURF_X32R32UI_1_A8R8G8B8, 0x07, baseComponents_rgba, gcvFALSE
     },
 
-
     {
         gcmNameFormat(X8G8R8I_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(24),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8G8R8I_1_A4R4G4B4, 0x01, baseComponents_rgba,
@@ -2914,17 +2902,16 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(X8G8R8UI_1_A4R4G4B4), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         {{{ 0, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 }, { 16, 8 }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvSURF_X8G8R8UI_1_A4R4G4B4, 0x01, baseComponents_rgba,
         gcvSURF_X8G8R8UI_1_A4R4G4B4, 0x05, baseComponents_rgba, gcvFALSE
     },
 
-
     {
         gcmNameFormat(B8G8R8I_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8I_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2933,7 +2920,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B8G8R8UI_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE,
+        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, { 8, 8 }, { 16, 8 }, {0}, {0}}},
         gcvSURF_B8G8R8UI_1_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2942,7 +2929,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16I_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16I_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2951,7 +2938,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16I_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16I_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2960,7 +2947,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16UI_2_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        2, 1, 0, gcvFALSE,
+        2, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16UI_2_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2969,7 +2956,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B16G16R16UI_1_G32R32F), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(64),
-        1, gcvTRUE, gcvFALSE, gcvFALSE,
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_SWAP_DWORD,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 16 }, { 32, 16 }, { 16, 16 }, {0}, {0}}},
         gcvSURF_B16G16R16UI_1_G32R32F, 0x15, baseComponents_rgba,
@@ -2978,7 +2965,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B32G32R32I_3_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_SIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        3, 1, 0, gcvFALSE,
+        3, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32I_3_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -2987,7 +2974,7 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
 
     {
         gcmNameFormat(B32G32R32UI_3_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(96),
-        3, 1, 0, gcvFALSE,
+        3, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 32 }, { 64, 32 }, { 32, 32 }, {0}, {0}}},
         gcvSURF_B32G32R32UI_3_A8R8G8B8, 0x06, baseComponents_rgba,
@@ -3002,7 +2989,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 {
     {
         gcmNameFormat(ASTC4x4), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 4, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3010,7 +2997,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC5x4), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 5, 4, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3018,7 +3005,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC5x5), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 5, 5, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3026,7 +3013,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC6x5), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 6, 5, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3034,7 +3021,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC6x6), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 6, 6, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3042,7 +3029,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x5), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 8, 5, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3050,7 +3037,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x6), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 8, 6, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3058,7 +3045,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x8), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 8, 8, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3066,7 +3053,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x5), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 10, 5, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3074,7 +3061,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x6), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 10, 6, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3082,7 +3069,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x8), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 10, 8, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3090,7 +3077,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x10), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 10, 10, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3098,7 +3085,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC12x10), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 12, 10, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3106,7 +3093,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC12x12), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 0, 12, 12, 128,
-        1, 0, 0, gcvFALSE,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3114,7 +3101,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC4x4_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 4, 4, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3122,7 +3109,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC5x4_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 5, 4, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3130,7 +3117,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC5x5_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 5, 5, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3138,7 +3125,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC6x5_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 6, 5, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3146,7 +3133,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC6x6_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 6, 6, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3154,7 +3141,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x5_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 8, 5, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3162,7 +3149,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x6_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 8, 6, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3170,7 +3157,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC8x8_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 8, 8, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3178,7 +3165,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x5_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 10, 5, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3186,7 +3173,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x6_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 10, 6, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3194,7 +3181,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x8_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 10, 8, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3202,7 +3189,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC10x10_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 10, 10, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3210,7 +3197,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC12x10_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 12, 10, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3218,7 +3205,7 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
 
     {
         gcmNameFormat(ASTC12x12_SRGB), gcvFORMAT_CLASS_ASTC, gcvFORMAT_DATATYPE_SRGB, 0, 12, 12, 128,
-        1, 0, 0, gcvTRUE,
+        1, 0, 0, gcvTRUE, gcvENDIAN_NO_SWAP,
         gcmINVALID_PIXEL_FORMAT_CLASS, gcmINVALID_PIXEL_FORMAT_CLASS,
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
@@ -3307,6 +3294,23 @@ gcoHARDWARE_InitializeFormatArrayTable(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    /* Change all endian mode to NO_SWAP for little endian mode */
+    if (!Hardware->bigEndian)
+    {
+        gctSIZE_T i;
+
+        for (i = 0; i < gcmCOUNTOF(formatArray); ++i)
+        {
+            gctUINT j;
+            struct gcsFORMAT_ARRAY *pFmtArray = &formatArray[i];
+
+            for (j = 0; j < pFmtArray->count; ++j)
+            {
+                pFmtArray->formats[j].endian = gcvENDIAN_NO_SWAP;
+            }
+        }
+    }
 
 #if gcdENABLE_3D
     if (Hardware->patchID == gcvPATCH_GTFES30)

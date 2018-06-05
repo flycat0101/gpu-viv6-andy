@@ -16795,7 +16795,9 @@ _EnableTileStatus(
             /* Program clear value register. */
             gcmSETSTATEDATA_NEW(
                 stateDelta, reserve, memory, gcvFALSE, 0x059B,
-                Surface->fcValue[SurfView->firstSlice]
+                (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP)
+                    ? Surface->fcValue[SurfView->firstSlice]
+                    : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
                 );
 
         gcmENDSTATEBATCH_NEW(
@@ -16803,8 +16805,6 @@ _EnableTileStatus(
             );
 
         gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", TileStatusAddress, Surface->tileStatusNode.size);
-
-
     }
 
     /* Render target surfaces. */
@@ -17007,7 +17007,9 @@ _EnableTileStatus(
             /* Program clear value register. */
             gcmSETSTATEDATA_NEW(
                 stateDelta, reserve, memory, gcvFALSE, 0x0598,
-                Surface->fcValue[SurfView->firstSlice]
+                (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP)
+                    ? Surface->fcValue[SurfView->firstSlice]
+                    : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
                 );
 
         gcmENDSTATEBATCH_NEW(
@@ -17039,7 +17041,8 @@ _EnableTileStatus(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, Surface->fcValueUpper[SurfView->firstSlice] );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
+ Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17348,7 +17351,7 @@ _EnableTileStatusMRT(
     }
 
     /*
-    ** 1. 0x0690 slot 0 is uesless on RTL impelmetation.
+    ** 1. 0x0690 slot 0 is useless on RTL implementation.
     ** 2. we need keep Hardware->memoryConfig always has correct information for RT0,
     **    as it's combined with depth information.
     */
@@ -17526,7 +17529,8 @@ _EnableTileStatusMRT(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0598, Surface->fcValue[SurfView->firstSlice] );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0598, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
+ Surface->fcValue[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17555,7 +17559,8 @@ _EnableTileStatusMRT(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, Surface->fcValueUpper[SurfView->firstSlice] );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
+ Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17696,8 +17701,9 @@ _EnableTileStatusMRT(
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0680 + RtIndex,
- Surface->fcValue[SurfView->firstSlice] );    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0680 + RtIndex, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
+ Surface->fcValue[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -17725,8 +17731,9 @@ _EnableTileStatusMRT(
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0688 + RtIndex,
- Surface->fcValueUpper[SurfView->firstSlice] );    gcmENDSTATEBATCH_NEW(reserve, memory);
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0688 + RtIndex, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
+ Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
         }

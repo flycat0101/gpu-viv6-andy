@@ -6127,42 +6127,6 @@ _FlushMultiTarget(
         if (Hardware->features[gcvFEATURE_SEPARATE_RT_CTRL] ||
             Hardware->features[gcvFEATURE_128BTILE])
         {
-            gctUINT32 endianCtrl = 0x0;
-
-            if (Hardware->bigEndian)
-            {
-                switch (pColorTarget->format)
-                {
-                case 0x00:
-                case 0x01:
-                case 0x02:
-                case 0x03:
-                case 0x04:
-                case 0x11:
-                case 0x12:
-                case 0x13:
-                case 0x1A:
-                case 0x1B:
-                case 0x1C:
-                    endianCtrl = 0x1;
-                    break;
-
-                case 0x16:
-                case 0x1D:
-                case 0x1E:
-                case 0x14:
-                case 0x15:
-                case 0x25:
-                case 0x26:
-                case 0x27:
-                    endianCtrl = 0x2;
-                    break;
-
-                default:
-                    break;
-                }
-            }
-
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -6185,7 +6149,7 @@ _FlushMultiTarget(
 };
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x5248 + (i-1), ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) ((gctUINT32) (endianCtrl) & ((gctUINT32) ((((1 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (surface->formatInfo.endian) & ((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
  1:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
@@ -6718,55 +6682,15 @@ gcoHARDWARE_FlushTarget(
         Hardware->features[gcvFEATURE_VMSAA])
     {
         gcoSURF depth = Hardware->PEStates->depthStates.surface;
-        gctUINT32 colorEndianCtrl = 0x0;
-        gctUINT32 depthEndianCtrl = 0x0;
+        gctUINT32 colorEndianCtrl = pColorTarget->surface
+                                  ? pColorTarget->surface->formatInfo.endian
+                                  : 0x0;
+        gctUINT32 depthEndianCtrl = depth ? depth->formatInfo.endian : 0x0;
         gctUINT32 colorCacheCtrl = colorCacheMode == gcvCACHE_128
                                  ? 0x0
                                  : 0x1;
         gctUINT32 colorVmsaa = vMsaa ? 0x1
                                      : 0x0;
-
-
-        if (Hardware->bigEndian)
-        {
-            switch (format)
-            {
-            case 0x00:
-            case 0x01:
-            case 0x02:
-            case 0x03:
-            case 0x04:
-            case 0x11:
-            case 0x12:
-            case 0x13:
-            case 0x1A:
-            case 0x1B:
-            case 0x1C:
-                colorEndianCtrl = 0x1;
-                break;
-
-            case 0x16:
-            case 0x1D:
-            case 0x1E:
-            case 0x14:
-            case 0x15:
-            case 0x25:
-            case 0x26:
-            case 0x27:
-                colorEndianCtrl = 0x2;
-                break;
-
-            default:
-                break;
-            }
-
-            if (depth)
-            {
-                depthEndianCtrl = (depth->bitsPerPixel == 16)
-                                ? 0x1
-                                : 0x2;
-            }
-        }
 
         Hardware->PEStates->peConfigExReg =
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
