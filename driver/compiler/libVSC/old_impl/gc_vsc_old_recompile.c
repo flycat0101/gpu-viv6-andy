@@ -4806,15 +4806,20 @@ gcLoadCLPatchLibrary(
         }
         for (j = 0; j < CL_LIB_COUNT; j++)
         {
-            if(gcCLPatchLibrary[j]) continue; /* loaded already */
-                library = gcvNULL;
+            if(gcCLPatchLibrary[j] &&
+               (LONG_ULONG_LIB_INDEX != j ||
+                (gcShaderHasInt64Patch(gcCLPatchLibrary[j]) != gcmOPT_oclInt64InVIR()))) continue; /* loaded already */
+            library = gcvNULL;
             if (gcmOPT_LibShaderFile())
             {
                 /* read lib shader from file  */
                 status =  gcSHADER_ReadGCSLShaderFromFile(gcCLPatchLibFileName[j], &library);
             }
-            if ((status == gcvSTATUS_VERSION_MISMATCH) || (library == gcvNULL))
+            if ((status == gcvSTATUS_VERSION_MISMATCH) || (library == gcvNULL) ||
+                (gcShaderHasInt64Patch(library) == gcmOPT_oclInt64InVIR()))
             {
+                gctBOOL int64Patch = gcvFALSE;
+
                 stringNum = sizeof(CLPatchLib[j]) / sizeof(gctSTRING);
                 patchLen = stringNum;
                 for (i = 0; i < stringNum; i++)
@@ -4836,9 +4841,14 @@ gcLoadCLPatchLibrary(
 
                 sourceSize = gcoOS_StrLen(gcCLPatchSource[j], gcvNULL);
                 options = "";
-                if(Shader && gcShaderHasInt64Patch(Shader) && LONG_ULONG_LIB_INDEX == j)
+                if(LONG_ULONG_LIB_INDEX == j)
                 {
-                    options = "-cl-viv-longulong-patch";
+                    if(!gcmOPT_oclInt64InVIR())
+                    {
+                        options = "-cl-viv-longulong-patch";
+                        int64Patch = gcvTRUE;
+
+                    }
                 }
                 status = (*gcCLCompiler)(gcvNULL,
                                             sourceSize,
@@ -4856,6 +4866,10 @@ gcLoadCLPatchLibrary(
                         gcoOS_Print("%s\n", log);
                     }
                     goto OnError;
+                }
+                if(int64Patch)
+                {
+                    gcShaderSetHasInt64Patch(library);
                 }
                 if (gcmOPT_LibShaderFile())
                 {
@@ -8349,7 +8363,10 @@ _patchLongULong(
                     if (Shader->kernelFunctions[j]->codeStart <= i+1 &&
                         Shader->kernelFunctions[j]->codeEnd >= i+1 &&
                         Shader->kernelFunctions[j]->codeCount > 0)
+                    {
                         Shader->kernelFunctions[j]->codeCount += 1;
+                        Shader->kernelFunctions[j]->codeEnd += 1;
+                    }
 
                     if (Shader->kernelFunctions[j]->codeStart > i+1 &&
                         Shader->kernelFunctions[j]->codeCount > 0)
@@ -8500,7 +8517,10 @@ _patchLongULong(
                     if (Shader->kernelFunctions[j]->codeStart <= patchInstrIndex+1 &&
                         Shader->kernelFunctions[j]->codeEnd >= patchInstrIndex+1 &&
                         Shader->kernelFunctions[j]->codeCount > 0)
+                    {
                         Shader->kernelFunctions[j]->codeCount += 1;
+                        Shader->kernelFunctions[j]->codeEnd += 1;
+                    }
 
                     if (Shader->kernelFunctions[j]->codeStart > patchInstrIndex+1 &&
                         Shader->kernelFunctions[j]->codeCount > 0)
@@ -8518,11 +8538,14 @@ _patchLongULong(
                     if (label->defined > patchInstrIndex+1)
                         label->defined += 1;
                     link = label->referenced;
-                    while (link)
+                    if(label->label != jmpLabel)
                     {
-                        if (link->referenced > patchInstrIndex+1)
-                            link->referenced += 1;
-                        link = link->next;
+                        while (link)
+                        {
+                            if (link->referenced > patchInstrIndex)
+                                link->referenced += 1;
+                            link = link->next;
+                        }
                     }
                 }
             }
@@ -9290,16 +9313,6 @@ gcSHADER_DynamicPatch(
     */
     if (curDirective)
         _addInstNopToEndOfMainFunc(Shader);
-
-    gcShaderClrHasInt64Patch(Shader);
-    for (; curDirective; curDirective = curDirective->next)
-    {
-        if (curDirective->kind == gceRK_PATCH_CL_LONGULONG)
-        {
-            gcShaderSetHasInt64Patch(Shader);
-            break;
-        }
-    }
 
     curDirective = PatchDirective;
 
