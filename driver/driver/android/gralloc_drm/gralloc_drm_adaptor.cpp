@@ -75,10 +75,10 @@ static int drm_adaptor_getpid(void)
 {
     static int32_t drm_adaptor_pid = 0;
 
-	if (unlikely(!drm_adaptor_pid))
-		android_atomic_write((int32_t) getpid(), &drm_adaptor_pid);
+    if (unlikely(!drm_adaptor_pid))
+        android_atomic_write((int32_t) getpid(), &drm_adaptor_pid);
 
-	return (int)drm_adaptor_pid;
+    return (int)drm_adaptor_pid;
 }
 
 static int load(struct gralloc_module_t **pHmi)

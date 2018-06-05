@@ -16375,6 +16375,10 @@ VIR_Shader_ComputeWorkGroupNum(
     }
     else
     {
+        /*
+        ** VIV:TODO:
+        ** For those chips can't support workGroup pack optimization, we should use 1 to replace (gctFLOAT)threadCount / (gctFLOAT)workGroupSize.
+        */
         numWorkGroup = (gctUINT)ceil(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount) * (gctFLOAT)threadCount / (gctFLOAT)workGroupSize);
     }
 

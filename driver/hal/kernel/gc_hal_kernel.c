@@ -2666,7 +2666,7 @@ gckKERNEL_Dispatch(
                      (kernel->profileEnable == gcvTRUE))
                 {
                     gcmkONERROR(gckCOMMAND_Stall(kernel->command, gcvTRUE));
-                    
+
                     if (kernel->command->currContext)
                     {
                         gcmkONERROR(gckHARDWARE_UpdateContextProfile(

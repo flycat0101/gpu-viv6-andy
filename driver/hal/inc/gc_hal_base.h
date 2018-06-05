@@ -77,7 +77,7 @@ typedef struct _gcsUSER_MEMORY_DESC *   gcsUSER_MEMORY_DESC_PTR;
 { \
     if(Obj->sharedLock != gcvNULL)\
     {\
-        (gcoOS_AcquireMutex( \
+        (gcoOS_AcquireMutex(\
                      gcvNULL, Obj->sharedLock, gcvINFINITE));\
     }\
 }
@@ -103,88 +103,88 @@ gcsSystemInfo;
 #if gcdSYNC
 #define gcPLS_INITIALIZER \
 { \
-    gcvNULL,         /* gcoOS object.      */ \
-    gcvNULL,         /* gcoHAL object.     */ \
-    0,               /* internalSize       */ \
-    gcvNULL,         /* internalPhysical   */ \
-    gcvNULL,         /* internalLogical    */ \
-    0,               /* externalSize       */ \
-    gcvNULL,         /* externalPhysical   */ \
-    gcvNULL,         /* externalLogical    */ \
-    0,               /* contiguousSize     */ \
-    gcvNULL,         /* contiguousPhysical */ \
-    gcvNULL,         /* contiguousLogical  */ \
-    gcvNULL,         /* eglDisplayInfo     */ \
-    gcvNULL,         /* eglSurfaceInfo     */ \
+    gcvNULL, /* gcoOS object.      */ \
+    gcvNULL, /* gcoHAL object.     */ \
+    0, /* internalSize       */ \
+    gcvNULL, /* internalPhysical   */ \
+    gcvNULL, /* internalLogical    */ \
+    0, /* externalSize       */ \
+    gcvNULL, /* externalPhysical   */ \
+    gcvNULL, /* externalLogical    */ \
+    0, /* contiguousSize     */ \
+    gcvNULL, /* contiguousPhysical */ \
+    gcvNULL, /* contiguousLogical  */ \
+    gcvNULL, /* eglDisplayInfo     */ \
+    gcvNULL, /* eglSurfaceInfo     */ \
     gcvSURF_A8R8G8B8,/* eglConfigFormat    */ \
-    gcvNULL,         /* reference          */ \
-    0,               /* processID          */ \
-    0,               /* threadID           */ \
-    gcvFALSE,        /* exiting            */ \
-    gcvFALSE,        /* Special flag for NP2 texture. */ \
-    gcvFALSE,        /* device open.       */ \
-    gcvNULL,         /* destructor         */ \
-    gcvNULL,         /* accessLock         */ \
-    gcvNULL,         /* GL FE compiler lock*/ \
-    gcvNULL,         /* CL FE compiler lock*/ \
+    gcvNULL, /* reference          */ \
+    0, /* processID          */ \
+    0, /* threadID           */ \
+    gcvFALSE, /* exiting            */ \
+    gcvFALSE, /* Special flag for NP2 texture. */ \
+    gcvFALSE, /* device open.       */ \
+    gcvNULL, /* destructor         */ \
+    gcvNULL, /* accessLock         */ \
+    gcvNULL, /* GL FE compiler lock*/ \
+    gcvNULL, /* CL FE compiler lock*/ \
     gcvPATCH_NOTINIT,/* global patchID     */ \
-    gcvNULL,         /* global fenceID*/ \
+    gcvNULL, /* global fenceID*/ \
 }
 #else
 #define gcPLS_INITIALIZER \
 { \
-    gcvNULL,         /* gcoOS object.      */ \
-    gcvNULL,         /* gcoHAL object.     */ \
-    0,               /* internalSize       */ \
-    gcvNULL,         /* internalPhysical   */ \
-    gcvNULL,         /* internalLogical    */ \
-    0,               /* externalSize       */ \
-    gcvNULL,         /* externalPhysical   */ \
-    gcvNULL,         /* externalLogical    */ \
-    0,               /* contiguousSize     */ \
-    gcvNULL,         /* contiguousPhysical */ \
-    gcvNULL,         /* contiguousLogical  */ \
-    gcvNULL,         /* eglDisplayInfo     */ \
-    gcvNULL,         /* eglSurfaceInfo     */ \
+    gcvNULL, /* gcoOS object.      */ \
+    gcvNULL, /* gcoHAL object.     */ \
+    0, /* internalSize       */ \
+    gcvNULL, /* internalPhysical   */ \
+    gcvNULL, /* internalLogical    */ \
+    0, /* externalSize       */ \
+    gcvNULL, /* externalPhysical   */ \
+    gcvNULL, /* externalLogical    */ \
+    0, /* contiguousSize     */ \
+    gcvNULL, /* contiguousPhysical */ \
+    gcvNULL, /* contiguousLogical  */ \
+    gcvNULL, /* eglDisplayInfo     */ \
+    gcvNULL, /* eglSurfaceInfo     */ \
     gcvSURF_A8R8G8B8,/* eglConfigFormat    */ \
-    gcvNULL,         /* reference          */ \
-    0,               /* processID          */ \
-    0,               /* threadID           */ \
-    gcvFALSE,        /* exiting            */ \
-    gcvFALSE,        /* Special flag for NP2 texture. */ \
-    gcvFALSE,        /* device open.       */ \
-    gcvNULL,         /* destructor         */ \
-    gcvNULL,         /* accessLock         */ \
-    gcvNULL,         /* GL FE compiler lock*/ \
-    gcvNULL,         /* CL FE compiler lock*/ \
+    gcvNULL, /* reference          */ \
+    0, /* processID          */ \
+    0, /* threadID           */ \
+    gcvFALSE, /* exiting            */ \
+    gcvFALSE, /* Special flag for NP2 texture. */ \
+    gcvFALSE, /* device open.       */ \
+    gcvNULL, /* destructor         */ \
+    gcvNULL, /* accessLock         */ \
+    gcvNULL, /* GL FE compiler lock*/ \
+    gcvNULL, /* CL FE compiler lock*/ \
     gcvPATCH_NOTINIT,/* global patchID     */ \
 }
 #endif
 #else
 #define gcPLS_INITIALIZER \
 { \
-    gcvNULL,         /* gcoOS object.      */ \
-    gcvNULL,         /* gcoHAL object.     */ \
-    0,               /* internalSize       */ \
-    gcvNULL,         /* internalPhysical   */ \
-    gcvNULL,         /* internalLogical    */ \
-    0,               /* externalSize       */ \
-    gcvNULL,         /* externalPhysical   */ \
-    gcvNULL,         /* externalLogical    */ \
-    0,               /* contiguousSize     */ \
-    gcvNULL,         /* contiguousPhysical */ \
-    gcvNULL,         /* contiguousLogical  */ \
-    gcvNULL,         /* eglDisplayInfo     */ \
-    gcvNULL,         /* eglSurfaceInfo     */ \
+    gcvNULL, /* gcoOS object.      */ \
+    gcvNULL, /* gcoHAL object.     */ \
+    0, /* internalSize       */ \
+    gcvNULL, /* internalPhysical   */ \
+    gcvNULL, /* internalLogical    */ \
+    0, /* externalSize       */ \
+    gcvNULL, /* externalPhysical   */ \
+    gcvNULL, /* externalLogical    */ \
+    0, /* contiguousSize     */ \
+    gcvNULL, /* contiguousPhysical */ \
+    gcvNULL, /* contiguousLogical  */ \
+    gcvNULL, /* eglDisplayInfo     */ \
+    gcvNULL, /* eglSurfaceInfo     */ \
     gcvSURF_A8R8G8B8,/* eglConfigFormat    */ \
-    gcvNULL,         /* reference          */ \
-    0,               /* processID          */ \
-    0,               /* threadID           */ \
-    gcvFALSE,        /* exiting            */ \
-    gcvFALSE,        /* Special flag for NP2 texture. */ \
-    gcvFALSE,        /* device open.       */ \
-    gcvNULL,         /* destructor        */ \
-    gcvNULL,         /* accessLock        */ \
+    gcvNULL, /* reference          */ \
+    0, /* processID          */ \
+    0, /* threadID           */ \
+    gcvFALSE, /* exiting            */ \
+    gcvFALSE, /* Special flag for NP2 texture. */ \
+    gcvFALSE, /* device open.       */ \
+    gcvNULL, /* destructor        */ \
+    gcvNULL, /* accessLock        */ \
 }
 #endif
 
@@ -4582,7 +4582,7 @@ gckOS_Verify(
             gcoOS_Verify(verifyStatus); \
             if (verifyStatus != gcvSTATUS_OK) \
             { \
-                gcmTRACE( \
+                gcmTRACE(\
                     gcvLEVEL_ERROR, \
                     "gcmVERIFY_OK(%d): function returned %d", \
                     __LINE__, verifyStatus \
@@ -4597,7 +4597,7 @@ gckOS_Verify(
             gceSTATUS verifyStatus = func; \
             if (verifyStatus != gcvSTATUS_OK) \
             { \
-                gcmkTRACE( \
+                gcmkTRACE(\
                     gcvLEVEL_ERROR, \
                     "gcmkVERIFY_OK(%d): function returned %d", \
                     __LINE__, verifyStatus \
@@ -5110,7 +5110,7 @@ gcoHAL_GetUserDebugOption(
         CommandBuffer->lastLoadStateCount   = Count
 
 #   define gcmVERIFYLOADSTATE(CommandBuffer, Memory, Address) \
-        gcmASSERT( \
+        gcmASSERT(\
             (gctUINT) (Memory  - gcmUINT64_TO_TYPE(CommandBuffer->lastLoadStatePtr, gctUINT32_PTR) - 1) \
             == \
             (gctUINT) (Address - CommandBuffer->lastLoadStateAddress) \
@@ -5219,7 +5219,7 @@ gcoHAL_GetUserDebugOption(
 
 #define gcmBEGINSTATEBUFFER(Hardware, CommandBuffer, StateDelta, Memory, ReserveSize) \
 { \
-    gcmONERROR(gcoBUFFER_Reserve( \
+    gcmONERROR(gcoBUFFER_Reserve(\
         Hardware->engine[CurrentEngine].buffer, ReserveSize, gcvTRUE, gcvCOMMAND_3D, &CommandBuffer \
         )); \
     \
@@ -5234,7 +5234,7 @@ gcoHAL_GetUserDebugOption(
 { \
     gcmENDSECUREUSER(); \
     \
-    gcmASSERT( \
+    gcmASSERT(\
         gcmUINT64_TO_TYPE(CommandBuffer->lastReserve, gctUINT8_PTR) + ReserveSize \
         == \
          (gctUINT8_PTR) Memory \
@@ -5253,9 +5253,9 @@ gcoHAL_GetUserDebugOption(
     gcmSTORELOADSTATE(CommandBuffer, Memory, Address, Count); \
     \
     *Memory++ \
-        = gcmSETFIELDVALUE(0, AQ_COMMAND_LOAD_STATE_COMMAND, OPCODE,  LOAD_STATE) \
-        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, FLOAT,   FixedPoint) \
-        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, COUNT,   Count) \
+        = gcmSETFIELDVALUE(0, AQ_COMMAND_LOAD_STATE_COMMAND, OPCODE, LOAD_STATE) \
+        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, FLOAT, FixedPoint) \
+        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, COUNT, Count) \
         | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, ADDRESS, Address); \
     \
     gcmSKIPSECUREUSER(); \
@@ -5281,7 +5281,7 @@ gcoHAL_GetUserDebugOption(
     \
     *Memory++ = __temp_data32__; \
     \
-    gcoHARDWARE_UpdateDelta( \
+    gcoHARDWARE_UpdateDelta(\
         StateDelta, Address, 0, __temp_data32__ \
         ); \
     \
@@ -5301,7 +5301,7 @@ gcoHAL_GetUserDebugOption(
     \
     *Memory++ = __temp_data32__; \
     \
-    gcoHARDWARE_UpdateDelta( \
+    gcoHARDWARE_UpdateDelta(\
         StateDelta, Address, Mask, __temp_data32__ \
         ); \
     \
@@ -5368,7 +5368,7 @@ gcoHAL_GetUserDebugOption(
 
 #define gcmSETSEMASTALLPIPE(StateDelta, CommandBuffer, Memory, Data) \
 { \
-    gcmSETSINGLECTRLSTATE(StateDelta, CommandBuffer, Memory, gcvFALSE, AQSemaphoreRegAddrs, Data); \
+    gcmSETSINGLECTRLSTATE(StateDelta, CommandBuffer, Memory, gcvFALSE, 0x0E02, Data); \
     \
     *Memory++ = gcmSETFIELDVALUE(0, STALL_COMMAND, OPCODE, STALL); \
     \
@@ -5396,8 +5396,8 @@ gcoHAL_GetUserDebugOption(
 #define gcmSETSTARTDECOMMAND(Memory, Count) \
 { \
     *Memory++ \
-        = gcmSETFIELDVALUE(0, AQ_COMMAND_START_DE_COMMAND, OPCODE,     START_DE) \
-        | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, COUNT,      Count) \
+        = gcmSETFIELDVALUE(0, AQ_COMMAND_START_DE_COMMAND, OPCODE, START_DE) \
+        | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, COUNT, Count) \
         | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, DATA_COUNT, 0); \
     \
     *Memory++ = 0xDEADDEED; \
@@ -5423,7 +5423,7 @@ gcoHAL_GetUserDebugOption(
     }\
     else \
     {\
-        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF( \
+        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF(\
             Hardware->engine[CurrentEngine].buffer, &CommandBuffer \
             ));\
         \
@@ -5469,7 +5469,7 @@ gcoHAL_GetUserDebugOption(
     }                                                                           \
     else                                                                        \
     {                                                                           \
-        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF(                                   \
+        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF(\
             Hardware->engine[CurrentEngine].buffer, &CommandBuffer              \
             ));                                                                 \
                                                                                 \
@@ -5487,9 +5487,9 @@ gcoHAL_GetUserDebugOption(
     gcmASSERT((gctUINT32)Count <= 1024); \
     \
     *Memory++ \
-        = gcmSETFIELDVALUE(0, AQ_COMMAND_LOAD_STATE_COMMAND, OPCODE,  LOAD_STATE) \
-        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, FLOAT,   FixedPoint) \
-        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, COUNT,   Count) \
+        = gcmSETFIELDVALUE(0, AQ_COMMAND_LOAD_STATE_COMMAND, OPCODE, LOAD_STATE) \
+        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, FLOAT, FixedPoint) \
+        | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, COUNT, Count) \
         | gcmSETFIELD     (0, AQ_COMMAND_LOAD_STATE_COMMAND, ADDRESS, Address); \
     \
     gcmSKIPSECUREUSER(); \
@@ -5509,7 +5509,7 @@ gcoHAL_GetUserDebugOption(
     \
     *Memory++ = __temp_data32__; \
     \
-    gcoHARDWARE_UpdateDelta( \
+    gcoHARDWARE_UpdateDelta(\
         StateDelta, Address, 0, __temp_data32__ \
         ); \
     \
@@ -5527,7 +5527,7 @@ gcoHAL_GetUserDebugOption(
     \
     *Memory++ = __temp_data32__; \
     \
-    gcoHARDWARE_UpdateDelta( \
+    gcoHARDWARE_UpdateDelta(\
         StateDelta, Address, Mask, __temp_data32__ \
         ); \
     \
@@ -5590,7 +5590,7 @@ gcoHAL_GetUserDebugOption(
 
 #define gcmSETSEMASTALLPIPE_NEW(StateDelta, CommandBuffer, Memory, Data) \
 { \
-    gcmSETSINGLECTRLSTATE_NEW(StateDelta, CommandBuffer, Memory, gcvFALSE, AQSemaphoreRegAddrs, Data); \
+    gcmSETSINGLECTRLSTATE_NEW(StateDelta, CommandBuffer, Memory, gcvFALSE, 0x0E02, Data); \
     \
     *Memory++ = gcmSETFIELDVALUE(0, STALL_COMMAND, OPCODE, STALL); \
     \
@@ -5606,8 +5606,8 @@ gcoHAL_GetUserDebugOption(
 #define gcmSETSTARTDECOMMAND_NEW(CommandBuffer, Memory, Count) \
 { \
     *Memory++ \
-        = gcmSETFIELDVALUE(0, AQ_COMMAND_START_DE_COMMAND, OPCODE,     START_DE) \
-        | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, COUNT,      Count) \
+        = gcmSETFIELDVALUE(0, AQ_COMMAND_START_DE_COMMAND, OPCODE, START_DE) \
+        | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, COUNT, Count) \
         | gcmSETFIELD     (0, AQ_COMMAND_START_DE_COMMAND, DATA_COUNT, 0); \
     \
     *Memory++ = 0xDEADDEED; \
@@ -5724,7 +5724,7 @@ gcoHAL_GetUserDebugOption(
 
 #define gcmBEGINSTATEBUFFER_FAST(Hardware, CommandBuffer, Memory, ReserveSize) \
 { \
-    gcmONERROR(gcoBUFFER_Reserve( \
+    gcmONERROR(gcoBUFFER_Reserve(\
     Hardware->engine[gcvENGINE_RENDER].buffer, ReserveSize, gcvTRUE, &CommandBuffer \
         )); \
     \
@@ -5741,7 +5741,7 @@ gcoHAL_GetUserDebugOption(
     }\
     else \
     {\
-        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF( \
+        gcmONERROR(gcoBUFFER_StartTEMPCMDBUF(\
             Hardware->engine[gcvENGINE_RENDER].buffer, &CommandBuffer \
             ));\
         \
@@ -5784,8 +5784,8 @@ gcoHAL_GetUserDebugOption(
     if (ChipModel == gcv2000 && (ChipRevision == 0x5118 || ChipRevision == 0x5140)) \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 256; \
         PsConstMax   = 64; \
         ConstMax     = 320; \
@@ -5793,8 +5793,8 @@ gcoHAL_GetUserDebugOption(
     else if (NumConstants == 320) \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 256; \
         PsConstMax   = 64; \
         ConstMax     = 320; \
@@ -5803,8 +5803,8 @@ gcoHAL_GetUserDebugOption(
     else if (NumConstants > 256 && ChipModel == gcv1000) \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 256; \
         PsConstMax   = 64; \
         ConstMax     = 320; \
@@ -5812,8 +5812,8 @@ gcoHAL_GetUserDebugOption(
     else if (NumConstants > 256) \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 256; \
         PsConstMax   = 256; \
         ConstMax     = 512; \
@@ -5821,8 +5821,8 @@ gcoHAL_GetUserDebugOption(
     else if (NumConstants == 256) \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 256; \
         PsConstMax   = 256; \
         ConstMax     = 512; \
@@ -5830,8 +5830,8 @@ gcoHAL_GetUserDebugOption(
     else \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 168; \
         PsConstMax   = 64; \
         ConstMax     = 232; \
@@ -5846,13 +5846,13 @@ gcoHAL_GetUserDebugOption(
         UnifiedConst = gcvTRUE; \
         if (Halti5Avail) \
         { \
-            VsConstBase  = gcregGpipeUniformsRegAddrs; \
-            PsConstBase  = gcregPixelUniformsRegAddrs; \
+            VsConstBase  = 0xD000; \
+            PsConstBase  = 0xD800; \
         } \
         else \
         {\
-            VsConstBase  = gcregSHUniformsRegAddrs; \
-            PsConstBase  = gcregSHUniformsRegAddrs; \
+            VsConstBase  = 0xC000; \
+            PsConstBase  = 0xC000; \
         }\
         if ((ChipModel == gcv880) && ((ChipRevision & 0xfff0) == 0x5120)) \
         { \
@@ -5872,8 +5872,8 @@ gcoHAL_GetUserDebugOption(
         if (ChipModel == gcv2000 && (ChipRevision == 0x5118 || ChipRevision == 0x5140)) \
         { \
             UnifiedConst = gcvFALSE; \
-            VsConstBase  = AQVertexShaderConstRegAddrs; \
-            PsConstBase  = AQPixelShaderConstRegAddrs; \
+            VsConstBase  = 0x1400; \
+            PsConstBase  = 0x1C00; \
             VsConstMax   = 256; \
             PsConstMax   = 64; \
             ConstMax     = 320; \
@@ -5881,8 +5881,8 @@ gcoHAL_GetUserDebugOption(
         else \
         { \
             UnifiedConst = gcvFALSE; \
-            VsConstBase  = AQVertexShaderConstRegAddrs; \
-            PsConstBase  = AQPixelShaderConstRegAddrs; \
+            VsConstBase  = 0x1400; \
+            PsConstBase  = 0x1C00; \
             VsConstMax   = 256; \
             PsConstMax   = 256; \
             ConstMax     = 512; \
@@ -5891,8 +5891,8 @@ gcoHAL_GetUserDebugOption(
     else \
     { \
         UnifiedConst = gcvFALSE; \
-        VsConstBase  = AQVertexShaderConstRegAddrs; \
-        PsConstBase  = AQPixelShaderConstRegAddrs; \
+        VsConstBase  = 0x1400; \
+        PsConstBase  = 0x1C00; \
         VsConstMax   = 168; \
         PsConstMax   = 64; \
         ConstMax     = 232; \
@@ -5974,3 +5974,5 @@ gcoHAL_GetUserDebugOption(
 #endif
 
 #endif /* __gc_hal_base_h_ */
+
+

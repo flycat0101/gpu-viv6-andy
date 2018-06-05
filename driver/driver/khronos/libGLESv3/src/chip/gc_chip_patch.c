@@ -29268,7 +29268,7 @@ static __GLchipPatch gcChipPatches[] =
 
         gcChipPatchDEQP_MultiSampleInterpolation_1,
     },
-    
+
     {
         GC_CHIP_PATCH_DEQP_MULTISAMPLE_INTERPOLATION_2,
         "gcChipPatchDEQP_MultiSampleInterpolation_2, interpolate_at_centroid, fragment shader replacement",

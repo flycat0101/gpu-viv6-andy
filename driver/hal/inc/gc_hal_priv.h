@@ -42,10 +42,10 @@ typedef enum _gcePATCH_ID
     gcvPATCH_GLBM27,
     gcvPATCH_GLBMGUI,
     gcvPATCH_GFXBENCH,
-    gcvPATCH_ANTUTU,        /* Antutu 3.x */
-    gcvPATCH_ANTUTU4X,      /* Antutu 4.x */
-    gcvPATCH_ANTUTU5X,      /* Antutu 5.x */
-    gcvPATCH_ANTUTUGL3,     /* Antutu 3D Rating */
+    gcvPATCH_ANTUTU, /* Antutu 3.x */
+    gcvPATCH_ANTUTU4X, /* Antutu 4.x */
+    gcvPATCH_ANTUTU5X, /* Antutu 5.x */
+    gcvPATCH_ANTUTUGL3, /* Antutu 3D Rating */
     gcvPATCH_QUADRANT,
     gcvPATCH_GPUBENCH,
     gcvPATCH_GLOFTSXHM,
@@ -135,13 +135,13 @@ typedef enum _gcePATCH_ID
     gcvPATCH_BATCHCOUNT,
     gcvPATCH_SILICONSTUDIOGPUMARK,
     gcvPATCH_LEANBACKSCROLLING,
-    gcvPATCH_ANTUTU6X,      /* Antutu 6.x */
+    gcvPATCH_ANTUTU6X, /* Antutu 6.x */
     gcvPATCH_ANTUTU3DBench,
     gcvPATCH_CAR_CHASE,
     gcvPATCH_ANDROID_BROWSER,
-    gcvPATCH_COMPUTBENCH_CL,  /* ComputBench 1.5 */
-    gcvPATCH_GLU3,            /* gfx3.0 glu.*/
-    gcvPATCH_GLU4,            /* gfx4.0 glu.*/
+    gcvPATCH_COMPUTBENCH_CL, /* ComputBench 1.5 */
+    gcvPATCH_GLU3, /* gfx3.0 glu.*/
+    gcvPATCH_GLU4, /* gfx4.0 glu.*/
     gcvPATCH_MRVELBM20,
     gcvPATCH_OGLES3OQ,
     gcvPATCH_ANDROID_CTS_UIRENDERING,
@@ -289,3 +289,5 @@ gcoOS_DetectProgrameByEncryptedSymbols(
 #endif
 
 #endif /* __gc_hal_priv_h_ */
+
+

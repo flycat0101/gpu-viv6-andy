@@ -2785,7 +2785,7 @@ static void _VIR_RA_LS_ExtendLRofMOVASrc0(
     gctBOOL                  needExtendLR = gcvTRUE;
     VIR_Enable               enable = VIR_Operand_GetEnable(pInst->dest);
     VIR_RA_LS_Liverange     *pDestLR = gcvNULL;
-    
+
     endPoint = gcvMAXUINT32;
     defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
     if (defIdx != VIR_INVALID_DEF_INDEX)

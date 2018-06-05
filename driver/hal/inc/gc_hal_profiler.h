@@ -640,7 +640,7 @@ extern "C" {
 #endif
 
 #if gcdENDIAN_BIG
-#define BIG_ENDIAN_TRANS_INT(x) ((gctUINT32)( \
+#define BIG_ENDIAN_TRANS_INT(x) ((gctUINT32)(\
         (((gctUINT32)(x) & (gctUINT32)0x000000FFUL) << 24) | \
         (((gctUINT32)(x) & (gctUINT32)0x0000FF00UL) << 8)  | \
         (((gctUINT32)(x) & (gctUINT32)0x00FF0000UL) >> 8)  | \
@@ -1129,3 +1129,5 @@ gcoPROFILER_Flush(
 #endif
 
 #endif /* __gc_hal_profiler_h_ */
+
+

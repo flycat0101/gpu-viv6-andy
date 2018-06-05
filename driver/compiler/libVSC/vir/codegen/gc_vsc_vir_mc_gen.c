@@ -1256,6 +1256,7 @@ _VSC_MC_GEN_GenInstType(
                If src0 and src1 have the same data type(float/int), use the data type which has the larger size;
                otherwise use src0's data type.
 
+               VIV:TODO: insert a explicit type conversion for src0 before SELECT.
             */
             VIR_TypeId src0TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
             VIR_TypeId src1TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 1)));

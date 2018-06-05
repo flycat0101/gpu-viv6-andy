@@ -85,8 +85,8 @@ struct _FBDisplay
 /* Structure that defines a window. */
 struct _FBWindow
 {
-    struct _FBDisplay*      display;
-    gctUINT    offset;
+    struct _FBDisplay* display;
+    gctUINT            offset;
     gctINT             x, y;
     gctINT             width;
     gctINT             height;

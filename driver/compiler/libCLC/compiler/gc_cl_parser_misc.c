@@ -8677,7 +8677,7 @@ OUT cloIR_EXPR * Result
 
 OnError:
     if(Result) *Result = result;
-    return status;    
+    return status;
 }
 
 clsDeclOrDeclList *
@@ -8704,7 +8704,7 @@ IN gctINT TokenType
                                     FieldSelection->lineNo,
                                     FieldSelection->stringNo,
                                     fieldSelection->lhs,
-                                    &lhs)); 
+                                    &lhs));
 
         fieldSelection->lhs = clParseFieldSelectionExpr(Compiler,
                                                         lhs,
@@ -8730,7 +8730,7 @@ IN gctINT TokenType
                                     FieldSelection->stringNo,
                                     designationScope->designation,
                                     &lhs));
-         
+
         fieldSelection->lhs = clParseFieldSelectionExpr(Compiler,
                                                         lhs,
                                                         FieldSelection);
@@ -9606,7 +9606,7 @@ IN cloIR_EXPR InitExpr
   }
   else if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_CONSTANT &&
       (name->decl.dataType->accessQualifier == clvQUALIFIER_CONST ||
-       (!clmDECL_IsPointerType(&name->decl) && 
+       (!clmDECL_IsPointerType(&name->decl) &&
         (!clmDECL_IsElementScalar(&name->decl) ||
          clmDATA_TYPE_IsHighPrecision(name->decl.dataType))))) {
      name->u.variableInfo.u.constant = gcvNULL;
@@ -11100,24 +11100,24 @@ IN OUT cloIR_EXPR *NewCondExpr
            operandExpr = unaryExpr->operand;
        }
        break;
- 
+
     case clvIR_BINARY_EXPR:
        binaryExpr = (cloIR_BINARY_EXPR) &operandExpr->base;
        if(!(binaryExpr->type == clvBINARY_SUBSCRIPT ||
             binaryExpr->type == clvBINARY_LSHIFT ||
             binaryExpr->type == clvBINARY_RSHIFT)) {
            cltELEMENT_TYPE leftElementType, rightElementType;
- 
+
            leftElementType = clmDATA_TYPE_elementType_GET(binaryExpr->leftOperand->decl.dataType);
            rightElementType = clmDATA_TYPE_elementType_GET(binaryExpr->rightOperand->decl.dataType);
- 
+
            operandExpr = binaryExpr->rightOperand;
            if(leftElementType > rightElementType) { /* convert right */
                operandExpr = binaryExpr->leftOperand;
            }
        }
        break;
- 
+
     default:
        break;
     }

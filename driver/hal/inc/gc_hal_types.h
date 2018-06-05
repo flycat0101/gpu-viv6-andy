@@ -105,7 +105,7 @@ extern "C" {
 #define gcdDEBUG_CODE           (1 << 5)
 #define gcdDEBUG_STACK          (1 << 6)
 
-#define gcmIS_DEBUG(flag)       ( gcdDEBUG & (flag | gcdDEBUG_ALL) )
+#define gcmIS_DEBUG(flag)       (gcdDEBUG & (flag | gcdDEBUG_ALL) )
 
 #ifndef gcdDEBUG
 #if (defined(DBG) && DBG) || defined(DEBUG) || defined(_DEBUG)
@@ -359,7 +359,7 @@ gcs2D_PROFILE;
 
 /* Macro to combine four characters into a Charcater Code. */
 #define gcmCC(c1, c2, c3, c4) \
-( \
+(\
     (char) (c1) \
     | \
     ((char) (c2) <<  8) \
@@ -372,7 +372,7 @@ gcs2D_PROFILE;
 #define gcmPRINTABLE(c)         ((((c) >= ' ') && ((c) <= '}')) ? ((c) != '%' ?  (c) : ' ') : ' ')
 
 #define gcmCC_PRINT(cc) \
-    gcmPRINTABLE((char) ( (cc)        & 0xFF)), \
+    gcmPRINTABLE((char) ((cc)        & 0xFF)), \
     gcmPRINTABLE((char) (((cc) >>  8) & 0xFF)), \
     gcmPRINTABLE((char) (((cc) >> 16) & 0xFF)), \
     gcmPRINTABLE((char) (((cc) >> 24) & 0xFF))
@@ -527,7 +527,7 @@ gceSTATUS;
 **      field   Name of field within register.
 */
 #define gcmFIELDMASK(reg, field) \
-( \
+(\
     __gcmALIGN(__gcmMASK(reg##_##field), reg##_##field) \
 )
 
@@ -544,7 +544,7 @@ gceSTATUS;
 **      field   Name of field within register.
 */
 #define gcmGETFIELD(data, reg, field) \
-( \
+(\
     ((((gctUINT32) (data)) >> __gcmSTART(reg##_##field)) \
         & __gcmMASK(reg##_##field)) \
 )
@@ -563,7 +563,7 @@ gceSTATUS;
 **      value   Value for field.
 */
 #define gcmSETFIELD(data, reg, field, value) \
-( \
+(\
     (((gctUINT32) (data)) \
         & ~__gcmALIGN(__gcmMASK(reg##_##field), reg##_##field)) \
         |  __gcmALIGN((gctUINT32) (value) \
@@ -585,7 +585,7 @@ gceSTATUS;
 **      value   Name of the value within the field.
 */
 #define gcmSETFIELDVALUE(data, reg, field, value) \
-( \
+(\
     (((gctUINT32) (data)) \
         & ~__gcmALIGN(__gcmMASK(reg##_##field), reg##_##field)) \
         |  __gcmALIGN(reg##_##field##_##value \
@@ -604,8 +604,8 @@ gceSTATUS;
 **      field   Name of field within register.
 */
 #define gcmGETMASKEDFIELDMASK(reg, field) \
-( \
-    gcmSETFIELD(0, reg,          field, ~0U) | \
+(\
+    gcmSETFIELD(0, reg, field, ~0U) | \
     gcmSETFIELD(0, reg, MASK_ ## field, ~0U)   \
 )
 
@@ -622,8 +622,8 @@ gceSTATUS;
 **      value   Value for field.
 */
 #define gcmSETMASKEDFIELD(reg, field, value) \
-( \
-    gcmSETFIELD     (~0U, reg,          field, value) & \
+(\
+    gcmSETFIELD     (~0U, reg, field, value) & \
     gcmSETFIELDVALUE(~0U, reg, MASK_ ## field, ENABLED) \
 )
 
@@ -640,8 +640,8 @@ gceSTATUS;
 **      value   Value for field.
 */
 #define gcmSETMASKEDFIELDVALUE(reg, field, value) \
-( \
-    gcmSETFIELDVALUE(~0U, reg,          field, value) & \
+(\
+    gcmSETFIELDVALUE(~0U, reg, field, value) & \
     gcmSETFIELDVALUE(~0U, reg, MASK_ ## field, ENABLED) \
 )
 
@@ -660,7 +660,7 @@ gceSTATUS;
 **      value   Name of the value within the field.
 */
 #define gcmVERIFYFIELDVALUE(data, reg, field, value) \
-( \
+(\
     (((gctUINT32) (data)) >> __gcmSTART(reg##_##field) & \
                              __gcmMASK(reg##_##field)) \
         == \
@@ -672,30 +672,30 @@ gceSTATUS;
 */
 
 #define __gcmSTARTBIT(Field) \
-    ( 1 ? Field )
+    (1 ? Field )
 
 #define __gcmBITSIZE(Field) \
-    ( 0 ? Field )
+    (0 ? Field )
 
 #define __gcmBITMASK(Field) \
-( \
+(\
     (1 << __gcmBITSIZE(Field)) - 1 \
 )
 
 #define gcmGETBITS(Value, Type, Field) \
-( \
-    ( ((Type) (Value)) >> __gcmSTARTBIT(Field) ) \
+(\
+    (((Type) (Value)) >> __gcmSTARTBIT(Field) ) \
     & \
     __gcmBITMASK(Field) \
 )
 
 #define gcmSETBITS(Value, Type, Field, NewValue) \
-( \
-    ( ((Type) (Value)) \
+(\
+    (((Type) (Value)) \
     & ~(__gcmBITMASK(Field) << __gcmSTARTBIT(Field)) \
     ) \
     | \
-    ( ( ((Type) (NewValue)) \
+    ((((Type) (NewValue)) \
       & __gcmBITMASK(Field) \
       ) << __gcmSTARTBIT(Field) \
     ) \
@@ -714,7 +714,7 @@ gceSTATUS;
 */
 
 #define gcmISINREGRANGE(Address, Name) \
-( \
+(\
     ((Address & (~0U << Name ## _LSB)) == (Name ## _Address >> 2)) \
 )
 
@@ -749,12 +749,12 @@ gceSTATUS;
 **      p       Pointer value.
 */
 #define gcmPTR2INT(p) \
-( \
+(\
     (gctUINTPTR_T) (p) \
 )
 
 #define gcmPTR2INT32(p) \
-( \
+(\
     (gctUINT32)(gctUINTPTR_T) (p) \
 )
 
@@ -770,7 +770,7 @@ gceSTATUS;
 */
 
 #define gcmINT2PTR(i) \
-( \
+(\
     (gctPOINTER) (gctUINTPTR_T)(i) \
 )
 
@@ -786,7 +786,7 @@ gceSTATUS;
 **      field   Field name.
 */
 #define gcmOFFSETOF(s, field) \
-( \
+(\
     gcmPTR2INT32(& (((struct s *) 0)->field)) \
 )
 
@@ -816,7 +816,7 @@ gceSTATUS;
 #if defined(__GNUC__) && !defined(__KERNEL__)
 #  define gcmBSWAP32(x)     __builtin_bswap32(x)
 #else
-#  define gcmBSWAP32(x) ((gctUINT32)( \
+#  define gcmBSWAP32(x) ((gctUINT32)(\
         (((gctUINT32)(x) & (gctUINT32)0x000000FFUL) << 24) | \
         (((gctUINT32)(x) & (gctUINT32)0x0000FF00UL) << 8)  | \
         (((gctUINT32)(x) & (gctUINT32)0x00FF0000UL) >> 8)  | \
@@ -989,3 +989,5 @@ gcsLISTHEAD;
 #endif
 
 #endif /* __gc_hal_types_h_ */
+
+

@@ -358,7 +358,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
             }
 
             target->kernelCount++;
-             
+
             /*[bug20118]: need to increase the counter in context*/
             target->base.context->kernelCount++;
             return kernel;

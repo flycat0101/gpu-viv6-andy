@@ -7260,7 +7260,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_uint32    height            = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth             = TENSOR_VIEW_SIZE_INDEX(input, 2);
     vx_uint32    batch             = TENSOR_VIEW_SIZE_INDEX(input, 3);
-	vx_uint32    dims              = TENSOR_DIM_NUM(input);
+    vx_uint32    dims              = TENSOR_DIM_NUM(input);
     vx_image     imgInput          = NULL;
     vx_image     imgOutput         = NULL;
     vx_int8      srcFixPointPos    = input->tensorBuffer->fixedPointPos;

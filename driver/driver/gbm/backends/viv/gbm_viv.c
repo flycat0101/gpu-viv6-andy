@@ -55,7 +55,7 @@
 
 struct gbm_backend gbm_viv_backend;
 
-gceSTATUS
+static gceSTATUS
 gbm_viv_query_attrib_from_image(
     void *eglImage,
     gctINT *width,

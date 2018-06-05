@@ -94,8 +94,8 @@ typedef enum _gceHAL_COMMAND_CODES
     gcvHAL_FREE_CONTIGUOUS_MEMORY,
 
     /* Video memory allocation. */
-    gcvHAL_ALLOCATE_VIDEO_MEMORY,           /* Enforced alignment. */
-    gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY,    /* No alignment. */
+    gcvHAL_ALLOCATE_VIDEO_MEMORY, /* Enforced alignment. */
+    gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY, /* No alignment. */
     gcvHAL_RELEASE_VIDEO_MEMORY,
 
     /* Physical-to-logical mapping. */
@@ -1372,3 +1372,5 @@ gcsHAL_INTERFACE;
 #endif
 
 #endif /* __gc_hal_driver_h_ */
+
+

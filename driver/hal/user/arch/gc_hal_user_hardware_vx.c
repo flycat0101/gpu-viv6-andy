@@ -32720,6 +32720,9 @@ gcoHARDWAREVX_ProgrammeTPEngine(
  5:5))) | (((gctUINT32) ((gctUINT32) (info->outBrickMode) & ((gctUINT32) ((((1 ?
  5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
  5:5)))
+                        /*| gcmSETFIELD(0, GCREG_TP_INST_WORD12, ALU_Z_FILTER_MODE, info->aluZFilterMode)*/
+                        /*| gcmSETFIELD(0, GCREG_TP_INST_WORD12, ALU_Z_FILTER_START_OVERFETCH,info->aluZFilterStartOverfetch)*/
+                        /*| gcmSETFIELD(0, GCREG_TP_INST_WORD12, ALU_Z_FILTER_END_OVERFETCH, info->aluZFilterEndOverfetch)*/
                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:14) - (0 ? 17:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:14) - (0 ?
  17:14) + 1))))))) << (0 ? 17:14))) | (((gctUINT32) ((gctUINT32) (info->aluSquarePreshift) & ((gctUINT32) ((((1 ?

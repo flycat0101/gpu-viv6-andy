@@ -144,7 +144,7 @@ _AllocateCounters(
     /* Success. */
     return gcvSTATUS_OK;
 OnError:
-    
+
     if (counterBuffer->counters)
     {
         gcmOS_SAFE_FREE(gcvNULL, counterBuffer->counters);
@@ -154,7 +154,7 @@ OnError:
     {
         gcmOS_SAFE_FREE(gcvNULL, counterBuffer);
     }
-    
+
     return status;
 }
 

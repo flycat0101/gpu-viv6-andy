@@ -922,7 +922,7 @@ clfExecuteCommandCopyBuffer(
     {
         hwCopy = hwCopy && (!(gcmPTR2INT(dstBuffer->u.buffer.logical) & 0xFF));
     }
-    
+
     if (hwCopy)
     {
         if (gcmIS_ERROR(clfExecuteHWCopy(Command)))
@@ -3076,7 +3076,7 @@ clCreateBuffer(
     {
         gctUINT32 physical;
 
-        if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)) 
+        if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV))
             gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node);
         else
             gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node);
@@ -3901,7 +3901,7 @@ clCreateImage2D(
 #if MAP_TO_DEVICE
     chipModel = Context->devices[0]->deviceInfo.chipModel;
 
-    if((Flags & CL_MEM_USE_HOST_PTR) 
+    if((Flags & CL_MEM_USE_HOST_PTR)
         && !(gcmPTR2INT(HostPtr) & 0x3F)
         && !(gcmPTR2INT(HostPtr) & 0x3F)
         && !(chipModel == gcv3000 || chipModel == gcv5000))

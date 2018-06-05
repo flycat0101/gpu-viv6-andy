@@ -774,3 +774,5 @@ gcoCL_ChooseBltEngine(
 #endif
 
 #endif /* __gc_hal_user_cl_h_ */
+
+

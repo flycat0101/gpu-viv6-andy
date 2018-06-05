@@ -149,7 +149,7 @@ extern "C" {
 #if USE_LOCAL_MEMORY_POOL
 #define gcmMEM_DeclareFSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer \
     ) \
@@ -158,7 +158,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_CAllocate##TypeName( \
+Prefix##_CAllocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer \
     ) \
@@ -172,7 +172,7 @@ Prefix##_CAllocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -185,7 +185,7 @@ Prefix##_Free##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName##List( \
+Prefix##_Free##TypeName##List(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type *                    FirstPointer, \
     Type *                    LastPointer \
@@ -200,7 +200,7 @@ Prefix##_Free##TypeName##List( \
 
 #define gcmMEM_DeclareVSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Size \
@@ -214,7 +214,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
- Prefix##_CAllocate##TypeName( \
+ Prefix##_CAllocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Size \
@@ -229,7 +229,7 @@ gceSTATUS \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -243,7 +243,7 @@ Prefix##_Free##TypeName( \
 
 #define gcmMEM_DeclareAFSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Count \
@@ -257,7 +257,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_CAllocate##TypeName( \
+Prefix##_CAllocate##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Count \
@@ -272,7 +272,7 @@ Prefix##_CAllocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -288,7 +288,7 @@ Prefix##_Free##TypeName( \
 
 #define gcmMEM_DeclareFSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer \
     ) \
@@ -303,7 +303,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_CAllocate##TypeName( \
+Prefix##_CAllocate##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type **                    Pointer \
     ) \
@@ -319,7 +319,7 @@ Prefix##_CAllocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_FS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -333,7 +333,7 @@ Prefix##_Free##TypeName( \
 
 #define gcmMEM_DeclareVSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_VS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Size \
@@ -349,7 +349,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_CAllocate##TypeName( \
+Prefix##_CAllocate##TypeName(\
     gcsMEM_VS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Size \
@@ -366,7 +366,7 @@ Prefix##_CAllocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_VS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -380,7 +380,7 @@ Prefix##_Free##TypeName( \
 
 #define gcmMEM_DeclareAFSMemPool(Type, TypeName, Prefix) \
 gceSTATUS \
-Prefix##_Allocate##TypeName( \
+Prefix##_Allocate##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Count \
@@ -396,7 +396,7 @@ Prefix##_Allocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_CAllocate##TypeName( \
+Prefix##_CAllocate##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type **                    Pointer, \
     gctUINT                    Count \
@@ -413,7 +413,7 @@ Prefix##_CAllocate##TypeName( \
 } \
  \
 gceSTATUS \
-Prefix##_Free##TypeName( \
+Prefix##_Free##TypeName(\
     gcsMEM_AFS_MEM_POOL        MemPool, \
     Type *                    Pointer \
     ) \
@@ -520,3 +520,5 @@ gcfMEM_AFSMemPoolFreeANode(
 
 #endif /* (gcdENABLE_3D || gcdENABLE_VG) */
 #endif /* __gc_hal_mem_h_ */
+
+

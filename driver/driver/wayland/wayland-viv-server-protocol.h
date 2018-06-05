@@ -65,44 +65,44 @@ extern const struct wl_interface wl_viv_interface;
  * @struct wl_viv_interface
  */
 struct wl_viv_interface {
-	/**
-	 * Create server side buffer stub
-	 *
-	 * Map the client buffer to server side. Buffer is a actually
-	 * surface object.
-	 */
-	void (*create_buffer)(struct wl_client *client,
-			      struct wl_resource *resource,
-			      uint32_t id,
-			      uint32_t width,
-			      uint32_t height,
-			      uint32_t stride,
-			      int32_t format,
-			      int32_t type,
-			      uint32_t node,
-			      int32_t pool,
-			      uint32_t size,
-			      uint32_t tsNode,
-			      int32_t tsPool,
-			      uint32_t tsSize,
-			      int32_t fd);
-	/**
-	 * Sync tile status
-	 *
-	 * Pass tile status information to server side. @enabled: tile
-	 * status is now enabled. @compressed: compressed, tile status must
-	 * be enabled. @dirty: some pixels are not resolved, ie, tile
-	 * status is dirty. @fc_value: the fast clear value.
-	 * @fc_value_upper: upper 32bit fast clear value.
-	 */
-	void (*enable_tile_status)(struct wl_client *client,
-				   struct wl_resource *resource,
-				   struct wl_resource *id,
-				   uint32_t enabled,
-				   uint32_t compressed,
-				   uint32_t dirty,
-				   uint32_t fc_value,
-				   uint32_t fc_value_upper);
+    /**
+     * Create server side buffer stub
+     *
+     * Map the client buffer to server side. Buffer is a actually
+     * surface object.
+     */
+    void (*create_buffer)(struct wl_client *client,
+                  struct wl_resource *resource,
+                  uint32_t id,
+                  uint32_t width,
+                  uint32_t height,
+                  uint32_t stride,
+                  int32_t format,
+                  int32_t type,
+                  uint32_t node,
+                  int32_t pool,
+                  uint32_t size,
+                  uint32_t tsNode,
+                  int32_t tsPool,
+                  uint32_t tsSize,
+                  int32_t fd);
+    /**
+     * Sync tile status
+     *
+     * Pass tile status information to server side. @enabled: tile
+     * status is now enabled. @compressed: compressed, tile status must
+     * be enabled. @dirty: some pixels are not resolved, ie, tile
+     * status is dirty. @fc_value: the fast clear value.
+     * @fc_value_upper: upper 32bit fast clear value.
+     */
+    void (*enable_tile_status)(struct wl_client *client,
+                   struct wl_resource *resource,
+                   struct wl_resource *id,
+                   uint32_t enabled,
+                   uint32_t compressed,
+                   uint32_t dirty,
+                   uint32_t fc_value,
+                   uint32_t fc_value_upper);
 };
 
 

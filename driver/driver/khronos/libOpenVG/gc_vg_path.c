@@ -529,6 +529,7 @@ gceSTATUS vgfDrawPath(
 
 #if gcdMOVG
          /* Compute the path bounds.
+         * VIV: [todo] Should be optimized by cache the result.
         */
         if (Path->boundsDirty && !useSoftwareTS)
         {

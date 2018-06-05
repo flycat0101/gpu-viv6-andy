@@ -17,7 +17,7 @@ The following directory:
 includes X11 EXA driver based on Vivante 2D GPU. It supports both DRI and DRI3 frameworks.
 
 Vivante 6.2.4 and later driver releases fully support the DRI3 framework. The DRI3 kernel driver
-support is included in the Vivante kernel driver galcore.ko. The Vivante DRI3 user-mode 
+support is included in the Vivante kernel driver galcore.ko. The Vivante DRI3 user-mode
 library libdrm.so source code is included in the directory
 
     libdrm-2.4.66/...

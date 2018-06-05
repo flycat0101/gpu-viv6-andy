@@ -169,15 +169,6 @@ viv_handle_create_buffer(struct wl_client *client,
 
     buffer->fd = (gctINT32)fd;
 
-    /* These fields are used by freescale 2D composition. */
-    gcmONERROR(gcoSURF_Lock(surface, buffer->physical, gcvNULL));
-    gcmONERROR(gcoSURF_Unlock(surface, gcvNULL));
-    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &buffer->gpuBaseAddr));
-    gcmONERROR(gcoSURF_GetTiling(surface, &buffer->tiling));
-    gcmONERROR(gcoSURF_GetAlignedSize(surface, &buffer->alignedWidth, &buffer->alignedHeight, gcvNULL));
-    buffer->format = format;
-    /* End freescale 2D composition. */
-
     buffer->resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
 
     if (!buffer->resource)

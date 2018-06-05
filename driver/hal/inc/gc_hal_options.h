@@ -234,7 +234,7 @@ This define enables the use of VM for gckCommand and fence buffers.
 #       endif
 /*
     gcdDEBUG_OPTION_NONE_TEXTURE
-        When set to 1, the type of texture will be set to AQ_TEXTURE_SAMPLE_MODE_TYPE_NONE.
+        When set to 1, the type of texture will be set to 0x0.
 */
 #ifndef gcdDEBUG_OPTION_NONE_TEXTURE
 #           define gcdDEBUG_OPTION_NONE_TEXTURE                 0
@@ -720,7 +720,7 @@ This define enables the use of VM for gckCommand and fence buffers.
 
 /*
     gcdENABLE_INFINITE_SPEED_HW
-            enable the Infinte HW , this is for 2D openVG
+            enable the Infinte HW, this is for 2D openVG
 */
 #ifndef gcdENABLE_INFINITE_SPEED_HW
 #   define gcdENABLE_INFINITE_SPEED_HW          0
@@ -1360,3 +1360,5 @@ VIV:gcdUSE_MMU_EXCEPTION
 
 
 #endif /* __gc_hal_options_h_ */
+
+

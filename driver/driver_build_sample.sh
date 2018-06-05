@@ -219,10 +219,12 @@ esac;
 #                                      EGL_API_FB and EGL_API_DFB must be 0.
 #                               0      Do not use DRI to support X accelerator.
 #
+#    X11_DRI3                   1      Use DRI3 framework to support X11.              0
+#                               0      Do not use DRI3 framework to support X11.
+#
 #    EGL_API_DFB                1      Use directFB accelerator.                       0
 #                                      EGL_API_FB and EGL_API_DRI must be 0.
-#                               0      Do not use DRI to support X accelerator.
-#
+#                               0      Do not use directFB accelerator.
 #
 #    gcdSTATIC_LINK             1      Enable static linking.                          0
 #                               0      Disable static linking;
@@ -336,6 +338,9 @@ fi
 if [ -z $BUILD_OPTION_EGL_API_DRI ]; then
     BUILD_OPTION_EGL_API_DRI=0
 fi
+if [ -z $BUILD_OPTION_X11_DRI3 ]; then
+    BUILD_OPTION_X11_DRI3=0
+fi
 if [ -z $BUILD_OPTION_EGL_API_WL ]; then
     BUILD_OPTION_EGL_API_WL=0
 fi
@@ -382,6 +387,7 @@ BUILD_OPTIONS="$BUILD_OPTIONS GC355_PROFILER=$BUILD_OPTION_GC355_PROFILER"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_FB=$BUILD_OPTION_EGL_API_FB"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DFB=$BUILD_OPTION_EGL_API_DFB"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DRI=$BUILD_OPTION_EGL_API_DRI"
+BUILD_OPTIONS="$BUILD_OPTIONS X11_DRI3=$BUILD_OPTION_X11_DRI3"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_WL=$BUILD_OPTION_EGL_API_WL"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_GBM=$BUILD_OPTION_EGL_API_GBM"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_NULLWS=$BUILD_OPTION_EGL_API_NULLWS"

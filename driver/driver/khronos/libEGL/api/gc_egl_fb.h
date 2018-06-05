@@ -100,7 +100,7 @@ struct eglFbPlatform
                         IN PlatformPixmapType Pixmap
                         );
 
-	VEGLPlatform (*GetFbdevPlatform) (
+    VEGLPlatform (*GetFbdevPlatform) (
                         void * NativeDisplay
                         );
 

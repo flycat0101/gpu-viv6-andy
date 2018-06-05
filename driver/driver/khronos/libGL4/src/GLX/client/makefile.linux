@@ -86,11 +86,12 @@ INCLUDE += \
 	-I$(ROOTFS_USR)/include/pixman-1
 
 ifeq ($(X11_DRI3),1)
-INCLUDE += -I$(ROOTFS_USR)/include/libdrm
+INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
+           -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
 else
 INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
-  
+
 CFLAGS += $(INCLUDE)
 
 TARGET_NAME=libGL.so.1.2

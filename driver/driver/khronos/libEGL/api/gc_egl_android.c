@@ -579,17 +579,6 @@ _TranslateFormat(
         case HAL_PIXEL_FORMAT_BLOB:
             return gcvSURF_A8;
 #endif
-        /* graphics_ext. */
-#ifdef FSL_YUV_EXT
-        case HAL_PIXEL_FORMAT_YCbCr_422_P:
-            return gcvSURF_UNKNOWN;
-        case HAL_PIXEL_FORMAT_YCbCr_420_P:
-            return gcvSURF_I420;
-        case HAL_PIXEL_FORMAT_CbYCrY_422_I:
-            return gcvSURF_UYVY;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-            return gcvSURF_NV12;
-#endif
         default:
             LOGE("%s: unknown android format=%x", __func__, Format);
             return gcvSURF_UNKNOWN;

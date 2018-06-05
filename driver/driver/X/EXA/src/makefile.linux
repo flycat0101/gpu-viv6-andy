@@ -57,12 +57,13 @@ CFLAGS += -DSMALL_THRESHOLD
 CFLAGS += -fvisibility=hidden -fPIC -DPIC
 CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
           -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
-CFLAGS += -I./vivante_gal -I./vivante_ext -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I$(AQROOT)/hal/inc 
+CFLAGS += -I./vivante_gal -I./vivante_ext -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I$(AQROOT)/hal/kernel/inc
 
 LFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I$(ROOTFS_USR)/include/libdrm
+CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
+          -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
 LFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm

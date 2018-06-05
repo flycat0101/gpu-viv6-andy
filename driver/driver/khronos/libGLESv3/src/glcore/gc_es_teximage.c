@@ -202,7 +202,7 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_SRGB_EXT, GL_SRGB_EXT, GL_UNSIGNED_BYTE, 4, GL_FALSE },
     { GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
 
-    /*  GL_EXT_texture_rg extension GL_OES_texture_float and GL_OES_texture_half_float 
+    /*  GL_EXT_texture_rg extension GL_OES_texture_float and GL_OES_texture_half_float
     ** would make these formats color-renderable */
     { GL_RED_EXT, GL_RED_EXT, GL_FLOAT, 4, GL_TRUE },
     { GL_RED_EXT, GL_RED_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },

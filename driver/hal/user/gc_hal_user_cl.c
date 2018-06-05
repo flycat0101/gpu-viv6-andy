@@ -1175,12 +1175,12 @@ gcoCL_QueryDeviceInfo(
     gctUINT32 chipRevision = 0;
     gctBOOL chipEnableEP = gcvFALSE;
     VSC_HW_CONFIG hwCfg;
-    
+
     gcmHEADER();
     gcmASSERT(DeviceInfo != gcvNULL);
 
     gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
-    
+
     gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
     /* Number of shader cores and threads */
     gcmONERROR(

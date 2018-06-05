@@ -4156,7 +4156,7 @@ gcChipProgramBuildBindingInfo(
                     /* Current attriLocation is not a list, we just use a array and only support
                     ** one aliased attribute for each slot.
                     ** the data structure is:
-                    ** 
+                    **
                     ** ------------------------------------------
                     **| 0~15 attribute slot| 16~31 aliased attrib|
                     ** ------------------------------------------

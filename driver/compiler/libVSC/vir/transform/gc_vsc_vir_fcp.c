@@ -1155,6 +1155,7 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
             /*
             ** Change the instType to UINT16.
+            ** VIV:TODO: is UINT16 enough for globalIndex?
             */
             VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
 
@@ -1296,6 +1297,7 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
 
             /*
             ** Change the instType to UINT16.
+            ** VIV:TODO: is UINT16 enough for globalIndex?
             */
             VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
 

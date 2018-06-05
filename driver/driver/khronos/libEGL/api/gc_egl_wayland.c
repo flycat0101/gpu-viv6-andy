@@ -709,7 +709,6 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         gcoSURF_Unlock(buffer->info.surface, gcvNULL);
         gcoSURF_Destroy(buffer->info.surface);
         gcoHAL_Commit(gcvNULL, gcvFALSE);
-
         buffer->info.surface = gcvNULL;
 
         /* Restore hardware type. */

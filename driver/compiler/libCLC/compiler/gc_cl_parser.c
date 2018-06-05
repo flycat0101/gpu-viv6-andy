@@ -543,7 +543,7 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 # define YYERROR_VERBOSE 0
 #endif
 
-#if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
+#if !defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
 #line 23 "gc_cl.y"
 typedef union YYSTYPE {
     clsLexToken        token;
@@ -581,29 +581,29 @@ typedef union YYSTYPE {
 /* Line 214 of yacc.c.  */
 #line 604 "gc_cl_parser.c"
 
-#if ! defined (yyoverflow) || YYERROR_VERBOSE
+#if !defined (yyoverflow) || YYERROR_VERBOSE
 
 /* The parser invokes alloca or malloc; define the necessary symbols.  */
 
-# if YYSTACK_USE_ALLOCA
+#if YYSTACK_USE_ALLOCA
 #  define YYSTACK_ALLOC alloca
 # else
-#  ifndef YYSTACK_USE_ALLOCA
-#   if defined (alloca) || defined (_ALLOCA_H)
+#ifndef YYSTACK_USE_ALLOCA
+#if defined (alloca) || defined (_ALLOCA_H)
 #    define YYSTACK_ALLOC alloca
 #   else
-#    ifdef __GNUC__
+#ifdef __GNUC__
 #     define YYSTACK_ALLOC __builtin_alloca
 #    endif
 #   endif
 #  endif
 # endif
 
-# ifdef YYSTACK_ALLOC
+#ifdef YYSTACK_ALLOC
    /* Pacify GCC's `empty if-body' warning. */
 #  define YYSTACK_FREE(Ptr) do { /* empty */; } while (0)
 # else
-#  if defined (__STDC__) || defined (__cplusplus)
+#if defined (__STDC__) || defined (__cplusplus)
 
 #   define YYSIZE_T size_t
 #  endif
@@ -635,8 +635,8 @@ union yyalloc
 
 /* Copy COUNT objects from FROM to TO.  The source and destination do
    not overlap.  */
-# ifndef YYCOPY
-#  if 1 < __GNUC__
+#ifndef YYCOPY
+#if 1 < __GNUC__
 #   define YYCOPY(To, From, Count) \
       __builtin_memcpy (To, From, (Count) * sizeof (*(From)))
 #  else
@@ -947,98 +947,98 @@ static const unsigned short yyrline[] =
    First, the terminals, then, starting at YYNTOKENS, nonterminals. */
 static const char *const yytname[] =
 {
-  "$end", "error", "$undefined", "T_VERY_FIRST_TERMINAL", "T_VOID", 
-  "T_MAT2", "T_MAT3", "T_MAT4", "T_MAT8", "T_MAT16", "T_BOOL", "T_BOOL2", 
-  "T_BOOL3", "T_BOOL4", "T_BOOL8", "T_BOOL16", "T_BOOL32", "T_HALF", 
-  "T_HALF2", "T_HALF3", "T_HALF4", "T_HALF8", "T_HALF16", "T_HALF32", 
-  "T_FLOAT", "T_FLOAT2", "T_FLOAT3", "T_FLOAT4", "T_FLOAT8", "T_FLOAT16", 
-  "T_DOUBLE", "T_DOUBLE2", "T_DOUBLE3", "T_DOUBLE4", "T_DOUBLE8", 
-  "T_DOUBLE16", "T_QUAD", "T_QUAD2", "T_QUAD3", "T_QUAD4", "T_QUAD8", 
-  "T_QUAD16", "T_CHAR", "T_CHAR2", "T_CHAR3", "T_CHAR4", "T_CHAR8", 
-  "T_CHAR16", "T_CHAR32", "T_UCHAR", "T_UCHAR2", "T_UCHAR3", "T_UCHAR4", 
-  "T_UCHAR8", "T_UCHAR16", "T_UCHAR32", "T_SHORT", "T_SHORT2", "T_SHORT3", 
-  "T_SHORT4", "T_SHORT8", "T_SHORT16", "T_SHORT32", "T_USHORT", 
-  "T_USHORT2", "T_USHORT3", "T_USHORT4", "T_USHORT8", "T_USHORT16", 
-  "T_USHORT32", "T_INT", "T_INT2", "T_INT3", "T_INT4", "T_INT8", 
-  "T_INT16", "T_UINT", "T_UINT2", "T_UINT3", "T_UINT4", "T_UINT8", 
-  "T_UINT16", "T_LONG", "T_LONG2", "T_LONG3", "T_LONG4", "T_LONG8", 
-  "T_LONG16", "T_ULONG", "T_ULONG2", "T_ULONG3", "T_ULONG4", "T_ULONG8", 
-  "T_ULONG16", "T_SAMPLER_T", "T_IMAGE1D_T", "T_IMAGE1D_ARRAY_T", 
-  "T_IMAGE1D_BUFFER_T", "T_IMAGE2D_ARRAY_T", "T_IMAGE2D_T", "T_IMAGE3D_T", 
-  "T_IMAGE2D_PTR_T", "T_IMAGE2D_DYNAMIC_ARRAY_T", "T_SIZE_T", "T_EVENT_T", 
-  "T_PTRDIFF_T", "T_INTPTR_T", "T_UINTPTR_T", "T_GENTYPE", "T_F_GENTYPE", 
-  "T_IU_GENTYPE", "T_I_GENTYPE", "T_U_GENTYPE", "T_SIU_GENTYPE", 
-  "T_BOOL_PACKED", "T_BOOL2_PACKED", "T_BOOL3_PACKED", "T_BOOL4_PACKED", 
-  "T_BOOL8_PACKED", "T_BOOL16_PACKED", "T_BOOL32_PACKED", "T_CHAR_PACKED", 
-  "T_CHAR2_PACKED", "T_CHAR3_PACKED", "T_CHAR4_PACKED", "T_CHAR8_PACKED", 
-  "T_CHAR16_PACKED", "T_CHAR32_PACKED", "T_UCHAR_PACKED", 
-  "T_UCHAR2_PACKED", "T_UCHAR3_PACKED", "T_UCHAR4_PACKED", 
-  "T_UCHAR8_PACKED", "T_UCHAR16_PACKED", "T_UCHAR32_PACKED", 
-  "T_SHORT_PACKED", "T_SHORT2_PACKED", "T_SHORT3_PACKED", 
-  "T_SHORT4_PACKED", "T_SHORT8_PACKED", "T_SHORT16_PACKED", 
-  "T_SHORT32_PACKED", "T_USHORT_PACKED", "T_USHORT2_PACKED", 
-  "T_USHORT3_PACKED", "T_USHORT4_PACKED", "T_USHORT8_PACKED", 
-  "T_USHORT16_PACKED", "T_USHORT32_PACKED", "T_HALF_PACKED", 
-  "T_HALF2_PACKED", "T_HALF3_PACKED", "T_HALF4_PACKED", "T_HALF8_PACKED", 
-  "T_HALF16_PACKED", "T_HALF32_PACKED", "T_GENTYPE_PACKED", "T_FLOATNXM", 
-  "T_DOUBLENXM", "T_BUILTIN_DATA_TYPE", "T_RESERVED_DATA_TYPE", 
-  "T_VIV_PACKED_DATA_TYPE", "T_IDENTIFIER", "T_TYPE_NAME", 
-  "T_FLOATCONSTANT", "T_UINTCONSTANT", "T_INTCONSTANT", "T_BOOLCONSTANT", 
-  "T_CHARCONSTANT", "T_STRING_LITERAL", "T_FIELD_SELECTION", 
-  "T_LSHIFT_OP", "T_RSHIFT_OP", "T_INC_OP", "T_DEC_OP", "T_LE_OP", 
-  "T_GE_OP", "T_EQ_OP", "T_NE_OP", "T_AND_OP", "T_OR_OP", "T_XOR_OP", 
-  "T_MUL_ASSIGN", "T_DIV_ASSIGN", "T_ADD_ASSIGN", "T_MOD_ASSIGN", 
-  "T_LEFT_ASSIGN", "T_RIGHT_ASSIGN", "T_AND_ASSIGN", "T_XOR_ASSIGN", 
-  "T_OR_ASSIGN", "T_SUB_ASSIGN", "T_STRUCT_UNION_PTR", 
-  "T_INITIALIZER_END", "T_BREAK", "T_CONTINUE", "T_RETURN", "T_GOTO", 
-  "T_WHILE", "T_FOR", "T_DO", "T_ELSE", "T_IF", "T_SWITCH", "T_CASE", 
-  "T_DEFAULT", "T_CONST", "T_RESTRICT", "T_VOLATILE", "T_STATIC", 
-  "T_EXTERN", "T_CONSTANT", "T_GLOBAL", "T_LOCAL", "T_PRIVATE", 
-  "T_KERNEL", "T_UNIFORM", "T_READ_ONLY", "T_WRITE_ONLY", "T_PACKED", 
-  "T_ALIGNED", "T_ENDIAN", "T_VEC_TYPE_HINT", "T_ATTRIBUTE__", 
-  "T_REQD_WORK_GROUP_SIZE", "T_WORK_GROUP_SIZE_HINT", 
-  "T_KERNEL_SCALE_HINT", "T_ALWAYS_INLINE", "T_UNSIGNED", "T_STRUCT", 
-  "T_UNION", "T_TYPEDEF", "T_ENUM", "T_INLINE", "T_SIZEOF", "T_TYPE_CAST", 
-  "T_VEC_STEP", "T_TYPEOF", "T_VERY_LAST_TERMINAL", "'('", "')'", "'['", 
-  "']'", "'{'", "'}'", "'.'", "','", "':'", "'='", "';'", "'!'", "'-'", 
-  "'~'", "'+'", "'*'", "'/'", "'%'", "'<'", "'>'", "'|'", "'^'", "'&'", 
-  "'?'", "$accept", "variable_identifier", "string_literal", 
-  "primary_expression", "postfix_expression", "integer_expression", 
-  "function_call", "function_call_with_parameters", "type_cast", 
-  "function_call_header", "curly_bracket_type_cast", "cast_expression", 
-  "@1", "unary_expression", "unary_operator", "multiplicative_expression", 
-  "additive_expression", "shift_expression", "relational_expression", 
-  "equality_expression", "and_expression", "exclusive_or_expression", 
-  "inclusive_or_expression", "logical_and_expression", 
-  "logical_xor_expression", "logical_or_expression", 
-  "conditional_expression", "assignment_expression", 
-  "assignment_operator", "expression", "constant_expression", "tags", 
-  "enum_specifier", "enumerator_list", "enumerator", "declaration", 
-  "function_prototype", "function_declarator", 
-  "function_header_with_parameters", "function_header", 
-  "parameter_declarator", "parameter_declaration", "parameter_qualifier", 
-  "parameter_type_specifier", "type_qualifier_list", "pointer", 
-  "declarator", "direct_declarator", "array_size", "array_declarator", 
-  "init_declarator_list", "@2", "@3", "@4", "single_declaration", "@5", 
-  "@6", "attribute_specifier", "@7", "attribute_specifier_opt", 
-  "attribute_list", "@8", "attribute", "typeof_type_specifier", 
-  "fully_specified_type", "type_qualifier", "type_specifier", "type_name", 
-  "struct_or_union", "struct_union_specifier", "@9", "@10", "@11", "@12", 
-  "struct_declaration_list", "struct_declaration", 
-  "struct_declarator_list", "struct_declarator", "initializer_list_start", 
-  "initializer", "initializer_list", "designation", "designator_list", 
-  "@13", "designator", "declaration_statement", "statement", 
-  "simple_statement", "compound_statement", "@14", 
-  "statement_no_new_scope", "compound_statement_no_new_scope", "@15", 
-  "statement_list", "expression_statement", "selection_statement", 
-  "switch_body_statement_list", "switch_body_statement", "switch_body", 
-  "@16", "if_sub_statement", "iteration_statement", "@17", "@18", 
-  "for_init_statement", "conditionopt", "for_control", "jump_statement", 
+  "$end", "error", "$undefined", "T_VERY_FIRST_TERMINAL", "T_VOID",
+  "T_MAT2", "T_MAT3", "T_MAT4", "T_MAT8", "T_MAT16", "T_BOOL", "T_BOOL2",
+  "T_BOOL3", "T_BOOL4", "T_BOOL8", "T_BOOL16", "T_BOOL32", "T_HALF",
+  "T_HALF2", "T_HALF3", "T_HALF4", "T_HALF8", "T_HALF16", "T_HALF32",
+  "T_FLOAT", "T_FLOAT2", "T_FLOAT3", "T_FLOAT4", "T_FLOAT8", "T_FLOAT16",
+  "T_DOUBLE", "T_DOUBLE2", "T_DOUBLE3", "T_DOUBLE4", "T_DOUBLE8",
+  "T_DOUBLE16", "T_QUAD", "T_QUAD2", "T_QUAD3", "T_QUAD4", "T_QUAD8",
+  "T_QUAD16", "T_CHAR", "T_CHAR2", "T_CHAR3", "T_CHAR4", "T_CHAR8",
+  "T_CHAR16", "T_CHAR32", "T_UCHAR", "T_UCHAR2", "T_UCHAR3", "T_UCHAR4",
+  "T_UCHAR8", "T_UCHAR16", "T_UCHAR32", "T_SHORT", "T_SHORT2", "T_SHORT3",
+  "T_SHORT4", "T_SHORT8", "T_SHORT16", "T_SHORT32", "T_USHORT",
+  "T_USHORT2", "T_USHORT3", "T_USHORT4", "T_USHORT8", "T_USHORT16",
+  "T_USHORT32", "T_INT", "T_INT2", "T_INT3", "T_INT4", "T_INT8",
+  "T_INT16", "T_UINT", "T_UINT2", "T_UINT3", "T_UINT4", "T_UINT8",
+  "T_UINT16", "T_LONG", "T_LONG2", "T_LONG3", "T_LONG4", "T_LONG8",
+  "T_LONG16", "T_ULONG", "T_ULONG2", "T_ULONG3", "T_ULONG4", "T_ULONG8",
+  "T_ULONG16", "T_SAMPLER_T", "T_IMAGE1D_T", "T_IMAGE1D_ARRAY_T",
+  "T_IMAGE1D_BUFFER_T", "T_IMAGE2D_ARRAY_T", "T_IMAGE2D_T", "T_IMAGE3D_T",
+  "T_IMAGE2D_PTR_T", "T_IMAGE2D_DYNAMIC_ARRAY_T", "T_SIZE_T", "T_EVENT_T",
+  "T_PTRDIFF_T", "T_INTPTR_T", "T_UINTPTR_T", "T_GENTYPE", "T_F_GENTYPE",
+  "T_IU_GENTYPE", "T_I_GENTYPE", "T_U_GENTYPE", "T_SIU_GENTYPE",
+  "T_BOOL_PACKED", "T_BOOL2_PACKED", "T_BOOL3_PACKED", "T_BOOL4_PACKED",
+  "T_BOOL8_PACKED", "T_BOOL16_PACKED", "T_BOOL32_PACKED", "T_CHAR_PACKED",
+  "T_CHAR2_PACKED", "T_CHAR3_PACKED", "T_CHAR4_PACKED", "T_CHAR8_PACKED",
+  "T_CHAR16_PACKED", "T_CHAR32_PACKED", "T_UCHAR_PACKED",
+  "T_UCHAR2_PACKED", "T_UCHAR3_PACKED", "T_UCHAR4_PACKED",
+  "T_UCHAR8_PACKED", "T_UCHAR16_PACKED", "T_UCHAR32_PACKED",
+  "T_SHORT_PACKED", "T_SHORT2_PACKED", "T_SHORT3_PACKED",
+  "T_SHORT4_PACKED", "T_SHORT8_PACKED", "T_SHORT16_PACKED",
+  "T_SHORT32_PACKED", "T_USHORT_PACKED", "T_USHORT2_PACKED",
+  "T_USHORT3_PACKED", "T_USHORT4_PACKED", "T_USHORT8_PACKED",
+  "T_USHORT16_PACKED", "T_USHORT32_PACKED", "T_HALF_PACKED",
+  "T_HALF2_PACKED", "T_HALF3_PACKED", "T_HALF4_PACKED", "T_HALF8_PACKED",
+  "T_HALF16_PACKED", "T_HALF32_PACKED", "T_GENTYPE_PACKED", "T_FLOATNXM",
+  "T_DOUBLENXM", "T_BUILTIN_DATA_TYPE", "T_RESERVED_DATA_TYPE",
+  "T_VIV_PACKED_DATA_TYPE", "T_IDENTIFIER", "T_TYPE_NAME",
+  "T_FLOATCONSTANT", "T_UINTCONSTANT", "T_INTCONSTANT", "T_BOOLCONSTANT",
+  "T_CHARCONSTANT", "T_STRING_LITERAL", "T_FIELD_SELECTION",
+  "T_LSHIFT_OP", "T_RSHIFT_OP", "T_INC_OP", "T_DEC_OP", "T_LE_OP",
+  "T_GE_OP", "T_EQ_OP", "T_NE_OP", "T_AND_OP", "T_OR_OP", "T_XOR_OP",
+  "T_MUL_ASSIGN", "T_DIV_ASSIGN", "T_ADD_ASSIGN", "T_MOD_ASSIGN",
+  "T_LEFT_ASSIGN", "T_RIGHT_ASSIGN", "T_AND_ASSIGN", "T_XOR_ASSIGN",
+  "T_OR_ASSIGN", "T_SUB_ASSIGN", "T_STRUCT_UNION_PTR",
+  "T_INITIALIZER_END", "T_BREAK", "T_CONTINUE", "T_RETURN", "T_GOTO",
+  "T_WHILE", "T_FOR", "T_DO", "T_ELSE", "T_IF", "T_SWITCH", "T_CASE",
+  "T_DEFAULT", "T_CONST", "T_RESTRICT", "T_VOLATILE", "T_STATIC",
+  "T_EXTERN", "T_CONSTANT", "T_GLOBAL", "T_LOCAL", "T_PRIVATE",
+  "T_KERNEL", "T_UNIFORM", "T_READ_ONLY", "T_WRITE_ONLY", "T_PACKED",
+  "T_ALIGNED", "T_ENDIAN", "T_VEC_TYPE_HINT", "T_ATTRIBUTE__",
+  "T_REQD_WORK_GROUP_SIZE", "T_WORK_GROUP_SIZE_HINT",
+  "T_KERNEL_SCALE_HINT", "T_ALWAYS_INLINE", "T_UNSIGNED", "T_STRUCT",
+  "T_UNION", "T_TYPEDEF", "T_ENUM", "T_INLINE", "T_SIZEOF", "T_TYPE_CAST",
+  "T_VEC_STEP", "T_TYPEOF", "T_VERY_LAST_TERMINAL", "'('", "')'", "'['",
+  "']'", "'{'", "'}'", "'.'", "','", "':'", "'='", "';'", "'!'", "'-'",
+  "'~'", "'+'", "'*'", "'/'", "'%'", "'<'", "'>'", "'|'", "'^'", "'&'",
+  "'?'", "$accept", "variable_identifier", "string_literal",
+  "primary_expression", "postfix_expression", "integer_expression",
+  "function_call", "function_call_with_parameters", "type_cast",
+  "function_call_header", "curly_bracket_type_cast", "cast_expression",
+  "@1", "unary_expression", "unary_operator", "multiplicative_expression",
+  "additive_expression", "shift_expression", "relational_expression",
+  "equality_expression", "and_expression", "exclusive_or_expression",
+  "inclusive_or_expression", "logical_and_expression",
+  "logical_xor_expression", "logical_or_expression",
+  "conditional_expression", "assignment_expression",
+  "assignment_operator", "expression", "constant_expression", "tags",
+  "enum_specifier", "enumerator_list", "enumerator", "declaration",
+  "function_prototype", "function_declarator",
+  "function_header_with_parameters", "function_header",
+  "parameter_declarator", "parameter_declaration", "parameter_qualifier",
+  "parameter_type_specifier", "type_qualifier_list", "pointer",
+  "declarator", "direct_declarator", "array_size", "array_declarator",
+  "init_declarator_list", "@2", "@3", "@4", "single_declaration", "@5",
+  "@6", "attribute_specifier", "@7", "attribute_specifier_opt",
+  "attribute_list", "@8", "attribute", "typeof_type_specifier",
+  "fully_specified_type", "type_qualifier", "type_specifier", "type_name",
+  "struct_or_union", "struct_union_specifier", "@9", "@10", "@11", "@12",
+  "struct_declaration_list", "struct_declaration",
+  "struct_declarator_list", "struct_declarator", "initializer_list_start",
+  "initializer", "initializer_list", "designation", "designator_list",
+  "@13", "designator", "declaration_statement", "statement",
+  "simple_statement", "compound_statement", "@14",
+  "statement_no_new_scope", "compound_statement_no_new_scope", "@15",
+  "statement_list", "expression_statement", "selection_statement",
+  "switch_body_statement_list", "switch_body_statement", "switch_body",
+  "@16", "if_sub_statement", "iteration_statement", "@17", "@18",
+  "for_init_statement", "conditionopt", "for_control", "jump_statement",
   "translation_unit", "external_declaration", "function_definition", 0
 };
 #endif
 
-# ifdef YYPRINT
+#ifdef YYPRINT
 /* YYTOKNUM[YYLEX-NUM] -- Internal token number corresponding to
    token YYLEX-NUM.  */
 static const unsigned short yytoknum[] =
@@ -2101,19 +2101,19 @@ static const unsigned short yystos[] =
      240,   240,   247
 };
 
-#if ! defined (YYSIZE_T) && defined (__SIZE_TYPE__)
+#if !defined (YYSIZE_T) && defined (__SIZE_TYPE__)
 # define YYSIZE_T __SIZE_TYPE__
 #endif
-#if ! defined (YYSIZE_T) && defined (size_t)
+#if !defined (YYSIZE_T) && defined (size_t)
 # define YYSIZE_T size_t
 #endif
-#if ! defined (YYSIZE_T)
-# if defined (__STDC__) || defined (__cplusplus)
+#if !defined (YYSIZE_T)
+#if defined (__STDC__) || defined (__cplusplus)
 #  include <stddef.h> /* INFRINGES ON USER NAME SPACE */
 #  define YYSIZE_T size_t
 # endif
 #endif
-#if ! defined (YYSIZE_T)
+#if !defined (YYSIZE_T)
 # define YYSIZE_T unsigned int
 #endif
 
@@ -2176,7 +2176,7 @@ while (0)
 /* Enable debugging if requested.  */
 #if YYDEBUG
 
-# ifndef YYFPRINTF
+#ifndef YYFPRINTF
 
 #  define YYFPRINTF fprintf
 # endif
@@ -2274,7 +2274,7 @@ int yydebug;
 
 
 /* YYINITDEPTH -- initial size of the parser's stacks.  */
-#ifndef    YYINITDEPTH
+#ifndef YYINITDEPTH
 # define YYINITDEPTH 200
 #endif
 
@@ -2297,13 +2297,13 @@ int yydebug;
 
 #if YYERROR_VERBOSE
 
-# ifndef yystrlen
-#  if defined (__GLIBC__) && defined (_STRING_H)
+#ifndef yystrlen
+#if defined (__GLIBC__) && defined (_STRING_H)
 #   define yystrlen strlen
 #  else
 /* Return the length of YYSTR.  */
 static YYSIZE_T
-#   if defined (__STDC__) || defined (__cplusplus)
+#if defined (__STDC__) || defined (__cplusplus)
 yystrlen (const char *yystr)
 #   else
 yystrlen (yystr)
@@ -2320,14 +2320,14 @@ yystrlen (yystr)
 #  endif
 # endif
 
-# ifndef yystpcpy
-#  if defined (__GLIBC__) && defined (_STRING_H) && defined (_GNU_SOURCE)
+#ifndef yystpcpy
+#if defined (__GLIBC__) && defined (_STRING_H) && defined (_GNU_SOURCE)
 #   define yystpcpy stpcpy
 #  else
 /* Copy YYSRC to YYDEST, returning the address of the terminating '\0' in
    YYDEST.  */
 static char *
-#   if defined (__STDC__) || defined (__cplusplus)
+#if defined (__STDC__) || defined (__cplusplus)
 yystpcpy (char *yydest, const char *yysrc)
 #   else
 yystpcpy (yydest, yysrc)
@@ -2372,7 +2372,7 @@ yysymprint (yyoutput, yytype, yyvaluep)
   if (yytype < YYNTOKENS)
     {
       YYFPRINTF (yyoutput, "token %s (", yytname[yytype]);
-# ifdef YYPRINT
+#ifdef YYPRINT
       YYPRINT (yyoutput, yytoknum[yytype], *yyvaluep);
 # endif
     }
@@ -2417,7 +2417,7 @@ yydestruct (yytype, yyvaluep)
 /* Prevent warnings from -Wmissing-prototypes.  */
 
 #ifdef YYPARSE_PARAM
-# if defined (__STDC__) || defined (__cplusplus)
+#if defined (__STDC__) || defined (__cplusplus)
 int yyparse (void *YYPARSE_PARAM);
 # else
 int yyparse ();
@@ -2440,7 +2440,7 @@ int yyparse ();
 `----------*/
 
 #ifdef YYPARSE_PARAM
-# if defined (__STDC__) || defined (__cplusplus)
+#if defined (__STDC__) || defined (__cplusplus)
 int yyparse (void *YYPARSE_PARAM)
 # else
 int yyparse (YYPARSE_PARAM)
@@ -2564,7 +2564,7 @@ int yynerrs;
     yyvs = yyvs1;
       }
 #else /* no yyoverflow */
-# ifndef YYSTACK_RELOCATE
+#ifndef YYSTACK_RELOCATE
       goto yyoverflowlab;
 # else
       /* Extend the stack our own way.  */
@@ -2709,9 +2709,9 @@ yyreduce:
     {
         case 2:
 #line 192 "gc_cl.y"
-    { yyval.expr = clParseVariableIdentifier(Compiler, &yyvsp[0].token); 
+    { yyval.expr = clParseVariableIdentifier(Compiler, &yyvsp[0].token);
           if(yyval.expr == gcvNULL) {
-             YYERROR; 
+             YYERROR;
           }
         ;}
     break;
@@ -2850,7 +2850,7 @@ yyreduce:
 #line 277 "gc_cl.y"
     {
         clParseCastExprBegin(Compiler, &yyvsp[-1].decl);
-        (void) gcoOS_ZeroMemory((gctPOINTER)&yyval.token, sizeof(clsLexToken)); 
+        (void) gcoOS_ZeroMemory((gctPOINTER)&yyval.token, sizeof(clsLexToken));
         yyval.token.type = T_TYPE_CAST;
     ;}
     break;
@@ -2862,9 +2862,9 @@ yyreduce:
 
   case 31:
 #line 288 "gc_cl.y"
-    { 
+    {
            clParseCastExprBegin(Compiler, gcvNULL);
-               (void) gcoOS_ZeroMemory((gctPOINTER)&yyval.token, sizeof(clsLexToken)); 
+               (void) gcoOS_ZeroMemory((gctPOINTER)&yyval.token, sizeof(clsLexToken));
            yyval.token.type = T_TYPE_CAST;
         ;}
     break;
@@ -2959,7 +2959,7 @@ yyreduce:
 
   case 49:
 #line 342 "gc_cl.y"
-    { 
+    {
            yyval.expr = yyvsp[0].expr;
         ;}
     break;
@@ -3191,7 +3191,7 @@ yyreduce:
 
   case 95:
 #line 478 "gc_cl.y"
-    { 
+    {
         if(cloCOMPILER_GetParserState(Compiler) == clvPARSER_IN_TYPE_CAST) {
                yyval.expr = clParseBinarySequenceExpr(Compiler,
                           (YYSTYPE *)&yyvsp[-3].token, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr);
@@ -3261,7 +3261,7 @@ yyreduce:
 #line 534 "gc_cl.y"
     {
            slsSLINK_LIST *enumList;
-           
+
            slmSLINK_LIST_Initialize(enumList);
                    yyval.enumeratorList = clParseAddEnumerator(Compiler, yyvsp[0].enumeratorName, enumList);
         ;}
@@ -3378,7 +3378,7 @@ yyreduce:
 
   case 129:
 #line 608 "gc_cl.y"
-    { 
+    {
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, yyvsp[-1].typeQualifierList, gcvTRUE, &yyvsp[-2].decl);
                     yyval.paramName = clParseParameterDecl(Compiler, &decl, &yyvsp[0].token);
@@ -3456,7 +3456,7 @@ yyreduce:
 
   case 143:
 #line 654 "gc_cl.y"
-    { 
+    {
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, yyvsp[0].typeQualifierList, gcvTRUE, &yyvsp[-1].decl);
             yyval.paramName = clParseParameterDecl(Compiler, &decl, gcvNULL);
@@ -3465,7 +3465,7 @@ yyreduce:
 
   case 144:
 #line 660 "gc_cl.y"
-    { 
+    {
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, yyvsp[-1].typeQualifierList, gcvTRUE, &yyvsp[-2].decl);
             yyval.paramName = clParseArrayParameterDecl(Compiler, &decl, gcvNULL, yyvsp[0].expr);
@@ -3512,7 +3512,7 @@ yyreduce:
 
   case 152:
 #line 691 "gc_cl.y"
-    { 
+    {
           yyval.token = yyvsp[0].token;
           yyval.token.u.identifier.ptrDscr = yyvsp[-1].typeQualifierList;
         ;}
@@ -4027,7 +4027,7 @@ yyreduce:
 
   case 252:
 #line 955 "gc_cl.y"
-    { 
+    {
            if(gcmIS_ERROR(yyvsp[-1].status)) {
                        yyval.status = yyvsp[-1].status;
            }
@@ -4040,7 +4040,7 @@ yyreduce:
 
   case 253:
 #line 968 "gc_cl.y"
-    {  
+    {
                    yyval.status = clParseTypeSpecifiedFieldDeclList(Compiler, &yyvsp[-2].decl, yyvsp[-1].fieldDeclList);
         ;}
     break;
@@ -4082,7 +4082,7 @@ yyreduce:
                               yyvsp[0].token.stringNo,
                               &typeCastArgs);
            if(gcmIS_ERROR(status)) {
-              YYERROR; 
+              YYERROR;
               yyval.expr = gcvNULL;
            }
            else {
@@ -4123,12 +4123,12 @@ yyreduce:
 
   case 266:
 #line 1029 "gc_cl.y"
-    { 
+    {
            gceSTATUS status;
            status = cloCOMPILER_PushDesignationScope(Compiler,
                                  yyvsp[-1].declOrDeclList->lhs);
            if(gcmIS_ERROR(status)) {
-             YYERROR; 
+             YYERROR;
            }
            yyval.declOrDeclList = yyvsp[-1].declOrDeclList;
         ;}
@@ -4141,7 +4141,7 @@ yyreduce:
 
   case 268:
 #line 1044 "gc_cl.y"
-    { 
+    {
            yyval.token.type = T_EOF;
         ;}
     break;
@@ -4426,7 +4426,7 @@ yyreduce:
 
   case 319:
 #line 1232 "gc_cl.y"
-    { 
+    {
           clsForExprPair nullPair = {gcvNULL, gcvNULL};
           yyclearin;
           yyerrok;
@@ -4435,7 +4435,7 @@ yyreduce:
 
   case 320:
 #line 1238 "gc_cl.y"
-    { 
+    {
           clsForExprPair nullPair = {gcvNULL, gcvNULL};
           yyclearin;
           yyerrok;
