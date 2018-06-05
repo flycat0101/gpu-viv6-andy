@@ -863,10 +863,18 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
     /* Get bytes per pixel. */
     bytesPerPixel = Surface->formatInfo.bitsPerPixel / 8;
 
-    /* Query the tile status size for one 64x64 supertile. */
+    /*
+     * Query the tile status size for a 64x64 supertile.
+     * Because of resolve limitation, hw may not be available to clear ts of one
+     * 64x64 supertile, ts size alignment is introduced in query. Here we
+     * simply query ts size of 8 supertiles then div by 8 to get ts size of
+     * a single supertile.
+     */
     gcmONERROR(gcoHARDWARE_QueryTileStatus(Hardware, Surface,
-                                           64 * 64 * bytesPerPixel,
+                                           64 * 64 * 8 * bytesPerPixel,
                                            &bytes, gcvNULL, &fillColor));
+
+    bytes >>= 3;
 
     if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
     {
