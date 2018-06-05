@@ -693,6 +693,33 @@ static int gc_dump_trigger_write(const char __user *buf, size_t count, void* dat
     return strtoint_from_user(buf, count, &dumpCore);
 }
 
+static int gc_clk_show(struct seq_file* m, void* data)
+{
+    gcsINFO_NODE *node = m->private;
+    gckGALDEVICE device = node->device;
+    gctUINT i;
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+        if (device->kernels[i])
+        {
+            gckHARDWARE hardware = device->kernels[i]->hardware;
+
+            if (hardware->mcClk)
+            {
+                seq_printf(m, "gpu%d mc clock: %d HZ.\n", i, hardware->mcClk);
+            }
+
+            if (hardware->shClk)
+            {
+                seq_printf(m, "gpu%d sh clock: %d HZ.\n", i, hardware->shClk);
+            }
+        }
+    }
+
+    return 0;
+}
+
 static gcsINFO InfoList[] =
 {
     {"info", gc_info_show},
@@ -703,6 +730,7 @@ static gcsINFO InfoList[] =
     {"version", gc_version_show},
     {"vidmem", gc_vidmem_show, gc_vidmem_write},
     {"dump_trigger", gc_dump_trigger_show, gc_dump_trigger_write},
+    {"clk", gc_clk_show},
 };
 
 static gceSTATUS
@@ -2063,6 +2091,55 @@ gckGALDEVICE_Stop_Threads(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gckGALDEVICE_QueryFrequency(
+    IN gckGALDEVICE Device
+    )
+{
+    gctUINT64 mcStart[gcvCORE_COUNT], shStart[gcvCORE_COUNT];
+    gctUINT32 mcClk[gcvCORE_COUNT], shClk[gcvCORE_COUNT];
+    gckKERNEL kernel;
+    gceSTATUS status;
+    gctUINT i;
+
+    gcmkHEADER_ARG("Device=0x%p", Device);
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+        if (Device->kernels[i])
+        {
+            kernel = Device->kernels[i];
+            mcStart[i] = shStart[i] = 0;
+
+            gckHARDWARE_EnterQueryClock(kernel->hardware,
+                                        &mcStart[i], &shStart[i]);
+        }
+    }
+
+    gcmkONERROR(gckOS_Delay(Device->os, 50));
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+        if (Device->kernels[i] && mcStart[i])
+        {
+            kernel = Device->kernels[i];
+            mcClk[i] = shClk[i] = 0;
+
+            gckHARDWARE_ExitQueryClock(kernel->hardware,
+                                       mcStart[i], shStart[i],
+                                       &mcClk[i], &shClk[i]);
+
+            kernel->hardware->mcClk = mcClk[i];
+            kernel->hardware->shClk = shClk[i];
+        }
+    }
+
+OnError:
+    gcmkFOOTER_NO();
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gckGALDEVICE_Start
@@ -2096,6 +2173,8 @@ gckGALDEVICE_Start(
 
     /* Start the kernel thread. */
     gcmkONERROR(gckGALDEVICE_Start_Threads(Device));
+
+    gcmkONERROR(gckGALDEVICE_QueryFrequency(Device));
 
     for (i = 0; i < gcvCORE_COUNT; i++)
     {

@@ -2217,6 +2217,12 @@ gckKERNEL_Dispatch(
                 &Interface->u.QueryChipIdentity));
         break;
 
+    case gcvHAL_QUERY_CHIP_FREQUENCY:
+        /* Query chip clock. */
+        Interface->u.QueryChipFrequency.mcClk = Kernel->hardware->mcClk;
+        Interface->u.QueryChipFrequency.shClk = Kernel->hardware->shClk;
+        break;
+
     case gcvHAL_MAP_MEMORY:
         physical = gcmINT2PTR(Interface->u.MapMemory.physical);
 

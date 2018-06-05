@@ -5777,6 +5777,8 @@ gckHARDWARE_SetMMUStates(
         }
     }
 
+    reserveBytes += 8;
+
     /* Convert logical address into physical address. */
     gcmkONERROR(
         gckOS_GetPhysicalAddress(Hardware->os, MtlbAddress, &physical));
@@ -5964,6 +5966,30 @@ gckHARDWARE_SetMMUStates(
                     = configEx;
             }
         }
+
+        *buffer++
+            = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E12) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)));
+
+        *buffer++
+            = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16)));
 
         do{*buffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -13758,6 +13784,112 @@ gckHARDWARE_DummyDraw(
     *Bytes = bytes;
 
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gckHARDWARE_EnterQueryClock(
+    IN gckHARDWARE Hardware,
+    OUT gctUINT64 *McStart,
+    OUT gctUINT64 *ShStart
+    )
+{
+    gceSTATUS status;
+    gctUINT64 mcStart, shStart;
+    gctBOOL acquired = gcvFALSE;
+
+    while (!acquired)
+    {
+        gcmkONERROR(
+            gckOS_AcquireMutex(Hardware->os, Hardware->powerMutex, gcvINFINITE));
+        acquired = gcvTRUE;
+
+        if (Hardware->chipPowerState != gcvPOWER_ON)
+        {
+            /* Release mutex and try power on. */
+            gckOS_ReleaseMutex(Hardware->os, Hardware->powerMutex);
+            acquired = gcvFALSE;
+
+            gcmkONERROR(
+                gckHARDWARE_SetPowerManagementState(Hardware, gcvPOWER_ON_AUTO));
+        }
+    }
+
+    gcmkONERROR(gckOS_GetTime(&mcStart));
+    gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00438, 0));
+
+    *McStart = mcStart;
+
+    if (Hardware->core <= gcvCORE_3D_MAX)
+    {
+        gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00470, 0xFFU << 24));
+
+        gcmkONERROR(gckOS_GetTime(&shStart));
+
+        gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00470, 0x4U << 24));
+
+        *ShStart = shStart;
+    }
+
+OnError:
+    if (acquired)
+    {
+        gckOS_ReleaseMutex(Hardware->os, Hardware->powerMutex);
+    }
+
+    return status;
+}
+
+gceSTATUS
+gckHARDWARE_ExitQueryClock(
+    IN gckHARDWARE Hardware,
+    IN gctUINT64 McStart,
+    IN gctUINT64 ShStart,
+    OUT gctUINT32 *McClk,
+    OUT gctUINT32 *ShClk
+    )
+{
+    gceSTATUS status;
+    gctUINT64 mcEnd, shEnd;
+    gctUINT32 mcCycle, shCycle;
+    gctUINT64 mcFreq, shFreq = 0;
+
+    gcmkONERROR(gckOS_GetTime(&mcEnd));
+    gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00438, &mcCycle));
+
+    if (mcCycle == 0)
+    {
+        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+    }
+
+    /* cycle = (gctUINT64)cycle * 1000000 / (end - start); */
+    mcFreq = ((gctUINT64)mcCycle * ((1000000U << 12) / (gctUINT32)(mcEnd - McStart))) >> 12;
+
+    *McClk = (gctUINT32)mcFreq;
+
+    if (Hardware->core <= gcvCORE_3D_MAX)
+    {
+        gcmkONERROR(gckOS_GetTime(&shEnd));
+        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x0045C, &shCycle));
+
+        if (!shCycle)
+        {
+            /*TODO: [VIV] Query SH cycle not support for old chips */
+            *ShClk = *McClk;
+            return gcvSTATUS_OK;
+        }
+
+        if (!ShStart)
+        {
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
+
+        shFreq = ((gctUINT64)shCycle * ((1000000U << 12) / (gctUINT32)(shEnd - ShStart))) >> 12;
+    }
+
+    *ShClk = (gctUINT32)shFreq;
+
+OnError:
+    return status;
 }
 
 

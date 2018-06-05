@@ -862,6 +862,9 @@ struct _gcoHARDWARE
     gctBOOL                     swwas[gcvSWWA_COUNT];
     gcsHAL_QUERY_CHIP_OPTIONS   options;
 
+    gctUINT32                   mcClk;
+    gctUINT32                   shClk;
+
 #if gcdENABLE_3D
     /* API type. */
     gceAPI                      api;

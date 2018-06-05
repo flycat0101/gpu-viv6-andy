@@ -6533,7 +6533,8 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (ClockFrequency != gcvNULL)
     {
-        *ClockFrequency = 500;
+        /* Return the shader core clock in Mhz. */
+        *ClockFrequency = (Hardware->shClk + 500000) / 1000000;
     }
 
 OnError:

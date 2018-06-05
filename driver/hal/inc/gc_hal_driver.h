@@ -43,6 +43,7 @@ typedef enum _gceHAL_COMMAND_CODES
     /* Generic query. */
     gcvHAL_QUERY_VIDEO_MEMORY,
     gcvHAL_QUERY_CHIP_IDENTITY,
+    gcvHAL_QUERY_CHIP_FREQUENCY,
 
     /* Contiguous memory. */
     gcvHAL_ALLOCATE_NON_PAGED_MEMORY,
@@ -410,6 +411,13 @@ typedef struct _gcsHAL_INTERFACE
 
         /* gcvHAL_QUERY_CHIP_IDENTITY */
         gcsHAL_QUERY_CHIP_IDENTITY      QueryChipIdentity;
+
+        struct _gcsHAL_QUERY_CHIP_FREQUENCY
+        {
+            OUT gctUINT32               mcClk;
+            OUT gctUINT32               shClk;
+        }
+        QueryChipFrequency;
 
         /* gcvHAL_MAP_MEMORY */
         struct _gcsHAL_MAP_MEMORY
