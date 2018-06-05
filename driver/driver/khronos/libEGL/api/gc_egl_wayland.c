@@ -786,11 +786,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
                 break;
             }
 
-            /* First dequeued buffer should come back into queue first, but find one buffer is queued and it is freed before
-            first dequeued buffer, it results in calling dispatch_queue(wl_dpy, wl_queue, 100) many times. It is better that
-            when the oldest buffer is used, only need one time to sync and wait until the non-free buffer is free
-            */
-            ret = roundtrip_queue(wl_dpy, wl_queue);
+            ret = dispatch_queue(wl_dpy, wl_queue, 5);
 
             if (ret == -1)
             {
