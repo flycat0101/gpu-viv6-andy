@@ -141,7 +141,7 @@ typedef struct _cl_mem
             gceSURF_FORMAT          internalFormat;
             gcoTEXTURE              texture;
             gcoSURF                 surface;
-            gctBOOL                 surfaceMapped;
+            gceIMAGE_MEM_TYPE       surfaceMapped;
             gctUINT32               texturePhysical;    /* Texture data. */
             gctPOINTER              textureLogical;     /* Texture data. */
             gctUINT                 textureStride;      /* Texture data. */

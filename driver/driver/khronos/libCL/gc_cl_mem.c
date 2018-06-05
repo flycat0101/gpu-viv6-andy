@@ -287,7 +287,7 @@ clfReleaseMemObject(
 
                 MemObj->u.image.texture = gcvNULL;
                 MemObj->u.image.surface = gcvNULL;
-                MemObj->u.image.surfaceMapped = gcvFALSE;
+                MemObj->u.image.surfaceMapped = gcvIMAGE_MEM_DEFAULT;
 
                 /* Invoke and free callbacks */
                 memObjCallback = MemObj->memObjCallback;
@@ -3616,7 +3616,7 @@ clCreateImage(
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
-    image->u.image.surfaceMapped    = gcvFALSE;
+    image->u.image.surfaceMapped    = gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
     /* TODO: need to handle 1d buffer */
     image->u.image.buffer           = ImageDesc->buffer;
@@ -3640,7 +3640,17 @@ clCreateImage(
     /*endianHint = clfEndianHint(internalformat, type);*/
 
 #if MAP_TO_DEVICE
-    image->u.image.surfaceMapped = (Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F);
+    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F))
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
+        }
+    }
 #endif
     clmONERROR(gcoCL_CreateTexture(&image->u.image.surfaceMapped,
                                    dim1Size,
@@ -3853,7 +3863,7 @@ clCreateImage2D(
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
-    image->u.image.surfaceMapped    = gcvFALSE;
+    image->u.image.surfaceMapped    =  gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
     image->u.image.vxcaddressingMode = 0;
     image->u.image.vxcfilterMode    = 0;
@@ -3876,10 +3886,20 @@ clCreateImage2D(
 #if MAP_TO_DEVICE
     chipModel = Context->devices[0]->deviceInfo.chipModel;
 
-    image->u.image.surfaceMapped =
-            (Flags & CL_MEM_USE_HOST_PTR)
-            && !(gcmPTR2INT(HostPtr) & 0x3F)
-            && !(chipModel == gcv3000 || chipModel == gcv5000);
+    if((Flags & CL_MEM_USE_HOST_PTR) 
+        && !(gcmPTR2INT(HostPtr) & 0x3F)
+        && !(gcmPTR2INT(HostPtr) & 0x3F)
+        && !(chipModel == gcv3000 || chipModel == gcv5000))
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
+        }
+    }
 #endif
     clmONERROR(gcoCL_CreateTexture(&image->u.image.surfaceMapped,
                                    ImageWidth,
@@ -4113,7 +4133,7 @@ clCreateImage3D(
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
-    image->u.image.surfaceMapped    = gcvFALSE;
+    image->u.image.surfaceMapped    = gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
     image->u.image.vxcaddressingMode = 0;
     image->u.image.vxcfilterMode    = 0;
@@ -4131,7 +4151,17 @@ clCreateImage3D(
     imageHeader = (clsImageHeader_PTR) image->u.image.logical;
 
 #if MAP_TO_DEVICE
-    image->u.image.surfaceMapped = (Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F);
+    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F))
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
+        }
+    }
 #endif
     clmONERROR(gcoCL_CreateTexture(&image->u.image.surfaceMapped,
                                    ImageWidth,

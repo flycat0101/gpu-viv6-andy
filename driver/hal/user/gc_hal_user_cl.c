@@ -849,21 +849,21 @@ gcoCL_UnlockSurface(
 */
 gceSTATUS
 gcoCL_CreateTexture(
-    IN OUT gctBOOL*         MapHostMemory,
-    IN gctUINT              Width,
-    IN gctUINT              Height,
-    IN gctUINT              Depth,
-    IN gctCONST_POINTER     Memory,
-    IN gctUINT              Stride,
-    IN gctUINT              Slice,
-    IN gceSURF_FORMAT       Format,
-    IN gceENDIAN_HINT       EndianHint,
-    OUT gcoTEXTURE *        Texture,
-    OUT gcoSURF *           Surface,
-    OUT gctUINT32  *        Physical,
-    OUT gctPOINTER *        Logical,
-    OUT gctUINT *           SurfStride,
-    OUT gctUINT *           SurfSliceSize
+    IN OUT gceIMAGE_MEM_TYPE* MapHostMemory,
+    IN gctUINT                Width,
+    IN gctUINT                Height,
+    IN gctUINT                Depth,
+    IN gctCONST_POINTER       Memory,
+    IN gctUINT                Stride,
+    IN gctUINT                Slice,
+    IN gceSURF_FORMAT         Format,
+    IN gceENDIAN_HINT         EndianHint,
+    OUT gcoTEXTURE *          Texture,
+    OUT gcoSURF *             Surface,
+    OUT gctUINT32  *          Physical,
+    OUT gctPOINTER *          Logical,
+    OUT gctUINT *             SurfStride,
+    OUT gctUINT *             SurfSliceSize
     )
 {
     gceSTATUS status;
@@ -878,7 +878,7 @@ gcoCL_CreateTexture(
     gcmASSERT(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_LINEAR));
 
     /* Try to map host memory first. */
-    if (*MapHostMemory)
+    if (*MapHostMemory != gcvIMAGE_MEM_DEFAULT)
     {
         gctUINT32 alignedWidth= Width;
         gctUINT32 alignedHeight = Height;
@@ -902,6 +902,11 @@ gcoCL_CreateTexture(
         {
             do {
                 gcmERR_BREAK(gcoSURF_ConstructWrapper(gcvNULL, &surface));
+
+                if(gcvIMAGE_MEM_HOST_PTR == *MapHostMemory)
+                {
+                    surface->node.u.normal.cacheable = gcvTRUE;
+                }
 
                 gcmERR_BREAK(gcoSURF_SetBuffer(surface,
                                      gcvSURF_BITMAP,
