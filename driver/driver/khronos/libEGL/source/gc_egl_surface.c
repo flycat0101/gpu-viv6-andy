@@ -1992,6 +1992,18 @@ veglCreatePlatformWindowSurface(
     surface->buffer = renderBuffer;
     surface->protectedContent = protectedContent;
 
+    /* For easily debug */
+    if (dpy->platform->setSwapInterval)
+    {
+        gctSTRING interval = gcvNULL;
+
+        gcoOS_GetEnv(gcvNULL, "VIV_EGL_SWAP_INTERVAL", &interval);
+        if (interval)
+        {
+            dpy->platform->setSwapInterval(surface, (EGLint)atoi(interval));
+        }
+    }
+
     /* Connect to window. */
     result = dpy->platform->connectWindow(dpy, surface, surface->hwnd);
 
