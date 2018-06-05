@@ -910,7 +910,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
      * Determine minimal resolve size alignment.
      * resolve rectangle must be 16x4 aligned. 16x4 size is 16x4x2B.
      */
-    blockWidth  = 64 * (16*4*2 / bytes);
+    blockWidth  = 64 * (16 * 4 * 2 / (gctINT)bytes);
     blockHeight = (Surface->tiling & gcvTILING_SPLIT_BUFFER) ? 128 : 64;
 
     /*
@@ -985,7 +985,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
     }
 
     /* Calculate tile status surface stride. */
-    stride = Surface->alignedW / 64 * bytes;
+    stride = Surface->alignedW / 64 * (gctUINT)bytes;
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
@@ -1216,11 +1216,11 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
         gcmGETHARDWAREADDRESS(Surface->tileStatusNode, tileStatusAddress);
 
         physical[0] = tileStatusAddress
-                    + (Surface->alignedW / 64) * (clearOrigin.y / blockHeight) * bytes
-                    + (clearOrigin.x / 64) * bytes;
+                    + (Surface->alignedW / 64) * (clearOrigin.y / blockHeight) * (gctINT)bytes
+                    + (clearOrigin.x / 64) * (gctINT)bytes;
 
         physical[1] = physical[0]
-                    + bytes * Surface->bottomBufferOffset / 64 / 64 / bytesPerPixel;
+                    + (gctUINT32)bytes * Surface->bottomBufferOffset / 64 / 64 / bytesPerPixel;
 
         if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
         {
@@ -1349,11 +1349,11 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
         clearOrigin.x = clearOrigin.x + clearSize.x - blockWidth;
 
         physical[0] = tileStatusAddress
-                    + (Surface->alignedW / 64) * (clearOrigin.y / blockHeight) * bytes
-                    + (clearOrigin.x / 64) * bytes;
+                    + (Surface->alignedW / 64) * (clearOrigin.y / blockHeight) * (gctINT32)bytes
+                    + (clearOrigin.x / 64) * (gctINT32)bytes;
 
         physical[1] = physical[0]
-                    + bytes * Surface->bottomBufferOffset / 64 / 64 / bytesPerPixel;
+                    + (gctUINT32)bytes * Surface->bottomBufferOffset / 64 / 64 / bytesPerPixel;
 
         if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
         {
