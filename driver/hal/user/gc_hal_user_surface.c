@@ -2358,9 +2358,9 @@ gcoSURF_Construct(
     surface->object.type        = gcvOBJ_SURF;
     surface->dither2D      = gcvFALSE;
     surface->deferDither3D = gcvFALSE;
-    surface->paddingFormat = (format == gcvSURF_R8_1_X8R8G8B8 || format == gcvSURF_G8R8_1_X8R8G8B8
-                             || format == gcvSURF_A8_1_A8R8G8B8)
-                                ? gcvTRUE : gcvFALSE;
+    surface->paddingFormat = (format == gcvSURF_R8_1_X8R8G8B8 || format == gcvSURF_G8R8_1_X8R8G8B8 ||
+                              format == gcvSURF_A8_1_A8R8G8B8 || format == gcvSURF_A8L8_1_A8R8G8B8)
+                           ? gcvTRUE : gcvFALSE;
     surface->garbagePadded = gcvTRUE;
 
 #if gcdENABLE_3D

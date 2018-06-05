@@ -89,6 +89,14 @@ static const gceTEXTURE_SWIZZLE baseComponents_rrrg[] =
     gcvTEXTURE_SWIZZLE_G
 };
 
+static const gceTEXTURE_SWIZZLE baseComponents_rrra[] =
+{
+    gcvTEXTURE_SWIZZLE_R,
+    gcvTEXTURE_SWIZZLE_R,
+    gcvTEXTURE_SWIZZLE_R,
+    gcvTEXTURE_SWIZZLE_A
+};
+
 static const gceTEXTURE_SWIZZLE baseComponents_r00g[] =
 {
     gcvTEXTURE_SWIZZLE_R,
@@ -1340,6 +1348,15 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
         {{{ 16, 16 }, { 0, 16 }, {0}, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8L8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(A8L8_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, gcvTRUE, gcvFALSE, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 24, 8 }, { 16, 8}, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
+        {{{ 24, 8 }, { 16, 8}, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_A8L8_1_A8R8G8B8, 0x07, baseComponents_rrra, gcvTRUE
     },
 };
 
@@ -4432,6 +4449,22 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->closestRenderFormat = gcvSURF_R8;
         info->renderFormat        = 0x23;
         info->pixelSwizzle        = baseComponents_r001;
+    }
+
+    if (!Hardware->features[gcvFEATURE_BLT_ENGINE])
+    {
+        gctSIZE_T i;
+
+        for (i = 0; i < gcmCOUNTOF(formatLuminanceAlpha); ++i)
+        {
+            /* change all closestTXFormat=gcvSURF_A8L8 to gcvSURF_A8L8_1_A8R8G8B8 */
+            if (formatLuminanceAlpha[i].closestTXFormat == gcvSURF_A8L8)
+            {
+                formatLuminanceAlpha[i].closestTXFormat = gcvSURF_A8L8_1_A8R8G8B8;
+                formatLuminanceAlpha[i].txFormat        = gcvINVALID_TEXTURE_FORMAT;
+                formatLuminanceAlpha[i].txIntFilter     = gcvFALSE;
+            }
+        }
     }
 
     gcmFOOTER_NO();

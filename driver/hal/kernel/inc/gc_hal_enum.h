@@ -929,6 +929,8 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_A12L12,
     gcvSURF_A16L16,
 
+    gcvSURF_A8L8_1_A8R8G8B8,
+
     /* Bump formats. */
     gcvSURF_L6V5U5              = 1000,
     gcvSURF_V8U8,

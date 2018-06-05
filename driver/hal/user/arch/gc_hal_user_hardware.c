@@ -8906,6 +8906,12 @@ _ConvertResolveFormat(
             flipRB[i] = gcvFALSE;
             break;
 
+        case gcvSURF_A8L8_1_A8R8G8B8:
+            hwFormat[i] = 0x6;
+            flipRB[i]   = gcvFALSE;
+            fakeFormat  = gcvTRUE;
+            break;
+
         case gcvSURF_A8R8G8B8:
             hwFormat[i] = 0x6;
             flipRB[i]   = gcvFALSE;
@@ -12923,7 +12929,9 @@ gcoHARDWARE_ResolveRect(
 
             /* The source paddings are default value, is not from gcvSURF_G8R8_1_X8R8G8B8 to gcvSURF_R8_1_X8R8G8B8 and dst was full overwritten, the dst will be default value. */
             if (srcSurf->paddingFormat && !srcSurf->garbagePadded &&
-                !(srcSurf->format == gcvSURF_G8R8_1_X8R8G8B8 && dstSurf->format == gcvSURF_R8_1_X8R8G8B8) &&
+                (srcSurf->format == gcvSURF_R8_1_X8R8G8B8 ||
+                 (srcSurf->format == gcvSURF_A8_1_A8R8G8B8 && dstSurf->format == gcvSURF_A8L8_1_A8R8G8B8)
+                ) &&
                 dstOrigin->x == 0 && rectSize->x >= (gctINT)dstSurf->requestW &&
                 dstOrigin->y == 0 && rectSize->y >= (gctINT)dstSurf->requestH)
             {
@@ -15500,7 +15508,9 @@ OnExit:
 
             /* The source paddings are default value, is not from gcvSURF_G8R8_1_X8R8G8B8 to gcvSURF_R8_1_X8R8G8B8 and dst was full overwritten, the dst will be default value. */
             if (srcSurf->paddingFormat && !srcSurf->garbagePadded &&
-                !(srcSurf->format == gcvSURF_G8R8_1_X8R8G8B8 && dstSurf->format == gcvSURF_R8_1_X8R8G8B8) &&
+                (srcSurf->format == gcvSURF_R8_1_X8R8G8B8 ||
+                 (srcSurf->format == gcvSURF_A8_1_A8R8G8B8 && dstSurf->format == gcvSURF_A8L8_1_A8R8G8B8)
+                ) &&
                 dstOrigin->x == 0 && rectSize->x >= (gctINT)dstSurf->requestW &&
                 dstOrigin->y == 0 && rectSize->y >= (gctINT)dstSurf->requestH)
             {
@@ -23618,6 +23628,7 @@ gcoHARDWARE_QueryCompression(
             break;
 
         case gcvSURF_A8R8G8B8:
+        case gcvSURF_A8L8_1_A8R8G8B8:
             format = 0x3;
             if((Surface->hints & gcvSURF_DEC) == gcvSURF_DEC)
             {
