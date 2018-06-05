@@ -1298,6 +1298,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
             vxoContext_GetUniqueKernelTable(context, OUT (vx_kernel_info_t *)ptr);
             break;
 
+        case VX_CONTEXT_NONLINEAR_MAX_DIMENSION:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+
+            *(vx_size *)ptr = VX_INT_MAX_NONLINEAR_DIM;
+
+            break;
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
             return VX_ERROR_NOT_SUPPORTED;
