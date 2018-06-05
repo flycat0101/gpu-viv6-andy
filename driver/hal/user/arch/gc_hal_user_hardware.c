@@ -3081,6 +3081,11 @@ gcoHARDWARE_DetectProcess(
 #endif
             gcvFALSE
         },
+        {
+            gcvPATCH_CHROME,
+            "\x9c\x97\x8d\x90\x92\x96\x8a\x92",
+            gcvFALSE
+        },
 #if defined(ANDROID)
         {
             gcvPATCH_CHROME,
