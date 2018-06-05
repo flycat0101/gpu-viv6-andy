@@ -12148,12 +12148,16 @@ gckHARDWARE_PrepareFunctions(
     {
         gctUINT32 mmuBytes;
         gctPHYS_ADDR_T physical = 0;
+        gctUINT32 flags = gcvALLOC_FLAG_CONTIGUOUS;
 
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+        flags |= gcvALLOC_FLAG_4GB_ADDR;
+#endif
         /* Allocate mmu command buffer within 32bit space */
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
             gcvFALSE,
-            gcvALLOC_FLAG_CONTIGUOUS | gcvALLOC_FLAG_4GB_ADDR,
+            flags,
             &Hardware->mmuFuncBytes,
             &Hardware->mmuFuncPhysical,
             &Hardware->mmuFuncLogical
@@ -12164,6 +12168,13 @@ gckHARDWARE_PrepareFunctions(
             Hardware->mmuFuncLogical,
             &physical
             ));
+
+        if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
+        {
+            gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "
+                      "please rebuild kernel with CONFIG_ZONE_DMA32=y.",
+                      __FUNCTION__, __LINE__, physical);
+        }
 
         function = &Hardware->functions[gcvHARDWARE_FUNCTION_MMU];
         function->logical = (gctUINT8_PTR)Hardware->mmuFuncLogical;
