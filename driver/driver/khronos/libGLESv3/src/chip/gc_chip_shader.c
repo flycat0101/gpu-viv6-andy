@@ -16,6 +16,8 @@
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_SHADER
 
+#define MAX_ALIASED_ATTRIB_COUNT 2
+
 gcePROGRAM_STAGE __glChipGLShaderStageToHAL[] =
 {
     gcvPROGRAM_STAGE_VERTEX,   /* __GLSL_STAGE_VS   */
@@ -3391,7 +3393,7 @@ gcChipProgramCleanBindingInfo(
         }
     }
 
-    for (i = 0; i < (GLint)gc->constants.shaderCaps.maxVertAttributes; ++i)
+    for (i = 0; i < (GLint)gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
     {
         program->attribLocation[i].pInput   = gcvNULL;
         program->attribLocation[i].index    = (GLuint)-1;
@@ -4041,6 +4043,9 @@ gcChipProgramBuildBindingInfo(
         GLuint count = 0;
         __GLchipSLBinding *binding;
         __GLchipSLInput *input;
+        gctBOOL bGLSL1_0 = (firstStage == __GLSL_STAGE_VS)
+                         ? gcShader_IsES11Compiler(pBinaries[firstStage])
+                         : gcvFALSE;
 
         /* Allocate the array for the vertex attributes. */
         bytes = program->inCount * sizeof(__GLchipSLInput);
@@ -4117,7 +4122,7 @@ gcChipProgramBuildBindingInfo(
             /* expand the attribute, if it is a matrix, to basic types */
             for (j = 0; j < input->size; ++j, ++index)
             {
-                if (i < activeUserInputCount && index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes)
+                if (i < activeUserInputCount && index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes * MAX_ALIASED_ATTRIB_COUNT)
                 {
                     gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Too many attributes\n"));
                     gcmTRACE(gcvLEVEL_ERROR, "LinkShaders: Too many attributes");
@@ -4140,7 +4145,7 @@ gcChipProgramBuildBindingInfo(
 
             input = program->attribLocation[i].pInput;
 
-            if (input->location != -1)
+            if (input->location != -1 && !(bGLSL1_0 && program->hasAliasedAttrib))
             {
                 /* Test for overflow. */
                 if (input->location + (GLuint)input->size > gc->constants.shaderCaps.maxUserVertAttributes)
@@ -4180,7 +4185,7 @@ gcChipProgramBuildBindingInfo(
             for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
             {
                 /* Walk all attribute locations. */
-                for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes; ++i)
+                for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
                 {
                     /* Ignore if location is unavailable or not the start of an array. */
                     if ((!program->attribLocation[i].pInput) || (program->attribLocation[i].index != 0))
@@ -4218,7 +4223,7 @@ gcChipProgramBuildBindingInfo(
                             **    is possible in OpenGL ES Shading Language 1.00 vertex shaders.
                             **
                             */
-                            if (!gcShader_IsES11Compiler(*pBinaries) && program->attribLinkage[binding->index + j])
+                            if (!bGLSL1_0 && program->attribLinkage[binding->index + j])
                             {
                                 gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied.", input->name));
                                 gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", binding->name);
@@ -7130,8 +7135,8 @@ __glChipCreateProgram(
     }
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
-                           gc->constants.shaderCaps.maxVertAttributes * gcmSIZEOF(__GLchipSLLocation),
-                           &pointer));
+                              gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT * gcmSIZEOF(__GLchipSLLocation),
+                              &pointer));
 
     program->attribLocation = pointer;
 
@@ -7592,11 +7597,6 @@ __glChipLinkProgram(
 
     /* set attribute location */
     vsBinary = masterPgInstance->binaries[__GLSL_STAGE_VS];
-    if (vsBinary && !gcShader_IsES11Compiler(vsBinary) && program->hasAliasedAttrib)
-    {
-        status = gcvSTATUS_LINK_INVALID_SHADERS;
-        gcmONERROR(status);
-    }
 
     if (vsBinary && gcShader_IsES11Compiler(vsBinary) && program->hasAliasedAttrib)
     {

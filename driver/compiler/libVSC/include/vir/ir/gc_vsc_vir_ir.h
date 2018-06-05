@@ -4799,6 +4799,11 @@ VIR_Shader_IsESCompiler(
     );
 
 gctBOOL
+VIR_Shader_IsES11Compiler(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
 VIR_Shader_IsES30Compiler(
     IN VIR_Shader * Shader
     );
