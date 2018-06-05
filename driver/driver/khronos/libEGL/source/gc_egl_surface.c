@@ -214,8 +214,8 @@ _InitDrawable(
     Surface->drawable.config         = &Surface->config;
     Surface->drawable.width          = Surface->config.width;
     Surface->drawable.height         = Surface->config.height;
-    Surface->drawable.rtHandle       = (void*)Surface->renderTarget;
-    Surface->drawable.prevRtHandle   = (void*)Surface->prevRenderTarget;
+    Surface->drawable.rtHandles[0]       = (void*)Surface->renderTarget;
+    Surface->drawable.prevRtHandles[0]   = (void*)Surface->prevRenderTarget;
     Surface->drawable.depthHandle    = (Surface->config.depthSize > 0) ?
                                        (void*)Surface->depthBuffer: gcvNULL;
     /* If config requires stencil buffer, EGL chooses to combine it with depth buffer */
@@ -796,8 +796,8 @@ veglResizeSurface(
             }
 
             /* Sync drawable with renderTarget. */
-            Surface->drawable.rtHandle     = Surface->renderTarget;
-            Surface->drawable.prevRtHandle = gcvNULL;
+            Surface->drawable.rtHandles[0]     = Surface->renderTarget;
+            Surface->drawable.prevRtHandles[0] = gcvNULL;
         }
         else if (Surface->renderTarget == gcvNULL)
         {
@@ -1832,8 +1832,8 @@ veglCreateRenderTarget(
         ));
 
     /* Sync drawable with renderTarget. */
-    Surface->drawable.rtHandle     = Surface->renderTarget;
-    Surface->drawable.prevRtHandle = gcvNULL;
+    Surface->drawable.rtHandles[0]     = Surface->renderTarget;
+    Surface->drawable.prevRtHandles[0] = gcvNULL;
 
     return EGL_TRUE;
 
@@ -2951,8 +2951,8 @@ eglSurfaceAttrib(
                 ));
 
             /* Sync drawable with renderTarget. */
-            surface->drawable.rtHandle     = surface->renderTarget;
-            surface->drawable.prevRtHandle = gcvNULL;
+            surface->drawable.rtHandles[0]     = surface->renderTarget;
+            surface->drawable.prevRtHandles[0] = gcvNULL;
         }
         else if (surface->renderTarget == gcvNULL)
         {

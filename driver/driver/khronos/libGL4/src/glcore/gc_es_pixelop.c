@@ -464,120 +464,123 @@ GLvoid GL_APIENTRY __gles_ReadBuffer(__GLcontext *gc, GLenum mode)
     }
     else
     {
-#ifdef OPENGL40
-        GLenum modeOffset = 0;
-        GLenum originalReadBuffer;
-            /*
-        ** gc binding to the window buffer */
+        if (!gc->imports.fromEGL)
+        {
+            GLenum modeOffset = 0;
+            GLenum originalReadBuffer;
+                /*
+            ** gc binding to the window buffer */
 
-        __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
+            __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
 
-        __GL_VERTEX_BUFFER_FLUSH(gc);
+            __GL_VERTEX_BUFFER_FLUSH(gc);
 
-        if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
-            modeOffset = mode - GL_AUX0;
-            mode = GL_AUX0;
-        }
+            if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
+                modeOffset = mode - GL_AUX0;
+                mode = GL_AUX0;
+            }
 
-        originalReadBuffer = gc->state.pixel.readBuffer;
-        gc->state.pixel.readBuffer = mode;
+            originalReadBuffer = gc->state.pixel.readBuffer;
+            gc->state.pixel.readBuffer = mode;
 
-        switch (mode) {
-          case GL_NONE:
-              gc->state.pixel.readBuffer = GL_NONE;
-              break;
+            switch (mode) {
+              case GL_NONE:
+                  gc->state.pixel.readBuffer = GL_NONE;
+                  break;
 
-          case GL_FRONT_RIGHT:
-              if (!gc->modes.stereoMode) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
-                  return;
-              }
-              break;
+              case GL_FRONT_RIGHT:
+                  if (!gc->modes.stereoMode) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  break;
 
-          case GL_FRONT_LEFT:
-              break;
+              case GL_FRONT_LEFT:
+                  break;
 
-          case GL_BACK_RIGHT:
-              if (!(gc->modes.stereoMode && gc->modes.doubleBufferMode)) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
-                  return;
-              }
-              break;
+              case GL_BACK_RIGHT:
+                  if (!(gc->modes.stereoMode && gc->modes.doubleBufferMode)) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  break;
 
-          case GL_BACK_LEFT:
-              if (!gc->modes.doubleBufferMode) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
-                  return;
-              }
-              break;
+              case GL_BACK_LEFT:
+                  if (!gc->modes.doubleBufferMode) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  break;
 
-          case GL_FRONT:
-              gc->state.pixel.readBuffer = GL_FRONT_LEFT;
-              break;
-
-          case GL_BACK:
-              if (!gc->modes.doubleBufferMode) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
-                  return;
-              }
-              gc->state.pixel.readBuffer = GL_BACK_LEFT;
-              break;
-
-          case GL_LEFT:
+              case GL_FRONT:
                   gc->state.pixel.readBuffer = GL_FRONT_LEFT;
-              break;
+                  break;
 
-          case GL_RIGHT:
-              if (!gc->modes.stereoMode) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
+              case GL_BACK:
+                  if (!gc->modes.doubleBufferMode) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  gc->state.pixel.readBuffer = GL_BACK_LEFT;
+                  break;
+
+              case GL_LEFT:
+                      gc->state.pixel.readBuffer = GL_FRONT_LEFT;
+                  break;
+
+              case GL_RIGHT:
+                  if (!gc->modes.stereoMode) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  gc->state.pixel.readBuffer = GL_FRONT_RIGHT;
+                  break;
+
+              case GL_AUX0:
+                  if (modeOffset >= (GLenum)gc->modes.numAuxBuffers) {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      gc->state.pixel.readBuffer = originalReadBuffer;
+                      return;
+                  }
+                  mode = modeOffset + GL_AUX0;
+                  gc->state.pixel.readBuffer = mode;
+                  break;
+
+              default:
+                  __glSetError(gc, GL_INVALID_ENUM);
                   return;
-              }
-              gc->state.pixel.readBuffer = GL_FRONT_RIGHT;
-              break;
+            }
 
-          case GL_AUX0:
-              if (modeOffset >= (GLenum)gc->modes.numAuxBuffers) {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  gc->state.pixel.readBuffer = originalReadBuffer;
-                  return;
-              }
-              mode = modeOffset + GL_AUX0;
-              gc->state.pixel.readBuffer = mode;
-              break;
+            if (mode != gc->state.pixel.readBuffer)
+            {
+                gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
+            }
 
-          default:
-              __glSetError(gc, GL_INVALID_ENUM);
-              return;
+            /* Update GL state */
+            gc->state.pixel.readBufferReturn = mode;
+
+            /* flip attribute dirty bit */
+            __GL_SET_SWP_DIRTY_ATTR(gc, __GL_SWP_READBUFFER_BIT);
         }
-
-        if (mode != gc->state.pixel.readBuffer)
+        else
         {
-            gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
-        }
+            if (mode != GL_NONE && mode != GL_BACK)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
 
-        /* Update GL state */
-        gc->state.pixel.readBufferReturn = mode;
-
-        /* flip attribute dirty bit */
-        __GL_SET_SWP_DIRTY_ATTR(gc, __GL_SWP_READBUFFER_BIT);
-#else
-        if (mode != GL_NONE && mode != GL_BACK)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            /* If gc binds to default FBO. */
+            if (mode != gc->state.raster.readBuffer)
+            {
+                gc->state.raster.readBuffer = mode;
+                gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
+            }
         }
-
-        /* If gc binds to default FBO. */
-        if (mode != gc->state.raster.readBuffer)
-        {
-            gc->state.raster.readBuffer = mode;
-            gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
-        }
-#endif
     }
 
 OnError:

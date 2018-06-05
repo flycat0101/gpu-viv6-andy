@@ -90,6 +90,53 @@ typedef struct __GLpBufferTextureRec {
 ** context to the application.
 */
 typedef struct __GLcontextModesRec {
+
+    GLint  rgbaBits;
+    GLint  configBufferSize;
+
+    GLint  alphaBits, blueBits, greenBits, redBits;
+    GLint  depthBits;
+    GLint  stencilBits;
+
+    GLenum  configCaveat;
+    GLint   configId;
+
+    GLboolean  defaultConfig;
+    GLboolean  nativeRenderable;
+    GLint      nativeVisualType;
+
+    /*multisample extend*/
+    GLint  samples;
+
+    GLuint sampleBuffers;
+
+    GLenum                     surfaceType;
+    GLboolean                  bindToTetxureRGB;
+    GLboolean                  bindToTetxureRGBA;
+
+    GLint                      luminanceSize;
+    GLint                      alphaMaskSize;
+    GLenum                     colorBufferType;
+    GLenum                     renderableType;
+    GLenum                     conformant;
+    GLenum                     matchFormat;
+    GLint                      matchNativePixmap;
+    GLint                      width;
+    GLint                      height;
+    GLint                      level;
+
+    GLint                      minSwapInterval;
+    GLint                      maxSwapInterval;
+
+    GLenum                     transparentType;
+    GLint                      transparentRedValue;
+    GLint                      transparentGreenValue;
+    GLint                      transparentBlueValue;
+    /* Special config on android to return BGRA visual. */
+    GLboolean                  swizzleRB;
+    /* EGL_ANDROID_recordable extension. */
+    GLboolean                  recordableConfig;
+
     GLuint rgbMode;
     GLuint rgbFloatMode;
     GLuint doubleBufferMode;
@@ -99,23 +146,13 @@ typedef struct __GLcontextModesRec {
     GLuint haveDepthBuffer;
     GLuint haveStencilBuffer;
 
-    /*multisample extend*/
-    GLint  samples;
-
-    GLuint sampleBuffers;
-
-    GLint  redBits, greenBits, blueBits, alphaBits;
     GLuint redMask, greenMask, blueMask, alphaMask;
-    GLint  rgbaBits; /* total bits for rgba */
 
     GLint  accumBits; /*total accumulation buffer bits */
     GLint  accumRedBits, accumGreenBits, accumBlueBits, accumAlphaBits;
-    GLint  depthBits;
-    GLint  stencilBits;
+
 
     GLint  numAuxBuffers;
-
-    GLint  level;
 
 #ifdef _LINUX_
     GLuint colorIndexMode;
@@ -155,6 +192,8 @@ typedef struct __GLcontextModesRec {
 #endif
 
 } __GLcontextModes;
+
+
 
 #define __GL_FULL_SCREEN                    0x40
 #define __GL_DRAW_TO_FRONT                  0x80

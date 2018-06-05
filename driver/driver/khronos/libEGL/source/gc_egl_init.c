@@ -374,7 +374,6 @@ _FillIn(
     config->stencilSize = Depth->stencilSize;
 
     config->configCaveat = EGL_NONE;
-
     config->minSwapInterval = Display->minSwapInterval;
     config->maxSwapInterval = Display->maxSwapInterval;;
 
@@ -423,11 +422,13 @@ _FillIn(
 
     config->renderableType = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     config->conformant     = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     if (Samples == 16)
     {

@@ -593,7 +593,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
 
     /* If the drawable was current but resized, need to detach old surface before updating new ones. */
     if (glDrawable->gc &&
-        (glDrawable->rtHandle      != eglDrawable->rtHandle    ||
+        (glDrawable->rtHandle      != eglDrawable->rtHandles[0]    ||
          glDrawable->depthHandle   != eglDrawable->depthHandle ||
          glDrawable->stencilHandle != eglDrawable->stencilHandle
         )
@@ -629,8 +629,8 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
         glDrawable->rtFormatInfo = gcvNULL;
     }
 
-    glDrawable->rtHandle = eglDrawable->rtHandle;
-    glDrawable->prevRtHandle = eglDrawable->prevRtHandle;
+    glDrawable->rtHandle = eglDrawable->rtHandles[0];
+    glDrawable->prevRtHandle = eglDrawable->prevRtHandles[0];
 
     /* Get the depth stencil format Info, see EGL::veglGetFormat() */
     if (eglDrawable->depthHandle)

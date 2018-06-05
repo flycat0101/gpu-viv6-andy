@@ -8484,9 +8484,12 @@ __glChipFlush(
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
 
 #ifdef OPENGL40
-        if(gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
+        if(!gc->imports.fromEGL)
         {
-            (*gc->imports.internalSwapBuffers)(gc, GL_TRUE, GL_TRUE);
+            if(gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
+            {
+                (*gc->imports.internalSwapBuffers)(gc, GL_TRUE, GL_TRUE);
+            }
         }
     }
 #endif
@@ -9255,7 +9258,10 @@ __glChipDrawEnd(
     gcmHEADER_ARG("gc=0x%x", gc);
 
 #ifdef OPENGL40
-    gcmONERROR(__gl4ChipFlush(gc));
+    if (!gc->imports.fromEGL)
+    {
+        gcmONERROR(__gl4ChipFlush(gc));
+    }
 #endif
 
 #if defined(ANDROID) && __GL_CHIP_ENABLE_MEMORY_REDUCTION

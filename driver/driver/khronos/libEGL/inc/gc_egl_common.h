@@ -250,6 +250,57 @@ typedef struct __VEGLimports
     gctUINT64   appStartTime;
     gctFILE     apiTimeFile;
 #endif
+
+    gctUINT (*getMemoryStatus)(EGLenum);
+        /* Error handling */
+    void (*warning)(void *gc, const void *fmt);
+    void (*fatal)(void *gc, const void *fmt);
+    /* Set window's GL api dispatch table */
+
+    void (*setProcTable)(void *gc, void *state);
+
+        /* Drawable mutex lock from gl core */
+    void (*lockDrawable)(void *lock);
+    void (*unlockDrawable)(void *lock);
+
+    /* GetDC and GetHWND */
+    void *(*getHWND)(void *gc);
+    void *(*getDC)(void *other);
+    void (*releaseDC)(void *other, void *hDC);
+
+    /* Blt back buffer content to front buffer */
+    /* This function is called if renderring in front buffer */
+    void (*internalSwapBuffers)(void *gc, gctBOOL bSwapFront, gctBOOL finishMode);
+
+    /* Get current display mode */
+    void (*getDisplayMode)(gctUINT *width, gctUINT *height, gctUINT *depth);
+
+    /* Get the colorbuffer from the handle of pbuffer */
+    void *(*getColorbufferPBuffer)(void  *hpbuffer,EGLenum iBuffer);
+
+    /* Device configuration changed function */
+    void (*deviceConfigChanged)(void *gc);
+
+    void (*bltImageToScreen)(void *gc,
+                              gctINT bitsAlignedWidth,
+                              gctINT bitsAlignedHeight,
+                              gctINT bitsPerPixel,
+                              gctINT * bits,
+                              gctINT left,
+                              gctINT top,
+                              gctINT width,
+                              gctINT height);
+
+
+    gctBOOL  coreProfile;
+
+    gctINT   version;
+    /* Device DLL interface */
+    void *device;
+    gctUINT deviceIndex;
+    EGLBoolean  fromEGL;
+    /* Operating system dependent data goes here */
+    void *other;
 } VEGLimports;
 
 
@@ -263,18 +314,12 @@ typedef struct EGLDrawableRec
     EGLint      width;
     EGLint      height;
 
-#if defined(OPENGL40) && defined(__GL_MAX_DRAW_BUFFERS_GL4)
-    void      * rtHandles[__GL_MAX_DRAW_BUFFERS];        /* gco surface handle of render target */
-    void      * prevRtHandles[__GL_MAX_DRAW_BUFFERS];    /* gco surface handle of previous render target */
-    void      * accumHandle;
-#else
-    void      * rtHandle;        /* gco surface handle of render target */
-    void      * prevRtHandle;    /* gco surface handle of prevous render target */
-#endif
-
+    void      * rtHandles[gcdMAX_DRAW_BUFFERS/2];        /* gco surface handle of render target */
+    void      * prevRtHandles[gcdMAX_DRAW_BUFFERS/2];    /* gco surface handle of previous render target */
     void      * depthHandle;     /* gco surface handle of depth */
     void      * stencilHandle;   /* gco surface handle of stencil */
 
+    void      * accumHandle;
     void      * private;         /* private handle point to API drawable */
     void        (* destroyPrivate)(void *);
 } EGLDrawable, *VEGLDrawable;

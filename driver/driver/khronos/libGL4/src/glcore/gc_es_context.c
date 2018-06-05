@@ -639,7 +639,6 @@ GLvoid __glInitPointState(__GLcontext *gc)
 }
 #endif
 
-#ifdef OPENGL40
 GLvoid __glFormatGLModes(__GLcontextModes *tmodes, __GLcontextModes *smodes)
 {
     __GL_MEMZERO(tmodes, sizeof(__GLcontextModes));
@@ -649,9 +648,8 @@ GLvoid __glFormatGLModes(__GLcontextModes *tmodes, __GLcontextModes *smodes)
     tmodes->tripleBufferMode = 0;
     tmodes->stereoMode = 0;
 
-    tmodes->haveDepthBuffer = smodes->haveDepthBuffer != 0;
-    tmodes->haveStencilBuffer = smodes->haveStencilBuffer != 0;
-    tmodes->haveAccumBuffer = smodes->haveAccumBuffer != 0;
+    tmodes->haveDepthBuffer = smodes->depthBits != 0;
+    tmodes->haveStencilBuffer = smodes->stencilBits != 0;
     tmodes->sampleBuffers = smodes->sampleBuffers;
     tmodes->samples = smodes->samples;
 
@@ -666,37 +664,15 @@ GLvoid __glFormatGLModes(__GLcontextModes *tmodes, __GLcontextModes *smodes)
 
     tmodes->accumBits = smodes->accumBits;
     tmodes->accumRedBits = smodes->accumRedBits;
-    tmodes->greenBits = smodes->greenBits;
-    tmodes->accumBlueBits = tmodes->accumBlueBits;
-    tmodes->accumAlphaBits = tmodes->accumAlphaBits;
+    tmodes->accumGreenBits = smodes->accumGreenBits;
+    tmodes->accumBlueBits = smodes->accumBlueBits;
+    tmodes->accumAlphaBits = smodes->accumAlphaBits;
+    tmodes->haveAccumBuffer = (smodes->accumRedBits +
+                               smodes->accumGreenBits +
+                               smodes->accumBlueBits +
+                               smodes->accumAlphaBits) > 0;
 }
-#else
-GLvoid __glFormatGLModes(__GLcontextModes *modes, VEGLConfig pConfigs)
-{
-    __GL_MEMZERO(modes, sizeof(__GLcontextModes));
-    modes->rgbMode = 1;
-    modes->rgbFloatMode = 0;
-    modes->doubleBufferMode = 1;
-    modes->tripleBufferMode = 0;
-    modes->stereoMode = 0;
-    if (pConfigs)
-    {
-        modes->haveDepthBuffer = pConfigs->depthSize != 0;
-        modes->haveStencilBuffer = pConfigs->stencilSize != 0;
-        modes->sampleBuffers = pConfigs->sampleBuffers;
-        modes->samples = pConfigs->samples;
 
-        modes->redBits = pConfigs->redSize;
-        modes->greenBits = pConfigs->greenSize;
-        modes->blueBits = pConfigs->blueSize;
-        modes->alphaBits = pConfigs->alphaSize;
-
-        modes->rgbaBits = pConfigs->bufferSize;
-        modes->depthBits = pConfigs->depthSize;
-        modes->stencilBits = pConfigs->stencilSize;
-    }
-}
-#endif
 
 GLvoid __glDestroyDrawable(void* drawable)
 {
@@ -732,11 +708,8 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
                                      )
 #endif
 {
-#ifdef OPENGL40
     __GLcontextModes *pmode = gcvNULL;
-#else
-    VEGLConfig eglConfig = gcvNULL;
-#endif
+
     GLuint i;
     __GLdrawablePrivate *glDrawable = gcvNULL;
     gcoSURF accumSurf;
@@ -770,12 +743,16 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
         }
     }
 
-#ifdef OPENGL40
     pmode = (__GLcontextModes *)eglDrawable->config;
-#else
-    eglConfig = (VEGLConfig)eglDrawable->config;
-#endif
 
+#ifdef OPENGL40
+    if (gc->imports.fromEGL)
+    {
+        pmode->doubleBufferMode = GL_TRUE;
+    }
+#else
+    pmode->doubleBufferMode = GL_TRUE;
+#endif
 
     /* If the drawable was current but resized, need to detach old surface before updating new ones. */
     if (glDrawable->gc &&
@@ -789,38 +766,14 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     }
 
     /* Always update glDrawable info when EGL set drawable */
-#ifdef OPENGL40
+
+
     __glFormatGLModes(&glDrawable->modes, pmode);
-#else
-    __glFormatGLModes(&glDrawable->modes, eglConfig);
-#endif
+
 
     glDrawable->width= eglDrawable->width;
     glDrawable->height = eglDrawable->height;
 
-#ifndef OPENGL40
-    /* Get the rt format Info, see EGL::veglGetFormat() */
-    switch (eglConfig->greenSize)
-    {
-    case 4:
-        glDrawable->rtFormatInfo = &__glFormatInfoTable[__GL_FMT_RGBA4];
-        break;
-    case 5:
-        glDrawable->rtFormatInfo = &__glFormatInfoTable[__GL_FMT_RGB5_A1];
-        break;
-    case 6:
-        glDrawable->rtFormatInfo = &__glFormatInfoTable[__GL_FMT_RGB565];
-        break;
-    case 8:
-        glDrawable->rtFormatInfo = eglConfig->alphaSize
-                                 ? &__glFormatInfoTable[__GL_FMT_RGBA8]
-                                 : &__glFormatInfoTable[__GL_FMT_RGB8];
-        break;
-    default:
-        GL_ASSERT(0);
-        glDrawable->rtFormatInfo = gcvNULL;
-    }
-#else
     switch (pmode->greenBits)
     {
     case 4:
@@ -841,8 +794,6 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
         GL_ASSERT(0);
         glDrawable->rtFormatInfo = gcvNULL;
     }
-#endif
-
 
 #ifdef OPENGL40
     if (eglDrawable->accumHandle)
@@ -851,6 +802,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
         (*gc->dp.createAccumBufferInfo)(gc, accumSurf,glDrawable);
     }
 #endif
+
     for (i = 0 ; i < __GL_MAX_DRAW_BUFFERS; i++)
     {
         glDrawable->rtHandles[i] = eglDrawable->rtHandles[i];
@@ -860,25 +812,15 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     /* Get the depth stencil format Info, see EGL::veglGetFormat() */
     if (eglDrawable->depthHandle)
     {
-#ifdef OPENGL40
         switch (pmode->depthBits)
-#else
-        switch (eglConfig->depthSize)
-#endif
         {
         case 16:
             glDrawable->dsFormatInfo = &__glFormatInfoTable[__GL_FMT_Z16];
             break;
         case 24:
-#ifdef OPENGL40
             glDrawable->dsFormatInfo = pmode->stencilBits
                                      ? &__glFormatInfoTable[__GL_FMT_Z24S8]
                                      : &__glFormatInfoTable[__GL_FMT_Z24];
-#else
-            glDrawable->dsFormatInfo = eglConfig->stencilSize
-                                     ? &__glFormatInfoTable[__GL_FMT_Z24S8]
-                                     : &__glFormatInfoTable[__GL_FMT_Z24];
-#endif
             break;
         default:
             GL_ASSERT(0);
@@ -890,20 +832,11 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     {
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_S8_ONLY_RENDERING) == gcvSTATUS_TRUE)
         {
-#ifdef OPENGL40
             glDrawable->dsFormatInfo = pmode->stencilBits ? &__glFormatInfoTable[__GL_FMT_S8] : gcvNULL;
-#else
-            glDrawable->dsFormatInfo = eglConfig->stencilSize ? &__glFormatInfoTable[__GL_FMT_S8] : gcvNULL;
-        }
-#endif
         }
         else
         {
-#ifdef OPENGL40
             glDrawable->dsFormatInfo = pmode->stencilBits ? &__glFormatInfoTable[__GL_FMT_Z24S8] : gcvNULL;
-#else
-            glDrawable->dsFormatInfo = eglConfig->stencilSize ? &__glFormatInfoTable[__GL_FMT_Z24S8] : gcvNULL;
-#endif
         }
     }
 
@@ -1597,11 +1530,7 @@ GLboolean __glDestroyContext(GLvoid *context)
 }
 
 GLvoid *__glCreateContext(GLint clientVersion,
-#ifdef OPENGL40
-                          VEGLEXimports *imports,
-#else
                           VEGLimports *imports,
-#endif
                           GLvoid* sharedCtx)
 {
     __GLcontext *gc = gcvNULL;
@@ -1702,14 +1631,10 @@ GLvoid *__glCreateContext(GLint clientVersion,
         break;
     }
 
-#ifdef OPENGL40
     if(imports->config)
     {
         __glFormatGLModes(&gc->modes, (__GLcontextModes *)imports->config);
     }
-#else
-    __glFormatGLModes(&gc->modes, (VEGLConfig)imports->config);
-#endif
 
     /* Fill in the export functions.
     */

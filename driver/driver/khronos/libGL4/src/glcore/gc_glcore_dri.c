@@ -32,7 +32,7 @@ GLbyte *prevLockFile = NULL;
 GLint prevLockLine = 0;
 #endif
 
-extern veglDISPATCH GLESv2_DISPATCH_TABLE;
+extern veglDISPATCH GL_DISPATCH_TABLE;
 extern GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask);
 GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
 extern GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawableChange);
@@ -301,7 +301,7 @@ static void __vivsyncNative(void )
 {
 
 }
-VEGLEXimports imports = {
+VEGLimports imports = {
     gcvNULL,
     gcvNULL,
     __vivsyncNative,
@@ -311,13 +311,23 @@ VEGLEXimports imports = {
     __vivImpCalloc,
     __vivImpRealloc,
     __vivImpFree,
+    __vivImpNoop,
+    __vivImpNoop,
+    __vivImpNoop,
+    __vivImpNoop,
+    gcvNULL,                 /* config */
+    gcvFALSE,                /* robustAccess */
+    0,                       /* resetNotification */
+    gcvFALSE,                /* debuggable */
+    0,
+    gcvFALSE,
+#if gcdGC355_PROFILER
+    0,
+    gcvNULL,
+#endif
     __vivImpGetMemoryStatus,
     __vivImpWarning,
     __vivImpFatal,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
     __vivImpNoop,
     __vivImpNoop,
     __vivImpNoop,
@@ -329,16 +339,12 @@ VEGLEXimports imports = {
     __vivImpNoop,
     __vivImpNoop,
     __vivBltImageToScreen,
-        gcvNULL,                 /* config */
-        gcvFALSE,                /* robustAccess */
-        0,                       /* resetNotification */
-        gcvFALSE,                /* debuggable */
-        0,
-        gcvFALSE,
-        0x14,
-        &__glDevicePipeEntry[0],/*device*/
-        0,/*deviceIndex*/
-        gcvNULL,/*other*/
+    gcvFALSE,
+    0x14,
+    &__glDevicePipeEntry[0],/*device*/
+    0,/*deviceIndex*/
+    gcvFALSE,
+    gcvNULL,/*other*/
 };
 
 
@@ -749,7 +755,7 @@ vivCreateContext( const __GLcontextModes *modes,
     imports.config = (void *)modes;
 
     /* create the core rendering context */
-    gc = GLESv2_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate);
+    gc = GL_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate);
 
     _glthread_UNLOCK_MUTEX(__vivCrtMutex);
 

@@ -1042,11 +1042,7 @@ if (localMask & bit)                                \
 typedef struct __GLexportsRec
 {
     /* Context management (return GL_FALSE on failure) */
-#ifdef OPENGL40
-    GLvoid* (*createContext)(GLint clientVersion, VEGLEXimports *imports, GLvoid* sharedCtx);
-#else
     GLvoid* (*createContext)(GLint clientVersion, VEGLimports *imports, GLvoid* sharedCtx);
-#endif
     GLboolean (*destroyContext)(GLvoid *gc);
     GLvoid  (*setDrawable)(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
     GLboolean (*makeCurrent)(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawChange);
@@ -1154,13 +1150,8 @@ struct __GLcontextRec
 
     GLuint magic;
 
-#ifdef OPENGL40
-    /* EGL imported functions which might be OS specific */
-    VEGLEXimports imports;
-#else
     /* EGL imported functions which might be OS specific */
     VEGLimports imports;
-#endif
 
     /* GLcore exported functions for other layers' use */
     __GLexports exports;

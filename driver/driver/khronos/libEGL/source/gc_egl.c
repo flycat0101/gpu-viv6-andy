@@ -33,6 +33,7 @@ static gctCONST_STRING _dispatchNames[] =
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
+    "GL_DISPATCH_TABLE",                /* OpenGL */
 };
 #endif
 #endif
@@ -205,6 +206,7 @@ _InitDispatchTables(
 #if gcdENABLE_3D
     extern veglDISPATCH GLES_CM_DISPATCH_TABLE;
     extern veglDISPATCH GLESv2_DISPATCH_TABLE;
+    extern veglDISPATCH GL_DISPATCH_TABLE;
 #  endif
 #ifndef VIVANTE_NO_VG
     extern veglDISPATCH OpenVG_DISPATCH_TABLE;
@@ -216,6 +218,7 @@ _InitDispatchTables(
     Thread->dispatchTables[vegl_OPENGL_ES11]    = &GLES_CM_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL_ES20]    = &GLESv2_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL_ES30]    = &GLESv2_DISPATCH_TABLE;
+    Thread->dispatchTables[vegl_OPENGL] = &GL_DISPATCH_TABLE;
 #  endif
 #ifndef VIVANTE_NO_VG
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;

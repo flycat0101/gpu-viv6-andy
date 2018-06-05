@@ -170,6 +170,7 @@ typedef enum _veglAPIINDEX
     vegl_OPENGL_ES20,
     vegl_OPENGL_ES30,
     vegl_OPENVG,
+    vegl_OPENGL,
 
     vegl_API_LAST,
 }

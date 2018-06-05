@@ -18,7 +18,7 @@ HEAPSIZE 2560000
 VERSION 1.100
 
 EXPORTS
-
+		GL_DISPATCH_TABLE
         DrvDeleteContext
         DrvSetContext
         DrvReleaseContext

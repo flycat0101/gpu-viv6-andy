@@ -34,7 +34,7 @@ __glProfiler(
         return GL_FALSE;
     }
 
-    return (*gc->dp.profiler)(Profiler, Enum, Value);
+    return (*gc->dp.profiler)(gc, Enum, Value);
 }
 
 

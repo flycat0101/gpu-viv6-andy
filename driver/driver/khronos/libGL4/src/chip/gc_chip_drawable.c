@@ -59,7 +59,8 @@ gcChipPickDrawBuffersForDrawable(
         gcsRECT clearRect = {0};
         gctBOOL fullClear = gcvFALSE;
 
-#ifdef OPENGL40
+    if (!gc->imports.fromEGL )
+    {
         gctBOOL bDrawToFront = gcvFALSE;
         for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
         {
@@ -147,9 +148,11 @@ gcChipPickDrawBuffersForDrawable(
         {
             gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
         }
-#else
+    }
+    else
+    {
         rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[0];
-#endif
+    }
 
         if (gc->flags & __GL_CONTEXT_SKIP_PRESERVE_CLEAR_RECT)
         {

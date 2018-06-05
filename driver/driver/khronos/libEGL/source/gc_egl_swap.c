@@ -2149,8 +2149,8 @@ _SwapBuffersRegion(
                 }
 
                 /* Sync drawable with renderTarget. */
-                draw->drawable.rtHandle = draw->renderTarget;
-                draw->drawable.prevRtHandle = draw->prevRenderTarget;
+                draw->drawable.rtHandles[0] = draw->renderTarget;
+                draw->drawable.prevRtHandles[0] = draw->prevRenderTarget;
 
                 /* Update drawable to api. */
                 if (!_SetDrawable(thread,

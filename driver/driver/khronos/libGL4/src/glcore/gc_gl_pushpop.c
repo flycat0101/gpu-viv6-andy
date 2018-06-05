@@ -1000,7 +1000,7 @@ GLvoid __glFreeAttribStackState(__GLcontext *gc)
          spp++)
     {
         sp = *spp;
-        if (!sp)
+        if (sp)
         {
             (*gc->imports.free)(gc, sp);
         }
@@ -1019,7 +1019,7 @@ GLvoid __glFreeAttribStackState(__GLcontext *gc)
         spp++)
     {
         sp = *spp;
-        if (!sp)
+        if (sp)
         {
             (*gc->imports.free)(gc, sp);
         }

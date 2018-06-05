@@ -160,11 +160,7 @@ void __eglDestruct(void)
 
 static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
 {
-#ifdef OPENGL40
-    __GLcontext *gc = __glCreateContext((GLint)ClientVersion, (VEGLEXimports *)Imports, SharedContext);
-#else
     __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
-#endif
 
     return gc;
 }
@@ -392,7 +388,7 @@ static EGL_PROC veglGetProcAddr_es3(const char *procname)
 }
 
 /* Dispatch table. */
-veglDISPATCH GLESv2_DISPATCH_TABLE =
+veglDISPATCH GL_DISPATCH_TABLE =
 {
     /* createContext            */  veglCreateContext_es3,
     /* destroyContext           */  veglDestroyContext_es3,

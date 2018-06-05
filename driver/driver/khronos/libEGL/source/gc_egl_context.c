@@ -37,6 +37,7 @@ static const char * _dlls[] =
     "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0 */
     "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 3.0 */
     "libOpenVG.so",                     /* OpenVG 1.0 */
+    "libGL.so",
 #elif defined(__QNXNTO__)
     "libEGL_viv",                       /* EGL */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
@@ -44,6 +45,7 @@ static const char * _dlls[] =
     "glesv2-dlls",                      /* OpenGL ES 2.0 */
     "glesv2-dlls",                      /* OpenGL ES 3.0 */
     "vg-dlls",                          /* OpenVG 1.0 */
+    "gl-dlls",
 #elif defined(__APPLE__)
     "libEGL.dylib",                     /* EGL */
     "libGLESv1_CL.dylib",               /* OpenGL ES 1.1 Common Lite */
@@ -51,6 +53,7 @@ static const char * _dlls[] =
     "libGLESv2.dylib",                  /* OpenGL ES 2.0 */
     "libGLESv3.dylib",                  /* OpenGL ES 3.0 */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
+    "libOpenGL.dylib",
 #else
     "libEGL",                           /* EGL */
     "libGLESv1_CL",                     /* OpenGL ES 1.1 Common Lite */
@@ -58,6 +61,7 @@ static const char * _dlls[] =
     "libGLESv2",                        /* OpenGL ES 2.0 */
     "libGLESv2",                        /* OpenGL ES 3.0 */
     "libOpenVG",                        /* OpenVG 1.0 */
+    "libGL",
 #endif
 };
 
@@ -70,6 +74,7 @@ static const char * _dispatchNames[] =
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
+    "GL_DISPATCH_TABLE",                /* OpenGL GL 3.0 */
 };
 #endif
 
@@ -200,6 +205,10 @@ _GetAPIIndex(
 
         case EGL_OPENVG_API:
             index = vegl_OPENVG;
+            break;
+
+        case EGL_OPENGL_API:
+            index = vegl_OPENGL;
             break;
         }
     }
@@ -511,6 +520,7 @@ _CreateApiContext(
     imports.resetNotification = Context->resetNotification;
     imports.contextFlags = Context->flags;
     imports.debuggable = (Context->flags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR) ? gcvTRUE : gcvFALSE;
+    imports.fromEGL = gcvTRUE;
 
     /*
      * EGL_EXT_protected_context.
@@ -805,9 +815,28 @@ veglBindAPI(
         break;
 
     case EGL_OPENGL_API:
-        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
-        gcmFOOTER_ARG("%d", EGL_FALSE);
-        return EGL_FALSE;
+        /*
+                veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
+                gcmFOOTER_ARG("%d", EGL_FALSE);
+                return EGL_FALSE;
+        */
+                /* OpenGL ES API. */
+        if (!thread->dispatchTables[vegl_OPENGL])
+        {
+            /* OpenGL ES API not supported. */
+            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
+            gcmFOOTER_ARG("%d", EGL_FALSE);
+            return EGL_FALSE;
+        }
+
+        if (thread->api != api)
+        {
+            thread->api = api;
+            thread->context = thread->glContext;
+        }
+        gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+        break;
+
 
     case EGL_OPENVG_API:
         /* OpenVG API. */
@@ -1259,6 +1288,13 @@ eglCreateContext(
     {
         if ((thread->api == EGL_OPENVG_API)
         &&  !(eglConfig->renderableType & EGL_OPENVG_BIT)
+        )
+        {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        else if ((thread->api == EGL_OPENGL_API)
+        &&  !(eglConfig->renderableType & EGL_OPENGL_BIT)
         )
         {
             veglSetEGLerror(thread,  EGL_BAD_CONFIG);
@@ -1917,8 +1953,8 @@ veglMakeCurrent(
                     }
 
                     /* Sync drawable with renderTarget. */
-                    sur->drawable.rtHandle = gcvNULL;
-                    sur->drawable.prevRtHandle = gcvNULL;
+                    sur->drawable.rtHandles[0] = gcvNULL;
+                    sur->drawable.prevRtHandles[0] = gcvNULL;
                 }
 
                 /* Dereference the current draw surface. */
@@ -2149,8 +2185,8 @@ veglMakeCurrent(
                     }
 
                     /* Sync drawable with renderTarget. */
-                    sur->drawable.rtHandle     = gcvNULL;
-                    sur->drawable.prevRtHandle = gcvNULL;
+                    sur->drawable.rtHandles[0]     = gcvNULL;
+                    sur->drawable.prevRtHandles[0] = gcvNULL;
                 }
 
                 /* Dereference the current draw surface. */
@@ -2367,8 +2403,8 @@ veglMakeCurrent(
             }
 
             /* Sync drawable with renderTarget. */
-            draw->drawable.rtHandle     = draw->renderTarget;
-            draw->drawable.prevRtHandle = draw->prevRenderTarget;
+            draw->drawable.rtHandles[0]     = draw->renderTarget;
+            draw->drawable.prevRtHandles[0] = draw->prevRenderTarget;
         }
         else if (draw->renderTarget == gcvNULL)
         {
