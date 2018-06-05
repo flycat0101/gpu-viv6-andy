@@ -6498,92 +6498,6 @@ OnError:
 }
 
 static gceSTATUS
-_3DBlitClearTileStatus(
-    IN gcsSURF_VIEW *SurfView,
-    IN gctBOOL ClearAsDirty
-    )
-{
-    static gctBOOL sDirty = gcvFALSE;
-    const gctSIZE_T cMaxWidth = 1 << 16;
-
-    gcoSURF surf = SurfView->surf;
-    gctSIZE_T bytes = 0;
-    gctUINT32 fillColor = 0;
-    gcsPOINT origin = {0};
-    gcsPOINT rectSize;
-    struct _gcoSURF tsSurf;
-    gcsSURF_VIEW tsView;
-    gcs3DBLIT_INFO clearInfo = {0};
-    gcsSURF_FORMAT_INFO_PTR formatInfo;
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("SurfView=0x%x ClearAsDirty=%d", SurfView, ClearAsDirty);
-
-    /* Query the tile status size. */
-    gcmONERROR(
-        gcoHARDWARE_QueryTileStatus(gcvNULL,
-                                    surf->alignedW,
-                                    surf->alignedH,
-                                    surf->size,
-                                    surf->vMsaa,
-                                    surf->isMsaa,
-                                    surf->bitsPerPixel,
-                                    &bytes,
-                                    gcvNULL,
-                                    &fillColor));
-
-    if (ClearAsDirty)
-    {
-        fillColor = 0;
-    }
-
-    /* Compute clear window for tile status */
-    rectSize.x = (gctINT32)bytes >> 2;
-    rectSize.y = 1;
-    while ((rectSize.x >= (gctINT32)cMaxWidth) && ((rectSize.x & 0x1) == 0))
-    {
-        rectSize.x >>= 1;
-        rectSize.y <<= 1;
-    }
-
-    if ((rectSize.x >= (gctINT32)cMaxWidth) || (rectSize.x * rectSize.y * 4 != (gctINT32)bytes))
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    gcmONERROR(gcoSURF_QueryFormat(gcvSURF_A8R8G8B8, &formatInfo));
-
-    gcoOS_ZeroMemory(&tsSurf, sizeof(tsSurf));
-    tsSurf.requestW = tsSurf.allocedW = tsSurf.alignedW = rectSize.x;
-    tsSurf.requestH = tsSurf.allocedH = tsSurf.alignedH = rectSize.y;
-    tsSurf.tiling = gcvLINEAR;
-    tsSurf.sampleInfo = g_sampleInfos[1];
-    tsSurf.isMsaa = gcvFALSE;
-    tsSurf.format = formatInfo->format;
-    tsSurf.formatInfo = *formatInfo;
-    tsSurf.bitsPerPixel = tsSurf.formatInfo.bitsPerPixel;
-    tsSurf.stride = tsSurf.alignedW * tsSurf.bitsPerPixel / 8;
-    tsSurf.cacheMode = gcvCACHE_NONE;
-    tsSurf.node = surf->tileStatusNode;
-    tsSurf.dirty = &sDirty;
-
-    tsView.surf = &tsSurf;
-    tsView.firstSlice = 0;
-    tsView.numSlices = 1;
-
-    clearInfo.clearValue[0] = fillColor;  /* dirtied */
-    clearInfo.clearBitMask  = _ByteMaskToBitMask(0xF);
-    gcmGETHARDWAREADDRESS(surf->tileStatusNode, clearInfo.destAddress);
-    clearInfo.destAddress += SurfView->firstSlice * surf->tileStatusSliceSize;
-
-    gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, &tsView, &clearInfo, &origin, &rectSize));
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-static gceSTATUS
 _3DBlitClearRect(
     IN gcsSURF_VIEW *SurfView,
     IN gcsSURF_CLEAR_ARGS_PTR ClearArgs,
@@ -6594,9 +6508,7 @@ _3DBlitClearRect(
     gcsPOINT origin, rectSize;
     gcs3DBLIT_INFO clearInfo = {0};
     gcs3DBLIT_INFO hzClearInfo = {0};
-    gctBOOL previousFC = gcvFALSE;
-    gctBOOL enableFC = gcvFALSE;    /* FALSE means don't change the previous FC status */
-    gctBOOL dirtyTS = gcvFALSE;
+    gctBOOL fastClear = gcvTRUE;
     gcsRECT_PTR rect = ClearArgs->clearRect;
 
     gcoSURF surf = SurfView->surf;
@@ -6622,8 +6534,6 @@ _3DBlitClearRect(
     /* Compute clear values. */
     gcmONERROR(_ComputeClear(surf, ClearArgs, LayerIndex));
 
-    previousFC = !surf->tileStatusDisabled[SurfView->firstSlice];
-
     /* Prepare clearInfo. */
     clearInfo.clearValue[0] = surf->clearValue[LayerIndex];
     clearInfo.clearValue[1] = surf->clearValueUpper[LayerIndex];
@@ -6636,7 +6546,6 @@ _3DBlitClearRect(
     clearInfo.destTileStatusAddress += SurfView->firstSlice * surf->tileStatusSliceSize;
     clearInfo.origin = &origin;
     clearInfo.rect = &rectSize;
-
     if ((clearInfo.clearBitMask == 0)
     &&  (clearInfo.clearBitMaskUpper == 0)
     )
@@ -6651,33 +6560,15 @@ _3DBlitClearRect(
     &&  (rect->bottom >= (gctINT)surf->requestH)
     &&  (clearInfo.clearBitMask == 0xFFFFFFFF)
     &&  (clearInfo.clearBitMaskUpper == 0xFFFFFFFF)
-    &&  (clearInfo.destTileStatusAddress != 0)
     )
     {
-        /* Can enable FC for full clear*/
-        enableFC = gcvTRUE;
         clearInfo.fcClearValue[0] = clearInfo.clearValue[0];
         clearInfo.fcClearValue[1] = clearInfo.clearValue[1];
     }
     else
     {
-        /* For partial full-mask clear, can eable fast clear if previously disabled */
-        if (!previousFC
-        &&  (clearInfo.clearBitMask == 0xFFFFFFFF)
-        &&  (clearInfo.clearBitMaskUpper == 0xFFFFFFFF)
-        &&  (clearInfo.destTileStatusAddress != 0)
-        )
-        {
-            enableFC = gcvTRUE;
-            dirtyTS  = gcvTRUE;
-            clearInfo.fcClearValue[0] = clearInfo.clearValue[0];
-            clearInfo.fcClearValue[1] = clearInfo.clearValue[1];
-        }
-        else
-        {
-            clearInfo.fcClearValue[0] = surf->fcValue[SurfView->firstSlice];
-            clearInfo.fcClearValue[1] = surf->fcValueUpper[SurfView->firstSlice];
-        }
+        clearInfo.fcClearValue[0] = surf->fcValue[SurfView->firstSlice];
+        clearInfo.fcClearValue[1] = surf->fcValueUpper[SurfView->firstSlice];
     }
 
     if (clearHZ)
@@ -6696,19 +6587,18 @@ _3DBlitClearRect(
         hzClearInfo.rect = &rectSize;
     }
 
+    fastClear &= !surf->tileStatusDisabled[SurfView->firstSlice];
+
+    if (clearHZ)
+    {
+        fastClear = (surf->hzTileStatusNode.pool != gcvPOOL_UNKNOWN);
+    }
+
     if ((surf->bitsPerPixel == 8) &&
         (surf->isMsaa) &&
         !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_8bit_256TILE_FC_FIX))
     {
-        enableFC = gcvFALSE;
-        dirtyTS  = gcvFALSE;
-
-        /* Need to disable FC for this case */
-        if (previousFC)
-        {
-            gcmONERROR(gcoSURF_DisableTileStatus(SurfView, gcvTRUE));
-            previousFC = gcvFALSE;
-        }
+        fastClear = gcvFALSE;
     }
 
     /* Flush the tile status cache. */
@@ -6716,20 +6606,15 @@ _3DBlitClearRect(
     gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SurfView, gcvFALSE));
     gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
 
-    /* Need to clear ts to all dirty for partial fast clear */
-    if (dirtyTS)
-    {
-        if (gcmIS_ERROR(_3DBlitClearTileStatus(SurfView, gcvTRUE)))
-        {
-            enableFC = gcvFALSE;
-        }
-    }
-
-    /* If previous fc was disabled, and this time not enable it */
-    if (!previousFC && !enableFC)
+    if (!fastClear)
     {
         clearInfo.destTileStatusAddress = 0;
-        hzClearInfo.destTileStatusAddress = 0;
+
+        if (clearHZ)
+        {
+            hzClearInfo.destTileStatusAddress = 0;
+        }
+        gcmONERROR(gcoSURF_DisableTileStatus(SurfView, gcvTRUE));
     }
 
     /* Clear. */
@@ -6738,8 +6623,6 @@ _3DBlitClearRect(
         (surf->tileStatusNode.pool == gcvPOOL_UNKNOWN) &&
         (surf->clearBitMask[LayerIndex] != surf->clearBitMaskUpper[LayerIndex]))
     {
-        gcmASSERT(!previousFC && !enableFC);
-
         status = gcoHARDWARE_ClearSoftware(gcvNULL,
                                            SurfView,
                                            LayerIndex,
@@ -6760,13 +6643,13 @@ _3DBlitClearRect(
         gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &hzClearInfo, &origin, &rectSize));
     }
 
-    if (enableFC)
+    if (fastClear)
     {
         /* Record FC value. */
         surf->fcValue[SurfView->firstSlice] = clearInfo.fcClearValue[0];
         surf->fcValueUpper[SurfView->firstSlice] = clearInfo.fcClearValue[1];
 
-        if (clearHZ && hzClearInfo.destTileStatusAddress)
+        if (clearHZ)
         {
             /* Record HZ FC value. */
             surf->fcValueHz = hzClearInfo.clearValue[0];
