@@ -140,6 +140,8 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
     }
     else
     {
+        gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
+
         /* Construct binary. */
         gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shaderBinary));
 
@@ -263,10 +265,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     if (program->binary == gcvNULL || !program->linked)
     {
         gcmONERROR(gcfVX_LoadCompiler(program->base.context));
-    }
-    else
-    {
-        gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
     }
 
     if (program->binary == gcvNULL)
