@@ -999,6 +999,8 @@ gcfVX_RunKernel(
     }
 
 #if SYNC_OUTPUT_MEMORY
+    /* add flush here to make sure the graph has completed before reading out the result for WIN32 */
+    gcoVX_Flush(gcvTRUE);
     gcmONERROR(gcfVX_SyncMemoryForOutPut(Context));
 #endif
 
