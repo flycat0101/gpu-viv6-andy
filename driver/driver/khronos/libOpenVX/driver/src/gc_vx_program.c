@@ -264,6 +264,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     {
         gcmONERROR(gcfVX_LoadCompiler(program->base.context));
     }
+    else
+    {
+        gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
+    }
 
     if (program->binary == gcvNULL)
     {
