@@ -3260,6 +3260,36 @@ vk_Exit:
     return result;
 }
 
+static VkResult __vk_RemoveCommandBuffersObject(
+    VkDevice device,
+    VkCommandPool commandPool
+    )
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
+    VkResult result = VK_SUCCESS;
+    VkCommandBuffer pBuf = cdp->vkCmdBufferList;
+
+    /* Remove any remaining command buffers that the app forgot */
+    while (pBuf)
+    {
+        __vkCommandBuffer *cmd = (__vkCommandBuffer *)pBuf;
+
+        if (cmd && commandPool == cmd->commandPool)
+        {
+            pBuf = (VkCommandBuffer)cmd->next;
+            __vk_RemoveObject(devCtx, __VK_OBJECT_COMMAND_BUFFER, (__vkObject*)cmd);
+        }
+        else
+        {
+            result = __VK_ERROR_INVALID_HANDLE;
+            break;
+        }
+    }
+
+    return result;
+}
+
 VKAPI_ATTR void VKAPI_CALL __valid_DestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator)
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
@@ -3279,6 +3309,12 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyCommandPool(VkDevice device, VkCommand
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
+
+    /* before free cdp, driver will try to free cmd obj in cdp which
+    ** app forget to do. In validation layer, the global object managment
+    ** need keep the same logic
+    */
+    __vk_RemoveCommandBuffersObject(device, commandPool);
 
     __vk_RemoveObject(devCtx, __VK_OBJECT_COMMAND_POOL, (__vkObject*)cdp);
 
