@@ -1203,7 +1203,7 @@ gcoCL_QueryDeviceInfo(
     DeviceInfo->maxWorkItemSizes[0]   = gcmMIN(threadCount, 1024);
     DeviceInfo->maxWorkItemSizes[1]   = gcmMIN(threadCount, 1024);
     DeviceInfo->maxWorkItemSizes[2]   = gcmMIN(threadCount, 1024);
-    DeviceInfo->maxWorkGroupSize      = gcmMIN(threadCount, 128);
+    DeviceInfo->maxWorkGroupSize      = gcmMIN(threadCount, 256);
 
     if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_ENHANCEMENTS2))
     {
