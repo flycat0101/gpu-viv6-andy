@@ -3351,6 +3351,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     VIR_LoopDU* du;
     gctBOOL repeat;
     VSC_UNI_LIST invariantInsts;
+    gctBOOL invariantInstsHasLoad = gcvFALSE;
 
     if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
     {
@@ -3507,6 +3508,10 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                             _VIR_LoopDU_RemoveDef(du, defSym, inst);
                             repeat = gcvTRUE;
 
+                            if (VIR_OPCODE_LoadsOnly(VIR_Inst_GetOpcode(inst)))
+                            {
+                                invariantInstsHasLoad = gcvTRUE;
+                            }
                             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
                             {
                                 VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "the following instruction is loop invariant:\n");
@@ -3528,8 +3533,10 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         }
     } while(repeat);
 
-    /* move loop invariant instructions out */
-    if(vscUNILST_GetNodeCount(&invariantInsts))
+    /* move loop invariant instructions out if has load
+     * TODO : only promote load related insts
+     */
+    if(invariantInstsHasLoad && vscUNILST_GetNodeCount(&invariantInsts))
     {
         VIR_BB* preHead = gcvNULL;
         VSC_UL_ITERATOR iter;
