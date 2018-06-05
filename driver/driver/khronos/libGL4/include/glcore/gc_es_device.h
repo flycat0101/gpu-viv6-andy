@@ -64,7 +64,7 @@ typedef struct __GLdeviceStructRec
 
     GLboolean (*devGetConstants)(__GLcontext *gc, struct __GLdeviceConstantsRec *constants);
 
-#ifdef _LINUX_
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
     /* Create a HW specific drawable structure that is attached to drawInfo->private */
     GLvoid (*devCreateDrawable)(struct __GLdrawablePrivateRec *drawInfo, GLvoid *window);
     /* Initialize/Deinitialize device */
@@ -73,10 +73,11 @@ typedef struct __GLdeviceStructRec
 #else
     GLvoid (*devInitialize)();
     GLboolean (*devDeinitialize)();
-
+#ifdef _WINDOWS
     GLint (*devDescribePixelFormat)(GLint iPixelFormat, GLuint nBytes, GLvoid* ppfd, GLboolean bDisplayableOnly);
     GLboolean (*devSetPixelFormat)(GLint iPixelFormat);
     DisplayInfoStruct DisplayInfo;
+#endif
 #endif
 
     GLboolean IsRotated;

@@ -508,7 +508,7 @@ typedef GLvoid (GLAPIENTRY *__T_GenBuffers)(__GLcontext *,  GLsizei, GLuint *);
 typedef GLboolean (GLAPIENTRY *__T_IsBuffer)(__GLcontext *,  GLuint);
 typedef GLvoid (GLAPIENTRY *__T_BufferData)(__GLcontext *,  GLenum, GLsizeiptr, const GLvoid *, GLenum);
 typedef GLvoid (GLAPIENTRY *__T_BufferSubData)(__GLcontext *,  GLenum, GLintptr, GLsizeiptr, const GLvoid *);
-typedef GLvoid (GLAPIENTRY *__T_GetBufferSubData)(__GLcontext *,  GLenum, GLintptr, GLsizeiptr, const GLvoid *);
+typedef GLvoid (GLAPIENTRY *__T_GetBufferSubData)(__GLcontext *,  GLenum, GLintptr, GLsizeiptr, GLvoid *);
 typedef GLvoid* (GLAPIENTRY *__T_MapBuffer)(__GLcontext *,  GLenum, GLenum);
 typedef GLboolean (GLAPIENTRY *__T_UnmapBuffer)(__GLcontext *,  GLenum);
 typedef GLvoid (GLAPIENTRY *__T_GetBufferParameteriv)(__GLcontext *,  GLenum, GLenum, GLint *);
@@ -3629,7 +3629,7 @@ enum {
     GLboolean      (GLAPIENTRY *IsBuffer) (_gcArgComma_ GLuint buffer); \
     GLvoid         (GLAPIENTRY *BufferData) (_gcArgComma_ GLenum target, GLsizeiptr size, const GLvoid* data, GLenum usage); \
     GLvoid         (GLAPIENTRY *BufferSubData) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data); \
-    GLvoid         (GLAPIENTRY *GetBufferSubData) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data); \
+    GLvoid         (GLAPIENTRY *GetBufferSubData) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr size, GLvoid* data); \
     GLvoid*        (GLAPIENTRY *MapBufferOES) (_gcArgComma_ GLenum target, GLenum access _retPointer); \
     GLboolean      (GLAPIENTRY *UnmapBufferOES) (_gcArgComma_ GLenum target); \
     GLvoid*        (GLAPIENTRY *MapBuffer) (_gcArgComma_ GLenum target, GLenum access); \

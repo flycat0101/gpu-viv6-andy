@@ -280,6 +280,20 @@ vdkSetupEGL(
             }
         }
 
+
+        if (ConfigurationAttributes == VDK_CONFIG_RGB888_D16_GL)
+        {
+            defaultConfig     = 1;
+            configuration[11] = EGL_OPENGL_BIT;
+
+            /* Bind OpenGL API. */
+            if (!eglBindAPI(EGL_OPENGL_API))
+            {
+                return 0;
+            }
+        }
+
+
         if (!eglChooseConfig(Egl->eglDisplay,
                                   defaultConfig
                                       ? configuration

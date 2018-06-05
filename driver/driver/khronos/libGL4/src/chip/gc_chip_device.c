@@ -19,8 +19,8 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_device.h"
-#ifdef _LINUX_
-#else
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#elif defined(_WINDOWS)
 #include "vvtpfdtypes.h"
 #include "wintogl.h"
 #endif
@@ -28,10 +28,10 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_DEVICE
 
 __GLchipGlobal dpGlobalInfo;
-#ifdef _LINUX_
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
 extern void __glChipCreateDrawable(__GLdrawablePrivate *draw,void *window);
-#else
-extern VEGLEXimports imports;
+#elif defined(_WINDOWS)
+extern VEGLimports imports;
 
 #define START_INDEX_OF_NONEDISPLAYABLE_COLOR   7
 
@@ -370,7 +370,7 @@ GLboolean __glDpSetPixelFormat(GLint iPixelFormat )
 /* done */
 #endif
 
-#ifdef _LINUX_
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
 #include<X11/Xlib.h>
 #include<X11/Xutil.h>
 #include<stdio.h>
@@ -414,6 +414,7 @@ GLvoid __gldevInitialize()
 {
 
 }
+
 GLboolean
 __gldevDeinitialize()
 {
@@ -432,12 +433,11 @@ __glDpInitialize(
     deviceEntry->devGetConstants    = __glChipGetDeviceConstants;
     deviceEntry->devUpdateDrawable  = __glChipUpdateDrawable;
     deviceEntry->devDestroyDrawable = __glChipDestroyDrawable;
-
-    deviceEntry->devInitialize    = __gldevInitialize;
     deviceEntry->devDeinitialize    = __gldevDeinitialize;
-#ifdef _LINUX_
+    deviceEntry->devInitialize      = __gldevInitialize;
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
     deviceEntry->devCreateDrawable = __glChipCreateDrawable;
-#else
+#elif defined(_WINDOWS)
     deviceEntry->devDescribePixelFormat = __glDpDescribePixelFormat;
     deviceEntry->devSetPixelFormat = __glDpSetPixelFormat;
 #endif

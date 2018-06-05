@@ -8756,7 +8756,7 @@ GLvoid GLAPIENTRY __glesProfile(Indexubv)(__GLcontext *gc,   const GLubyte *c ){
 GLvoid GLAPIENTRY __glesProfile(TexCoordPointer)(__GLcontext *gc, GLint size, GLenum type, GLsizei stride, const GLvoid *ptr){}
 GLvoid GLAPIENTRY __glesProfile(GetVertexAttribdv) (__GLcontext *gc, GLuint index, GLenum pname, GLdouble* params){}
 GLvoid GLAPIENTRY __glesProfile(GetQueryObjectiv) (__GLcontext *gc, GLuint id, GLenum pname, GLint* params){}
-GLvoid GLAPIENTRY __glesProfile(GetBufferSubData) (__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data){}
+GLvoid GLAPIENTRY __glesProfile(GetBufferSubData) (__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr size, GLvoid* data){}
 GLvoid* GLAPIENTRY __glesProfile(MapBuffer)(__GLcontext *gc, GLenum target, GLenum access){return gcvNULL;}
 GLvoid GLAPIENTRY __glesProfile(DeleteObjectARB) (__GLcontext *gc, UINT obj){}
 GLvoid GLAPIENTRY __glesProfile(GetInfoLogARB) (__GLcontext *gc, UINT obj, GLsizei maxLength, GLsizei *length, char *infoLog){}

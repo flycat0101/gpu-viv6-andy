@@ -953,7 +953,7 @@ veglSetContext(
 {
     gceSTATUS status;
     vgsCONTEXT_PTR context = (vgsCONTEXT_PTR) Context;
-    gcoSURF Draw  = Drawable ? (gcoSURF)Drawable->rtHandle : gcvNULL;
+    gcoSURF Draw  = Drawable ? (gcoSURF)Drawable->rtHandles[0] : gcvNULL;
     /*gcoSURF Read  = Readable ? (gcoSURF)Readable->rtHandle : gcvNULL;
     gcoSURF Depth = Drawable ? (gcoSURF)Drawable->depthHandle : gcvNULL;*/
 

@@ -4376,7 +4376,7 @@ GLvoid GLAPIENTRY __GLES_APINAME(GetVertexAttribdv) (GLuint index, GLenum pname,
     gc->currentImmediateTable->GetVertexAttribdv(gc, index, pname, params);
 }
 GLvoid GLAPIENTRY __GLES_APINAME(GetQueryObjectiv) (GLuint id, GLenum pname, GLint* params){}
-GLvoid GLAPIENTRY __GLES_APINAME(GetBufferSubData) (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data){}
+GLvoid GLAPIENTRY __GLES_APINAME(GetBufferSubData) (GLenum target, GLintptr offset, GLsizeiptr size, GLvoid* data){}
 GLvoid GLAPIENTRY __GLES_APINAME(DeleteObjectARB) (UINT obj){}
 GLvoid GLAPIENTRY __GLES_APINAME(GetInfoLogARB) (UINT obj, GLsizei maxLength, GLsizei *length, char *infoLog){}
 

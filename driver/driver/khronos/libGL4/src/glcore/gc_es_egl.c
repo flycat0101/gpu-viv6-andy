@@ -26,11 +26,8 @@ extern __GLesDispatchTable __glesApiFuncDispatchTable;
 extern GLint __glGetDispatchOffset(const char *procName);
 extern __GLprocAddr __glGetProcAddr(const GLchar *procName);
 
-#ifdef OPENGL40
-extern GLvoid* __glCreateContext(GLint, VEGLEXimports*, GLvoid*);
-#else
 extern GLvoid* __glCreateContext(GLint, VEGLimports*, GLvoid*);
-#endif
+
 
 extern GLuint __glDestroyContext(GLvoid *gc);
 #ifdef OPENGL40

@@ -12,7 +12,6 @@
 
 
 #include "gc_glff_precomp.h"
-#include "gc_egl_common.h"
 
 #define _GC_OBJ_ZONE    glvZONE_CONTEXT
 
@@ -942,8 +941,8 @@ glfSetContext(
 
 
     context = (glsCONTEXT_PTR) Context;
-    draw    = Drawable ? (gcoSURF) Drawable->rtHandle : gcvNULL;
-    read    = Readable ? (gcoSURF) Readable->rtHandle : gcvNULL;
+    draw    = Drawable ? (gcoSURF) Drawable->rtHandles[0] : gcvNULL;
+    read    = Readable ? (gcoSURF) Readable->rtHandles[0] : gcvNULL;
     depth   = Drawable ? ((gcoSURF) (Drawable->depthHandle
                        ?  Drawable->depthHandle : Drawable->stencilHandle))
                        : gcvNULL;
@@ -1010,8 +1009,8 @@ glfSetContext(
         context->drawHeight = context->effectiveHeight = drawHeight;
 
         /* Get previous surfaces. */
-        context->prevRead = Readable ? (gcoSURF) Readable->prevRtHandle : gcvNULL;
-        context->prevDraw = Drawable ? (gcoSURF) Drawable->prevRtHandle : gcvNULL;
+        context->prevRead = Readable ? (gcoSURF) Readable->prevRtHandles[0] : gcvNULL;
+        context->prevDraw = Drawable ? (gcoSURF) Drawable->prevRtHandles[0] : gcvNULL;
 
         /* Copy surfaces into context. */
         context->draw  = draw;

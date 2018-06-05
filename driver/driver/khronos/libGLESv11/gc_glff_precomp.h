@@ -14,10 +14,8 @@
 #ifndef __gc_glff_precomp_h_
 #define __gc_glff_precomp_h_
 
-#include "gc_hal_types.h"
-#include "gc_hal_base.h"
+#include "gc_hal.h"
 #include "gc_hal_user_math.h"
-#include "gc_hal_options.h"
 
 /*******************************************************************************
 ** Include standard libraries.

@@ -391,8 +391,8 @@ veglSetContext(
     VEGLDrawable Readable
     )
 {
-    gcoSURF Draw  = Drawable ? (gcoSURF)Drawable->rtHandle : gcvNULL;
-    gcoSURF Read  = Readable ? (gcoSURF)Readable->rtHandle : gcvNULL;
+    gcoSURF Draw  = Drawable ? (gcoSURF)Drawable->rtHandles[0] : gcvNULL;
+    gcoSURF Read  = Readable ? (gcoSURF)Readable->rtHandles[0] : gcvNULL;
     gcoSURF Depth = Drawable ? (gcoSURF)Drawable->depthHandle : gcvNULL;
     _VGContext *context = (_VGContext*) Context;
 

@@ -31,7 +31,7 @@ typedef struct __GLchipGlobalRec
     GLuint                  height;
     GLuint                  bpp;
     GLuint                  stride;
-#ifdef _LINUX_
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
     /* Frame buffer base physical address for on screen */
     GLvoid *logicalAddress;
     GLvoid *basePhyAddress;
