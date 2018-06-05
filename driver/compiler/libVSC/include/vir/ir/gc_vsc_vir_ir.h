@@ -6422,6 +6422,8 @@ typedef struct _VIR_AC_OFFSET_INFO
     /* Base offset. */
     VIR_SymbolKind          baseOffsetType;
     VIR_SymId               baseOffset;
+    gctBOOL                 accessVecCompByVariable;  /* if true, add vecget/vecset to visit vec component */
+    VIR_TypeId              accessVecType;            /* record the vector type and used in its user */
     /* Vector index. */
     VIR_SymbolKind          vectorIndexType;
     VIR_SymId               vectorIndex;

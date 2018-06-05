@@ -13767,6 +13767,8 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     gctBOOL                 treatPushConstAsMemory = gcvFALSE;
     gctBOOL                 isTypeStruct, isTypeArray, isTypeMatrix, isTypeVector, isRowMajorMatrixColumnIndexing = gcvFALSE;
     gctBOOL                 noNeedWShift = gcvFALSE;
+    gctBOOL                 accessVecComp = gcvFALSE;         /* access component of VEC by variable if true */
+    VIR_TypeId              accessVecType = VIR_TYPE_UNKNOWN; /* save vector type and used in the user instr vecget/vecset */
 
     /* Do the preprocessor. */
     for (i = 0; i < AccessChainLength; i++)
@@ -13774,6 +13776,7 @@ VIR_Operand_EvaluateOffsetByAccessChain(
         if (AccessChainType[i] == VIR_SYM_VARIABLE)
         {
             isBaseAllConstantIndex = gcvFALSE;
+            break;
         }
     }
 
@@ -13937,42 +13940,57 @@ VIR_Operand_EvaluateOffsetByAccessChain(
 
                 if(vectorIndexType == VIR_SYM_VARIABLE)
                 {
-                    VIR_TypeId arrayTypeId;
-                    VIR_SymId arraySymId;
-                    VIR_Instruction* arrayInitializationInst;
-                    gctUINT j;
-
-                    baseOffsetType = VIR_SYM_UNKNOWN;
-
-                    offset = 0;
-                    gcoOS_PrintStrSafe(arrayName, 32, &offset, "_spv_ac_vector_dynamic_%d", ResultId);
-
-                    VIR_Shader_AddArrayType(Shader, VIR_Type_GetIndex(baseType), VIR_GetTypeComponents(VIR_Type_GetIndex(type)), 1, &arrayTypeId);
-                    VIR_Shader_AddString(Shader, arrayName, &nameId);
-                    VIR_Shader_AddSymbol(Shader,
-                        VIR_SYM_VARIABLE,
-                        nameId,
-                        VIR_Shader_GetTypeFromId(Shader, arrayTypeId),
-                        VIR_STORAGE_GLOBAL,
-                        &arraySymId);
-
-                    arraySym = VIR_Shader_GetSymFromId(Shader, arraySymId);
-                    VIR_Symbol_SetFlag(arraySym,VIR_SYMFLAG_WITHOUT_REG);
-
-                    for(j = 0; j < VIR_GetTypeComponents(VIR_Type_GetIndex(type)); j++)
+                    /* special case : variable is used as index of vector variable, like
+                     *   gl_in[0].gl_Position[gl_InvocationID] ; type of gl_Position is vec4
+                     *   add vecget/vecset after load/store
+                     */
+                    if (i == AccessChainLength-1)
                     {
-                        VIR_Function_AddInstruction(Function, VIR_OP_MOV, VIR_Type_GetIndex(baseType), &arrayInitializationInst);
-                        VIR_Operand_SetSym(VIR_Inst_GetDest(arrayInitializationInst), arraySym);
-                        VIR_Operand_SetOpKind(VIR_Inst_GetDest(arrayInitializationInst), VIR_OPND_SYMBOL);
-                        VIR_Operand_SetTypeId(VIR_Inst_GetDest(arrayInitializationInst), VIR_Type_GetIndex(baseType));
-                        VIR_Operand_SetEnable(VIR_Inst_GetDest(arrayInitializationInst), VIR_ENABLE_X);
-                        VIR_Operand_SetIsConstIndexing(VIR_Inst_GetDest(arrayInitializationInst), 1);
-                        VIR_Operand_SetRelIndex(VIR_Inst_GetDest(arrayInitializationInst), j);
-                        VIR_Operand_SetSymbol(VIR_Inst_GetSource(arrayInitializationInst, 0), Function, VIR_Symbol_GetIndex(BaseSymbol));
-                        VIR_Operand_SetTypeId(VIR_Inst_GetSource(arrayInitializationInst, 0), VIR_Type_GetIndex(baseType));
-                        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(arrayInitializationInst, 0), (VIR_Swizzle)(j | j << 2 | j << 4 | j << 6));
+                        /* not support packed type */
+                        gcmASSERT((!VIR_TypeId_isPacked(VIR_Type_GetIndex(type))) && VIR_GetTypeComponents(VIR_Type_GetIndex(type)) <= 16);
+                        baseOffset = 0;    /*keep baseOffsetType as previous chain element*/
+                        accessVecComp = gcvTRUE;
+                        accessVecType = VIR_Type_GetIndex(type);
+                    }
+                    else
+                    {
+                        VIR_TypeId arrayTypeId;
+                        VIR_SymId arraySymId;
+                        VIR_Instruction* arrayInitializationInst;
+                        gctUINT j;
 
-                        vectorArraryOperand[j] = VIR_Inst_GetSource(arrayInitializationInst, 0);
+                        baseOffsetType = VIR_SYM_UNKNOWN;
+
+                        offset = 0;
+                        gcoOS_PrintStrSafe(arrayName, 32, &offset, "_spv_ac_vector_dynamic_%d", ResultId);
+
+                        VIR_Shader_AddArrayType(Shader, VIR_Type_GetIndex(baseType), VIR_GetTypeComponents(VIR_Type_GetIndex(type)), 1, &arrayTypeId);
+                        VIR_Shader_AddString(Shader, arrayName, &nameId);
+                        VIR_Shader_AddSymbol(Shader,
+                            VIR_SYM_VARIABLE,
+                            nameId,
+                            VIR_Shader_GetTypeFromId(Shader, arrayTypeId),
+                            VIR_STORAGE_GLOBAL,
+                            &arraySymId);
+
+                        arraySym = VIR_Shader_GetSymFromId(Shader, arraySymId);
+                        VIR_Symbol_SetFlag(arraySym,VIR_SYMFLAG_WITHOUT_REG);
+
+                        for(j = 0; j < VIR_GetTypeComponents(VIR_Type_GetIndex(type)); j++)
+                        {
+                            VIR_Function_AddInstruction(Function, VIR_OP_MOV, VIR_Type_GetIndex(baseType), &arrayInitializationInst);
+                            VIR_Operand_SetSym(VIR_Inst_GetDest(arrayInitializationInst), arraySym);
+                            VIR_Operand_SetOpKind(VIR_Inst_GetDest(arrayInitializationInst), VIR_OPND_SYMBOL);
+                            VIR_Operand_SetTypeId(VIR_Inst_GetDest(arrayInitializationInst), VIR_Type_GetIndex(baseType));
+                            VIR_Operand_SetEnable(VIR_Inst_GetDest(arrayInitializationInst), VIR_ENABLE_X);
+                            VIR_Operand_SetIsConstIndexing(VIR_Inst_GetDest(arrayInitializationInst), 1);
+                            VIR_Operand_SetRelIndex(VIR_Inst_GetDest(arrayInitializationInst), j);
+                            VIR_Operand_SetSymbol(VIR_Inst_GetSource(arrayInitializationInst, 0), Function, VIR_Symbol_GetIndex(BaseSymbol));
+                            VIR_Operand_SetTypeId(VIR_Inst_GetSource(arrayInitializationInst, 0), VIR_Type_GetIndex(baseType));
+                            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(arrayInitializationInst, 0), (VIR_Swizzle)(j | j << 2 | j << 4 | j << 6));
+
+                            vectorArraryOperand[j] = VIR_Inst_GetSource(arrayInitializationInst, 0);
+                        }
                     }
                 }
             }
@@ -14214,6 +14232,8 @@ VIR_Operand_EvaluateOffsetByAccessChain(
         AccessChainOffsetInfo->blockIndex = blockIndex;
         AccessChainOffsetInfo->baseOffsetType = baseOffsetType;
         AccessChainOffsetInfo->baseOffset = baseOffset;
+        AccessChainOffsetInfo->accessVecCompByVariable = accessVecComp;
+        AccessChainOffsetInfo->accessVecType = accessVecType;
         AccessChainOffsetInfo->vectorIndexType = vectorIndexType;
         AccessChainOffsetInfo->vectorIndex = vectorIndex;
         AccessChainOffsetInfo->noNeedWShift = noNeedWShift;

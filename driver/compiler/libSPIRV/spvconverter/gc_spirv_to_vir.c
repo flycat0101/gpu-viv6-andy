@@ -132,6 +132,8 @@
 #define SPV_ID_SYM_BLOCK_OFFSET_VALUE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.blockIndex)
 #define SPV_ID_SYM_OFFSET_TYPE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.baseOffsetType)
 #define SPV_ID_SYM_OFFSET_VALUE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.baseOffset)
+#define SPV_ID_SYM_OFFSET_ACCESSVECCOMPBYVARIABLE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.accessVecCompByVariable)
+#define SPV_ID_SYM_OFFSET_VECTYPE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.accessVecType)
 #define SPV_ID_SYM_VECTOR_OFFSET_TYPE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.vectorIndexType)
 #define SPV_ID_SYM_VECTOR_OFFSET_VALUE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.vectorIndex)
 #define SPV_ID_SYM_NO_NEED_WSHIFT(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.noNeedWShift)
@@ -8393,6 +8395,62 @@ static gctBOOL __SpvUseLoadStoreToAccessBlock(gcSPV spv, VIR_Shader * virShader,
     return ret;
 }
 
+static VSC_ErrCode __spvGenerateInstrinsicVecGet(gcSPV spv,
+                                             VIR_Symbol *destSym,
+                                             VIR_Symbol *src0Sym,
+                                             VIR_Swizzle src0Swizzle,
+                                             VIR_Symbol *src1Sym,
+                                             VIR_Swizzle src1Swizzle)
+
+{
+    VIR_Instruction *virVecGetInst;
+    VIR_ParmPassing *parmOpnd;
+    gctUINT argCount = 2;
+    VIR_Operand *src0Opnd;
+    VIR_Operand *src1Opnd;
+    VIR_TypeId dstTypeId;
+    VSC_ErrCode virErrCode;
+    gcmASSERT(destSym && src0Sym && src1Sym);
+    dstTypeId = VIR_Symbol_GetTypeId(destSym);
+    virErrCode = VIR_Function_AddInstruction(spv->virFunction,
+                                             VIR_OP_INTRINSIC,
+                                             dstTypeId,
+                                             &virVecGetInst);
+    VIR_Operand_SetRoundMode(VIR_Inst_GetDest(virVecGetInst), VIR_ROUND_DEFAULT);
+    VIR_Operand_SetModifier(VIR_Inst_GetDest(virVecGetInst), VIR_MOD_NONE);
+    VIR_Operand_SetEnable(VIR_Inst_GetDest(virVecGetInst), __SpvGenEnable(spv, VIR_Symbol_GetType(destSym), dstTypeId));
+    VIR_Operand_SetOpKind(VIR_Inst_GetDest(virVecGetInst), VIR_OPND_SYMBOL);
+    VIR_Operand_SetTypeId(VIR_Inst_GetDest(virVecGetInst), VIR_Symbol_GetTypeId(destSym));
+    VIR_Operand_SetSym(VIR_Inst_GetDest(virVecGetInst), destSym);
+
+    /*src0 is instrinsic Kind */
+    VIR_Operand_SetIntrinsic(VIR_Inst_GetSource(virVecGetInst, 0), VIR_IK_vecGet);
+    /* src1 is parameter */
+    VIR_Function_NewParameters(spv->virFunction, argCount, &parmOpnd);
+    VIR_Operand_SetParameters(VIR_Inst_GetSource(virVecGetInst, 1), parmOpnd);
+
+    /* fill two parmOpnds */
+    src0Opnd = parmOpnd->args[0];
+    VIR_Operand_SetSwizzle(src0Opnd, src0Swizzle);
+    VIR_Operand_SetSym(src0Opnd, src0Sym);
+    VIR_Operand_SetOpKind(src0Opnd, VIR_OPND_SYMBOL);
+    VIR_Operand_SetTypeId(src0Opnd,  VIR_Symbol_GetTypeId(src0Sym));
+    VIR_Operand_SetPrecision(src0Opnd, VIR_PRECISION_HIGH);
+    VIR_Operand_SetRoundMode(src0Opnd, VIR_ROUND_DEFAULT);
+    VIR_Operand_SetModifier(src0Opnd, VIR_MOD_NONE);
+
+    src1Opnd = parmOpnd->args[1];
+    VIR_Operand_SetSwizzle(src1Opnd, src1Swizzle);
+    VIR_Operand_SetSym(src1Opnd, src1Sym);
+    VIR_Operand_SetOpKind(src1Opnd, VIR_OPND_SYMBOL);
+    VIR_Operand_SetTypeId(src1Opnd,  VIR_Symbol_GetTypeId(src1Sym));
+    VIR_Operand_SetPrecision(src1Opnd, VIR_PRECISION_HIGH);
+    VIR_Operand_SetRoundMode(src1Opnd, VIR_ROUND_DEFAULT);
+    VIR_Operand_SetModifier(src1Opnd, VIR_MOD_NONE);
+
+    return virErrCode;
+}
+
 static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
 {
     gctUINT i, j, paramToFunc;
@@ -8415,6 +8473,13 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
     gctBOOL hasDest;
     gctBOOL isWorkGroup = gcvFALSE;
     gctUINT virOpndId = 0;
+    /*  following variables are copy of dest of MOV
+        and only used if spv->operand[0]
+     *  visiting vector component by variable
+     */
+    VIR_Symbol *dstVirScalarSym = gcvNULL;
+    VIR_Type   *dstVirScalarSymType= gcvNULL;
+    VIR_TypeId  dstVirScalarSymTypeId = VIR_TYPE_UNKNOWN;
 
     /* map spvopcode to vir opcode, if not support, add more inst */
     virOpcode = VIR_OP_MOV;
@@ -8483,6 +8548,35 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         {
             dstVirSym = VIR_Shader_GetSymFromId(virShader, virSymId);
         }
+    }
+
+    /* copy dstVirsym to dstVirScalar and create a vec symbol as the dstVirSym
+     * intrinsic VECGET will be added after LOAD/mov if
+     * spv->operand[0] visiting vector component by variable
+     */
+    if (hasDest && SPV_ID_SYM_OFFSET_ACCESSVECCOMPBYVARIABLE(spv->operands[0]))
+    {
+       gctCHAR name[32];
+       VIR_NameId nameId;
+       VIR_SymId tempSymId;
+       gctUINT    offset = 0;
+       /* save VirSym/type to copy variable*/
+       dstVirScalarSym = dstVirSym;
+       dstVirScalarSymType = dstVirType;
+       dstVirScalarSymTypeId = dstVirTypeId;
+       /* create a new VEC variable as the dest of MOV */
+       gcoOS_PrintStrSafe(name, 32, &offset, "_spv_temp_vec_%d", resultId);
+       dstVirTypeId = SPV_ID_SYM_OFFSET_VECTYPE(spv->operands[0]);
+       dstVirType = VIR_Shader_GetTypeFromId(virShader, dstVirTypeId);
+       VIR_Shader_AddString(virShader, name, &nameId);
+       VIR_Shader_AddSymbol(virShader,
+                    VIR_SYM_VARIABLE,
+                    nameId,
+                    dstVirType,
+                    VIR_STORAGE_GLOBAL,
+                    &tempSymId);
+        dstVirSym = VIR_Shader_GetSymFromId(virShader, tempSymId);
+        VIR_Symbol_SetFlag(dstVirSym, VIR_SYMFLAG_WITHOUT_REG);
     }
 
     /* check if it is block, only works for accesschain for now */
@@ -8716,6 +8810,19 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+
+            /* add instruction "intrinsic vecget" */
+            if (dstVirSym && SPV_ID_SYM_OFFSET_ACCESSVECCOMPBYVARIABLE(spv->operands[0]))
+            {
+                VIR_Swizzle param0swizzle;
+                VIR_Symbol  *vecIdxSym = gcvNULL;
+                gcmASSERT(VIR_SYM_VARIABLE == SPV_ID_SYM_VECTOR_OFFSET_TYPE(spv->operands[0]));
+                vecIdxSym = VIR_Shader_GetSymFromId(virShader, SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->operands[0]));
+                gcmASSERT(dstVirSym && VIR_Type_isVector(VIR_Symbol_GetType(dstVirSym)));    /* first parameter should be vector type */
+                gcmASSERT(vecIdxSym && VIR_Type_isScalar(VIR_Symbol_GetType(vecIdxSym)));    /* second parameter should be scalar */
+                param0swizzle = VIR_Swizzle_GenSwizzleByComponentCount(VIR_GetTypeComponents(VIR_Symbol_GetTypeId(dstVirSym)));
+                __spvGenerateInstrinsicVecGet(spv, dstVirScalarSym, dstVirSym, param0swizzle, vecIdxSym, VIR_SWIZZLE_XXXX);
+            }
         }
         else if (useLoadToAccessBlock)
         {
@@ -8940,7 +9047,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
     hasDest = VIR_OPCODE_hasDest(virOpcode);
 
     gcmASSERT(spv->opCode == SpvOpStore);
-
+    gcmASSERT(!SPV_ID_SYM_OFFSET_ACCESSVECCOMPBYVARIABLE(spv->operands[0])); /* unsupport vecset yet */
     spvTypeId = SPV_ID_SYM_SPV_TYPE(spv->operands[0]);
     /* First operand is pointer, let's find out the object */
     resultId = SPV_POINTER_VAR_OBJ_SPV_NAME(spv->operands[0]);

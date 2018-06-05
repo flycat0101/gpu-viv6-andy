@@ -82,6 +82,36 @@ label_set_jmp_n(
 }
 
 static gctBOOL
+label_set_jmp_neg2(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return label_set_jmp_n(Context, Inst, Opnd, -2);
+}
+
+static gctBOOL
+label_set_jmp_neg3(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return label_set_jmp_n(Context, Inst, Opnd, -3);
+}
+
+static gctBOOL
+label_set_jmp_neg4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return label_set_jmp_n(Context, Inst, Opnd, -4);
+}
+
+static gctBOOL
 label_set_jmp_neg5(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -89,6 +119,34 @@ label_set_jmp_neg5(
     )
 {
     return label_set_jmp_n(Context, Inst, Opnd, -5);
+}
+
+static gctBOOL
+label_set_jmp_neg7(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return label_set_jmp_n(Context, Inst, Opnd, -7);
+}
+
+static gctBOOL
+label_set_jmp_neg3_6_9(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if (!label_set_jmp_n(Context, Inst, Opnd, -3))
+    {
+        return gcvFALSE;
+    }
+    if (!label_set_jmp_n(Context, Inst, Opnd, -6))
+    {
+        return gcvFALSE;
+    }
+    return label_set_jmp_n(Context, Inst, Opnd, -9);
 }
 
 /* set current operand as constant 0.5. */
@@ -167,6 +225,48 @@ _constf_three(
     imm.fValue = (gctFLOAT) 3.0;
 
     VIR_Operand_SetImmediate(Opnd, VIR_TYPE_FLOAT32, imm);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_consti_one(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_ScalarConstVal     imm;
+    imm.iValue = 1;
+
+    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_consti_two(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_ScalarConstVal     imm;
+    imm.iValue = 2;
+
+    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_consti_three(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_ScalarConstVal     imm;
+    imm.iValue = 3;
+
+    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
 
     return gcvTRUE;
 }
@@ -315,6 +415,52 @@ _dup1stParmAsNeg(
     modifer |= VIR_MOD_NEG;
     VIR_Operand_SetModifier(Opnd, modifer);
 
+    return gcvTRUE;
+}
+
+static gctBOOL
+_dup1stParmSwizzleX(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _dup1stParm(Context, Inst, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_X));
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_dup1stParmSwizzleY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _dup1stParm(Context, Inst, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_Y));
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_dup1stParmSwizzleZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _dup1stParm(Context, Inst, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_Z));
+    return gcvTRUE;
+}
+
+static gctBOOL
+_dup1stParmSwizzleW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _dup1stParm(Context, Inst, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_W));
     return gcvTRUE;
 }
 
@@ -1564,6 +1710,77 @@ _dupTexldModifierFrom3rdParm(
     return gcvTRUE;
 }
 
+static gctBOOL
+_isIntrinParam0Vec4(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst)
+{
+    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
+    VIR_Operand             *vecOpnd;
+    VIR_ParmPassing         *parm;
+    VIR_TypeId               vecTypeId;
+    gcmASSERT(VIR_Operand_isParameters(pOpnd));
+
+    parm = VIR_Operand_GetParameters(pOpnd);
+    vecOpnd = parm->args[0];
+    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
+    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
+        VIR_GetTypeComponents(vecTypeId) == 4)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_isIntrinParam0Vec3(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst)
+{
+    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
+    VIR_Operand             *vecOpnd;
+    VIR_ParmPassing         *parm;
+    VIR_TypeId               vecTypeId;
+    gcmASSERT(VIR_Operand_isParameters(pOpnd));
+
+    parm = VIR_Operand_GetParameters(pOpnd);
+    vecOpnd = parm->args[0];
+    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
+
+    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
+        VIR_GetTypeComponents(vecTypeId) == 3)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_isIntrinParam0Vec2(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst)
+{
+    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
+    VIR_Operand             *vecOpnd;
+    VIR_ParmPassing         *parm;
+    VIR_TypeId               vecTypeId;
+    gcmASSERT(VIR_Operand_isParameters(pOpnd));
+
+    parm = VIR_Operand_GetParameters(pOpnd);
+    vecOpnd = parm->args[0];
+    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
+
+    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
+        VIR_GetTypeComponents(vecTypeId) == 2)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /* Construct the coord for 1DArray first, then calculate the coord. */
 static VIR_PatternMatchInst _intrinTexldPatInst0[] = {
     { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinSampler1DArray, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
@@ -1614,6 +1831,108 @@ static VIR_PatternReplaceInst _intrinTexldpcfRepInst0[] = {
 
 static VIR_Pattern _intrinTexldpcfPattern[] = {
     { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_intrinTexldpcf, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* vecget instrinsic function param0 is vec4
+    vecget d1, vec4 src0, src1
+=>
+    t0 = src1->secondparameter
+    d1 = src0.x
+    jmpc label2, t0 == 1
+    jmpc label3, t0 == 2
+    jmpc lable4, t0 == 3
+label1:
+    d1 = src0.y
+    jmp label4
+label2:
+    d1 = src0.z
+    jmp label4
+label3:
+    d1 = src0.w
+label4:
+*/
+static VIR_PatternMatchInst _intrinVecGetPatInst0[] = {
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec4 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _intrinVecGetRepInst0[] = {
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_two, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_three, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg5 } }, /*label2*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleZ } },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg7 } }, /*label3*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleW } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3_6_9 } }, /*label4*/
+};
+
+/* vecget instrinsic function param0 is vec3
+    vecget d1, vec3 src0, src1
+=>
+    t0 = src1->secondparameter
+    d1 = src0.x
+    jmpc label1, t0 == 1
+    jmpc label2, t0 == 2
+label1:
+    d1 = src0.y
+    jmp label3
+label2:
+    d1 = src0.z
+label3:
+*/
+static VIR_PatternMatchInst _intrinVecGetPatInst1[] = {
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec3 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _intrinVecGetRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_two, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg2 } }, /*label1*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg4 } }, /*label2*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleZ } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label3*/
+};
+
+/* vecget instrinsic function param0 is vec2
+    vecget d1, vec2 src0, src1
+=>
+    t0 = src1->secondparameter
+    jmpc label1, t0 == 1
+    d1 = src0.x
+    jmp label2;
+label1:
+    d1 = src0.y
+label2:
+*/
+static VIR_PatternMatchInst _intrinVecGetPatInst2[] = {
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec2 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _intrinVecGetRepInst2[] = {
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, 0, _consti_one, 0 } },
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
+    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label2*/
+};
+
+static VIR_Pattern _intrinVecGetPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 2) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -1830,7 +2149,7 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* (imageStore) */
     gcvNULL, /* (imageLoad) */
 
-    gcvNULL, /* vecGet (get a componet from a vec), link from lib */
+    _intrinVecGetPattern, /* vecGet (get a componet from a vec), link from lib */
     gcvNULL, /* vecSet (set a componet to a vec), link from lib */
 
     gcvNULL, /* add carry */
