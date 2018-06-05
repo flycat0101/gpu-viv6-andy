@@ -122,6 +122,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor         */ \
     gcvNULL,         /* accessLock         */ \
     gcvNULL,         /* GL FE compiler lock*/ \
@@ -151,6 +152,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor         */ \
     gcvNULL,         /* accessLock         */ \
     gcvNULL,         /* GL FE compiler lock*/ \
@@ -180,6 +182,7 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
+    gcvFALSE,        /* device open.       */ \
     gcvNULL,         /* destructor        */ \
     gcvNULL,         /* accessLock        */ \
 }

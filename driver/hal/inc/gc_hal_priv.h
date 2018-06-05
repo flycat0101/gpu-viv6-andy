@@ -215,6 +215,7 @@ typedef struct _gcsPLS
     gctBOOL                     exiting;
 
     gctBOOL                     bNeedSupportNP2Texture;
+    gctBOOL                     bDeviceOpen;
 
     gctPLS_DESTRUCTOR           destructor;
     /* Mutex to guard PLS access. currently it's for EGL.

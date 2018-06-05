@@ -1166,7 +1166,7 @@ _OpenDevice(
 
     pthread_mutex_lock(&plsMutex);
 
-    if (Os->device > 0)
+    if (gcPLS.bDeviceOpen)
     {
         pthread_mutex_unlock(&plsMutex);
         gcmFOOTER_NO();
@@ -1272,6 +1272,9 @@ _OpenDevice(
             &gcPLS.contiguousLogical
             ));
     }
+
+    /* make sure this instruction is at last */
+    gcPLS.bDeviceOpen = gcvTRUE;
 
 OnError:
     pthread_mutex_unlock(&plsMutex);
@@ -1500,7 +1503,7 @@ gcoOS_GetTLS(
 
     gcmONERROR(_GetTLS(&tls));
 
-    if (gcPLS.os->device < 0)
+    if (!gcPLS.bDeviceOpen)
     {
         status = _OpenDevice(gcPLS.os);
         gcmONERROR(status);
