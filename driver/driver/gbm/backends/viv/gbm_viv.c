@@ -617,9 +617,6 @@ _select_modifier(
     {
         switch (modifiers[i])
         {
-        case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC:
-            prio = gcmMAX(prio, MODIFIER_PRIORITY_SUPER_TILED_FC);
-            break;
         case DRM_FORMAT_MOD_VIVANTE_SUPER_TILED:
             prio = gcmMAX(prio, MODIFIER_PRIORITY_SUPER_TILED);
             break;
