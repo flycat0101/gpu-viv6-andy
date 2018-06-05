@@ -137,6 +137,7 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
     vx_status status = VX_SUCCESS;
     vx_uint32 bin[4];
     vx_uint32 numCorners  = 0;
+    vx_size numCornersVXSize  = 0;
     void *base = NULL;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
     vx_uint32 width, height;
@@ -220,7 +221,8 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
 
     if (num)
     {
-        status = vxWriteScalarValue(num, &numCorners);
+        numCornersVXSize = (vx_size)numCorners;
+        status = vxWriteScalarValue(num, &numCornersVXSize);
     }
 
 #if gcdVX_OPTIMIZER
