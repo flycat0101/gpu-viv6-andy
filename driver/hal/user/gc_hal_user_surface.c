@@ -440,8 +440,7 @@ gcoSURF_AllocateTileStatus(
         Surface->vMsaa = gcvFALSE;
     }
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE) &&
-        (Surface->cacheMode == gcvCACHE_NONE))
+    if (Surface->cacheMode == gcvCACHE_NONE)
     {
         Surface->cacheMode = DEFAULT_CACHE_MODE;
     }
@@ -564,12 +563,11 @@ gcoSURF_AllocateTileStatus(
         if (Surface->hzNode.pool != gcvPOOL_UNKNOWN)
         {
             /* Query the linear size for the tile status buffer. */
-            status = gcoHARDWARE_QueryTileStatus(gcvNULL,
-                                                 Surface,
-                                                 Surface->hzNode.size,
-                                                 &bytes,
-                                                 &alignment,
-                                                 gcvNULL);
+            status = gcoHARDWARE_QueryHzTileStatus(gcvNULL,
+                                                   Surface,
+                                                   Surface->hzNode.size,
+                                                   &bytes,
+                                                   &alignment);
 
             /* Tile status supported? */
             if (status == gcvSTATUS_NOT_SUPPORTED)

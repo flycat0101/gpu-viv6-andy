@@ -6671,6 +6671,55 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoHARDWARE_QueryHzTileStatus(
+    IN gcoHARDWARE Hardware,
+    IN gcoSURF Surface,
+    IN gctSIZE_T Bytes,
+    OUT gctSIZE_T_PTR Size,
+    OUT gctUINT_PTR Alignment
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 alignment;
+
+    gcmHEADER_ARG("Hardware=%p Surface=%p Size=%p Alignment=%p",
+                  Hardware, Surface, Size, Alignment);
+
+    gcmGETHARDWARE(Hardware);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+    gcmDEBUG_VERIFY_ARGUMENT(Size != gcvNULL);
+
+    /* Check tile status size. */
+    alignment = (Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
+                 Hardware->resolveAlignmentX * Hardware->resolveAlignmentY) * 4;
+
+    /* HZ tile status is 1/64 of HZ buffer size. */
+    *Size = Bytes >> 6;
+
+    if (Surface->isMsaa &&
+        (Hardware->features[gcvFEATURE_FAST_MSAA] ||
+         Hardware->features[gcvFEATURE_SMALL_MSAA]))
+    {
+        *Size >>= 2;
+    }
+
+    /* Align the tile status. */
+    *Size = gcmALIGN(*Size, alignment);
+
+    /* Set alignment. */
+    if (Alignment != gcvNULL)
+    {
+        *Alignment = 64;
+    }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
 
 gceSTATUS
 gcoHARDWARE_QuerySamplerBase(

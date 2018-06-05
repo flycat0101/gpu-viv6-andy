@@ -742,6 +742,16 @@ gcoHARDWARE_QueryTileStatus(
     OUT gctUINT32_PTR Filler
     );
 
+/* Get Hz tile status for a surface. */
+gceSTATUS
+gcoHARDWARE_QueryHzTileStatus(
+    IN gcoHARDWARE Hardware,
+    IN gcoSURF Surface,
+    IN gctSIZE_T Bytes,
+    OUT gctSIZE_T_PTR TsSize,
+    OUT gctUINT_PTR Alignment
+    );
+
 /* Disable (Turn off) tile status hardware programming. */
 gceSTATUS
 gcoHARDWARE_DisableHardwareTileStatus(
