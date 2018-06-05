@@ -870,6 +870,8 @@ int viv_drm_probe(struct device *dev);
 int viv_drm_remove(struct device *dev);
 #endif
 
+struct device *galcore_device;
+
 #if USE_LINUX_PCIE
 static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #else /* USE_LINUX_PCIE */
@@ -881,6 +883,8 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif /* USE_LINUX_PCIE */
 {
     int ret = -ENODEV;
+    static u64 dma_mask = ~0ULL;
+
     gcsMODULE_PARAMETERS moduleParam = {
         .irqLine            = irqLine,
         .registerMemBase    = registerMemBase,
@@ -918,6 +922,10 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
     memcpy(moduleParam.chipIDs, chipIDs, gcmSIZEOF(gctUINT) * gcvCORE_COUNT);
     moduleParam.compression = (compression == -1) ? gcvCOMPRESSION_OPTION_DEFAULT : (gceCOMPRESSION_OPTION)compression;
     platform->device = pdev;
+    galcore_device = &pdev->dev;
+
+    galcore_device->dma_mask = &dma_mask;
+
 #if USE_LINUX_PCIE
     if (pci_enable_device(pdev)) {
         printk(KERN_ERR "galcore: pci_enable_device() failed.\n");

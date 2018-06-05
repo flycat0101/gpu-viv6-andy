@@ -1833,6 +1833,93 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+gckKERNEL_CacheOperation(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 ProcessID,
+    IN gctUINT32 Node,
+    IN gceCACHEOPERATION Operation,
+    IN gctPOINTER Logical,
+    IN gctSIZE_T Bytes
+    )
+{
+    gceSTATUS status;
+    gckVIDMEM_NODE nodeObject = gcvNULL;
+    gcuVIDMEM_NODE_PTR node = gcvNULL;
+    void *memHandle;
+
+    gcmkHEADER_ARG("Kernel=%p pid=%u Node=%u op=%d Logical=%p Bytes=0x%lx",
+                   Kernel, ProcessID, Node, Operation, Logical, Bytes);
+
+    gcmkONERROR(gckVIDMEM_HANDLE_Lookup(Kernel,
+                                        ProcessID,
+                                        Node,
+                                        &nodeObject));
+
+    node = nodeObject->node;
+
+    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
+    {
+        static gctBOOL printed;
+
+        if (!printed)
+        {
+            printed = gcvTRUE;
+            gcmkPRINT("[galcore]: %s: Flush Video Memory", __FUNCTION__);
+        }
+
+        gcmkFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        memHandle = node->Virtual.physical;
+    }
+
+    switch (Operation)
+    {
+    case gcvCACHE_FLUSH:
+        /* Clean and invalidate the cache. */
+        status = gckOS_CacheFlush(Kernel->os,
+                                  ProcessID,
+                                  memHandle,
+                                  gcvINVALID_PHYSICAL_ADDRESS,
+                                  Logical,
+                                  Bytes);
+        break;
+    case gcvCACHE_CLEAN:
+        /* Clean the cache. */
+        status = gckOS_CacheClean(Kernel->os,
+                                  ProcessID,
+                                  memHandle,
+                                  gcvINVALID_PHYSICAL_ADDRESS,
+                                  Logical,
+                                  Bytes);
+        break;
+    case gcvCACHE_INVALIDATE:
+        /* Invalidate the cache. */
+        status = gckOS_CacheInvalidate(Kernel->os,
+                                       ProcessID,
+                                       memHandle,
+                                       gcvINVALID_PHYSICAL_ADDRESS,
+                                       Logical,
+                                       Bytes);
+        break;
+
+    case gcvCACHE_MEMORY_BARRIER:
+        status = gckOS_MemoryBarrier(Kernel->os, Logical);
+        break;
+
+    default:
+        gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        break;
+    }
+
+OnError:
+    gcmkFOOTER();
+    return status;
+}
+
 gceSTATUS
 gckKERNEL_WaitFence(
     IN gckKERNEL Kernel,
@@ -2072,7 +2159,6 @@ gckKERNEL_Dispatch(
     gcskSECURE_CACHE_PTR cache;
     gctPOINTER logical;
 #endif
-    gctUINT64 paddr = gcvINVALID_ADDRESS;
 #if !USE_NEW_LINUX_SIGNAL
     gctSIGNAL   signal;
 #endif
@@ -2823,48 +2909,15 @@ gckKERNEL_Dispatch(
         break;
 
     case gcvHAL_CACHE:
-
         logical = gcmUINT64_TO_PTR(Interface->u.Cache.logical);
-
         bytes = (gctSIZE_T) Interface->u.Cache.bytes;
-        switch(Interface->u.Cache.operation)
-        {
-        case gcvCACHE_FLUSH:
-            /* Clean and invalidate the cache. */
-            status = gckOS_CacheFlush(Kernel->os,
-                                      processID,
-                                      physical,
-                                      paddr,
-                                      logical,
-                                      bytes);
-            break;
-        case gcvCACHE_CLEAN:
-            /* Clean the cache. */
-            status = gckOS_CacheClean(Kernel->os,
-                                      processID,
-                                      physical,
-                                      paddr,
-                                      logical,
-                                      bytes);
-            break;
-        case gcvCACHE_INVALIDATE:
-            /* Invalidate the cache. */
-            status = gckOS_CacheInvalidate(Kernel->os,
-                                           processID,
-                                           physical,
-                                           paddr,
-                                           logical,
-                                           bytes);
-            break;
 
-        case gcvCACHE_MEMORY_BARRIER:
-            status = gckOS_MemoryBarrier(Kernel->os,
-                                         logical);
-            break;
-        default:
-            status = gcvSTATUS_INVALID_ARGUMENT;
-            break;
-        }
+        gcmkONERROR(gckKERNEL_CacheOperation(Kernel,
+                                             processID,
+                                             Interface->u.Cache.node,
+                                             Interface->u.Cache.operation,
+                                             logical,
+                                             bytes));
         break;
 
     case gcvHAL_TIMESTAMP:

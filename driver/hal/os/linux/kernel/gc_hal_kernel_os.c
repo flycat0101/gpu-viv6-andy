@@ -457,111 +457,6 @@ _QueryProcessPageTable(
     }
 }
 
-#if !gcdCACHE_FUNCTION_UNIMPLEMENTED && defined(CONFIG_OUTER_CACHE)
-static inline gceSTATUS
-outer_func(
-    gceCACHEOPERATION Type,
-    unsigned long Start,
-    unsigned long End
-    )
-{
-    switch (Type)
-    {
-        case gcvCACHE_CLEAN:
-            outer_clean_range(Start, End);
-            break;
-        case gcvCACHE_INVALIDATE:
-            outer_inv_range(Start, End);
-            break;
-        case gcvCACHE_FLUSH:
-            outer_flush_range(Start, End);
-            break;
-        default:
-            return gcvSTATUS_INVALID_ARGUMENT;
-            break;
-    }
-    return gcvSTATUS_OK;
-}
-
-/*******************************************************************************
-**  _HandleOuterCache
-**
-**  Handle the outer cache for the specified addresses.
-**
-**  ARGUMENTS:
-**
-**      gckOS Os
-**          Pointer to gckOS object.
-**
-**      gctPOINTER Physical
-**          Physical address to flush.
-**
-**      gctPOINTER Logical
-**          Logical address to flush.
-**
-**      gctSIZE_T Bytes
-**          Size of the address range in bytes to flush.
-**
-**      gceOUTERCACHE_OPERATION Type
-**          Operation need to be execute.
-*/
-gceSTATUS
-_HandleOuterCache(
-    IN gckOS Os,
-    IN gctUINT32 Physical,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes,
-    IN gceCACHEOPERATION Type
-    )
-{
-    gceSTATUS status;
-    gctPHYS_ADDR_T paddr;
-    gctPOINTER vaddr;
-    gctUINT32 offset, bytes, left;
-
-    gcmkHEADER_ARG("Os=0x%X Logical=0x%X Bytes=%lu",
-                   Os, Logical, Bytes);
-
-    if (Physical != gcvINVALID_ADDRESS)
-    {
-        /* Non paged memory or gcvPOOL_USER surface */
-        paddr = (unsigned long) Physical;
-        gcmkONERROR(outer_func(Type, paddr, paddr + Bytes));
-    }
-    else
-    {
-        /* Non contiguous virtual memory */
-        vaddr = Logical;
-        left = Bytes;
-
-        while (left)
-        {
-            /* Handle (part of) current page. */
-            offset = (gctUINTPTR_T)vaddr & ~PAGE_MASK;
-
-            bytes = gcmMIN(left, PAGE_SIZE - offset);
-
-            gcmkONERROR(_QueryProcessPageTable(vaddr, &paddr));
-            gcmkONERROR(outer_func(Type, paddr, paddr + bytes));
-
-            vaddr = (gctUINT8_PTR)vaddr + bytes;
-            left -= bytes;
-        }
-    }
-
-    mb();
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-#endif
-
 
 static gceSTATUS
 _ShrinkMemory(
@@ -1122,8 +1017,8 @@ gckOS_MapMemory(
 
         gcmkONERROR(
             allocator->ops->MapUser(allocator,
-                                    mdl, gcvFALSE,
-                                    &mdlMap->vmaAddr));
+                                    mdl, mdlMap,
+                                    gcvFALSE));
     }
 
     mutex_unlock(&mdl->mapsMutex);
@@ -1256,8 +1151,8 @@ gckOS_UnmapMemoryEx(
 
         BUG_ON(!allocator || !allocator->ops->UnmapUser);
 
-        allocator->ops->UnmapUser(allocator, mdl,
-                mdlMap->vmaAddr, mdl->numPages * PAGE_SIZE);
+        allocator->ops->UnmapUser(allocator, mdl, mdlMap,
+                mdl->numPages * PAGE_SIZE);
 
         gcmkVERIFY_OK(_DestroyMdlMap(mdl, mdlMap));
 
@@ -1449,7 +1344,7 @@ gckOS_AllocateNonPagedMemory(
             gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
 
-        gcmkONERROR(allocator->ops->MapUser(allocator, mdl, gcvFALSE, &mdlMap->vmaAddr));
+        gcmkONERROR(allocator->ops->MapUser(allocator, mdl, mdlMap, gcvFALSE));
 
         *Logical = mdlMap->vmaAddr;
     }
@@ -3042,16 +2937,8 @@ gckOS_MemoryBarrier(
     IN gctPOINTER Address
     )
 {
-#if gcdNONPAGED_MEMORY_BUFFERABLE \
-    && defined (CONFIG_ARM) \
-    && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34))
-    /* drain write buffer */
-    dsb();
+    _MemoryBarrier();
 
-    /* drain outer cache's write buffer? */
-#else
-    mb();
-#endif
     return gcvSTATUS_OK;
 }
 
@@ -3344,7 +3231,7 @@ gckOS_LockPages(
 
     if (mdlMap->vmaAddr == gcvNULL)
     {
-        status = allocator->ops->MapUser(allocator, mdl, Cacheable, &mdlMap->vmaAddr);
+        status = allocator->ops->MapUser(allocator, mdl, mdlMap, Cacheable);
 
         if (gcmIS_ERROR(status))
         {
@@ -3668,7 +3555,7 @@ gckOS_UnlockPages(
                 allocator->ops->UnmapUser(
                     allocator,
                     mdl,
-                    mdlMap->vmaAddr,
+                    mdlMap,
                     mdl->numPages * PAGE_SIZE);
 
                 mdlMap->vmaAddr = gcvNULL;
@@ -4465,6 +4352,55 @@ gckOS_ZeroMemory(
 /*******************************************************************************
 ********************************* Cache Control ********************************
 *******************************************************************************/
+static gceSTATUS
+_CacheOperation(
+    IN gckOS Os,
+    IN gctUINT32 ProcessID,
+    IN gctPHYS_ADDR Handle,
+    IN gctPHYS_ADDR_T Physical,
+    IN gctPOINTER Logical,
+    IN gctSIZE_T Bytes,
+    IN gceCACHEOPERATION Operation
+    )
+{
+    PLINUX_MDL mdl = (PLINUX_MDL)Handle;
+    PLINUX_MDL_MAP mdlMap;
+    gckALLOCATOR allocator;
+
+    if (!mdl || !mdl->allocator)
+    {
+        gcmkPRINT("[galcore]: %s: Logical=%p no mdl", __FUNCTION__, Logical);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    allocator = mdl->allocator;
+
+    if (allocator->ops->Cache)
+    {
+        mutex_lock(&mdl->mapsMutex);
+
+        mdlMap = FindMdlMap(mdl, ProcessID);
+
+        mutex_unlock(&mdl->mapsMutex);
+
+        if (mdlMap == gcvNULL)
+        {
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        if (mdlMap->cacheable)
+        {
+            allocator->ops->Cache(allocator,
+                mdl, Logical, Physical, Bytes, Operation);
+
+            return gcvSTATUS_OK;
+        }
+    }
+
+    _MemoryBarrier();
+
+    return gcvSTATUS_OK;
+}
 
 /*******************************************************************************
 **  gckOS_CacheClean
@@ -4524,7 +4460,7 @@ gckOS_CacheClean(
     IN gctSIZE_T Bytes
     )
 {
-    gcsPLATFORM * platform;
+    gceSTATUS status;
 
     gcmkHEADER_ARG("Os=0x%X ProcessID=%d Handle=0x%X Logical=%p Bytes=%lu",
                    Os, ProcessID, Handle, Logical, Bytes);
@@ -4534,61 +4470,14 @@ gckOS_CacheClean(
     gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
-    platform = Os->device->platform;
+    gcmkONERROR(_CacheOperation(Os, ProcessID,
+                                Handle, Physical, Logical, Bytes,
+                                gcvCACHE_CLEAN));
 
-    if (platform && platform->ops->cache)
-    {
-        platform->ops->cache(
-            platform,
-            ProcessID,
-            Handle,
-            Physical,
-            Logical,
-            Bytes,
-            gcvCACHE_CLEAN
-            );
+OnError:
+    gcmkFOOTER();
+    return status;
 
-        /* Success. */
-        gcmkFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
-
-#if !gcdCACHE_FUNCTION_UNIMPLEMENTED
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-
-#if defined (CONFIG_ARM)
-    /* Inner cache. */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)
-    dmac_map_area(Logical, Bytes, DMA_TO_DEVICE);
-#      else
-    dmac_clean_range(Logical, Logical + Bytes);
-#      endif
-
-#elif defined(CONFIG_ARM64)
-    __dma_map_area(Logical, Bytes, DMA_TO_DEVICE);
-#endif
-
-#if defined(CONFIG_OUTER_CACHE)
-    /* Outer cache. */
-    _HandleOuterCache(Os, Physical, Logical, Bytes, gcvCACHE_CLEAN);
-#endif
-
-#elif defined(CONFIG_MIPS)
-    dma_cache_wback((unsigned long) Logical, Bytes);
-#elif defined(CONFIG_PPC)
-    flush_dcache_range((unsigned long)Logical, (unsigned long)Logical + Bytes);
-#else
-    dma_sync_single_for_device(
-              gcvNULL,
-              (dma_addr_t)Physical,
-              Bytes,
-              DMA_TO_DEVICE);
-#endif
-#endif
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
 }
 
 /*******************************************************************************
@@ -4625,7 +4514,7 @@ gckOS_CacheInvalidate(
     IN gctSIZE_T Bytes
     )
 {
-    gcsPLATFORM * platform;
+    gceSTATUS status;
 
     gcmkHEADER_ARG("Os=0x%X ProcessID=%d Handle=0x%X Logical=%p Bytes=%lu",
                    Os, ProcessID, Handle, Logical, Bytes);
@@ -4635,60 +4524,13 @@ gckOS_CacheInvalidate(
     gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
-    platform = Os->device->platform;
+    gcmkONERROR(_CacheOperation(Os, ProcessID,
+                                Handle, Physical, Logical, Bytes,
+                                gcvCACHE_INVALIDATE));
 
-    if (platform && platform->ops->cache)
-    {
-        platform->ops->cache(
-            platform,
-            ProcessID,
-            Handle,
-            Physical,
-            Logical,
-            Bytes,
-            gcvCACHE_INVALIDATE
-            );
-
-        /* Success. */
-        gcmkFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
-
-#if !gcdCACHE_FUNCTION_UNIMPLEMENTED
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-
-#if defined (CONFIG_ARM)
-    /* Inner cache. */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)
-    dmac_unmap_area(Logical, Bytes, DMA_FROM_DEVICE);
-#      else
-    dmac_inv_range(Logical, Logical + Bytes);
-#      endif
-#elif defined(CONFIG_ARM64)
-    __dma_unmap_area(Logical, Bytes, DMA_FROM_DEVICE);
-#endif
-
-#if defined(CONFIG_OUTER_CACHE)
-    /* Outer cache. */
-    _HandleOuterCache(Os, Physical, Logical, Bytes, gcvCACHE_INVALIDATE);
-#endif
-
-#elif defined(CONFIG_MIPS)
-    dma_cache_inv((unsigned long) Logical, Bytes);
-#elif defined(CONFIG_PPC)
-    flush_dcache_range((unsigned long)Logical, (unsigned long)Logical + Bytes);
-#else
-    dma_sync_single_for_device(
-              gcvNULL,
-              (dma_addr_t)Physical,
-              Bytes,
-              DMA_FROM_DEVICE);
-#endif
-#endif
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
+OnError:
+    gcmkFOOTER();
+    return status;
 }
 
 /*******************************************************************************
@@ -4725,7 +4567,7 @@ gckOS_CacheFlush(
     IN gctSIZE_T Bytes
     )
 {
-    gcsPLATFORM * platform;
+    gceSTATUS status;
 
     gcmkHEADER_ARG("Os=0x%X ProcessID=%d Handle=0x%X Logical=%p Bytes=%lu",
                    Os, ProcessID, Handle, Logical, Bytes);
@@ -4735,61 +4577,13 @@ gckOS_CacheFlush(
     gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
-    platform = Os->device->platform;
+    gcmkONERROR(_CacheOperation(Os, ProcessID,
+                                Handle, Physical, Logical, Bytes,
+                                gcvCACHE_FLUSH));
 
-    if (platform && platform->ops->cache)
-    {
-        platform->ops->cache(
-            platform,
-            ProcessID,
-            Handle,
-            Physical,
-            Logical,
-            Bytes,
-            gcvCACHE_FLUSH
-            );
-
-        /* Success. */
-        gcmkFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
-
-#if !gcdCACHE_FUNCTION_UNIMPLEMENTED
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-#if defined (CONFIG_ARM)
-    /* Inner cache. */
-    dmac_flush_range(Logical, Logical + Bytes);
-#elif defined (CONFIG_ARM64)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-    __dma_flush_area(Logical, Bytes);
-#else
-    __dma_flush_range(Logical, Logical + Bytes);
-#endif
-#endif
-
-#if defined(CONFIG_OUTER_CACHE)
-    /* Outer cache. */
-    _HandleOuterCache(Os, Physical, Logical, Bytes, gcvCACHE_FLUSH);
-#endif
-
-#elif defined(CONFIG_MIPS)
-    dma_cache_wback_inv((unsigned long) Logical, Bytes);
-#elif defined(CONFIG_PPC)
-    flush_dcache_range((unsigned long)Logical, (unsigned long)Logical + Bytes);
-#elif defined(CONFIG_X86)
-    wbinvd_on_all_cpus();
-#else
-    dma_sync_single_for_device(
-              gcvNULL,
-              (dma_addr_t)Physical,
-              Bytes,
-              DMA_BIDIRECTIONAL);
-#endif
-#endif
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
+OnError:
+    gcmkFOOTER();
+    return status;
 }
 
 /*******************************************************************************
@@ -7569,8 +7363,10 @@ gckOS_MemoryMmap(
     )
 {
     PLINUX_MDL mdl;
+    PLINUX_MDL_MAP mdlMap;
     gckALLOCATOR allocator;
     gceSTATUS status = gcvSTATUS_OK;
+    gctBOOL cacheable = gcvFALSE;
 
     if (!Physical)
     {
@@ -7585,7 +7381,17 @@ gckOS_MemoryMmap(
         gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    gcmkONERROR(allocator->ops->Mmap(allocator, mdl, skipPages, numPages, Vma));
+    mutex_lock(&mdl->mapsMutex);
+
+    mdlMap = FindMdlMap(mdl, _GetProcessID());
+    if (mdlMap)
+    {
+        cacheable = mdlMap->cacheable;
+    }
+
+    mutex_unlock(&mdl->mapsMutex);
+
+    gcmkONERROR(allocator->ops->Mmap(allocator, mdl, cacheable, skipPages, numPages, Vma));
 
 OnError:
     return status;

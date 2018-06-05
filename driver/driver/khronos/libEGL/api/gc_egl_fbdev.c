@@ -3864,6 +3864,7 @@ _ConnectPixmap(
     gcoSURF shadow = gcvNULL;
     gctPOINTER pointer;
     VEGLPixmapInfo info = gcvNULL;
+    gceSURF_TYPE type = gcvSURF_CACHEABLE_BITMAP;
 
     /* Query pixmap geometry info. */
     gcmONERROR(fbdev_GetPixmapInfoEx((PlatformDisplayType) Display->hdc,
@@ -3954,14 +3955,14 @@ _ConnectPixmap(
                               pixmapWidth,
                               pixmapHeight,
                               1,
-                              gcvSURF_BITMAP,
+                              type,
                               pixmapFormat,
                               gcvPOOL_USER,
                               &wrapper));
 
         /* Set pixels. */
         status = gcoSURF_SetBuffer(wrapper,
-                                   gcvSURF_BITMAP,
+                                   type,
                                    pixmapFormat,
                                    pixmapStride,
                                    pixmapBits,

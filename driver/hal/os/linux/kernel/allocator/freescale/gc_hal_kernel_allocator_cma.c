@@ -270,9 +270,10 @@ static gceSTATUS
 _CMAFSLMmap(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
+    IN gctBOOL Cacheable,
     IN gctSIZE_T skipPages,
     IN gctSIZE_T numPages,
-    INOUT struct vm_area_struct *vma
+    IN struct vm_area_struct *vma
     )
 {
     gckOS os = Allocator->os;
@@ -317,7 +318,7 @@ static void
 _CMAFSLUnmapUser(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
-    IN gctPOINTER Logical,
+    IN PLINUX_MDL_MAP MdlMap,
     IN gctUINT32 Size
     )
 {
@@ -328,7 +329,7 @@ _CMAFSLUnmapUser(
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
-    if (vm_munmap((unsigned long)Logical, Size) < 0)
+    if (vm_munmap((unsigned long)MdlMap->vmaAddr, Size) < 0)
     {
         gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,
@@ -338,7 +339,7 @@ _CMAFSLUnmapUser(
     }
 #else
     down_write(&current->mm->mmap_sem);
-    if (do_munmap(current->mm, (unsigned long)Logical, Size) < 0)
+    if (do_munmap(current->mm, (unsigned long)MdlMap->vmaAddr, Size) < 0)
     {
         gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,
@@ -354,8 +355,8 @@ static gceSTATUS
 _CMAFSLMapUser(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
-    IN gctBOOL Cacheable,
-    OUT gctPOINTER * UserLogical
+    IN PLINUX_MDL_MAP MdlMap,
+    IN gctBOOL Cacheable
     )
 {
     gctPOINTER userLogical = gcvNULL;
@@ -413,23 +414,16 @@ _CMAFSLMapUser(
             gcmkERR_BREAK(gcvSTATUS_OUT_OF_RESOURCES);
         }
 
-        gcmkERR_BREAK(_CMAFSLMmap(Allocator, Mdl, 0, Mdl->numPages, vma));
+        gcmkERR_BREAK(_CMAFSLMmap(Allocator, Mdl, Cacheable, 0, Mdl->numPages, vma));
+        MdlMap->vma = vma;
     }
     while (gcvFALSE);
     up_write(&current->mm->mmap_sem);
 
     if (gcmIS_SUCCESS(status))
     {
-        gcmkONERROR(gckOS_CacheFlush(
-            Allocator->os,
-            _GetProcessID(),
-            Mdl,
-            gcvINVALID_ADDRESS,
-            userLogical,
-            Mdl->numPages * PAGE_SIZE
-            ));
-
-        *UserLogical = userLogical;
+        MdlMap->vmaAddr = userLogical;
+        MdlMap->cacheable = Cacheable;
     }
 
 OnError:
@@ -473,6 +467,18 @@ _CMACache(
     IN gceCACHEOPERATION Operation
     )
 {
+    switch (Operation)
+    {
+    case gcvCACHE_CLEAN:
+    case gcvCACHE_FLUSH:
+        _MemoryBarrier();
+        break;
+    case gcvCACHE_INVALIDATE:
+        break;
+    default:
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     return gcvSTATUS_OK;
 }
 

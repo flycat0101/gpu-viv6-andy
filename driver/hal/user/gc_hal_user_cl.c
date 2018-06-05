@@ -743,7 +743,7 @@ gcoCL_FlushSurface(
             }
 
             status = gcoOS_CacheFlush(gcvNULL,
-                                           0,
+                                           Surface->node.u.normal.node,
                                            Surface->node.logical,
                                            Surface->size);
         }

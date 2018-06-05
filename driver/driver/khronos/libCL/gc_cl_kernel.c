@@ -295,7 +295,9 @@ clfLoadKernelArgValues(
             {
                 if (memObj->u.buffer.wrapped && ((memObj->flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV) == 0))
                 {
-                    gcoOS_CacheInvalidate(gcvNULL, 0, memObj->u.buffer.logical, memObj->u.buffer.allocatedSize);
+                    gcsSURF_NODE_PTR surfNode = memObj->u.buffer.node;
+
+                    gcoOS_CacheInvalidate(gcvNULL, surfNode->u.normal.node, memObj->u.buffer.logical, memObj->u.buffer.allocatedSize);
                 }
 
                 /* Is this buffer for read or write?  Get render fence, and wait from render->blt engine result */

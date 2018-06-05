@@ -314,9 +314,10 @@ static gceSTATUS
 _DmaMmap(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
+    IN gctBOOL Cacheable,
     IN gctSIZE_T skipPages,
     IN gctSIZE_T numPages,
-    INOUT struct vm_area_struct *vma
+    IN struct vm_area_struct *vma
     )
 {
     struct mdl_dma_priv *mdlPriv = (struct mdl_dma_priv*)Mdl->priv;
@@ -333,7 +334,7 @@ _DmaMmap(
             vma->vm_start,
             (mdlPriv->dmaHandle >> PAGE_SHIFT) + skipPages,
             numPages << PAGE_SHIFT,
-            gcmkNONPAGED_MEMROY_PROT(vma->vm_page_prot)) < 0)
+            pgprot_writecombine(vma->vm_page_prot)) < 0)
 #else
     /* map kernel memory to user space.. */
     if (dma_mmap_writecombine(gcvNULL,
@@ -360,7 +361,7 @@ static void
 _DmaUnmapUser(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
-    IN gctPOINTER Logical,
+    IN PLINUX_MDL_MAP MdlMap,
     IN gctUINT32 Size
     )
 {
@@ -371,7 +372,7 @@ _DmaUnmapUser(
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
-    if (vm_munmap((unsigned long)Logical, Size) < 0)
+    if (vm_munmap((unsigned long)MdlMap->vmaAddr, Size) < 0)
     {
         gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,
@@ -381,7 +382,7 @@ _DmaUnmapUser(
     }
 #else
     down_write(&current->mm->mmap_sem);
-    if (do_munmap(current->mm, (unsigned long)Logical, Size) < 0)
+    if (do_munmap(current->mm, (unsigned long)MdlMap->vmaAddr, Size) < 0)
     {
         gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,
@@ -397,8 +398,8 @@ static gceSTATUS
 _DmaMapUser(
     gckALLOCATOR Allocator,
     PLINUX_MDL Mdl,
-    gctBOOL Cacheable,
-    OUT gctPOINTER * UserLogical
+    PLINUX_MDL_MAP MdlMap,
+    gctBOOL Cacheable
     )
 {
     gctPOINTER userLogical = gcvNULL;
@@ -458,9 +459,11 @@ _DmaMapUser(
             gcmkERR_BREAK(gcvSTATUS_OUT_OF_RESOURCES);
         }
 
-        gcmkERR_BREAK(_DmaMmap(Allocator, Mdl, 0, Mdl->numPages, vma));
+        gcmkERR_BREAK(_DmaMmap(Allocator, Mdl, Cacheable, 0, Mdl->numPages, vma));
 
-        *UserLogical = userLogical;
+        MdlMap->vmaAddr = userLogical;
+        MdlMap->cacheable = gcvFALSE;
+        MdlMap->vma = vma;
     }
     while (gcvFALSE);
     up_write(&current->mm->mmap_sem);
@@ -506,6 +509,18 @@ _DmaCache(
     IN gceCACHEOPERATION Operation
     )
 {
+    switch (Operation)
+    {
+    case gcvCACHE_CLEAN:
+    case gcvCACHE_FLUSH:
+        _MemoryBarrier();
+        break;
+    case gcvCACHE_INVALIDATE:
+        break;
+    default:
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     return gcvSTATUS_OK;
 }
 
