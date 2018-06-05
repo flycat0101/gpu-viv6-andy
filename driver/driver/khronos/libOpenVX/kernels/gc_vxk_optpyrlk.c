@@ -80,7 +80,8 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     vxReadScalarValue(numIterationsScalar, &numIterations);
     //vxReadScalarValue(winSizeScalar, &winSize);
 
-    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_CAPACITY, &capacity, sizeof(capacity));
+    /*only process the valid key points*/
+    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_NUMITEMS, &capacity, sizeof(capacity));
     status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ITEMSIZE, &itemsize, sizeof(itemsize));
 
     kernelContext->params.kernel = gcvVX_KERNEL_OPTICAL_FLOW_PYR_LK;
@@ -96,6 +97,19 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     kernelContext->params.isUseInitialEstimate = (gctUINT8)isUseInitialEstimate;
     kernelContext->params.maxLevel = (gctINT32)maxLevel;
     kernelContext->params.winSize = (gctINT32)winSize;
+
+    /*set the initial value (prevPts) to nextPts*/
+    {
+        vx_size i;
+        vx_uint8_ptr dstDataPtr = (vx_uint8_ptr)nextPts->memory.logicals[0];
+        vx_uint8_ptr srcDataPtr = (vx_uint8_ptr)prevPts->memory.logicals[0];
+
+        /*vxoVLKTracker_ValidateOutput makes sure that nextPts->capacity >= prevPts->capacity*/
+        for (i = 0; i < (capacity * itemsize); i++)
+        {
+            dstDataPtr[i] = srcDataPtr[i];
+        }
+    }
 
     /* prevPts - index = 0 */
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_ARRAY, prevPts, GC_VX_INDEX_AUTO);
