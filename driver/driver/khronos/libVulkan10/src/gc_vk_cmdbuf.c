@@ -983,17 +983,19 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     __vk_CommitInfo *pCommits = gcvNULL;
     uint32_t isub, icmd, istate, iexe;
     VkResult result = VK_SUCCESS;
+    uint32_t maxCommitCount = __VK_MAX_COMMITS;
 
     __VK_SET_ALLOCATIONCB(&devQueue->pDevContext->memCb);
 
+retry:
     pCommits = (__vk_CommitInfo *)__VK_ALLOC(
-        (__VK_MAX_COMMITS * sizeof(__vk_CommitInfo)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
+        (maxCommitCount * sizeof(__vk_CommitInfo)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
 
     if (!pCommits)
     {
         return VK_ERROR_OUT_OF_HOST_MEMORY;
     }
-    __VK_MEMZERO(pCommits, (__VK_MAX_COMMITS * sizeof(__vk_CommitInfo)));
+    __VK_MEMZERO(pCommits, (maxCommitCount * sizeof(__vk_CommitInfo)));
 
     for (isub = 0; isub < submitCount; isub++)
     {
@@ -1049,7 +1051,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                         pCommits[icommits].statePipe  = statePipe;
 
                         icommits++;
-                        __VK_ASSERT(icommits < __VK_MAX_COMMITS);
+                        if (icommits >= maxCommitCount)
+                        {
+                            maxCommitCount <<= 1;
+                            /* rollback: the extra wait semaphore in command buffer no need rollback,
+                            ** them has the same HW fence address */
+                            /* free memory */
+                            __VK_FREE(pCommits);
+                            /* reset state */
+                            cmd->state = __VK_CMDBUF_STATE_EXECUTABLE;
+                            pCommits = VK_NULL_HANDLE;
+                            goto retry;
+                        }
                     }
 
                     /* Update the remaining state buffer info */
@@ -1076,7 +1089,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                         pCommits[icommits].statePipe  = secStateBuffer->bufPipe;
 
                         icommits++;
-                        __VK_ASSERT(icommits < __VK_MAX_COMMITS);
+                        if (icommits >= maxCommitCount)
+                        {
+                            maxCommitCount <<= 1;
+                            /* rollback: the extra wait semaphore in command buffer no need rollback,
+                            ** them has the same HW fence address */
+                            /* free memory */
+                            __VK_FREE(pCommits);
+                            /* reset state */
+                            cmd->state = __VK_CMDBUF_STATE_EXECUTABLE;
+                            pCommits = VK_NULL_HANDLE;
+                            goto retry;
+                        }
 
                         secStateBuffer = secStateBuffer->next;
                     }
