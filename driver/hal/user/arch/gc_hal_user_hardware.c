@@ -17835,9 +17835,8 @@ gcoHARDWARE_EnableTileStatus(
 
         if (Surface->cacheMode == gcvCACHE_NONE)
         {
-            Surface->cacheMode = DEFAULT_CACHE_MODE;
+            Surface->cacheMode = (Surface->hints & gcvSURF_CACHE_MODE_128) ? gcvCACHE_128 : DEFAULT_CACHE_MODE;
         }
-
     }
 
     for (i = SurfView->firstSlice; i < (SurfView->firstSlice + SurfView->numSlices); i++)
