@@ -1494,7 +1494,10 @@ _FillInFeatureTable(
 
     Features[gcvFEATURE_EARLY_Z] = database->REG_NoEZ == 0;
 
-    Features[gcvFEATURE_COMPRESSION] = database->REG_ZCompression;
+    if (!Hardware->bigEndian)
+    {
+        Features[gcvFEATURE_COMPRESSION] = database->REG_ZCompression;
+    }
 
     Features[gcvFEATURE_MSAA] = database->REG_MSAA;
 
@@ -16914,9 +16917,9 @@ _EnableTileStatus(
             /* Program clear value register. */
             gcmSETSTATEDATA_NEW(
                 stateDelta, reserve, memory, gcvFALSE, 0x059B,
-                (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP)
-                    ? Surface->fcValue[SurfView->firstSlice]
-                    : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
+                (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP)
+                    ? gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
+                    : Surface->fcValue[SurfView->firstSlice]
                 );
 
         gcmENDSTATEBATCH_NEW(
@@ -17126,9 +17129,9 @@ _EnableTileStatus(
             /* Program clear value register. */
             gcmSETSTATEDATA_NEW(
                 stateDelta, reserve, memory, gcvFALSE, 0x0598,
-                (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP)
-                    ? Surface->fcValue[SurfView->firstSlice]
-                    : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
+                (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP)
+                    ? gcmBSWAP32(Surface->fcValue[SurfView->firstSlice])
+                    : Surface->fcValue[SurfView->firstSlice]
                 );
 
         gcmENDSTATEBATCH_NEW(
@@ -17160,8 +17163,8 @@ _EnableTileStatus(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
- Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP) ?
+ gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) : Surface->fcValueUpper[SurfView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17648,8 +17651,8 @@ _EnableTileStatusMRT(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0598, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
- Surface->fcValue[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0598, (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP) ?
+ gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) : Surface->fcValue[SurfView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17678,8 +17681,8 @@ _EnableTileStatusMRT(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
- Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x05AF, (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP) ?
+ gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) : Surface->fcValueUpper[SurfView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17820,8 +17823,8 @@ _EnableTileStatusMRT(
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0680 + RtIndex, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
- Surface->fcValue[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0680 + RtIndex, (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP) ?
+ gcmBSWAP32(Surface->fcValue[SurfView->firstSlice]) : Surface->fcValue[SurfView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -17850,8 +17853,8 @@ _EnableTileStatusMRT(
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0688 + RtIndex, (Surface->formatInfo.endian == gcvENDIAN_NO_SWAP) ?
- Surface->fcValueUpper[SurfView->firstSlice] : gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0688 + RtIndex, (Surface->formatInfo.endian != gcvENDIAN_NO_SWAP) ?
+ gcmBSWAP32(Surface->fcValueUpper[SurfView->firstSlice]) : Surface->fcValueUpper[SurfView->firstSlice] );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
