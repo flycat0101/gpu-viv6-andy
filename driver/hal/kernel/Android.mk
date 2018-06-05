@@ -24,9 +24,14 @@ include $(CLEAR_VARS)
 GALCORE := \
 	$(LOCAL_PATH)/../../galcore.ko
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+KERNEL_CFLAGS ?= KCFLAGS=-mno-android
+endif
+
 $(GALCORE):   KBUILD
 	@cd $(AQROOT)
 	@$(MAKE) -f Kbuild -C $(AQROOT) \
+		$(KERNEL_CFLAGS) \
 		AQROOT=$(abspath $(AQROOT)) \
 		AQARCH=$(abspath $(AQARCH)) \
 		AQVGARCH=$(abspath $(AQVGARCH)) \

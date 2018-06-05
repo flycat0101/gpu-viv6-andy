@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -119,33 +119,34 @@ LCM(int a, int b)
 }
 
 typedef struct {
-    xf86CrtcConfigFuncsRec imxCrtcConfigFuncs;
-    xf86CrtcFuncsRec imxCrtcFuncs;
-    xf86OutputFuncsRec imxOutputFuncs;
+    xf86CrtcConfigFuncsRec    imxCrtcConfigFuncs;
+    xf86CrtcFuncsRec    imxCrtcFuncs;
+    xf86OutputFuncsRec    imxOutputFuncs;
 
     /* Atoms for output properties */
-    Atom atomEdid;
+    Atom    atomEdid;
 
+    /* TODO - maybe don't need to store these? */
     xf86CrtcPtr    crtcPtr;
-    xf86OutputPtr outputPtr;
+    xf86OutputPtr    outputPtr;
 
     /* Which mode is currently set */
-    char fbModeNameCurrent[64];
+    char        fbModeNameCurrent[64];
 
-    Bool fbShadowAllocated;
-    Bool edidModesAvail;
+    Bool        fbShadowAllocated;
+    Bool        edidModesAvail;
 
     /* Buffer for reading EDID monitor data */
-    Uchar edidDataBytes[128];
+    Uchar        edidDataBytes[128];
 
     /* List of modes supported by frame buffer. */
     DisplayModePtr    fbModesList;
 
     /* Range of frame buffer modes supported. */
-    int fbMinWidth;
-    int fbMinHeight;
-    int fbMaxWidth;
-    int fbMaxHeight;
+    int        fbMinWidth;
+    int        fbMinHeight;
+    int        fbMaxWidth;
+    int        fbMaxHeight;
 
 } ImxDisplayRec, *ImxDisplayPtr;
 
@@ -197,8 +198,8 @@ Bool imxSetShadowBuffer(ScreenPtr pScreen)
     fPtr->fbMemoryScreenReserve = fbMaxScreenSize;
 
     xf86DrvMsg(scrnIndex, X_INFO,
-    "reserve %d bytes for on screen frame buffer; total fb memory size %d bytes; offset of shadow buffer %d\n",
-    fPtr->fbMemoryScreenReserve, fPtr->fbMemorySize, fbOffsetScreen2);
+        "reserve %d bytes for on screen frame buffer; total fb memory size %d bytes; offset of shadow buffer %d\n",
+        fPtr->fbMemoryScreenReserve, fPtr->fbMemorySize, fbOffsetScreen2);
 
     fPtr->fbMemoryStart2 = NULL;
     if ((unsigned int)(fbOffsetScreen2 + fbMaxScreenSize) <= (unsigned int)fPtr->fbMemorySize) {
@@ -207,13 +208,12 @@ Bool imxSetShadowBuffer(ScreenPtr pScreen)
     }
     else {
         xf86DrvMsg(scrnIndex, X_ERROR, "fb memory is not big enough to hold shadow buffer!\n");
+        return FALSE;
     }
 
     if (!imxDisplayStartScreenInit(scrnIndex, pScreen)) {
         return FALSE;
     }
-
-    return TRUE;
 }
 
 /* -------------------------------------------------------------------- */
@@ -224,9 +224,9 @@ imxRemoveTrailingNewLines(char* str)
     int len = strlen(str);
 
     while ((len > 0) && ('\n' == str[len-1])) {
+
         str[--len] = '\0';
     }
-
 }
 
 /* -------------------------------------------------------------------- */
@@ -262,7 +262,7 @@ static const char* imxSysnodeNameMonitorInfoArray[] =
 };
 static const int imxSysnodeNameMonitorInfoCount =
     sizeof(imxSysnodeNameMonitorInfoArray) /
-    sizeof(imxSysnodeNameMonitorInfoArray[0]);
+        sizeof(imxSysnodeNameMonitorInfoArray[0]);
 
 static xf86OutputStatus
 imxDisplayGetCableState(int scrnIndex, const char* fbId)
@@ -272,7 +272,7 @@ imxDisplayGetCableState(int scrnIndex, const char* fbId)
 
 static xf86MonPtr
 imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
-    const int edidDataMaxBytes)
+            const int edidDataMaxBytes)
 {
     /* Loop through each sysnode entry looking for the EDID info. */
     int iEntry;
@@ -286,14 +286,17 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
         strcat(sysnodeName, "fb_name");
         FILE* fp = fopen(sysnodeName, "r");
         if (NULL == fp) {
+
             continue;
         }
 
         /* The name of the frame buffer device */
         char linebuf[80] = "";
-        const BOOL bNoName = (NULL == fgets(linebuf, sizeof(linebuf), fp));
+        const BOOL bNoName =
+            (NULL == fgets(linebuf, sizeof(linebuf), fp));
         fclose(fp);
         if (bNoName || (0 != strncmp(linebuf, fbId, strlen(fbId)))) {
+
             continue;
         }
 
@@ -302,6 +305,7 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
         strcat(sysnodeName, "cable_state");
         fp = fopen(sysnodeName, "r");
         if (NULL == fp) {
+
             continue;
         }
 
@@ -312,6 +316,7 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
             (NULL == fgets(strCableState, sizeof(strCableState), fp));
         fclose(fp);
         if (bNoInfo) {
+
             continue;
         }
 
@@ -319,6 +324,7 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
 
         /* Determine cable state from the string. */
         if (0 != strcmp(strCableState, "plugin")) {
+
             continue;
         }
 
@@ -327,6 +333,7 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
         strcat(sysnodeName, "edid");
         fp = fopen(sysnodeName, "r");
         if (NULL == fp) {
+
             continue;
         }
 
@@ -348,20 +355,20 @@ imxDisplayGetEdid(ScrnInfoPtr pScrn, const char* fbId, Uchar edidDataBytes[],
         if (edidDataMaxBytes != nBytes) {
 
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-            "sysnode '%s' contains only %d of %d bytes\n",
-            sysnodeName, nBytes, edidDataMaxBytes);
+                   "sysnode '%s' contains only %d of %d bytes\n",
+                sysnodeName, nBytes, edidDataMaxBytes);
 
             continue;
         }
 
         /* Interpret the EDID monitor info. */
         xf86MonPtr pMonitor =
-        xf86InterpretEDID(pScrn->scrnIndex, edidDataBytes);
+            xf86InterpretEDID(pScrn->scrnIndex, edidDataBytes);
         if (NULL == pMonitor) {
 
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-            "cannot interpret EDID info in sysnode '%s'\n",
-            sysnodeName);
+                   "cannot interpret EDID info in sysnode '%s'\n",
+                sysnodeName);
 
             continue;
         }
@@ -380,6 +387,7 @@ imxDisplayGetMonitorPreferredMode(DisplayModePtr modesList)
     if (NULL != mode) do {
 
         if (0 != (M_T_PREFERRED & mode->type)) {
+
             return mode;
         }
 
@@ -393,7 +401,7 @@ imxDisplayGetMonitorPreferredMode(DisplayModePtr modesList)
 
 static Bool
 imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
-        const char* modeName)
+            const char* modeName)
 {
     /* Access driver private screen data */
     ImxPtr imxPtr = IMXPTR(pScrn);
@@ -408,15 +416,14 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
         /* name of the currently selected mode. */
         char sysnodeName[80];
         sprintf(sysnodeName, "/sys/class/graphics/%s/mode",
-        fbDeviceName);
+                fbDeviceName);
         int fd = open(sysnodeName, O_RDWR);
         if (-1 == fd) {
 
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-            "unable to open sysnode '%s':%s\n",
-            sysnodeName, strerror(errno));
+                "unable to open sysnode '%s':%s\n",
+                sysnodeName, strerror(errno));
             return FALSE;
-
         }
 
         /* Make sure mode name has a newline at end on the write. */
@@ -426,10 +433,10 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
 
         /* Write the desired mode name */
         if (-1 == write(fd, validModeName, strlen(validModeName))) {
-            close(fd);
+
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-            "unable to write '%s' to sysnode '%s': %s\n",
-            validModeName, sysnodeName, strerror(errno));
+                "unable to write '%s' to sysnode '%s': %s\n",
+                validModeName, sysnodeName, strerror(errno));
             return FALSE;
         }
 
@@ -447,8 +454,8 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
     if (0 != ioctl(fdDev, FBIOGET_FSCREENINFO, &fbFixScreenInfo)) {
 
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-        "unable to get FSCREENINFO for mode '%s': %s\n",
-        modeName, strerror(errno));
+            "unable to get FSCREENINFO for mode '%s': %s\n",
+            modeName, strerror(errno));
         return FALSE;
     }
 
@@ -457,8 +464,8 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
     if (0 != ioctl(fdDev, FBIOGET_VSCREENINFO, &fbVarScreenInfo)) {
 
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-        "unable to get VSCREENINFO for mode '%s': %s\n",
-        modeName, strerror(errno));
+            "unable to get VSCREENINFO for mode '%s': %s\n",
+            modeName, strerror(errno));
         return FALSE;
     }
 
@@ -474,7 +481,7 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
         /* of 2nd buffer? */
         /* Use fbMemoryStart2_noxshift instead of fbMemoryStart2 to support PXP which does not support xoffset */
         const int offsetBytes =
-        imxPtr->fbMemoryStart2_noxshift - imxPtr->mFB.mFBStart;
+            imxPtr->fbMemoryStart2_noxshift - imxPtr->mFB.mFBStart;
 
         /* What should the yoffset by to start of 2nd buffer? */
         const int yoffset = offsetBytes / line_length;
@@ -489,8 +496,8 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
         fbVarScreenInfo.yoffset = yoffset;
         fbVarScreenInfo.yres_virtual = vyres;
 
-        /* If the shadow memory is not allocated, then we need to */
-        /* reset any FB pan display back to (0,0). */
+    /* If the shadow memory is not allocated, then we need to */
+    /* reset any FB pan display back to (0,0). */
     } else {
 
         fbVarScreenInfo.xoffset = 0;
@@ -503,8 +510,8 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
     if (0 != ioctl(fdDev, FBIOPUT_VSCREENINFO, &fbVarScreenInfo)) {
 
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-        "unable to set VSCREENINFO for mode '%s': %s\n",
-        modeName, strerror(errno));
+            "unable to set VSCREENINFO for mode '%s': %s\n",
+            modeName, strerror(errno));
         return FALSE;
     }
 
@@ -568,8 +575,8 @@ imxDisplaySetUserMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
         fbVarScreenInfo.xoffset = 0;
         fbVarScreenInfo.yoffset = 0;
-        fbVarScreenInfo.xres = mode->HDisplay;
-        fbVarScreenInfo.yres = mode->VDisplay;
+        fbVarScreenInfo.xres = pScrn->virtualX;
+        fbVarScreenInfo.yres = pScrn->virtualY;
         fbVarScreenInfo.xres_virtual = IMX_ALIGN(fbVarScreenInfo.xres, imxPtr->fbAlignWidth);
         fbVarScreenInfo.yres_virtual = IMX_ALIGN(fbVarScreenInfo.yres, imxPtr->fbAlignHeight);
     }
@@ -744,7 +751,7 @@ imxDisplayGetCurrentMode(ScrnInfoPtr pScrn, int fd, const char* modeName)
     }
 
     /* Allocate a new mode structure. */
-    DisplayModePtr mode = (DisplayModePtr)malloc(sizeof(DisplayModeRec));
+    DisplayModePtr mode = malloc(sizeof(DisplayModeRec));
 
     /* Transfer info from fbdev var screen info */
     /* into the X DisplayModeRec. */
@@ -841,13 +848,6 @@ imxDisplayGetModes(ScrnInfoPtr pScrn, const char* fbDeviceName)
 
         /* Check whether meet XRandR requirement (SL/SX: some modes are not supported) */
         if (!imxDisplayCheckModeXRandR(pScrn)) {
-            if ( NULL != mode )
-            {
-                if (NULL != mode->name) {
-                    free((void *)((char*)mode->name));
-                }
-                free((void *)mode);
-            }
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                 "Mode '%s' is eliminated from XRandR support\n",
                 modeName);
@@ -863,14 +863,6 @@ imxDisplayGetModes(ScrnInfoPtr pScrn, const char* fbDeviceName)
 
             xf86PrintModeline(pScrn->scrnIndex, mode);
             modesList = xf86ModesAdd(modesList, mode);
-        } else {
-            if ( NULL != mode )
-            {
-                if (NULL != mode->name) {
-                    free((void *)((char*)mode->name));
-                }
-                free((void *)mode);
-            }
         }
     }
 
@@ -953,14 +945,16 @@ imxCrtcResize(ScrnInfoPtr pScrn, int width, int height)
     /* Access the screen pixmap */
     PixmapPtr pScreenPixmap = (*pScreen->GetScreenPixmap)(pScreen);
     if (NULL == pScreenPixmap) {
+
         return FALSE;
     }
 
     pScrn->virtualX = width;
     pScrn->virtualY = height;
+    pScrn->displayWidth = IMX_ALIGN(width, imxPtr->fbAlignWidth);
 
     const int bytesPerPixel = (pScrn->bitsPerPixel + 7) / 8;
-    const int stride = fbdevHWGetLineLength(pScrn);
+    const int stride = pScrn->displayWidth * bytesPerPixel;
 
     /* Resize the screen pixmap to new size */
     (*pScreen->ModifyPixmapHeader)(
@@ -1163,6 +1157,7 @@ imxCrtcCommit(xf86CrtcPtr crtc)
      * Commit mode changes to a CRTC
      */
 
+    /* TODO - unblank display after changing modes? */
 }
 
 static void*
@@ -1277,6 +1272,7 @@ imxCrtcShadowDestroy(xf86CrtcPtr crtc, PixmapPtr pPixmap, void* data)
 static void
 imxCrtcDestroy(xf86CrtcPtr crtc)
 {
+    /* TODO */
 }
 
 /* -------------------------------------------------------------------- */
@@ -1307,11 +1303,13 @@ imxOutputDPMS(xf86OutputPtr output, int mode)
 static void
 imxOutputSave(xf86OutputPtr output)
 {
+    /* TODO */
 }
 
 static void
 imxOutputRestore(xf86OutputPtr output)
 {
+    /* TODO */
 }
 
 static int
@@ -1401,6 +1399,7 @@ imxOutputGetModes(xf86OutputPtr output)
 static void
 imxOutputDestroy(xf86OutputPtr output)
 {
+    /* TODO */
 }
 
 static Bool
@@ -1647,6 +1646,7 @@ imxDisplayPreInit(ScrnInfoPtr pScrn)
                 "xf86InitialConfiguration failed\n");
         return FALSE;
     }
+
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO,
         "imxDisplayPreInit: virtual set %d x %d, display width %d\n",
@@ -2086,14 +2086,6 @@ imxRefreshModes(ScrnInfoPtr pScrn, int fbIndex, char *suggestMode)
 
             xf86PrintModeline(pScrn->scrnIndex, mode);
             modesList = xf86ModesAdd(modesList, mode);
-        } else {
-            if ( NULL != mode )
-            {
-                if (NULL != mode->name) {
-                    free((void *)((char*)mode->name));
-                }
-                free((void *)mode);
-            }
         }
     }
 

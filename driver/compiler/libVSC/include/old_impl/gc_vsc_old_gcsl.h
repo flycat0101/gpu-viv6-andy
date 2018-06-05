@@ -4369,6 +4369,11 @@ struct _gcSHADER
     /* Transform feedback varyings */
     gcsTRANSFORM_FEEDBACK       transformFeedback;
 
+#if defined(ANDROID)
+    gctBOOL                 bCutUniformLimit;
+#endif
+
+
     /* Source code string */
     gctUINT                     sourceLength;            /* including terminating '\0' */
     gctSTRING                   source;

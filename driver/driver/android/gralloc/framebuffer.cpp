@@ -72,7 +72,7 @@
              HAL_PIXEL_FORMAT_RGB_565   : 4
              HAL_PIXEL_FORMAT_BGRA_8888 : 5
  */
-#define FRAMEBUFFER_PIXEL_FORMAT  0
+#define FRAMEBUFFER_PIXEL_FORMAT  1
 
 /*
      NUM_BUFFERS
@@ -84,7 +84,7 @@
          This value should equal to (yres_virtual / yres).
  */
 #ifndef NUM_FRAMEBUFFER_SURFACE_BUFFERS
-#define NUM_BUFFERS               2
+#define NUM_BUFFERS               3
 #else
 #define NUM_BUFFERS               NUM_FRAMEBUFFER_SURFACE_BUFFERS
 #endif
@@ -200,6 +200,12 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         if (ioctl(m->framebuffer->fd, FBIOPAN_DISPLAY, &m->info) == -1) {
             LOGE("FBIOPAN_DISPLAY failed");
             m->base.unlock(&m->base, buffer);
+            return -errno;
+        }
+        unsigned int crtc = 0;
+        if (ioctl(m->framebuffer->fd, FBIO_WAITFORVSYNC, &crtc) == -1)
+        {
+            LOGE("FBIO_WAITFORVSYNC failed");
             return -errno;
         }
 #endif
@@ -405,7 +411,6 @@ static int mapFrameBufferLocked(struct private_module_t* module)
     }
 
 
-    module->flags = flags;
     module->info = info;
     module->finfo = finfo;
     module->xdpi = xdpi;
@@ -633,6 +638,12 @@ int gralloc_alloc_framebuffer(alloc_device_t* dev,
         if (err < 0) {
             LOGE("%s: failed to wrap", __FUNCTION__);
         }
+
+        /* XXX: Freescale need export the following fields. */
+        hnd->width  = w;
+        hnd->height = h;
+        hnd->format = format;
+        hnd->phys   = phys;
     }
 
     return 0;

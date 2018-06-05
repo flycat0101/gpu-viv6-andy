@@ -39,7 +39,7 @@ static const char * _dlls[] =
     "libOpenVG.so",                     /* OpenVG 1.0 */
     "libGL.so",
 #elif defined(__QNXNTO__)
-    "libEGL_viv",                       /* EGL */
+    "egl-dlls",                         /* EGL */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
     "glesv2-dlls",                      /* OpenGL ES 2.0 */
@@ -1247,7 +1247,7 @@ eglCreateContext(
                 match = (minor >= 0 && minor <= 2) ? EGL_TRUE : EGL_FALSE;
             }
             /* Halti2 HW support ES30 and ES31 */
-            else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
+            else if ((gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) && !(chipModel == gcv3000 && chipRevision == 0x5450)) ||
                 (chipModel == gcv900 && chipRevision == 0x5250))
             {
                 match = (minor >= 0 && minor <= 1) ? EGL_TRUE : EGL_FALSE;
@@ -1859,6 +1859,7 @@ veglMakeCurrent(
         }
     }
 
+
     /* Test for release of context. */
     if (!ctx && !draw && !read)
     {
@@ -1890,6 +1891,7 @@ veglMakeCurrent(
 
             /* Remove context. */
             gcmVERIFY(_ApiLoseCurrent(thread, current));
+
 
             if (current->draw != gcvNULL)
             {

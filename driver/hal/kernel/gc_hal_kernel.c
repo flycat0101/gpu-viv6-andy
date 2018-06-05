@@ -2592,6 +2592,19 @@ gckKERNEL_Dispatch(
         {
             gctUINT32 i;
 
+            if (Interface->u.Commit.count > 1 && Interface->engine == gcvENGINE_RENDER)
+            {
+                for (i = 0; i < Interface->u.Commit.count; i++)
+                {
+                    gceHARDWARE_TYPE type = Interface->hardwareType;
+                    gckKERNEL kernel = Device->map[type].kernels[i];
+
+                    gcmkONERROR(gckOS_Broadcast(kernel->os,
+                                                kernel->hardware,
+                                                gcvBROADCAST_GPU_COMMIT));
+                }
+            }
+
             status = gckCOMMAND_Commit(Kernel->command,
                 Interface->u.Commit.contexts[0] ?
                 gcmNAME_TO_PTR(Interface->u.Commit.contexts[0]) : gcvNULL,

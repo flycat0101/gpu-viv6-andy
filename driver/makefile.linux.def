@@ -49,6 +49,7 @@ USE_OPENVX          ?= 0
 USE_VULKAN          ?= 0
 USE_VDK             ?= 0
 
+MXC_FBDEV           ?= 0
 EGL_API_FB          ?= 0
 EGL_API_WL          ?= 0
 EGL_API_DRI         ?= 0
@@ -60,18 +61,18 @@ USE_MOVG            ?= 0
 GC355_MEM_PRINT     ?= 0
 GC355_PROFILER      ?= 0
 
-USE_BANK_ALIGNMENT  ?= 0
-BANK_BIT_START      ?= 0
-BANK_BIT_END        ?= 0
-BANK_CHANNEL_BIT    ?= 0
+USE_BANK_ALIGNMENT  ?= 1
+BANK_BIT_START      ?= 13
+BANK_BIT_END        ?= 15
+BANK_CHANNEL_BIT    ?= 12
 
 USE_LOADTIME_OPT    ?= 1
 YOCTO_DRI_BUILD     ?= 0
 VSC_VIR_BUILD       ?= 1
-USE_EXA_G2D         ?= 0
+USE_EXA_G2D         ?= 1
 GL4_LINUX_ENABLE    ?= 1
 
-SOC_PLATFORM        ?= default
+SOC_PLATFORM        ?= freescale-imx6
 
 ################################################################
 # Option dependency.
@@ -124,7 +125,8 @@ PFLAGS              := $(ORIG_PFLAGS)
 
 ################################################################
 # Toolchain.
-
+ifeq ($(YOCTO_BUILD),1)
+else
 ifeq ($(USE_ARMCC),1)
   ARM_BASE          ?= /home/software/ARM
   ARM_VERSION       ?= 4.0/650
@@ -135,8 +137,17 @@ ifeq ($(USE_ARMCC),1)
   AR                := $(CROSS_COMPILE)ar
   AS                := $(CROSS_COMPILE)as
   LD                := $(CROSS_COMPILE)link
+else ifeq ($(strip $(USE_ARM_YOCTO_SDK)),1)
+  CROSS_COMPILE     ?= arm-fsl-linux-gnueabi-
+  CC                ?= $(CROSS_COMPILE)gcc
+  CXX               ?= $(CROSS_COMPILE)g++
+  AR                ?= $(CROSS_COMPILE)ar
+  AS                ?= $(CROSS_COMPILE)as
+  LD                ?= $(CROSS_COMPILE)ld
+  RANLIB            ?= $(CROSS_COMPILE)ranlib
+  STRIP             ?= $(CROSS_COMPILE)strip
 else
-  CROSS_COMPILE     ?= arm-none-linux-gnueabi-
+  CROSS_COMPILE     ?= arm-fsl-linux-gnueabi-
   CC                := $(CROSS_COMPILE)gcc
   CXX               := $(CROSS_COMPILE)g++
   AR                := $(CROSS_COMPILE)ar
@@ -145,17 +156,18 @@ else
   RANLIB            := $(CROSS_COMPILE)ranlib
   STRIP             := $(CROSS_COMPILE)strip
 endif
+endif
 
 PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
 
 ################################################################
 # Resource.
 
-KERNEL_DIR          ?=
-TOOL_DIR            ?= /home/software/Linux
-X11_ARM_DIR         ?= $(TOOL_DIR)/X11_ARM
-ROOTFS_USR          ?= $(TOOL_DIR)/RootFS/usr
-WAYLAND_DIR         ?= $(TOOL_DIR)/wayland
+#KERNEL_DIR          ?=
+#TOOL_DIR            ?= /home/software/Linux
+#X11_ARM_DIR         ?= $(TOOL_DIR)/X11_ARM
+#ROOTFS_USR          ?= $(TOOL_DIR)/RootFS/usr
+#WAYLAND_DIR         ?= $(TOOL_DIR)/wayland
 
 VIVANTE_SDK_DIR     ?= $(AQROOT)/build/sdk
 VIVANTE_SDK_INC     ?= $(VIVANTE_SDK_DIR)/include
@@ -303,6 +315,10 @@ endif
 
 ifeq ($(EGL_API_NULLWS),1)
   CFLAGS            += -DEGL_API_NULLWS
+endif
+
+ifeq ($(MXC_FBDEV),1)
+  CFLAGS            += -DMXC_FBDEV=1
 endif
 
 ifeq ($(EGL_API_FB),1)

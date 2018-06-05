@@ -40,7 +40,7 @@ _AllocateMemory(
     IN gctSIZE_T Bytes,
     OUT gctPOINTER *Logical,
     OUT gctPHYS_ADDR *Physical,
-    OUT gctUINT32 *PhysAddr
+    OUT gctPHYS_ADDR_T *PhysAddr
     )
 {
     gceSTATUS status;
@@ -673,7 +673,7 @@ gckGALDEVICE_Construct(
     gctUINT32 internalBaseAddress = 0, internalAlignment = 0;
     gctUINT32 externalBaseAddress = 0, externalAlignment = 0;
     gctUINT32 horizontalTileSize, verticalTileSize;
-    gctUINT32 physAddr;
+    gctPHYS_ADDR_T physAddr;
     gctUINT32 physical;
     gckGALDEVICE device;
     gceSTATUS status;

@@ -356,7 +356,7 @@ gbm_viv_bo_import(
     gceTILING tiling = 0;
     int ret;
 
-    if (type == GBM_BO_IMPORT_EGL_IMAGE)
+    if (type == GBM_BO_IMPORT_EGL_IMAGE || type == GBM_BO_IMPORT_WL_BUFFER)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -903,7 +903,7 @@ gbm_viv_create_buffers(
             surfType =  gcvSURF_BITMAP;
         }
         /* TODO: Query from KMS to set gcvSURF_CACHE_MODE_128 bit */
-        surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128);
+        surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128 | gcvSURF_CMA_LIMIT);
 
         gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_DEFAULT, &rtSurf));
         surf->buffers[i].render_surface = rtSurf;

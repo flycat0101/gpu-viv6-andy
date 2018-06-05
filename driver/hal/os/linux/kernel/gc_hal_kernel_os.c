@@ -1289,6 +1289,12 @@ gckOS_AllocateNonPagedMemory(
 
     gcmkASSERT(Flag & gcvALLOC_FLAG_CONTIGUOUS);
 
+    if (Os->allocatorLimitMarker)
+    {
+        Flag |= gcvALLOC_FLAG_CMA_LIMIT;
+        Flag |= gcvALLOC_FLAG_CMA_PREEMPT;
+    }
+
     /* Walk all allocators. */
     list_for_each_entry(allocator, &Os->allocatorList, link)
     {
@@ -3054,6 +3060,15 @@ gckOS_AllocatePagedMemoryEx(
     if (mdl == gcvNULL)
     {
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+    if (Os->allocatorLimitMarker && (Flag & gcvALLOC_FLAG_CMA_LIMIT))
+    {
+        Flag &= ~gcvALLOC_FLAG_CACHEABLE;
+    }
+    else
+    {
+        Flag &= ~gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     /* Walk all allocators. */

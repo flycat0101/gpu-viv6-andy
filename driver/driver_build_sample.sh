@@ -6,9 +6,8 @@ set -e
 # establish build environment and build options value
 # Please modify the following items according your build environment
 
-ARCH=arm
-if [ ! -z $1 ]; then
-    ARCH=$1
+if [ -z $ARCH ]; then
+ARCH=arm-yocto
 fi
 
 export AQROOT=`pwd`
@@ -52,20 +51,66 @@ arm-yocto)
     export CPU_ARCH=armv7-a
     #export FIXED_ARCH_TYPE=arm-yocto
 
-    export KERNEL_DIR=/home/software/Linux/YOCTO/L3.10.9_1.0.0_alpha_20131009
-    export TOOLCHAIN=/home/software/Linux/YOCTO/poky/sysroots/x86_64-pokysdk-linux/usr
-    export PATH=$TOOLCHAIN/bin:$TOOLCHAIN/bin/cortexa9hf-vfp-neon-poky-linux-gnueabi:$PATH
-    export CROSS_COMPILE=arm-poky-linux-gnueabi-
-    export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
-    export ROOTFS_USR=$ROOTFS/usr
-    export X11_ARM_DIR=$ROOTFS/usr
-    export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
-    export LFLAGS="--sysroot=$ROOTFS"
-    export PFLAGS="--sysroot=$ROOTFS"
-    export FPU=vfp
-    export FLOAT_ABI=hard
+    #export KERNEL_DIR=/home/software/Linux/YOCTO/L3.10.9_1.0.0_alpha_20131009
+    #export TOOLCHAIN=/home/software/Linux/YOCTO/poky/sysroots/x86_64-pokysdk-linux/usr
+    #export PATH=$TOOLCHAIN/bin:$TOOLCHAIN/bin/cortexa9hf-vfp-neon-poky-linux-gnueabi:$PATH
+    #export CROSS_COMPILE=arm-poky-linux-gnueabi-
+    #export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
+    #export ROOTFS_USR=$ROOTFS/usr
+    #export X11_ARM_DIR=$ROOTFS/usr
+    #export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
+    #export LFLAGS="--sysroot=$ROOTFS"
+    #export PFLAGS="--sysroot=$ROOTFS"
+    #export FPU=vfp
+    #export FLOAT_ABI=hard
     BUILD_YOCTO_DRI_BUILD=1
+    BUILD_OPTION_USE_OPENCL=1
+    BUILD_OPTION_VIVANTE_ENABLE_2D=1
+    BUILD_OPTION_MXC_FBDEV=1
 ;;
+
+
+arm64-yocto)
+    export ARCH=arm64
+    export ARCH_TYPE=$ARCH
+    export CPU_TYPE=cortex-a53
+    export CPU_ARCH=armv8-a
+    export USE_KMS=1
+    BUILD_YOCTO_DRI_BUILD=1
+    BUILD_OPTION_USE_OPENCL=1
+    BUILD_OPTION_USE_VULKAN=1
+    BUILD_OPTION_USE_OPENVX=1
+    BUILD_OPTION_MXC_FBDEV=1
+    BUILD_OPTION_VIVANTE_ENABLE_2D=0
+
+;;
+
+IMX8_Alpha)
+    ARCH=arm64
+    export BOARD=IMX8_Alpha
+    export ARCH_TYPE=$ARCH
+    export CPU_TYPE=cortex-a53
+    export CPU_ARCH=armv8-a
+    #export FIXED_ARCH_TYPE=arm64-yocto
+
+    export KERNEL_DIR=/home/software/Linux/freescale/L4.9.11_imx8_alpha_kernel_code/linux-imx
+    export TOOLCHAIN=/home/software/Linux/freescale/fsl-imx-internal-xwayland/4.9.11-8mq_alpha/sysroots/x86_64-pokysdk-linux/usr/bin/aarch64-poky-linux
+    export PATH=$TOOLCHAIN:$PATH
+    export CROSS_COMPILE=aarch64-poky-linux-
+    export ROOTFS=/home/software/Linux/freescale/fsl-imx-internal-xwayland/4.9.11-8mq_alpha/sysroots/aarch64-poky-linux
+    export ROOTFS_USR=$ROOTFS/usr
+    export CFLAGS="--sysroot=$ROOTFS  -D__arm64"
+    export PFLAGS="--sysroot=$ROOTFS"
+    export LFLAGS="--sysroot=$ROOTFS"
+    export X11_ARM_DIR=$ROOTFS/usr
+    export HAVE_G2D=1
+    BUILD_YOCTO_DRI_BUILD=1
+    BUILD_OPTION_EGL_API_DRI=0
+    BUILD_OPTION_EGL_API_FB=0
+    BUILD_OPTION_X11_DRI3=1
+    BUILD_OPTION_VIVANTE_ENABLE_DRM=1
+;;
+
 
 unicore)
     export ARCH_TYPE=unicore
@@ -300,9 +345,9 @@ esac;
 #                                      gcdENABLE_BANK_ALIGNMENT is enabled.
 #
 #    DIRECTFB_MAJOR_VERSION     1
-#    DIRECTFB_MINOR_VERSION     4
-#    DIRECTFB_MICRO_VERSION     0      DirectFB version supported by GFX driver.
-#                                      Currentlly we support DirectFB-1.4.0.
+#    DIRECTFB_MINOR_VERSION     7
+#    DIRECTFB_MICRO_VERSION     4      DirectFB version supported by GFX driver.
+#                                     Currentlly we support DirectFB-1.7.4.
 #
 #   USE_POWER_MANAGEMENT        1      Enable GPU power managment code;                  1
 #                               0      Disable GPU power management code; Should set
@@ -329,6 +374,9 @@ BUILD_OPTION_NO_DMA_COHERENT=0
 BUILD_OPTION_USE_VDK=1
 BUILD_OPTION_GC355_MEM_PRINT=0
 BUILD_OPTION_GC355_PROFILER=0
+if [ -z $BUILD_OPTION_MXC_FBDEV ]; then
+    BUILD_OPTION_MXC_FBDEV=0
+fi
 if [ -z $BUILD_OPTION_EGL_API_FB ]; then
     BUILD_OPTION_EGL_API_FB=1
 fi
@@ -348,8 +396,20 @@ if [ -z $BUILD_OPTION_EGL_API_NULLWS ]; then
     BUILD_OPTION_EGL_API_NULLWS=0
 fi
 if [ -z $BUILD_OPTION_EGL_API_GBM ]; then
+    BUILD_OPTION_EGL_API_GBM=1
+fi
+if [ "$BOARD" = "IMX8_Alpha" ];then
     BUILD_OPTION_EGL_API_GBM=0
 fi
+
+if [ -z $BUILD_OPTION_VIVANTE_ENABLE_DRM ];then
+    BUILD_OPTION_VIVANTE_ENABLE_DRM=0
+fi
+
+if [ -z $BUILD_OPTION_X11_DRI3 ];then
+    BUILD_OPTION_X11_DRI3=0
+fi
+
 BUILD_OPTION_gcdSTATIC_LINK=0
 BUILD_OPTION_CUSTOM_PIXMAP=0
 if [ -z $BUILD_OPTION_USE_OPENCL ]; then
@@ -370,20 +430,28 @@ fi
 if [ -z $BUILD_YOCTO_DRI_BUILD ]; then
     BUILD_YOCTO_DRI_BUILD=0
 fi
+if [ -z $BUILD_OPTION_MAXCPUS ]; then
+    BUILD_OPTION_MAXCPUS=4
+fi
+
+if [ -z $USE_KMS ]; then
+    USE_KMS=0
+fi
 
 BUILD_OPTION_CONFIG_DOVEXC5_BOARD=0
 BUILD_OPTION_FPGA_BUILD=0
-BUILD_OPTION_VIVANTE_ENABLE_VG=0
+BUILD_OPTION_VIVANTE_ENABLE_VG=1
 BUILD_OPTION_VIVANTE_ENABLE_3D=1
 BUILD_OPTION_VIVANTE_ENABLE_2D=1
 BUILD_OPTION_DIRECTFB_MAJOR_VERSION=1
-BUILD_OPTION_DIRECTFB_MINOR_VERSION=4
-BUILD_OPTION_DIRECTFB_MICRO_VERSION=0
+BUILD_OPTION_DIRECTFB_MINOR_VERSION=7
+BUILD_OPTION_DIRECTFB_MICRO_VERSION=4
 
 BUILD_OPTIONS="NO_DMA_COHERENT=$BUILD_OPTION_NO_DMA_COHERENT"
 BUILD_OPTIONS="$BUILD_OPTIONS USE_VDK=$BUILD_OPTION_USE_VDK"
 BUILD_OPTIONS="$BUILD_OPTIONS GC355_MEM_PRINT=$BUILD_OPTION_GC355_MEM_PRINT"
 BUILD_OPTIONS="$BUILD_OPTIONS GC355_PROFILER=$BUILD_OPTION_GC355_PROFILER"
+BUILD_OPTIONS="$BUILD_OPTIONS MXC_FBDEV=$BUILD_OPTION_MXC_FBDEV"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_FB=$BUILD_OPTION_EGL_API_FB"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DFB=$BUILD_OPTION_EGL_API_DFB"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DRI=$BUILD_OPTION_EGL_API_DRI"
@@ -411,16 +479,30 @@ BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MAJOR_VERSION=$BUILD_OPTION_DIRECTFB_MAJO
 BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MINOR_VERSION=$BUILD_OPTION_DIRECTFB_MINOR_VERSION"
 BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MICRO_VERSION=$BUILD_OPTION_DIRECTFB_MICRO_VERSION"
 BUILD_OPTIONS="$BUILD_OPTIONS YOCTO_DRI_BUILD=$BUILD_YOCTO_DRI_BUILD"
+BUILD_OPTIONS="$BUILD_OPTIONS X11_DRI3=$BUILD_OPTION_X11_DRI3"
+BUILD_OPTIONS="$BUILD_OPTIONS VIVANTE_ENABLE_DRM=$BUILD_OPTION_VIVANTE_ENABLE_DRM"
+BUILD_OPTIONS="$BUILD_OPTIONS -j$BUILD_OPTION_MAXCPUS"
+BUILD_OPTIONS="$BUILD_OPTIONS USE_KMS=$USE_KMS"
 
-export PATH=$TOOLCHAIN/bin:$PATH
+#export PATH=$TOOLCHAIN/bin:$PATH
+COMMITNR=`git log -n 1 --format=%h`
+if [ "x$COMMITNR" != "x" ]; then
+  DIRTY=`git diff --quiet HEAD || echo '-dirty'`
+  export CFLAGS="$CFLAGS -DGIT_STRING='$COMMITNR$DIRTY'"
+fi
 
 ########################################################
 # clean/build driver and samples
 # build results will save to $SDK_DIR/
 #
-cd $AQROOT; make -j1 -f makefile.linux $BUILD_OPTIONS clean
-cd $AQROOT; make -j1 -f makefile.linux $BUILD_OPTIONS install 2>&1 | tee $AQROOT/linux_build.log
-
+(
+set -o pipefail
+if [ "clean" == "$1" ]; then
+cd $AQROOT; make -f makefile.linux $BUILD_OPTIONS clean
+else
+cd $AQROOT; make -f makefile.linux $BUILD_OPTIONS install 2>&1 | tee $AQROOT/linux_build.log
+fi
+)
 ########################################################
 # other build/clean commands to build/clean specified items, eg.
 #

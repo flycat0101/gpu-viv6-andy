@@ -29,7 +29,7 @@
 ** Inline macro definition.
 */
 
-#if defined(LINUX)
+#if defined(LINUX) || defined(__QNXNTO__)
 #   define vgmINLINE
 #else
 #   define vgmINLINE __inline

@@ -292,7 +292,9 @@ ifeq ($(SECURITY), 1)
 EXTRA_CFLAGS += -DgcdSECURITY=1
 endif
 
+ifneq ($(CONFIG_DRM), )
 EXTRA_CFLAGS += -DgcdENABLE_DRM=$(VIVANTE_ENABLE_DRM)
+endif
 
 EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/inc
 EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel
@@ -308,10 +310,6 @@ endif
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)
 EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/archvg
-endif
-
-ifeq ($(VIVANTE_ENABLE_DRM), 1)
-EXTRA_CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm
 endif
 
 EXTRA_CFLAGS += -DHOST=\"$(HOST)\"

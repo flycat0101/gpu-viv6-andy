@@ -47,7 +47,11 @@ const char * _EGL_VERSION = "\n\0$VERSION$"
                             gcmTXT2STR(gcvVERSION_MAJOR) "."
                             gcmTXT2STR(gcvVERSION_MINOR) "."
                             gcmTXT2STR(gcvVERSION_PATCH) ":"
-                            gcmTXT2STR(gcvVERSION_BUILD) "$\n";
+                            gcmTXT2STR(gcvVERSION_BUILD)
+#ifdef GIT_STRING
+                           ":"gcmTXT2STR(GIT_STRING)
+#endif
+                            "$\n";
 
 static void
 _DestroyThreadData(

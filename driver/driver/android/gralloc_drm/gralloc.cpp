@@ -299,13 +299,17 @@ static struct hw_module_methods_t gralloc_methods = {
     .open = gralloc_open
 };
 
+#ifndef GRALLOC_VIV_HARDWARE_MODULE_ID
+#  define GRALLOC_VIV_HARDWARE_MODULE_ID "gralloc_viv"
+#endif
+
 struct vivante_module_t HAL_MODULE_INFO_SYM = {
     .base = {
         .common = {
             .tag = HARDWARE_MODULE_TAG,
             .version_major = 1,
             .version_minor = 0,
-            .id = GRALLOC_HARDWARE_MODULE_ID,
+            .id = GRALLOC_VIV_HARDWARE_MODULE_ID,
             .name = "Vivante DRM Memory Allocator",
             .author = "Zongzong Yan",
             .methods = &gralloc_methods

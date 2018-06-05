@@ -559,7 +559,7 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                           width,
                           height,
                           1,
-                          type,
+                          type | gcvSURF_CMA_LIMIT,
                           format,
                           gcvPOOL_DEFAULT,
                           &surface));
@@ -1442,6 +1442,23 @@ _BindWindow(
         }
         while (gcvFALSE);
 #  endif
+
+        {
+            char *p;
+            p = getenv("GPU_VIV_EXT_RESOLVE");
+
+            if (p && p[0] == '0')
+            {
+                renderMode = VEGL_INDIRECT_RENDERING;
+            }
+
+            p = getenv("GPU_VIV_DISABLE_SUPERTILED_TEXTURE");
+
+            if (p && p[0] == '1')
+            {
+                renderMode = VEGL_INDIRECT_RENDERING;
+            }
+        }
 
         switch (renderMode)
         {

@@ -17,6 +17,10 @@
 **
 */
 
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+#endif
+
 #include "gc_hal_user_linux.h"
 #include "gc_hal_user_os_atomic.h"
 #include <sys/types.h>
@@ -84,6 +88,8 @@ const char * _GAL_PLATFORM = "\n\0$PLATFORM$Android$\n";
 const char * _GAL_PLATFORM = "\n\0$PLATFORM$Linux$\n";
 #endif
 
+/* flag used for apitrace*/
+#define RTLD_INTERNAL_USE 0x80000000 /* FIXME! may conflict with dlfcn.h in the future */
 /******************************************************************************\
 ***************************** gcoOS Object Structure ***************************
 \******************************************************************************/
@@ -2968,6 +2974,8 @@ gcoOS_AllocateVideoMemory(
 
     flag |= gcvALLOC_FLAG_CONTIGUOUS;
 
+    flag |= gcvALLOC_FLAG_CMA_LIMIT;
+
     if (InCacheable)
     {
         flag |= gcvALLOC_FLAG_CACHEABLE;
@@ -5187,6 +5195,18 @@ OnError:
     return status;
 }
 
+#if !gcdSTATIC_LINK
+static int isInApiTraceMode()
+{
+#ifndef UNDER_CE
+    void *fptr = dlsym(RTLD_DEFAULT, "ApiTraceEnabled");
+    return (fptr != NULL);
+#else
+    return 0;
+#endif
+}
+#endif
+
 /*******************************************************************************
 **
 **  gcoOS_LoadLibrary
@@ -5251,7 +5271,15 @@ gcoOS_LoadLibrary(
             Library = library;
         }
 
-        *Handle = dlopen(Library, RTLD_NOW);
+        /* If ENABLE_API_TRACE is defined, set a special flag to tell tracer bypass */
+        if (isInApiTraceMode())
+        {
+            *Handle = dlopen(Library, RTLD_NOW | RTLD_INTERNAL_USE);
+        }
+        else
+        {
+            *Handle = dlopen(Library, RTLD_NOW);
+        }
 
         /* Failed? */
         if (*Handle == gcvNULL)

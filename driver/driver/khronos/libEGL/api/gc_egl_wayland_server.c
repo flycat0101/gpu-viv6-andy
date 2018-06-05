@@ -115,6 +115,31 @@ viv_handle_create_buffer(struct wl_client *client,
     /* Switch to an available hardware type. */
     priv->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
                    : gcoHAL_QueryHybrid2D(gcvNULL) ? gcvHARDWARE_3D2D : gcvHARDWARE_3D;
+    if (gcoHAL_QuerySeparated2D(gcvNULL))
+    {
+        char *path = gcvNULL;
+        char *dir = getenv("XDG_RUNTIME_DIR");
+
+        if (dir)
+        {
+            path = (char*)malloc(strlen(dir) + 32);
+        }
+
+        if (path)
+        {
+            int ret = -1;
+
+            strcpy(path, dir);
+            strcat(path, "/use-g2d-renderer");
+            ret = access(path, F_OK);
+            if (ret)
+            {
+                priv->hwType = gcvHARDWARE_2D;
+            }
+
+            free(path);
+        }
+    }
 
     gcoHAL_SetHardwareType(gcvNULL, priv->hwType);
 
@@ -168,6 +193,15 @@ viv_handle_create_buffer(struct wl_client *client,
     buffer->height  = height;
 
     buffer->fd = (gctINT32)fd;
+
+    /* These fields are used by freescale 2D composition. */
+    gcmONERROR(gcoSURF_Lock(surface, buffer->physical, gcvNULL));
+    gcmONERROR(gcoSURF_Unlock(surface, gcvNULL));
+    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &buffer->gpuBaseAddr));
+    gcmONERROR(gcoSURF_GetTiling(surface, &buffer->tiling));
+    gcmONERROR(gcoSURF_GetAlignedSize(surface, &buffer->alignedWidth, &buffer->alignedHeight, gcvNULL));
+    buffer->format = format;
+    /* End freescale 2D composition. */
 
     buffer->resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
 

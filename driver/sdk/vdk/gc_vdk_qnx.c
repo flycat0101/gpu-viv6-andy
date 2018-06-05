@@ -439,7 +439,7 @@ vdkCreateWindow(
 {
     int pos[2];
     int size[2];
-    screen_window_t window = (NativeDisplayType) 0;
+    screen_window_t window = (NativeWindowType) NULL;
     int screen_format = SCREEN_FORMAT_RGBX8888;
     int screen_transparency = SCREEN_TRANSPARENCY_NONE;
     int screen_usage = SCREEN_USAGE_OPENGL_ES1

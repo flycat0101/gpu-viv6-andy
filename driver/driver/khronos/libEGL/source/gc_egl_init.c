@@ -450,7 +450,7 @@ _FillIn(
         if (patchId == gcvPATCH_GTFES30)
         {
             gctSTRING env;
-            gctINT enableAllConfig = 0;
+            gctINT enableAllConfig = 1;
             static gctBOOL printed = gcvFALSE;
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
             if (env)

@@ -16,6 +16,10 @@
 
 TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
 
+ifeq ($(TARGET_SONAME),)
+TARGET_SONAME = $(TARGET_NAME)
+endif
+
 ifeq ($(OBJ_DIR),)
 ifeq ($(DEBUG), 1)
 OBJ_DIR	?= bin_d
@@ -71,9 +75,9 @@ endif
 
 ifeq ($(DYNAMIC), 1)
 ifeq ($(USE_ARMCC), 1)
-LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
 else
-LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_SONAME) -Wl,-z,defs
 endif
 $(TARGET_OUTPUT): $(OBJECTS)
 	$(CC) $(LFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)

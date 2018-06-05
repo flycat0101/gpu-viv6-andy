@@ -648,6 +648,7 @@ typedef enum _gceSURF_TYPE
     gcvSURF_NUM_TYPES, /* Make sure this is the last one! */
 
     /* Combinations. */
+    gcvSURF_CMA_LIMIT               = 0x80000000,
     gcvSURF_NO_TILE_STATUS          = 0x100,
     gcvSURF_NO_VIDMEM               = 0x200, /* Used to allocate surfaces with no underlying vidmem node.
                                                    In Android, vidmem node is allocated by another process. */
@@ -2135,6 +2136,10 @@ gceCOMPRESSION_OPTION;
 /* Alloc with memory limit. */
 #define gcvALLOC_FLAG_MEMLIMIT              0x02000000
 
+/* CMA allocator only */
+#define gcvALLOC_FLAG_CMA_LIMIT             0x04000000
+
+#define gcvALLOC_FLAG_CMA_PREEMPT           0x08000000
 
 /* GL_VIV internal usage */
 #ifndef GL_MAP_BUFFER_OBJ_VIV

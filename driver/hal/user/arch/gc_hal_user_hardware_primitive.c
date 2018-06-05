@@ -16,10 +16,13 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_HARDWARE
 
+#define FSL_2D_BLT_TUNING_SIZE 1024
+
 typedef enum __SPLIT_RECT_MODE
 {
     SPLIT_RECT_MODE_NONE,
     SPLIT_RECT_MODE_COLUMN,
+    SPLIT_RECT_MODE_4LINES,
     SPLIT_RECT_MODE_LINE
 } SPLIT_RECT_MODE;
 
@@ -3105,6 +3108,19 @@ _PreSplitRectangle(
         }
         else
         {
+#if FSL_2D_BLT_TUNING_SIZE
+            gcsSURF_FORMAT_INFO_PTR srcFormatInfo;
+            gctUINT32 stride = State->multiSrc[State->currentSrcIndex].srcSurface.alignedW;
+
+            gcoSURF_QueryFormat(State->multiSrc[State->currentSrcIndex].srcSurface.format, &srcFormatInfo);
+
+            if((!Hardware->features[gcvFEATURE_MMU]) || ((stride * srcFormatInfo->bitsPerPixel) < (FSL_2D_BLT_TUNING_SIZE * 32)))
+            {
+                return SPLIT_RECT_MODE_NONE;
+            }
+
+            smode = SPLIT_RECT_MODE_4LINES;
+#else
             gctUINT32 srcAddress, dstAddress;
 
             gcmGETHARDWAREADDRESS(State->dstSurface.node, dstAddress);
@@ -3117,6 +3133,7 @@ _PreSplitRectangle(
             }
 
             smode = SPLIT_RECT_MODE_LINE;
+#endif
         }
     }
     else
@@ -3145,6 +3162,17 @@ _PreSplitRectangle(
             else
             {
                 rectNum += ((DestRect[i].right - DestRect[i].left) >> SPLIT_COLUMN) + 2;
+            }
+        }
+        else if (smode == SPLIT_RECT_MODE_4LINES)
+        {
+            if (swap)
+            {
+                rectNum += ((DestRect[i].right - DestRect[i].left) >> 2) + ((DestRect[i].right - DestRect[i].left) % 4);
+            }
+            else
+            {
+                rectNum += ((DestRect[i].bottom - DestRect[i].top) >> 2) + ((DestRect[i].bottom - DestRect[i].top) % 4);
             }
         }
         else
@@ -3299,6 +3327,94 @@ static int _SplitRectangle(
             else
             {
                 dstRect.left = dstRect.right;
+            }
+        }
+    }
+    else if (Mode == SPLIT_RECT_MODE_4LINES)
+    {
+        gctBOOL reverse = dstRect.top > srcRect.top;
+        gctINT32 r = (dstRect.bottom - dstRect.top) % 4;
+        n = (dstRect.bottom - dstRect.top) >> 2;
+
+        while (n-- > 0)
+        {
+            if (reverse)
+            {
+                dstRect.top = dstRect.bottom - 4;
+            }
+            else
+            {
+                dstRect.bottom = dstRect.top + 4;
+            }
+
+            if (State->multiSrc[State->currentSrcIndex].verMirror ^ reverse)
+            {
+                srcRect.top = srcRect.bottom - 4;
+            }
+            else
+            {
+                srcRect.bottom = srcRect.top + 4;
+            }
+
+            size += _DrawRectangle(Hardware, Memory + size, &srcRect, &dstRect);
+
+            if (reverse)
+            {
+                dstRect.bottom -= 4;
+            }
+            else
+            {
+                dstRect.top += 4;
+            }
+
+            if (State->multiSrc[State->currentSrcIndex].verMirror ^ reverse)
+            {
+                srcRect.bottom -= 4;
+            }
+            else
+            {
+                srcRect.top += 4;
+            }
+        }
+
+        while (r-- > 0)
+        {
+            if (reverse)
+            {
+                dstRect.top = dstRect.bottom - 1;
+            }
+            else
+            {
+                dstRect.bottom = dstRect.top + 1;
+            }
+
+            if (State->multiSrc[State->currentSrcIndex].verMirror ^ reverse)
+            {
+                srcRect.top = srcRect.bottom - 1;
+            }
+            else
+            {
+                srcRect.bottom = srcRect.top + 1;
+            }
+
+            size += _DrawRectangle(Hardware, Memory + size, &srcRect, &dstRect);
+
+            if (reverse)
+            {
+                --dstRect.bottom;
+            }
+            else
+            {
+                ++dstRect.top;
+            }
+
+            if (State->multiSrc[State->currentSrcIndex].verMirror ^ reverse)
+            {
+                --srcRect.bottom;
+            }
+            else
+            {
+                ++srcRect.top;
             }
         }
     }

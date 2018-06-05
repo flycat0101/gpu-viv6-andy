@@ -66,6 +66,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 endif
 
+LOCAL_C_INCLUDES += \
+    $(IMX_PATH)/imx/include
+
 LOCAL_MODULE_RELATIVE_PATH := hw
 
 LOCAL_MODULE         := gralloc_viv.$(HAL_MODULE_VARIANT)

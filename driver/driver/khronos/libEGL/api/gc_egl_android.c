@@ -62,6 +62,8 @@
 #  include <gc_gralloc_priv.h>
 #endif
 
+#include <graphics_ext.h>
+
 typedef struct ANativeWindow *       PlatformWindowType;
 typedef struct egl_native_pixmap_t * PlatformPixmapType;
 typedef void *                       PlatformDisplayType;
@@ -578,6 +580,23 @@ _TranslateFormat(
 #if ANDROID_SDK_VERSION >= 17
         case HAL_PIXEL_FORMAT_BLOB:
             return gcvSURF_A8;
+#endif
+        /* graphics_ext. */
+#ifdef FSL_YUV_EXT
+        case HAL_PIXEL_FORMAT_YCbCr_422_P:
+            return gcvSURF_UNKNOWN;
+        case HAL_PIXEL_FORMAT_YCbCr_420_P:
+            return gcvSURF_I420;
+        case HAL_PIXEL_FORMAT_CbYCrY_422_I:
+            return gcvSURF_UYVY;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+#if ANDROID_SDK_VERSION >= 27
+        case HAL_PIXEL_FORMAT_NV12_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G1_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G2_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G2_TILED_COMPRESSED:
+#endif
+            return gcvSURF_NV12;
 #endif
         default:
             LOGE("%s: unknown android format=%x", __func__, Format);
@@ -1108,7 +1127,31 @@ _PushGenericDrmBufferStatus(
     android_native_buffer_t * Buffer
     )
 {
-    /* TODO: Set tiling, ts state, fast-clear value, etc. */
+    /*XXX:
+     * For generic dma buffer, imx8mscale temporilary put ts at the end of
+     * master buffer.
+     */
+#if ANDROID_SDK_VERSION >= 27
+    if (Buffer->usage & GRALLOC_USAGE_TS_VIV)
+    {
+        gctINT32 stride;
+        gctUINT32 height;
+        gctUINT32 size;
+
+        gctPOINTER memory[3];
+        gctPOINTER ts;
+
+        gcoSURF_GetAlignedSize(Surface, gcvNULL, &height, &stride);
+        size = stride * height;
+
+        gcoSURF_Lock(Surface, gcvNULL, memory);
+
+        ts = (gctUINT8_PTR)memory[0] + size;
+        memcpy(ts, Surface->tileStatusNode.logical, Surface->tileStatusNode.size);
+
+        gcoSURF_Unlock(Surface, memory[0]);
+    }
+#endif
     return EGL_TRUE;
 }
 
@@ -1502,6 +1545,18 @@ _CreateGenericDrmBufferSurface(
     {
         status = gcoSURF_AppendTileStatus(surface);
     }
+
+    /*
+     * XXX: im8mscale: need append tile status as we cannot wrap
+     * external tile status node.
+     */
+#if ANDROID_SDK_VERSION >= 27
+    if ((RenderMode == VEGL_DIRECT_RENDERING))
+    {
+        surface->cacheMode = gcvCACHE_128;
+        status = gcoSURF_AppendTileStatus(surface);
+    }
+#endif
 
     *Surface = surface;
     return gcmIS_SUCCESS(status) ? EGL_TRUE : EGL_FALSE;
@@ -1948,17 +2003,23 @@ _QueryRenderMode(
             break;
         }
 
-        if (info->hwFramebuffer)
+        /*
+         * XXX: currently there's no hardware feature check for imx8mscale
+         * DEC400 framebuffer compression. Use android property to get this
+         * information.
+         */
+        if (info->hwFramebuffer || patchId == gcvPATCH_ANDROID_COMPOSITOR)
         {
-            /* Nothing to do for Framebuffer. */
-            renderMode = VEGL_INDIRECT_RENDERING;
-            break;
-        }
+            gctSTRING fbTileSupport = gcvNULL;
 
-        if (patchId == gcvPATCH_ANDROID_COMPOSITOR)
-        {
-            renderMode = VEGL_INDIRECT_RENDERING;
-            break;
+            if (!gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.boot.fbTileSupport", &fbTileSupport)) ||
+                !fbTileSupport ||
+                !gcmIS_SUCCESS(gcoOS_StrCmp(fbTileSupport, "enable")))
+            {
+                /* Indirect rendering for Framebuffer. */
+                renderMode = VEGL_INDIRECT_RENDERING;
+                break;
+            }
         }
 
         if ((info->consumerUsage & GRALLOC_USAGE_SW_WRITE_MASK) ||

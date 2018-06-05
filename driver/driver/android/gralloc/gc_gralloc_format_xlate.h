@@ -21,6 +21,11 @@
 #include <gc_hal_base.h>
 #include <gc_hal_enum.h>
 
+#ifdef FSL_YUV_EXT
+#  include <graphics_ext.h>
+#endif
+
+
 static const int formatXlate[] =
 {
     /* ANDROID HAL format      ---  VIVANTE HAL format. */
@@ -61,7 +66,12 @@ static const int formatXlate[] =
     HAL_PIXEL_FORMAT_YCrCb_420_SP,  gcvSURF_NV21,
     HAL_PIXEL_FORMAT_YCbCr_422_I,   gcvSURF_YUY2,
 
-#elif (ANDROID_SDK_VERSION >= 16)
+    HAL_PIXEL_FORMAT_YCbCr_420_P,   gcvSURF_I420,
+    HAL_PIXEL_FORMAT_YCbCr_420_I,   gcvSURF_I420,
+    HAL_PIXEL_FORMAT_CbYCrY_422_I,  gcvSURF_UYVY,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP,  gcvSURF_NV12,
+
+#elif (ANDROID_SDK_VERSION >= 16) && (ANDROID_SDK_VERSION <= 25)
     /* JellyBean and later */
     HAL_PIXEL_FORMAT_YV12,          gcvSURF_YV12,
     /* Legacy formats (deprecated), used by ImageFormat.java */
@@ -70,7 +80,21 @@ static const int formatXlate[] =
     HAL_PIXEL_FORMAT_YCbCr_422_I,   gcvSURF_YUY2,
     HAL_PIXEL_FORMAT_YCbCr_422_P,   gcvSURF_UNKNOWN, /* Not support. */
     HAL_PIXEL_FORMAT_YCbCr_420_SP,  gcvSURF_NV12,
+
+    HAL_PIXEL_FORMAT_YCbCr_420_P,   gcvSURF_I420,
+    HAL_PIXEL_FORMAT_CbYCrY_422_I,  gcvSURF_UYVY,
+
+#elif (ANDROID_SDK_VERSION >= 26)
+    HAL_PIXEL_FORMAT_YV12,          gcvSURF_YV12,
+    /* Legacy formats (deprecated), used by ImageFormat.java */
+    HAL_PIXEL_FORMAT_YCbCr_422_SP,  gcvSURF_NV16,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP,  gcvSURF_NV21,
+    HAL_PIXEL_FORMAT_YCbCr_422_I,   gcvSURF_YUY2,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP,  gcvSURF_NV12,
+
+    HAL_PIXEL_FORMAT_YCbCr_420_P,   gcvSURF_I420,
 #endif
+
     0 /* Terminator. */
 };
 

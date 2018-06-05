@@ -54,6 +54,9 @@ struct private_handle_t {
 
     /* file descriptors */
     int fd;
+#if ANDROID_SDK_VERSION >= 27
+    int fd_meta;
+#endif
 
     /* integers */
     int magic;
@@ -80,7 +83,11 @@ struct private_handle_t {
 };
 
 #define GRALLOC_PRIVATE_HANDLE_MAGIC   0x3141592
-#define GRALLOC_PRIVATE_HANDLE_NUM_FDS 1
+#if ANDROID_SDK_VERSION >= 27
+#  define GRALLOC_PRIVATE_HANDLE_NUM_FDS 2
+#else
+#  define GRALLOC_PRIVATE_HANDLE_NUM_FDS 1
+#endif
 #define GRALLOC_PRIVATE_HANDLE_NUM_INTS ( \
     ((sizeof(struct private_handle_t) - sizeof(native_handle_t))/sizeof(int)) \
      - GRALLOC_PRIVATE_HANDLE_NUM_FDS)

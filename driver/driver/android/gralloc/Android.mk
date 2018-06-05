@@ -34,6 +34,17 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/compiler/libVSC/include
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+LOCAL_SHARED_LIBRARIES += libbase
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 25),1)
+ifneq ($(findstring x7.1.1,x$(PLATFORM_VERSION)), x7.1.1)
+LOCAL_C_INCLUDES += hardware/imx/include
+LOCAL_CFLAGS += -DFSL_YUV_EXT
+endif
+endif
+
 # Where to find gralloc_priv.h
 LOCAL_C_INCLUDES += \
 
@@ -91,7 +102,7 @@ else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 endif
 
-LOCAL_MODULE         := gralloc.$(HAL_MODULE_VARIANT)
+LOCAL_MODULE         := gralloc_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

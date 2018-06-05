@@ -742,7 +742,11 @@ OnError:
 \******************************************************************************/
 
 static void __attribute__((constructor)) _ModuleConstructor(void);
+#if (_NTO_VERSION >= 700)
+static void _ModuleDestructor(void);
+#else
 static void _ModuleDestructor(void *);
+#endif
 
 static gceSTATUS
 _CacheRangeFlush(
@@ -1076,14 +1080,23 @@ OnError:
     gcmFOOTER();
 }
 
+#if (_NTO_VERSION >= 700)
 static void
 _ModuleDestructor(
-    void* arg
+    void
     )
+#else
+static void
+_ModuleDestructor(
+    void * arg
+    )
+#endif
 {
     gctINT reference = 0;
 
+#if (_NTO_VERSION < 700)
     arg = arg;
+#endif
 
     gcmHEADER();
 
