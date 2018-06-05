@@ -918,7 +918,6 @@ gbm_viv_create_buffers(
         }
         gcmONERROR(gcoSURF_Lock(rtSurf, gcvNULL, gcvNULL));
 
-
         bo = calloc(1, sizeof *bo);
         if (bo == NULL)
         {
@@ -957,6 +956,11 @@ gbm_viv_create_buffers(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
         bo->base.handle.u32 = handle;
+
+        if (gbm_viv_bo_map_fd(bo) == NULL)
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
     }
 
     return gcvSTATUS_OK;
