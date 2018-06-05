@@ -740,7 +740,7 @@ gceSTATUS;
 #define gcmBITSET(x, y)         ((x) & (y))
 /*******************************************************************************
 **
-**  gcmPTR2SIZE
+**  gcmPTR2INT
 **
 **      Convert a pointer to an integer value.
 **
@@ -748,7 +748,7 @@ gceSTATUS;
 **
 **      p       Pointer value.
 */
-#define gcmPTR2SIZE(p) \
+#define gcmPTR2INT(p) \
 ( \
     (gctUINTPTR_T) (p) \
 )
