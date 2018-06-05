@@ -303,6 +303,8 @@ _MapCommandBuffer(
             &physical
             ));
 
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, physical, &physical));
+
         gcmkSAFECASTPHYSADDRT(address, physical);
 
         gcmkONERROR(gckMMU_FlatMapping(mmu, address, 1));
@@ -3601,6 +3603,8 @@ gckKERNEL_MapLogicalToPhysical(
             /* Map the logical address to a DMA address. */
             gcmkONERROR(
                 gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
+
+            gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, slot->dma, &slot->dma));
         }
 
         /* Move slot to head of list. */
@@ -3709,6 +3713,8 @@ gckKERNEL_MapLogicalToPhysical(
             /* Map the logical address to a DMA address. */
             gcmkONERROR(
                 gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
+
+            gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, slot->dma, &slot->dma));
         }
 
         /* Save time stamp. */
@@ -3764,6 +3770,8 @@ gckKERNEL_MapLogicalToPhysical(
             gcmkONERROR(
                 gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
 
+            gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, slot->dma, &slot->dma));
+
             if (hash->nextHash != gcvNULL)
             {
                 gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
@@ -3811,6 +3819,8 @@ gckKERNEL_MapLogicalToPhysical(
             /* Map the logical address to a DMA address. */
             gcmkONERROR(
                 gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
+
+            gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, slot->dma, &slot->dma));
         }
     }
 #endif
@@ -6376,6 +6386,8 @@ gckKERNEL_MapInTrustApplicaiton(
                 logical,
                 &phys
                 ));
+
+            gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Kernel->os, phys, &phys));
         }
 
         phys &= ~pageMask;

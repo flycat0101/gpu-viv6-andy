@@ -1891,8 +1891,6 @@ gckOS_GetPhysicalAddress(
             _GetPhysicalAddressProcess(Os, Logical, processID, Address));
     }
 
-    gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Os, *Address, Address));
-
     /* Success. */
     gcmkFOOTER_ARG("*Address=%p", *Address);
     return gcvSTATUS_OK;

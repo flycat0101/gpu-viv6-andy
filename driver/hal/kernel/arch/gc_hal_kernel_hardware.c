@@ -1874,6 +1874,12 @@ gckHARDWARE_Construct(
             hardware->pagetableArray.logical,
             &hardware->pagetableArray.address
             ));
+
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
+            hardware->os,
+            hardware->pagetableArray.address,
+            &hardware->pagetableArray.address
+            ));
     }
 
     /* Return pointer to the gckHARDWARE object. */
@@ -3670,6 +3676,7 @@ gckHARDWARE_Event(
         {
             gctPHYS_ADDR_T phys;
             gckOS_GetPhysicalAddress(Hardware->os, Logical, &phys);
+            gckOS_CPUPhysicalToGPUPhysical(Hardware->os, phys, &phys);
             gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
                            "0x%08x: EVENT %d", phys, Event);
         }
@@ -4430,6 +4437,8 @@ gckHARDWARE_ConvertLogical(
         gcmkONERROR(gckOS_GetPhysicalAddress(Hardware->os, Logical, &physical));
     }
 
+    gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Hardware->os, physical, &physical));
+
     gcmkSAFECASTPHYSADDRT(address, physical);
 
     /* For old MMU, get GPU address according to baseAddress. */
@@ -4917,6 +4926,8 @@ gckHARDWARE_SetMMU(
         /* Convert the logical address into physical address. */
         gcmkONERROR(gckOS_GetPhysicalAddress(Hardware->os, Logical, &physical));
 
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(Hardware->os, physical, &physical));
+
         gcmkSAFECASTPHYSADDRT(address, physical);
 
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
@@ -5035,6 +5046,9 @@ gckHARDWARE_SetMMU(
 
                 gcmkONERROR(
                     gckOS_GetPhysicalAddress(Hardware->os, safeLogical, &physical));
+
+                gcmkVERIFY_OK(
+                    gckOS_CPUPhysicalToGPUPhysical(Hardware->os, physical, &physical));
 
                 address = (gctUINT32)(physical & 0xFFFFFFFF);
                 extSafeAddress = (gctUINT32)(physical >> 32);
@@ -5783,6 +5797,9 @@ gckHARDWARE_SetMMUStates(
     gcmkONERROR(
         gckOS_GetPhysicalAddress(Hardware->os, MtlbAddress, &physical));
 
+    gcmkVERIFY_OK(
+        gckOS_CPUPhysicalToGPUPhysical(Hardware->os, physical, &physical));
+
     config  = (gctUINT32)(physical & 0xFFFFFFFF);
     extMtlb = (gctUINT32)(physical >> 32);
 
@@ -5794,6 +5811,9 @@ gckHARDWARE_SetMMUStates(
 
     gcmkONERROR(
         gckOS_GetPhysicalAddress(Hardware->os, SafeAddress, &physical));
+
+    gcmkVERIFY_OK(
+        gckOS_CPUPhysicalToGPUPhysical(Hardware->os, physical, &physical));
 
     address = (gctUINT32)(physical & 0xFFFFFFFF);
     extSafeAddress = (gctUINT32)(physical >> 32);
@@ -6332,10 +6352,22 @@ gckHARDWARE_ConfigMMU(
         /* Get physical address of this command buffer segment. */
         gcmkONERROR(gckOS_GetPhysicalAddress(Hardware->os, buffer, &physical));
 
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
+            Hardware->os,
+            physical,
+            &physical
+            ));
+
         gcmkSAFECASTPHYSADDRT(address, physical);
 
         /* Get physical address of Master TLB. */
         gcmkONERROR(gckOS_GetPhysicalAddress(Hardware->os, MtlbLogical, &physical));
+
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
+            Hardware->os,
+            physical,
+            &physical
+            ));
 
         gcmkSAFECASTPHYSADDRT(config, physical);
 
@@ -12198,6 +12230,12 @@ gckHARDWARE_PrepareFunctions(
             &physical
             ));
 
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
+            os,
+            physical,
+            &physical
+            ));
+
         if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
         {
             gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "
@@ -12268,6 +12306,12 @@ gckHARDWARE_PrepareFunctions(
         gcmkONERROR(gckOS_GetPhysicalAddress(
             os,
             Hardware->auxFuncLogical,
+            &physical
+            ));
+
+        gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
+            os,
+            physical,
             &physical
             ));
 
