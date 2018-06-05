@@ -41,12 +41,10 @@
 #endif
 
 #ifdef _WIN32
-#pragma warning(disable:4127)   /* Conditional expression is constant (do { }
-                                ** while(0)). */
+#pragma warning(disable:4127)   /* Conditional expression is constant (do { } while(0)). */
 #pragma warning(disable:4100)   /* Unreferenced formal parameter. */
 #pragma warning(disable:4204)   /* Non-constant aggregate initializer (C99). */
-#pragma warning(disable:4131)   /* Uses old-style declarator (for Bison and
-                                ** Flex generated files). */
+#pragma warning(disable:4131)   /* Uses old-style declarator. */
 #pragma warning(disable:4206)   /* Translation unit is empty. */
 #pragma warning(disable:4214)   /* Nonstandard extension used :
                                 ** bit field types other than int. */
