@@ -705,7 +705,7 @@ static VkResult __vk_utils_saveResFile(
         tgaHeader[17] = (0x01 << 5);
 
         __VK_VERIFY_OK(gcoOS_PrintStrSafe(fName, gcdMAX_PATH, gcvNULL, "f%04u_%s%s",
-                                          sFileSeq++, res->pTag, suffix));
+                                          sFileSeq++, res->tag, suffix));
 
         /* Open tga file for write. */
         __VK_VERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
@@ -784,8 +784,6 @@ void __vk_utils_insertCmdRes(
 
         pResNode = (__vkCmdResNode*)__VK_ALLOC(sizeof(__vkCmdResNode), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
         __VK_MEMCOPY(&pResNode->res, res, sizeof(__vkCmdResource));
-        gcoOS_StrCopySafe(pResNode->tag, gcdMAX_PATH, res->pTag);
-        pResNode->res.pTag = pResNode->tag;
         pResNode->next = (*ppResLists);
         *ppResLists = pResNode;
     }
@@ -801,7 +799,6 @@ void __vk_utils_insertDescSetRes(
     uint32_t setIdx;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool*, cmdBuf->commandPool);
     __vkCmdResource cmdRes;
-    char tag[gcdMAX_PATH];
 
     for (setIdx = 0; setIdx < __VK_MAX_DESCRIPTOR_SETS; ++setIdx)
         {
@@ -824,7 +821,6 @@ void __vk_utils_insertDescSetRes(
                     {
                     case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
@@ -837,7 +833,7 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset;
                                 cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
 
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBuf=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBuf=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
                             }
@@ -846,7 +842,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
@@ -859,7 +854,7 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
                                 cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
 
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBufDynamic=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBufDynamic=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
                             }
@@ -868,7 +863,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
@@ -882,10 +876,10 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
 
                                 /* Storage buffer can used as either input or output */
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageBuf=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageBuf=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBuf=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBuf=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
                             }
@@ -894,7 +888,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
@@ -907,7 +900,7 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
                                 cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
 
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBufDynamic=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBufDynamic=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
                             }
@@ -916,7 +909,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vkBufferView *bufView;
@@ -931,7 +923,7 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.offset  = bufView->createInfo.offset;
                                 cmdRes.u.buf.range   = bufView->createInfo.range;
 
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformTexBuf=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformTexBuf=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
                             }
@@ -940,7 +932,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vkBufferView *bufView;
@@ -955,7 +946,7 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.buf.offset  = bufView->createInfo.offset;
                                 cmdRes.u.buf.range   = bufView->createInfo.range;
 
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageTexBuf=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageTexBuf=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
                             }
@@ -964,7 +955,6 @@ void __vk_utils_insertDescSetRes(
 
                     case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
                         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                        cmdRes.pTag = tag;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
                             __vkImageView *imgView;
@@ -980,10 +970,10 @@ void __vk_utils_insertDescSetRes(
                                 cmdRes.u.img.subResRange.aspectMask = 0;
 
                                 /* Storage image can used as either input or output */
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageImg=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageImg=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
-                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageImg=%d",
+                                gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageImg=%d",
                                                    cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
                                 __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
                             }
@@ -1015,12 +1005,10 @@ void __vk_utils_insertDrawCmdRes(
     __vkRenderSubPassInfo *subPass = bindInfo->renderPass.subPass;
     __vkFramebuffer *fb = bindInfo->renderPass.fb;
     __vkCmdResource cmdRes;
-    char tag[gcdMAX_PATH];
     const char *op = "draw";
 
     /* Dump Input Res */
     __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-    cmdRes.pTag = tag;
     cmdRes.isImage = VK_FALSE;
     cmdRes.u.buf.offset = 0;
     cmdRes.u.buf.range = VK_WHOLE_SIZE;
@@ -1028,7 +1016,7 @@ void __vk_utils_insertDrawCmdRes(
     if (indirectBuf)
     {
         cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, indirectBuf);
-        gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indirectBuf=%d",
+        gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indirectBuf=%d",
                            cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
         __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
     }
@@ -1038,7 +1026,7 @@ void __vk_utils_insertDrawCmdRes(
          ++i)
     {
         cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bindInfo->vertexBuffers.buffers[i]);
-        gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_vertexBuf%u=%d",
+        gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_vertexBuf%u=%d",
                            cmdBuf->obj.id, op, i, cmdRes.u.buf.pBuffer->obj.id);
         __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
     }
@@ -1046,7 +1034,7 @@ void __vk_utils_insertDrawCmdRes(
     if (bindInfo->indexBuffer.buffer)
     {
         cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bindInfo->indexBuffer.buffer);
-        gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indexBuf=%d",
+        gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indexBuf=%d",
                            cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
         __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
     }
@@ -1054,7 +1042,6 @@ void __vk_utils_insertDrawCmdRes(
     __vk_utils_insertDescSetRes(cmdBuf, &bindInfo->bindDescSet.graphics, op);
 
     __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-    cmdRes.pTag = tag;
     cmdRes.isImage = VK_TRUE;
 
     for (i = 0; i < subPass->colorCount; ++i)
@@ -1067,7 +1054,7 @@ void __vk_utils_insertDrawCmdRes(
             cmdRes.u.img.subResRange = colorView->createInfo.subresourceRange;
             cmdRes.u.img.subResRange.aspectMask = 0;
 
-            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_color%u=%d",
+            gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_color%u=%d",
                                cmdBuf->obj.id, op, i, cmdRes.u.img.pImage->obj.id);
             __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
         }
@@ -1081,7 +1068,7 @@ void __vk_utils_insertDrawCmdRes(
         cmdRes.u.img.subResRange = dsView->createInfo.subresourceRange;
         cmdRes.u.img.subResRange.aspectMask = 0;
 
-        gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_depth=%d",
+        gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_depth=%d",
                            cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
         __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
     }
@@ -1098,17 +1085,15 @@ void __vk_utils_insertComputeCmdRes(
     if (indirectBuf)
     {
         __vkCmdResource cmdRes;
-        char tag[gcdMAX_PATH];
         __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool*, cmdBuf->commandPool);
 
         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-        cmdRes.pTag = tag;
         cmdRes.isImage = VK_FALSE;
         cmdRes.u.buf.offset = 0;
         cmdRes.u.buf.range = VK_WHOLE_SIZE;
         cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, indirectBuf);
 
-        gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indirectBuf=%d",
+        gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_indirectBuf=%d",
                            cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
         __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
     }
@@ -1125,13 +1110,11 @@ void __vk_utils_insertCopyCmdRes(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer*)commandBuffer;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool*, cmdBuf->commandPool);
     __vkCmdResource cmdRes;
-    char tag[gcdMAX_PATH];
 
     if (srcRes)
     {
         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
 
-        cmdRes.pTag = tag;
         cmdRes.isImage = srcRes->isImage;
         if (cmdRes.isImage)
         {
@@ -1142,7 +1125,7 @@ void __vk_utils_insertCopyCmdRes(
             cmdRes.u.img.subResRange.baseArrayLayer = srcRes->u.img.subRes.arrayLayer;
             cmdRes.u.img.subResRange.layerCount     = 1;
 
-            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_input_image=%d",
+            gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_input_image=%d",
                                cmdBuf->obj.id, cmdRes.u.img.pImage->obj.id);
         }
         else
@@ -1151,7 +1134,7 @@ void __vk_utils_insertCopyCmdRes(
             cmdRes.u.buf.offset  = srcRes->u.buf.offset;
             cmdRes.u.buf.range   = VK_WHOLE_SIZE;
 
-            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_input_buffer=%d",
+            gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_input_buffer=%d",
                                cmdBuf->obj.id, cmdRes.u.buf.pBuffer->obj.id);
         }
 
@@ -1162,7 +1145,6 @@ void __vk_utils_insertCopyCmdRes(
     {
         __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
 
-        cmdRes.pTag = tag;
         cmdRes.isImage = dstRes->isImage;
         if (cmdRes.isImage)
         {
@@ -1173,7 +1155,7 @@ void __vk_utils_insertCopyCmdRes(
             cmdRes.u.img.subResRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
             cmdRes.u.img.subResRange.layerCount     = 1;
 
-            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_output_image=%d",
+            gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_output_image=%d",
                                cmdBuf->obj.id, cmdRes.u.img.pImage->obj.id);
         }
         else
@@ -1182,7 +1164,7 @@ void __vk_utils_insertCopyCmdRes(
             cmdRes.u.buf.offset  = dstRes->u.buf.offset;
             cmdRes.u.buf.range   = VK_WHOLE_SIZE;
 
-            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_output_buffer=%d",
+            gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_output_buffer=%d",
                                cmdBuf->obj.id, cmdRes.u.buf.pBuffer->obj.id);
         }
 
@@ -1273,7 +1255,7 @@ void __vk_utils_dumpCmdInputRes(
             /* Only dump the mapped range once */
             if (pMemory->mapped)
             {
-                gcmDUMP(gcvNULL, "#[info: update memory: %s", pResNode->res.pTag);
+                gcmDUMP(gcvNULL, "#[info: update memory: %s", pResNode->res.tag);
                 gcmDUMP_BUFFER(gcvNULL,
                                "memory",
                                pMemory->devAddr,
@@ -1330,7 +1312,7 @@ void __vk_utils_dumpCmdOutputRes(
                                     pLevel->partSize * partIdx +
                                     pLevel->sliceSize * pSubResRange->baseArrayLayer);
 
-                gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.pTag);
+                gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.tag);
                 gcmDUMP_BUFFER(gcvNULL, "verify", physical, logical, offset, size);
             }
         }
@@ -1346,7 +1328,7 @@ void __vk_utils_dumpCmdOutputRes(
                  ? (gctSIZE_T)(pBuffer->createInfo.size - pResNode->res.u.buf.offset)
                  : (gctSIZE_T)pResNode->res.u.buf.range;
 
-            gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.pTag);
+            gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.tag);
             gcmDUMP_BUFFER(gcvNULL, "verify", physical, logical, offset, size);
         }
 #endif

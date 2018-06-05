@@ -188,7 +188,7 @@ VkResult __vk_utils_readBinary(
 
 typedef struct __vkCmdResourceRec {
     VkBool32 isImage;
-    char *pTag;
+    char tag[gcdMAX_PATH];
 
     union {
         struct {
@@ -207,7 +207,6 @@ typedef struct __vkCmdResourceRec {
 
 struct __vkCmdResNodeRec {
     __vkCmdResource res;
-    char tag[gcdMAX_PATH];
 
     struct __vkCmdResNodeRec *next;
 };
