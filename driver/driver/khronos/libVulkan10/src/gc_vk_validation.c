@@ -5731,7 +5731,29 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceXcbPresentationSupportKH
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
-    return VK_SUCCESS;
+    __vkInstance *inst = (__vkInstance *)instance;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%d): vkCreateWaylandSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+    if (!pSurface)
+    {
+        result = __VK_ERROR_INVALID_POINTER;
+        goto vk_Exit;
+    }
+
+     result = __vk_CreateWaylandSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
+
+vk_Exit:
+    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
+
+    return result;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceWaylandPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, struct wl_display* display)

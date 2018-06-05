@@ -1487,7 +1487,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_MapMemory(
     __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
 
     *ppData = gcmUINT64_TO_PTR(gcmPTR_TO_UINT64(dvm->hostAddr) + offset);
-    dvm->mappedSize = size;
+    dvm->mappedSize = (size == VK_WHOLE_SIZE) ? (dvm->size - offset): size;
     dvm->mappedOffset = offset;
     dvm->mapped = VK_TRUE;
 
