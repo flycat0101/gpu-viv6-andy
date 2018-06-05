@@ -3690,10 +3690,12 @@ void halti5_helper_setSamplerStates(
 
     physical += TX_HW_DESCRIPTOR_MEM_SIZE * borderColorIdx;
 
-    __VK_ASSERT(imgv != gcvNULL);
-    pFormatProperties = &g_vkFormatInfoTable[imgv->formatInfo->residentImgFormat].formatProperties;
+    if (imgv)
+    {
+        pFormatProperties = &g_vkFormatInfoTable[imgv->formatInfo->residentImgFormat].formatProperties;
+    }
 
-    if (!(pFormatProperties->linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    if (pFormatProperties && !(pFormatProperties->linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
     {
         hwSamplerCtrl0 |= ((((gctUINT32) (hwSamplerCtrl0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ? 10:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
