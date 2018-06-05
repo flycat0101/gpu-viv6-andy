@@ -791,7 +791,8 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     {
         /* check resize. */
         if (buffer->info.width  != window->width ||
-            buffer->info.height != window->height)
+            buffer->info.height != window->height||
+            buffer->info.format != window->format)
         {
             /* The buffer must not be in compositor (ie, QUEUED state). */
             wl_egl_buffer_destroy(window, buffer);
