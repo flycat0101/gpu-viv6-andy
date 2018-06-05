@@ -1226,6 +1226,7 @@ _VSC_CPF_FoldConst(
         gcmASSERT(dstType < VIR_TYPE_LAST_PRIMITIVETYPE);
 
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_IMMEDIATE);
+        VIR_Operand_SetTypeId(srcOpnd, dstType);
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
@@ -1306,6 +1307,7 @@ _VSC_CPF_FoldConst(
         VIR_Operand_SetConstId(srcOpnd, new_const_id);
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
         VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
+        VIR_Operand_SetTypeId(srcOpnd, new_const->type);
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
