@@ -26,7 +26,7 @@
 #define SPV_MAX_OPCODE_NUM                          321
 
 /* switch could have a lot of cases. TODO: change this to dynamic */
-#define SPV_MAX_OPERAND_NUM                         20
+#define SPV_MAX_OPERAND_NUM                         30
 
 /* this is the max number of spvImageOperandMask */
 #define SPV_MAX_IMAGE_OPERAND_MASK                  8
