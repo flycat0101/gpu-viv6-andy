@@ -3978,6 +3978,12 @@ static VkResult halti5_helper_setDescSetSeperateImage(
 
                             __vk_utils_region_mad(&curTexRegion, &descriptorBinding->perElementSize, texArrayIdx, &descriptorBinding->offset);
                             resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curTexRegion.resource);
+
+                            if(resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                break;
+                            }
+
                             imgv = resInfo->u.imageInfo.imageView;
                             chipImgv = (halti5_imageView *)imgv->chipPriv;
 
@@ -4126,6 +4132,12 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
 
                             __vk_utils_region_mad(&curTexRegion, &texBinding->perElementSize, texArrayIdx, &texBinding->offset);
                             resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)texDescSet->resInfos + curTexRegion.resource);
+
+                            if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                break;
+                            }
+
                             imgv = resInfo->u.imageInfo.imageView;
                             chipImgv = (halti5_imageView *)imgv->chipPriv;
                             /* if board color will be used, must be valid combination */
@@ -4229,6 +4241,12 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                 __vk_utils_region_mad(&curDescRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curDescRegion.resource);
                 samplers = (__vkSampler **)((uint8_t*)descSet->samplers + curDescRegion.sampler);
+
+                if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    break;
+                }
+
                 imgv = resInfo->u.imageInfo.imageView;
                 img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
                 sampler = samplers[0];
@@ -4392,6 +4410,12 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 
                 __vk_utils_region_mad(&curDescRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curDescRegion.resource);
+
+                if(resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    break;
+                }
+
                 bufv = resInfo->u.bufferView;
                 chipBufv = (halti5_bufferView *)bufv->chipPriv;
 
@@ -4492,6 +4516,12 @@ static VkResult halti5_helper_setDescSetInputAttach(
 
                 __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
+
+                if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    break;
+                }
+
                 imgv = resInfo->u.imageInfo.imageView;
                 img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
                 chipImgv = (halti5_imageView *)imgv->chipPriv;
@@ -4661,6 +4691,11 @@ static VkResult halti5_helper_setDescSetStorage(
 
                 __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
+
+                if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    break;
+                }
 
                 switch (descriptorBinding->std.descriptorType)
                 {
@@ -4857,6 +4892,11 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
 
                 __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
+
+                if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    break;
+                }
 
                 switch (descriptorBinding->std.descriptorType)
                 {
