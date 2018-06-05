@@ -712,7 +712,7 @@ VkResult __vk_CommitStateBuffers(
     for (icommitPool = 0; icommitPool <= curPoolIndex; ++icommitPool)
     {
         VkBool32 bLast = (icommitPool == curPoolIndex);
-        uint32_t count = bLast ? commitCount : (__VK_MAX_COMMITS << icommitPool);
+        uint32_t count = bLast ? commitCount : (uint32_t)(__VK_MAX_COMMITS << icommitPool);
         for (icommits = 0; icommits < count; icommits++)
         {
             uint32_t *states;
