@@ -238,6 +238,7 @@ struct _gckHARDWARE
 
     gctPOINTER                  featureDatabase;
     gctBOOL                     hasAsyncFe;
+    gctBOOL                     hasL2Cache;
 
     gcsHARDWARE_SIGNATURE       signature;
 

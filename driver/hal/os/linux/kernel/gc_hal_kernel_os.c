@@ -2552,17 +2552,8 @@ gckOS_AtomicExchange(
     OUT gctUINT32_PTR OldValue
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Target=0x%X NewValue=%u", Os, Target, NewValue);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(OldValue != gcvNULL);
-
     /* Exchange the pair of 32-bit values. */
     *OldValue = (gctUINT32) atomic_xchg((atomic_t *) Target, (int) NewValue);
-
-    /* Success. */
-    gcmkFOOTER_ARG("*OldValue=%u", *OldValue);
     return gcvSTATUS_OK;
 }
 
@@ -2598,17 +2589,8 @@ gckOS_AtomicExchangePtr(
     OUT gctPOINTER * OldValue
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Target=0x%X NewValue=0x%X", Os, Target, NewValue);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(OldValue != gcvNULL);
-
     /* Exchange the pair of pointers. */
     *OldValue = (gctPOINTER)(gctUINTPTR_T) atomic_xchg((atomic_t *) Target, (int)(gctUINTPTR_T) NewValue);
-
-    /* Success. */
-    gcmkFOOTER_ARG("*OldValue=0x%X", *OldValue);
     return gcvSTATUS_OK;
 }
 
@@ -2636,18 +2618,12 @@ gckOS_AtomSetMask(
     )
 {
     gctUINT32 oval, nval;
-
-    gcmkHEADER_ARG("Atom=0x%0x", Atom);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     do
     {
         oval = atomic_read((atomic_t *) Atom);
         nval = oval | Mask;
     }
     while (atomic_cmpxchg((atomic_t *) Atom, oval, nval) != oval);
-
-    gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
 
@@ -2676,9 +2652,6 @@ gckOS_AtomClearMask(
 {
     gctUINT32 oval, nval;
 
-    gcmkHEADER_ARG("Atom=0x%0x", Atom);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     do
     {
         oval = atomic_read((atomic_t *) Atom);
@@ -2686,7 +2659,6 @@ gckOS_AtomClearMask(
     }
     while (atomic_cmpxchg((atomic_t *) Atom, oval, nval) != oval);
 
-    gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
 
@@ -2807,17 +2779,8 @@ gckOS_AtomGet(
     OUT gctINT32_PTR Value
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Atom=0x%0x", Os, Atom);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     /* Return the current value of atom. */
     *Value = atomic_read((atomic_t *) Atom);
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Value=%d", *Value);
     return gcvSTATUS_OK;
 }
 
@@ -2849,17 +2812,8 @@ gckOS_AtomSet(
     IN gctINT32 Value
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Atom=0x%0x Value=%d", Os, Atom);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     /* Set the current value of atom. */
     atomic_set((atomic_t *) Atom, Value);
-
-    /* Success. */
-    gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
 
@@ -2889,17 +2843,8 @@ gckOS_AtomIncrement(
     OUT gctINT32_PTR Value
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Atom=0x%0x", Os, Atom);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     /* Increment the atom. */
     *Value = atomic_inc_return((atomic_t *) Atom) - 1;
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Value=%d", *Value);
     return gcvSTATUS_OK;
 }
 
@@ -2929,17 +2874,8 @@ gckOS_AtomDecrement(
     OUT gctINT32_PTR Value
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Atom=0x%0x", Os, Atom);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Atom != gcvNULL);
-
     /* Decrement the atom. */
     *Value = atomic_dec_return((atomic_t *) Atom) + 1;
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Value=%d", *Value);
     return gcvSTATUS_OK;
 }
 
@@ -3101,11 +3037,6 @@ gckOS_MemoryBarrier(
     IN gctPOINTER Address
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Address=0x%X", Os, Address);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
 #if gcdNONPAGED_MEMORY_BUFFERABLE \
     && defined (CONFIG_ARM) \
     && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34))
@@ -3116,9 +3047,6 @@ gckOS_MemoryBarrier(
 #else
     mb();
 #endif
-
-    /* Success. */
-    gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
 

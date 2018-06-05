@@ -1747,7 +1747,9 @@ gckHARDWARE_Construct(
  22:22) + 1))))))) << (0 ? 22:22)))));
 #endif
 
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_64K_L2_CACHE) == gcvFALSE)
+    hardware->hasL2Cache = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_64K_L2_CACHE);
+
+    if (!hardware->hasL2Cache)
     {
         gcmkONERROR(gckOS_WriteRegisterEx(Os,
                                           Core,
@@ -2962,6 +2964,81 @@ OnError:
     return status;
 }
 
+/* Atomic version of Execute, for IRQ routine. */
+static gceSTATUS
+gckHARDWARE_AtomicExecute(
+    IN gckHARDWARE Hardware,
+    IN gctUINT32 Address,
+    IN gctSIZE_T Bytes
+    )
+{
+    gctUINT32 control;
+
+    /* Enable all events. */
+    gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00014, ~0U);
+
+    /* Write address register. */
+    gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00654, Address);
+
+    /* Build control register. */
+    control = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ? 16:16)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) ((Bytes + 7) >> 3) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));
+
+    /* Set big endian */
+    if (Hardware->bigEndian)
+    {
+        control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:20) - (0 ? 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ?
+ 21:20) + 1))))))) << (0 ? 21:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 21:20) - (0 ? 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ?
+ 21:20) + 1))))))) << (0 ? 21:20)));
+    }
+
+    /* Make sure writing to command buffer and previous AHB register is done. */
+    gckOS_MemoryBarrier(Hardware->os, gcvNULL);
+
+    /* Write control register. */
+    switch (Hardware->options.secureMode)
+    {
+    case gcvSECURE_NONE:
+        gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00658, control);
+        break;
+    case gcvSECURE_IN_NORMAL:
+
+#if defined(__KERNEL__)
+        gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00658, control);
+#endif
+        gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x003A4, control);
+
+        break;
+#if gcdENABLE_TRUST_APPLICATION
+    case gcvSECURE_IN_TA:
+        /* Send message to TA. */
+        gckKERNEL_SecurityStartCommand(Hardware->kernel, Address, (gctUINT32)Bytes);
+        break;
+#endif
+    default:
+        break;
+    }
+
+    /* Increase execute count. */
+    Hardware->executeCount++;
+
+    /* Record last execute address. */
+    Hardware->lastExecuteAddress = Address;
+
+    /* Success. */
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **
 **  gckHARDWARE_WaitLink
@@ -3028,7 +3105,7 @@ gckHARDWARE_WaitLink(
     gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmkVERIFY_ARGUMENT((Logical != gcvNULL) || (Bytes != gcvNULL));
 
-    useL2 = gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_64K_L2_CACHE);
+    useL2 = Hardware->hasL2Cache;
 
     /* Compute number of bytes required. */
     if (useL2)
@@ -4386,6 +4463,42 @@ OnError:
     return status;
 }
 
+static void
+_ResumeWaitLinkFE(
+    gckHARDWARE Hardware
+    )
+{
+    gctUINT32 resume;
+    gctUINT32 bytes;
+    gctUINT32 idle;
+
+    /* Make sure FE is idle. */
+    do
+    {
+        gckOS_ReadRegisterEx(Hardware->os,
+                             Hardware->core,
+                             0x00004,
+                             &idle);
+    }
+    while (idle != 0x7FFFFFFF);
+
+    gckOS_ReadRegisterEx(Hardware->os,
+                         Hardware->core,
+                         0x00664,
+                         &resume);
+
+    gckOS_ReadRegisterEx(Hardware->os,
+                         Hardware->core,
+                         0x00664,
+                         &resume);
+
+    /* Determine the wait-link command size. */
+    bytes = Hardware->hasL2Cache ? 24 : 16;
+
+    /* Start Command Parser. */
+    gckHARDWARE_AtomicExecute(Hardware, resume, bytes);
+}
+
 /*******************************************************************************
 **
 **  gckHARDWARE_Interrupt
@@ -4433,11 +4546,15 @@ gckHARDWARE_Interrupt(
          * That means, only need return ERROR when both FEs reports ERROR.
          */
         /* Read AQIntrAcknowledge register. */
-        gcmkONERROR(
-            gckOS_ReadRegisterEx(Hardware->os,
-                                 Hardware->core,
-                                 0x00010,
-                                 &data));
+        status = gckOS_ReadRegisterEx(Hardware->os,
+                                      Hardware->core,
+                                      0x00010,
+                                      &data);
+
+        if (gcmIS_ERROR(status))
+        {
+            goto OnError;
+        }
 
         if (data == 0)
         {
@@ -4449,6 +4566,13 @@ gckHARDWARE_Interrupt(
 #if gcdINTERRUPT_STATISTIC
             gckOS_AtomClearMask(Hardware->pendingEvent, data);
 #endif
+            if (data & (1 << 29))
+            {
+                /* Event ID 29 is not a normal event, but for invalidating pipe. */
+                _ResumeWaitLinkFE(Hardware);
+                data &= ~(1 << 29);
+            }
+
             /* Inform gckEVENT of the interrupt. */
             status = gckEVENT_Interrupt(eventObj, data);
         }
