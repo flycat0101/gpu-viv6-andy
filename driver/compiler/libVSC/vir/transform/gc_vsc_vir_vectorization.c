@@ -16,6 +16,7 @@
 
 #define MAX_CANDIDATE_SEARCH_ITERATE_COUNT    20000
 #define MAX_VECTORIZED_VEC_IMM                700
+#define MAX_VECTORIZE_BB_INST_COUNT           1000
 
 typedef struct VIR_VECTORIZER_INFO
 {
@@ -3685,7 +3686,7 @@ static VSC_ErrCode _DoVectorizationOnFunc(VIR_VECTORIZER_INFO* pVectorizerInfo,
     pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
     for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
     {
-        if (BB_GET_LENGTH(pThisBlock))
+        if (BB_GET_LENGTH(pThisBlock) && BB_GET_LENGTH(pThisBlock) < MAX_VECTORIZE_BB_INST_COUNT)
         {
             errCode = _DoVectorizationOnBasicBlock(pVectorizerInfo, pShader, pThisBlock, pDuInfo, pOvCallbacks, pMM);
             ON_ERROR(errCode, "Do vectorization on basic block");
