@@ -463,7 +463,7 @@ gcoHAL_ConstructEx(
         hal->dump      = gcvNULL;
 
         /* Query the kernel version number. */
-        iface.ignoreTLS = gcvFALSE;
+        iface.ignoreTLS = gcvTRUE;
         iface.command = gcvHAL_VERSION;
         gcmONERROR(gcoOS_DeviceControl(gcvNULL,
                                        IOCTL_GCHAL_INTERFACE,
@@ -531,6 +531,11 @@ gcoHAL_ConstructEx(
                 break;
             }
         }
+
+        hal->defaultHwType = hal->separated2D ? gcvHARDWARE_2D
+                           : hal->hybrid2D ? gcvHARDWARE_3D2D
+                           : hal->is3DAvailable ? gcvHARDWARE_3D
+                           : gcvHARDWARE_VG;
 
         hal->isGpuBenchSmoothTriangle = gcvFALSE;
     }

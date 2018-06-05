@@ -498,6 +498,80 @@ OnError:
 static void __attribute__((destructor)) _ModuleDestructor(void);
 
 static gceSTATUS
+_QueryVideoMemory(
+    OUT gctPHYS_ADDR * InternalAddress,
+    OUT gctSIZE_T * InternalSize,
+    OUT gctPHYS_ADDR * ExternalAddress,
+    OUT gctSIZE_T * ExternalSize,
+    OUT gctPHYS_ADDR * ContiguousAddress,
+    OUT gctSIZE_T * ContiguousSize
+    )
+{
+    gceSTATUS status;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER();
+
+    /* Call kernel HAL to query video memory. */
+    iface.ignoreTLS    = gcvTRUE;
+    iface.hardwareType = gcPLS.hal->defaultHwType,
+    iface.coreIndex    = 0;
+
+    iface.command = gcvHAL_QUERY_VIDEO_MEMORY;
+
+    /* Call kernel service. */
+    gcmONERROR(gcoOS_DeviceControl(gcvNULL,
+                                   IOCTL_GCHAL_INTERFACE,
+                                   &iface, gcmSIZEOF(iface),
+                                   &iface, gcmSIZEOF(iface)));
+
+    if (InternalAddress != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmDEBUG_VERIFY_ARGUMENT(InternalSize != gcvNULL);
+
+        /* Save internal memory size. */
+        *InternalAddress = gcmINT2PTR(iface.u.QueryVideoMemory.internalPhysical);
+        *InternalSize    = (gctSIZE_T)iface.u.QueryVideoMemory.internalSize;
+    }
+
+    if (ExternalAddress != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmDEBUG_VERIFY_ARGUMENT(ExternalSize != gcvNULL);
+
+        /* Save external memory size. */
+        *ExternalAddress = gcmINT2PTR(iface.u.QueryVideoMemory.externalPhysical);
+        *ExternalSize    = (gctSIZE_T)iface.u.QueryVideoMemory.externalSize;
+    }
+
+    if (ContiguousAddress != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmDEBUG_VERIFY_ARGUMENT(ContiguousSize != gcvNULL);
+
+        /* Save contiguous memory size. */
+        *ContiguousAddress = gcmINT2PTR(iface.u.QueryVideoMemory.contiguousPhysical);
+        *ContiguousSize    = (gctSIZE_T)iface.u.QueryVideoMemory.contiguousSize;
+    }
+
+    /* Success. */
+    gcmFOOTER_ARG("*InternalAddress=0x%08x *InternalSize=%lu "
+                  "*ExternalAddress=0x%08x *ExternalSize=%lu "
+                  "*ContiguousAddress=0x%08x *ContiguousSize=%lu",
+                  gcmOPT_VALUE(InternalAddress), gcmOPT_VALUE(InternalSize),
+                  gcmOPT_VALUE(ExternalAddress), gcmOPT_VALUE(ExternalSize),
+                  gcmOPT_VALUE(ContiguousAddress),
+                  gcmOPT_VALUE(ContiguousSize));
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
 _MapMemory(
     IN gctPHYS_ADDR Physical,
     IN gctSIZE_T NumberOfBytes,
@@ -514,7 +588,10 @@ _MapMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
-    iface.ignoreTLS            = gcvFALSE;
+    iface.ignoreTLS            = gcvTRUE;
+    iface.hardwareType         = gcPLS.hal->defaultHwType,
+    iface.coreIndex            = 0;
+
     iface.command              = gcvHAL_MAP_MEMORY;
     iface.u.MapMemory.physical = gcmPTR2INT32(Physical);
     iface.u.MapMemory.bytes    = NumberOfBytes;
@@ -557,7 +634,11 @@ _UnmapMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
-    iface.ignoreTLS              = gcvFALSE;
+    iface.ignoreTLS              = gcvTRUE;
+    iface.hardwareType           = gcPLS.hal ? gcPLS.hal->defaultHwType
+                                             : gcvHARDWARE_2D;
+    iface.coreIndex              = 0;
+
     iface.command                = gcvHAL_UNMAP_MEMORY;
     iface.u.UnmapMemory.physical = gcmPTR2INT32(Physical);
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
@@ -1153,8 +1234,7 @@ _OpenDevice(
     gcmONERROR(gcoHAL_ConstructEx(gcvNULL, gcvNULL, &gcPLS.hal));
 
     /* Query the video memory sizes. */
-    gcmONERROR(gcoOS_QueryVideoMemory(
-        gcPLS.os,
+    gcmONERROR(_QueryVideoMemory(
         &gcPLS.internalPhysical,
         &gcPLS.internalSize,
         &gcPLS.externalPhysical,
@@ -1429,24 +1509,7 @@ gcoOS_GetTLS(
     /* Assign default hardware type. */
     if ((tls->currentType == gcvHARDWARE_INVALID) && gcPLS.hal)
     {
-        gcoHAL hal = gcPLS.hal;
-
-        if (hal->separated2D)
-        {
-            tls->currentType = gcvHARDWARE_2D;
-        }
-        else if (hal->hybrid2D)
-        {
-            tls->currentType = gcvHARDWARE_3D2D;
-        }
-        else if (hal->is3DAvailable)
-        {
-            tls->currentType = gcvHARDWARE_3D;
-        }
-        else
-        {
-            tls->currentType = gcvHARDWARE_VG;
-        }
+        tls->currentType = gcPLS.hal->defaultHwType;
     }
 
     *TLS = tls;

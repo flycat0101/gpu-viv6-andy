@@ -3479,6 +3479,7 @@ struct _gcoHAL
     gctBOOL                 is3DAvailable;
     gctBOOL                 isGpuBenchSmoothTriangle;
 
+    gceHARDWARE_TYPE        defaultHwType;
 #if gcdENABLE_3D
     gcsSTATISTICS           statistics;
 #endif
