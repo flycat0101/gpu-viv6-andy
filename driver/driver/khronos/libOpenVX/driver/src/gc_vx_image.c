@@ -2425,8 +2425,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
             else
             {
                 vx_uint8* ptr = gcvNULL;
-
-                if (image->importType == VX_MEMORY_TYPE_HOST)
+                /*for non host ptr image or roi/channel image, should not release and reallocat memory*/
+                if((image->importType == VX_MEMORY_TYPE_HOST) && (image->parent == gcvNULL))
                 {
                     vx_context context = vxGetContext((vx_reference)image);
 
