@@ -402,6 +402,7 @@ veglQueryWaylandBuffer(
     struct wl_resource *Buffer,
     EGLint * Width,
     EGLint * Height,
+    EGLint * Fd,
     gcoSURF * Surface
     );
 

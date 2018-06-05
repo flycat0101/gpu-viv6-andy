@@ -301,6 +301,7 @@ veglQueryWaylandBuffer(
     struct wl_resource *Buffer,
     EGLint * Width,
     EGLint * Height,
+    EGLint * Fd,
     gcoSURF * Surface
     )
 {
@@ -324,6 +325,11 @@ veglQueryWaylandBuffer(
     if (Height)
     {
         *Height = buffer->height;
+    }
+
+    if (Fd)
+    {
+        *Fd = buffer->fd;
     }
 
     if (Surface)

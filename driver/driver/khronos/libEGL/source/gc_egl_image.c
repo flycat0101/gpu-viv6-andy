@@ -1019,6 +1019,7 @@ _CreateImageWL(
     gctUINT width  = 0;
     gctUINT height = 0;
     gcoSURF surface = gcvNULL;
+    gctINT fd = -1;
 
     /* Context must be null. */
     if (Ctx != gcvNULL)
@@ -1031,6 +1032,7 @@ _CreateImageWL(
                                Buffer,
                                (EGLint *) &width,
                                (EGLint *) &height,
+                               (EGLint *) &fd,
                                &surface) != EGL_TRUE)
     {
         veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);
@@ -1052,6 +1054,7 @@ _CreateImageWL(
     image->image.surface           = surface;
     image->image.u.wlbuffer.width  = width;
     image->image.u.wlbuffer.height = height;
+    image->image.u.wlbuffer.fd = fd;
 
     if (image->image.surface)
     {

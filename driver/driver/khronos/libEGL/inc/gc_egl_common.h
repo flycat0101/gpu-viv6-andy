@@ -189,6 +189,7 @@ typedef struct _khrEGL_IMAGE
         {
             gctINT              width;
             gctINT              height;
+            gctINT              fd;
         } wlbuffer;
     } u;
 }

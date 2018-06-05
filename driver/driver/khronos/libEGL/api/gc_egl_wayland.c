@@ -2371,6 +2371,7 @@ veglCreateWaylandBufferFromImage(
     struct wl_egl_display *display;
     struct wl_egl_buffer *buffer;
     gctINT32 fd = -1;
+    gcoSURF surface = NULL;
 
     VEGL_LOCK_DISPLAY_RESOURCE(Dpy);
 
@@ -2379,8 +2380,12 @@ veglCreateWaylandBufferFromImage(
     buffer = malloc(sizeof (struct wl_egl_buffer));
     memset(buffer, 0, sizeof (struct wl_egl_buffer));
 
+    /* wlbuffer's width and height and fd got from veglQueryWaylandBuffer */
     buffer->info.width  = Image->image.u.wlbuffer.width;
     buffer->info.height = Image->image.u.wlbuffer.height;
+    fd = Image->image.u.wlbuffer.fd;
+
+    gcmASSERT((fd >= 0));
 
     gcmONERROR(
         gcoSURF_GetAlignedSize(Image->image.surface,
@@ -2401,9 +2406,27 @@ veglCreateWaylandBufferFromImage(
                           &buffer->info.type,
                           &buffer->info.format));
 
+    surface = Image->image.surface;
+
+#if gcdENABLE_3D
+    buffer->info.tsNode = surface->tileStatusNode.u.normal.node;
+    buffer->info.tsPool = surface->tileStatusNode.pool;
+    buffer->info.tsSize = surface->tileStatusNode.size;
+
+    if (buffer->info.tsNode)
+    {
+        gcmONERROR(
+            gcoHAL_NameVideoMemory(buffer->info.tsNode,
+                                   &buffer->info.tsNode));
+    }
+#else
+    buffer->info.tsNode = 0;
+    buffer->info.tsPool = gcvPOOL_UNKNOWN;
+    buffer->info.tsSize = 0;
+#endif
+
     gcmONERROR(
         gcoHAL_NameVideoMemory(buffer->info.node, &buffer->info.node));
-
 
     wl_buf = buffer->wl_buf =
         wl_viv_create_buffer(display->wl_viv,
@@ -2412,10 +2435,13 @@ veglCreateWaylandBufferFromImage(
                 buffer->info.node, buffer->info.pool, buffer->info.size,
                 buffer->info.tsNode, buffer->info.tsPool, buffer->info.tsSize, buffer->info.fd);
 
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+        !surface->tileStatusDisabled[0], surface->compressed,
+        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+
     wl_proxy_set_queue((struct wl_proxy *)buffer->wl_buf, NULL);
 
     /*buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
-
     free(buffer);
     buffer = NULL;
 
@@ -2424,4 +2450,5 @@ veglCreateWaylandBufferFromImage(
 OnError:
     return wl_buf;
 }
+
 

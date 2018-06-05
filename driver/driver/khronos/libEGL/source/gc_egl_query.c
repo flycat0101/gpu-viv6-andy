@@ -1057,15 +1057,15 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQueryWaylandBufferWL(EGLDisplay dpy, struct wl_
     case EGL_TEXTURE_FORMAT:
         *value = EGL_TEXTURE_RGB;
         /* Not a query, just check if buffer is valid. */
-        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL);
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
     case EGL_WIDTH:
-        return veglQueryWaylandBuffer(d, buffer, value, gcvNULL, gcvNULL);
+        return veglQueryWaylandBuffer(d, buffer, value, gcvNULL, gcvNULL, gcvNULL);
     case EGL_HEIGHT:
-        return veglQueryWaylandBuffer(d, buffer, gcvNULL, value, gcvNULL);
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, value, gcvNULL, gcvNULL);
     case EGL_WAYLAND_Y_INVERTED_WL:
         *value = 1;
         /* Not a query, just check if buffer is valid. */
-        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL);
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
     default:
         return EGL_FALSE;
     }
