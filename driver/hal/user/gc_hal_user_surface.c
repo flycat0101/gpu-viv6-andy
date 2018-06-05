@@ -3258,31 +3258,37 @@ OnError:
     return status;
 }
 
+#endif /* gcdENABLE_3D */
+
 gceSTATUS
 gcoSURF_UpdateMetadata(
     IN gcoSURF Surface,
     IN gctINT TsFD
     )
 {
-    gctUINT32 compressFmt;
     gcsHAL_INTERFACE iface = {0};
-
-    gcoHARDWARE_MapCompressionFormat(Surface->compressFormat, &compressFmt);
 
     iface.command = gcvHAL_SET_VIDEO_MEMORY_METADATA;
     iface.u.SetVidMemMetadata.node              = Surface->node.u.normal.node;
     iface.u.SetVidMemMetadata.readback          = 0;
-    iface.u.SetVidMemMetadata.ts_fd             = TsFD;
-    iface.u.SetVidMemMetadata.fc_enabled        = !Surface->tileStatusDisabled[0];
-    iface.u.SetVidMemMetadata.fc_value          = Surface->fcValue[0];
-    iface.u.SetVidMemMetadata.fc_value_upper    = Surface->fcValueUpper[0];
-    iface.u.SetVidMemMetadata.compressed        = Surface->compressed;
-    iface.u.SetVidMemMetadata.compress_format   = compressFmt;
+
+#if gcdENABLE_3D
+    {
+        gctUINT32 compressFmt = 0;
+
+        gcoHARDWARE_MapCompressionFormat(Surface->compressFormat, &compressFmt);
+
+        iface.u.SetVidMemMetadata.ts_fd             = TsFD;
+        iface.u.SetVidMemMetadata.fc_enabled        = !Surface->tileStatusDisabled[0];
+        iface.u.SetVidMemMetadata.fc_value          = Surface->fcValue[0];
+        iface.u.SetVidMemMetadata.fc_value_upper    = Surface->fcValueUpper[0];
+        iface.u.SetVidMemMetadata.compressed        = Surface->compressed;
+        iface.u.SetVidMemMetadata.compress_format   = compressFmt;
+    }
+#endif
 
     return gcoHAL_Call(gcvNULL, &iface);
 }
-
-#endif /* gcdENABLE_3D */
 
 /*******************************************************************************
 **

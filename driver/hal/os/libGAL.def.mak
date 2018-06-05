@@ -364,6 +364,7 @@ EXPORTS
     gcoSURF_WrapSurface
     gcoSURF_GetInfo
     gcoSURF_QueryHints
+    gcoSURF_UpdateMetadata
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" != "0_0"
 ;   Both 3D & VG have these functions.
@@ -398,18 +399,17 @@ EXPORTS
     gcoSURF_GetFence
     gcoSURF_WaitFence
     gcoSURF_AlignResolveRect
- 	gcoSURF_DrawBlit
+    gcoSURF_DrawBlit
     gcsSURF_NODE_Construct
     gcsSURF_NODE_Destroy
-	gcsSURF_NODE_Lock
-	gcsSURF_NODE_Unlock
+    gcsSURF_NODE_Lock
+    gcsSURF_NODE_Unlock
     gcsSURF_NODE_GetHardwareAddress
     gcsSURF_NODE_SetHardwareAddress
-	gcsSURF_NODE_GetHWAddress
+    gcsSURF_NODE_GetHWAddress
 
     gcoSURF_FlushTileStatus
     gcoSURF_AppendTileStatus
-	gcoSURF_UpdateMetadata
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
