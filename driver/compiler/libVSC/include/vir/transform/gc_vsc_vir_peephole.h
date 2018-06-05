@@ -20,13 +20,20 @@ BEGIN_EXTERN_C()
 
 typedef struct VIR_PH_PEEPHOLE
 {
-    VIR_Shader* shader;
-    VIR_BASIC_BLOCK* curr_bb;
-    VIR_DEF_USAGE_INFO* du_info;
-    VSC_HW_CONFIG* hwCfg;
-    VSC_OPTN_PHOptions* options;
-    VIR_Dumper* dumper;
-    VSC_MM* pMM;
+    VIR_Shader *            shader;
+    VIR_BASIC_BLOCK *       curr_bb;
+    VIR_DEF_USAGE_INFO *    du_info;
+
+    /* hash tables */
+    VSC_HASH_TABLE *        work_set;
+    VSC_HASH_TABLE *        usage_set;
+    VSC_HASH_TABLE *        def_set0;
+    VSC_HASH_TABLE *        def_set1;
+
+    VSC_HW_CONFIG *         hwCfg;
+    VSC_OPTN_PHOptions *    options;
+    VIR_Dumper *            dumper;
+    VSC_MM *                pMM;
 
     gctBOOL     cfgChanged;
     gctBOOL     exprChanged;
@@ -50,11 +57,31 @@ typedef struct VIR_PH_PEEPHOLE
 #define VSC_PH_Peephole_SetCfgChanged(ph, c)   ((ph)->cfgChanged = (c))
 #define VSC_PH_Peephole_GetExprChanged(ph)     ((ph)->exprChanged)
 #define VSC_PH_Peephole_SetExprChanged(ph, e)  ((ph)->exprChanged = (e))
+#define VSC_PH_Peephole_WorkSet(ph)            ((ph)->work_set)
+#define VSC_PH_Peephole_UsageSet(ph)           ((ph)->usage_set)
+#define VSC_PH_Peephole_DefSet(ph)             ((ph)->def_set0)
+#define VSC_PH_Peephole_DefSet0(ph)            ((ph)->def_set0)
+#define VSC_PH_Peephole_DefSet1(ph)            ((ph)->def_set1)
 
 extern VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_PH_Peephole_PerformOnShader);
+
+VSC_ErrCode
+_VSC_PH_InitHashTable(
+    IN OUT VSC_PH_Peephole*  ph,
+    IN OUT VSC_HASH_TABLE ** ppHT,
+    IN PFN_VSC_HASH_FUNC     pfnHashFunc,
+    IN PFN_VSC_KEY_CMP       pfnKeyCmp,
+    IN gctINT                tableSize
+    );
+
+void
+_VSC_PH_ResetHashTable(
+    IN OUT VSC_HASH_TABLE * pHT
+    );
+
 
 END_EXTERN_C()
 
