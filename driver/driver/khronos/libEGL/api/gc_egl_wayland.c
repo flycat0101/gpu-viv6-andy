@@ -2017,6 +2017,17 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     window->swap_interval = 1;
     window->commit_signal = 1;
 
+    p = getenv("WL_EGL_SWAP_INTERVAL");
+    if (p != NULL)
+    {
+        int interval = atoi(p);
+        window->swap_interval = gcmCLAMP(interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
+    }
+    else
+    {
+        window->swap_interval = 1;
+    }
+
     pthread_mutex_init(&window->commit_mutex, NULL);
 
     p = getenv("GPU_VIV_WL_MULTI_BUFFER");
