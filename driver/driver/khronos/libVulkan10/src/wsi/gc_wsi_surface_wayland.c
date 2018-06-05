@@ -47,8 +47,11 @@ struct __vkWaylandSwapchainKHRRec
     VkIcdSurfaceWayland *           surface;
 
     struct wl_registry *            wl_registry;
-    struct wl_viv *                 wl_viv;
     struct wl_event_queue *         wl_queue;
+
+    struct wl_viv *                 wl_viv;
+    struct wl_compositor *          wl_compositor;
+    struct wl_region *              opaque_region;
 
     /* It's an old swapchain, replaced by new one. */
     VkBool32                        expired;
@@ -275,7 +278,7 @@ static VkResult waylandGetPhysicalDeviceSurfaceCapabilities(
     pSurfaceCapabilities->maxImageArrayLayers     = 1;
     pSurfaceCapabilities->supportedTransforms     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     pSurfaceCapabilities->currentTransform        = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    pSurfaceCapabilities->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+    pSurfaceCapabilities->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR | VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     pSurfaceCapabilities->supportedUsageFlags     = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     return VK_SUCCESS;
@@ -714,6 +717,10 @@ static void __DestroySwapchain(
 
         wl_registry_destroy(sc->wl_registry);
         wl_viv_destroy(sc->wl_viv);
+
+        if (sc->opaque_region)
+            wl_region_destroy(sc->opaque_region);
+
         wl_event_queue_destroy(sc->wl_queue);
     }
 
@@ -958,6 +965,9 @@ static VkResult __QueuePresentSwapchainImage(
     while (wl_display_prepare_read_queue(surf->display, sc->wl_queue) == -1)
         wl_display_dispatch_queue_pending(surf->display, sc->wl_queue);
 
+    if (sc->opaque_region)
+        wl_surface_set_opaque_region(surf->surface, sc->opaque_region);
+
     imageBuffer->frame_callback = wl_surface_frame(surf->surface);
     wl_proxy_set_queue((struct wl_proxy *)imageBuffer->frame_callback, sc->wl_queue);
     wl_callback_add_listener(imageBuffer->frame_callback, &frame_callback_listener, imageBuffer);
@@ -999,10 +1009,16 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
 {
     __vkWaylandSwapchainKHR *sc = data;
 
-    if (strcmp(interface, "wl_viv") == 0 && sc)
+    if (strcmp(interface, "wl_viv") == 0)
     {
         sc->wl_viv = wl_registry_bind(registry, name, &wl_viv_interface, 1);
         wl_proxy_set_queue((struct wl_proxy *)sc->wl_viv, sc->wl_queue);
+    }
+    else if (strcmp(interface, "wl_compositor") == 0)
+    {
+        sc->wl_compositor = wl_registry_bind(registry, name,
+                &wl_compositor_interface, 1);
+        wl_proxy_set_queue((struct wl_proxy *)sc->wl_compositor, sc->wl_queue);
     }
 }
 
@@ -1114,7 +1130,16 @@ static VkResult waylandCreateSwapchain(
 
     roundtrip_queue(surf->display, sc->wl_queue);
 
-    sc->imageCount          = 0;
+    if (sc->compositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+    {
+        sc->opaque_region = wl_compositor_create_region(sc->wl_compositor);
+        wl_proxy_set_queue((struct wl_proxy *)sc->opaque_region, sc->wl_queue);
+
+        /* Set opaque region to full surface. */
+        wl_region_add(sc->opaque_region, 0, 0, sc->imageExtent.width, sc->imageExtent.height);
+    }
+
+    sc->imageCount = 0;
 
     __VK_ONERROR(__CreateSwapchainCommandBuffer(sc));
 
