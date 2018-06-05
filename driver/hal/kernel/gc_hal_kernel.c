@@ -852,6 +852,13 @@ gckKERNEL_Destroy(
         Kernel->monitorTimerStop = gcvTRUE;
     }
 
+    if (Kernel->monitorTimer)
+    {
+        /* Stop and destroy monitor timer. */
+        gcmkVERIFY_OK(gckOS_StopTimer(Kernel->os, Kernel->monitorTimer));
+        gcmkVERIFY_OK(gckOS_DestroyTimer(Kernel->os, Kernel->monitorTimer));
+    }
+
 #if gcdENABLE_VG
     if (Kernel->vg)
     {
@@ -937,12 +944,6 @@ gckKERNEL_Destroy(
         gcmkVERIFY_OK(gckKERNEL_SecurityClose(Kernel->securityChannel));
     }
 #endif
-
-    if (Kernel->monitorTimer)
-    {
-        gcmkVERIFY_OK(gckOS_StopTimer(Kernel->os, Kernel->monitorTimer));
-        gcmkVERIFY_OK(gckOS_DestroyTimer(Kernel->os, Kernel->monitorTimer));
-    }
 
     /* Mark the gckKERNEL object as unknown. */
     Kernel->object.type = gcvOBJ_UNKNOWN;
