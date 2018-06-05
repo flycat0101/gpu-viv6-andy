@@ -7345,6 +7345,40 @@ _VIR_RA_LS_InsertFill(
     return retErrCode;
 }
 
+/* if src0 is spilled in MOVA d1, src0,
+   insert spill of src0 before real usage of MOVA */
+static VSC_ErrCode
+_VIR_RA_LS_InsertSpillBeforeMovaUsageInst(
+    VIR_RA_LS       *pRA,
+    VIR_Instruction *pDefInst,
+    VIR_Instruction *pMovInst)
+{
+    VSC_ErrCode         retErrCode = VSC_ERR_NONE;
+    VIR_OperandInfo     operandInfo;
+    VIR_RA_LS_Liverange *pLR;
+    gctUINT             webIdx;
+
+    if (VIR_Inst_GetPrev(pMovInst) == pDefInst)
+    {
+        /*spill code is inserted just before pDefInst and pDefInst(mova) will be deleted */
+        return retErrCode;
+    }
+
+    VIR_Operand_GetOperandInfo(pDefInst,
+                               pDefInst->src[VIR_Operand_Src0],
+                               &operandInfo);
+     webIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pDefInst, pDefInst->src[VIR_Operand_Src0]);
+     if (VIR_INVALID_WEB_INDEX != webIdx)
+     {
+         pLR = _VIR_RA_LS_Web2ColorLR(pRA, webIdx);
+         if (isLRSpilled(pLR))
+         {
+             retErrCode = _VIR_RA_LS_InsertSpill(pRA, pMovInst, pMovInst->src[VIR_Operand_Src0], pLR);
+         }
+     }
+     return retErrCode;
+}
+
 /*
     insert the MAD to compute the offset
     1: mad  offset.x, t1.x, __DEFAULT_TEMP_REGISTER_SIZE_IN_BYTE__, spillOffset
@@ -7476,6 +7510,14 @@ _VIR_RA_LS_InsertSpillOffset(
 
         retErrCode = _VIR_RA_LS_RewriteColor_Src(pRA, pDef->defKey.pDefInst,
             pDef->defKey.pDefInst->src[VIR_Operand_Src0], src1Opnd);
+
+        /* reload pDef->defKey.pDefInst->src[VIR_Operand_Src0] before movInst if needed.
+           for a vectorized mova t1.xyz, src1.xyz if sr1.xyz is spilled
+           we need to reload src1.xyz before mov */
+        if (isLDARR)
+        {
+            _VIR_RA_LS_InsertSpillBeforeMovaUsageInst(pRA, pDef->defKey.pDefInst, movInst);
+        }
 
         retErrCode = _VIR_RA_LS_GenTemp(pRA, &tmpSymId);
         VIR_Operand_SetTempRegister(movInst->dest,
