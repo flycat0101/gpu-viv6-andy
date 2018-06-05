@@ -1863,6 +1863,7 @@ gckHARDWARE_Construct(
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             hardware->os,
             gcvFALSE,
+            gcvALLOC_FLAG_CONTIGUOUS,
             &hardware->pagetableArray.size,
             &hardware->pagetableArray.physical,
             &hardware->pagetableArray.logical
@@ -12152,6 +12153,7 @@ gckHARDWARE_PrepareFunctions(
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
             gcvFALSE,
+            gcvALLOC_FLAG_CONTIGUOUS | gcvALLOC_FLAG_4GB_ADDR,
             &Hardware->mmuFuncBytes,
             &Hardware->mmuFuncPhysical,
             &Hardware->mmuFuncLogical
@@ -12162,12 +12164,6 @@ gckHARDWARE_PrepareFunctions(
             Hardware->mmuFuncLogical,
             &physical
             ));
-
-        if (physical & 0xFFFFFFFF00000000ULL)
-        {
-            gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits",
-                      __FUNCTION__, __LINE__, physical);
-        }
 
         function = &Hardware->functions[gcvHARDWARE_FUNCTION_MMU];
         function->logical = (gctUINT8_PTR)Hardware->mmuFuncLogical;
@@ -12223,6 +12219,7 @@ gckHARDWARE_PrepareFunctions(
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
             gcvFALSE,
+            gcvALLOC_FLAG_CONTIGUOUS,
             &Hardware->auxFuncBytes,
             &Hardware->auxFuncPhysical,
             &Hardware->auxFuncLogical

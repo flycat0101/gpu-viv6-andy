@@ -181,14 +181,12 @@ _NonContiguousFree(
 
 static struct page **
 _NonContiguousAlloc(
-    IN gctUINT32 NumPages
+    IN gctUINT32 NumPages,
+    IN gctUINT32 Gfp
     )
 {
     struct page ** pages;
     struct page *p;
-#if gcdDISCRETE_PAGES
-    struct page *l;
-#endif
     gctINT i, size;
 
     gcmkHEADER_ARG("NumPages=%u", NumPages);
@@ -220,7 +218,7 @@ _NonContiguousAlloc(
 
     for (i = 0; i < NumPages; i++)
     {
-        p = alloc_page(GFP_KERNEL | __GFP_HIGHMEM | gcdNOWARN);
+        p = alloc_page(Gfp);
 
         if (!p)
         {
@@ -235,10 +233,10 @@ _NonContiguousAlloc(
             if (page_to_pfn(pages[i-1]) == page_to_pfn(p)-1)
             {
                 /* Replaced page. */
-                l = p;
+                struct page *l = p;
 
                 /* Allocate a page which is not contiguous to previous one. */
-                p = alloc_page(GFP_KERNEL | __GFP_HIGHMEM | __GFP_NOWARN);
+                p = alloc_page(Gfp);
 
                 /* Give replaced page back. */
                 __free_page(l);
@@ -273,10 +271,8 @@ _GFPAlloc(
 {
     gceSTATUS status;
     gctUINT i;
+    u32 gfp = GFP_KERNEL | gcdNOWARN;
     gctBOOL contiguous = Flags & gcvALLOC_FLAG_CONTIGUOUS;
-#ifdef gcdSYS_FREE_MEMORY_LIMIT
-    struct sysinfo temsysinfo;
-#endif
 
     struct gfp_priv *priv = (struct gfp_priv *)Allocator->privateData;
     struct gfp_mdl_priv *mdlPriv = gcvNULL;
@@ -286,11 +282,12 @@ _GFPAlloc(
     gcmkHEADER_ARG("Allocator=%p Mdl=%p NumPages=%zu Flags=0x%x", Allocator, Mdl, NumPages, Flags);
 
 #ifdef gcdSYS_FREE_MEMORY_LIMIT
-    si_meminfo(&temsysinfo);
-
     if (Flags & gcvALLOC_FLAG_MEMLIMIT)
     {
-        if ( (temsysinfo.freeram < NumPages) || ((temsysinfo.freeram-NumPages) < gcdSYS_FREE_MEMORY_LIMIT) )
+        struct sysinfo temsysinfo;
+        si_meminfo(&temsysinfo);
+
+        if ((temsysinfo.freeram < NumPages) || ((temsysinfo.freeram-NumPages) < gcdSYS_FREE_MEMORY_LIMIT))
         {
             gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
@@ -301,6 +298,10 @@ _GFPAlloc(
 
     memset(mdlPriv, 0, sizeof(struct gfp_mdl_priv));
 
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+    gfp |= (Flags & gcvALLOC_FLAG_4GB_ADDR) ? __GFP_DMA32 : __GFP_HIGHMEM;
+#endif
+
     if (contiguous)
     {
         size_t bytes = NumPages << PAGE_SHIFT;
@@ -308,7 +309,7 @@ _GFPAlloc(
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
         void *addr = NULL;
 
-        addr = alloc_pages_exact(bytes, GFP_KERNEL | gcdNOWARN | __GFP_NORETRY);
+        addr = alloc_pages_exact(bytes, (gfp & ~__GFP_HIGHMEM) | __GFP_NORETRY);
 
         mdlPriv->contiguousPages = addr ? virt_to_page(addr) : gcvNULL;
 
@@ -325,8 +326,7 @@ _GFPAlloc(
                 goto OnError;
             }
 
-            mdlPriv->contiguousPages =
-                alloc_pages(GFP_KERNEL | __GFP_HIGHMEM | gcdNOWARN, order);
+            mdlPriv->contiguousPages = alloc_pages(gfp, order);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
             mdlPriv->exact = gcvFALSE;
@@ -350,7 +350,7 @@ _GFPAlloc(
     }
     else
     {
-        mdlPriv->nonContiguousPages = _NonContiguousAlloc(NumPages);
+        mdlPriv->nonContiguousPages = _NonContiguousAlloc(NumPages, gfp);
 
         if (mdlPriv->nonContiguousPages == gcvNULL)
         {
@@ -986,6 +986,9 @@ _GFPAlloctorInit(
                           | gcvALLOC_FLAG_MEMLIMIT
                           | gcvALLOC_FLAG_ALLOC_ON_FAULT
                           | gcvALLOC_FLAG_DMABUF_EXPORTABLE
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+                          | gcvALLOC_FLAG_4GB_ADDR
+#endif
                           ;
 
 #if defined(gcdEMULATE_SECURE_ALLOCATOR)

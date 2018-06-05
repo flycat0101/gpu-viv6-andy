@@ -2068,6 +2068,8 @@ gceCOMPRESSION_OPTION;
 /* Can be exported as dmabuf-fd */
 #define gcvALLOC_FLAG_DMABUF_EXPORTABLE     0x00000010
 
+#define gcvALLOC_FLAG_4GB_ADDR              0x00000020
+
 /* Do not try slow pools (gcvPOOL_VIRTUAL/gcvPOOL_CONTIGUOUS) */
 #define gcvALLOC_FLAG_FAST_POOLS            0x00000100
 

@@ -606,12 +606,9 @@ typedef enum _gceCHIPPOWERSTATE
     gcvPOWER_OFF,
     gcvPOWER_IDLE,
     gcvPOWER_SUSPEND,
-    gcvPOWER_SUSPEND_ATPOWERON,
-    gcvPOWER_OFF_ATPOWERON,
     gcvPOWER_IDLE_BROADCAST,
     gcvPOWER_SUSPEND_BROADCAST,
     gcvPOWER_OFF_BROADCAST,
-    gcvPOWER_OFF_RECOVERY,
     gcvPOWER_OFF_TIMEOUT,
     gcvPOWER_ON_AUTO
 }
@@ -1176,6 +1173,14 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_FORMAT_COUNT
 }
 gceSURF_FORMAT;
+
+typedef enum _gceIMAGE_MEM_TYPE
+{
+    gcvIMAGE_MEM_DEFAULT,
+    gcvIMAGE_MEM_HOST_PTR,
+    gcvIMAGE_MEM_HOST_PTR_UNCACHED,
+}
+gceIMAGE_MEM_TYPE;
 
 typedef enum _gceSURF_YUV_COLOR_SPACE
 {
@@ -2104,6 +2109,8 @@ gceCOMPRESSION_OPTION;
 #define gcvALLOC_FLAG_NON_CONTIGUOUS        0x00000008
 /* Can be exported as dmabuf-fd */
 #define gcvALLOC_FLAG_DMABUF_EXPORTABLE     0x00000010
+
+#define gcvALLOC_FLAG_4GB_ADDR              0x00000020
 
 /* Do not try slow pools (gcvPOOL_VIRTUAL/gcvPOOL_CONTIGUOUS) */
 #define gcvALLOC_FLAG_FAST_POOLS            0x00000100

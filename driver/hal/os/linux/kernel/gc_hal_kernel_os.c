@@ -1332,6 +1332,9 @@ gckOS_UnmapUserLogical(
 **      gctBOOL InUserSpace
 **          gcvTRUE if the pages need to be mapped into user space.
 **
+**      gctUINT32 Flag
+**          Allocation attribute.
+**
 **      gctSIZE_T * Bytes
 **          Pointer to a variable that holds the number of bytes to allocate.
 **
@@ -1352,6 +1355,7 @@ gceSTATUS
 gckOS_AllocateNonPagedMemory(
     IN gckOS Os,
     IN gctBOOL InUserSpace,
+    IN gctUINT32 Flag,
     IN OUT gctSIZE_T * Bytes,
     OUT gctPHYS_ADDR * Physical,
     OUT gctPOINTER * Logical
@@ -1364,7 +1368,6 @@ gckOS_AllocateNonPagedMemory(
     gctPOINTER addr;
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
     gckALLOCATOR allocator;
-    gctUINT32 flag = gcvALLOC_FLAG_CONTIGUOUS;
 
     gcmkHEADER_ARG("Os=0x%X InUserSpace=%d *Bytes=%lu",
                    Os, InUserSpace, gcmOPT_VALUE(Bytes));
@@ -1389,30 +1392,32 @@ gckOS_AllocateNonPagedMemory(
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
+    gcmkASSERT(Flag & gcvALLOC_FLAG_CONTIGUOUS);
+
     /* Walk all allocators. */
     list_for_each_entry(allocator, &Os->allocatorList, link)
     {
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
                        "%s(%d) flag = %x allocator->capability = %x",
-                        __FUNCTION__, __LINE__, flag, allocator->capability);
+                        __FUNCTION__, __LINE__, Flag, allocator->capability);
 
 #ifndef NO_DMA_COHERENT
         /* Point to dma coherent allocator. */
         if (strcmp(allocator->name, "dma"))
         {
-            if (((flag & allocator->capability) != flag) ||
+            if (((Flag & allocator->capability) != Flag) ||
                 (numPages > 1))
             {
                 continue;
             }
         }
 #else
-        if ((flag & allocator->capability) != flag)
+        if ((Flag & allocator->capability) != Flag)
         {
             continue;
         }
 #endif
-        status = allocator->ops->Alloc(allocator, mdl, numPages, flag);
+        status = allocator->ops->Alloc(allocator, mdl, numPages, Flag);
 
         if (gcmIS_SUCCESS(status))
         {
@@ -3733,6 +3738,7 @@ gckOS_AllocateContiguous(
     /* Same as non-paged memory for now. */
     gcmkONERROR(gckOS_AllocateNonPagedMemory(Os,
                                              InUserSpace,
+                                             gcvALLOC_FLAG_CONTIGUOUS,
                                              Bytes,
                                              Physical,
                                              Logical));
@@ -7290,6 +7296,7 @@ gckOS_AllocatePageArray(
     gcmkONERROR(gckOS_AllocateNonPagedMemory(
         Os,
         gcvFALSE,
+        gcvALLOC_FLAG_CONTIGUOUS,
         &bytes,
         PageArrayPhysical,
         PageArrayLogical

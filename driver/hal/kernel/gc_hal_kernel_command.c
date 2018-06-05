@@ -1132,6 +1132,7 @@ gckCOMMAND_Construct(
             gcmkONERROR(gckOS_AllocateNonPagedMemory(
                 os,
                 gcvFALSE,
+                gcvALLOC_FLAG_CONTIGUOUS,
                 &pageSize,
                 &command->queues[i].physical,
                 &command->queues[i].logical

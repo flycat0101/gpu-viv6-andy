@@ -136,6 +136,7 @@ _CMAFSLAlloc(
     )
 {
     gceSTATUS status;
+    u32 gfp = GFP_KERNEL | gcdNOWARN;
     gcsCMA_PRIV_PTR priv = (gcsCMA_PRIV_PTR)Allocator->privateData;
 
     struct mdl_cma_priv *mdl_priv=gcvNULL;
@@ -146,10 +147,17 @@ _CMAFSLAlloc(
     gcmkONERROR(gckOS_Allocate(os, sizeof(struct mdl_cma_priv), (gctPOINTER *)&mdl_priv));
     mdl_priv->kvaddr = gcvNULL;
 
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+    if (Flags & gcvALLOC_FLAG_4GB_ADDR)
+    {
+        gfp |= __GFP_DMA32;
+    }
+#endif
+
     mdl_priv->kvaddr = dma_alloc_writecombine(&os->device->platform->device->dev,
             NumPages * PAGE_SIZE,
             &mdl_priv->physical,
-            GFP_KERNEL | gcdNOWARN);
+            gfp);
 
     if (mdl_priv->kvaddr == gcvNULL)
     {
@@ -545,6 +553,9 @@ _CMAFSLAlloctorInit(
 
     allocator->capability = gcvALLOC_FLAG_CONTIGUOUS
                           | gcvALLOC_FLAG_DMABUF_EXPORTABLE
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+                          | gcvALLOC_FLAG_4GB_ADDR
+#endif
                           ;
 
     *Allocator = allocator;

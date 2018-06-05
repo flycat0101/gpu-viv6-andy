@@ -2176,6 +2176,7 @@ gckKERNEL_Dispatch(
             gckOS_AllocateNonPagedMemory(
                 Kernel->os,
                 FromUser,
+                gcvALLOC_FLAG_CONTIGUOUS,
                 &bytes,
                 &physical,
                 &logical));
@@ -4439,6 +4440,7 @@ gckKERNEL_AllocateVirtualMemory(
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
             InUserSpace,
+            gcvALLOC_FLAG_CONTIGUOUS,
             &bytes,
             &buffer->physical,
             &logical
@@ -5769,6 +5771,7 @@ gckFENCE_Create(
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             Os,
             gcvFALSE,
+            gcvALLOC_FLAG_CONTIGUOUS,
             &pageSize,
             &fence->physical,
             &fence->logical

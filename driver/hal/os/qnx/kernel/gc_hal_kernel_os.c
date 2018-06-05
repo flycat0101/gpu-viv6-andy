@@ -1052,6 +1052,9 @@ gckOS_UnmapUserLogical(
 **      gctBOOL InUserSpace
 **          gcvTRUE if the pages need to be mapped into user space.
 **
+**      gctUINT32 Flag
+**          Allocation attribute.
+**
 **      gctSIZE_T * Bytes
 **          Pointer to a variable that holds the number of bytes to allocate.
 **
@@ -1072,6 +1075,7 @@ gceSTATUS
 gckOS_AllocateNonPagedMemory(
     IN gckOS Os,
     IN gctBOOL InUserSpace,
+    IN gctUINT32 Flag,
     IN OUT gctSIZE_T * Bytes,
     OUT gctPHYS_ADDR * Physical,
     OUT gctPOINTER * Logical

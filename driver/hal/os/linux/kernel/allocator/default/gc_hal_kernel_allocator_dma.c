@@ -157,6 +157,7 @@ _DmaAlloc(
     )
 {
     gceSTATUS status;
+    u32 gfp = GFP_KERNEL | gcdNOWARN;
     gcsDMA_PRIV_PTR allocatorPriv = (gcsDMA_PRIV_PTR)Allocator->privateData;
 
     struct mdl_dma_priv *mdlPriv=gcvNULL;
@@ -166,13 +167,20 @@ _DmaAlloc(
 
     gcmkONERROR(gckOS_Allocate(os, sizeof(struct mdl_dma_priv), (gctPOINTER *)&mdlPriv));
 
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+    if (Flags & gcvALLOC_FLAG_4GB_ADDR)
+    {
+        gfp |= __GFP_DMA32;
+    }
+#endif
+
     mdlPriv->kvaddr
 #if defined CONFIG_ARM64
-        = dma_alloc_coherent(_GetDevice(os), NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, GFP_KERNEL | gcdNOWARN);
+        = dma_alloc_coherent(_GetDevice(os), NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, gfp);
 #elif defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC
-        = dma_alloc_coherent(gcvNULL, NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, GFP_KERNEL | gcdNOWARN);
+        = dma_alloc_coherent(gcvNULL, NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, gfp);
 #else
-        = dma_alloc_writecombine(gcvNULL, NumPages * PAGE_SIZE,  &mdlPriv->dmaHandle, GFP_KERNEL | gcdNOWARN);
+        = dma_alloc_writecombine(gcvNULL, NumPages * PAGE_SIZE,  &mdlPriv->dmaHandle, gfp);
 #endif
 
 #ifdef CONFLICT_BETWEEN_BASE_AND_PHYS
@@ -578,7 +586,11 @@ _DmaAlloctorInit(
      * DMA allocator is only used for NonPaged memory
      * when NO_DMA_COHERENT is not defined.
      */
-    allocator->capability = gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+    allocator->capability = gcvALLOC_FLAG_DMABUF_EXPORTABLE
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+                          | gcvALLOC_FLAG_4GB_ADDR
+#endif
+                          ;
 
     *Allocator = allocator;
 

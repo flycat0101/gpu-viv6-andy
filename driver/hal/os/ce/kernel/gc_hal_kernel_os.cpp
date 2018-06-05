@@ -899,6 +899,9 @@ gckOS_UnmapUserLogical(
 **      gctBOOL InUserSpace
 **          gcvTRUE if the pages need to be mapped into user space.
 **
+**      gctUINT32 Flag
+**          Allocation attribute.
+**
 **      gctSIZE_T * Bytes
 **          Pointer to a variable that holds the number of bytes to allocate.
 **
@@ -918,6 +921,7 @@ gckOS_UnmapUserLogical(
 gceSTATUS gckOS_AllocateNonPagedMemory(
     IN gckOS Os,
     IN gctBOOL InUserSpace,
+    IN gctUINT32 Flag,
     IN OUT gctSIZE_T * Bytes,
     OUT gctPHYS_ADDR * Physical,
     OUT gctPOINTER * Logical
@@ -1472,6 +1476,7 @@ gckOS_AllocateContiguous(
     /* Same as non-paged memory for now. */
     gcmkONERROR(gckOS_AllocateNonPagedMemory(Os,
                                              InUserSpace,
+                                             gcvALLOC_FLAG_CONTIGUOUS,
                                              Bytes,
                                              Physical,
                                              Logical));
