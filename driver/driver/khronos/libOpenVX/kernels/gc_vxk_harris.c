@@ -57,7 +57,10 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
 
         s = (1 / ((1 << (grad - 1)) * block_size * 255.0));
 
-        s *= (1 << (gctINT32)shift->value->f32);
+        if(shift->value->f32 >= 1.0f)
+            s *= (1 << (gctINT32)shift->value->f32);
+        else if (shift->value->f32 > 0.0f)
+            s *= shift->value->f32;
 
         s = s * s;
 

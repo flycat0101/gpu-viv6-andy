@@ -315,8 +315,11 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
         vx_int32 radius = 0;
         vx_float32 r = 0.0f, thresh = 0.0f;
         vx_df_image format = VX_DF_IMAGE_VIRT;
+        vx_uint32 width = 0, height = 0;
 
         status |= vxQueryImage(src, VX_IMAGE_FORMAT, &format, sizeof(format));
+        status |= vxQueryImage(src, VX_IMAGE_WIDTH, &width, sizeof(width));
+        status |= vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
         status |= vxReadScalarValue(rad, &r);
         status |= vxReadScalarValue(thr, &thresh);
@@ -333,7 +336,7 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
             {
                 kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
             }
-            else
+        else
 #endif
             {
                 if (node->kernelContext == VX_NULL)
@@ -346,6 +349,8 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
                 kernelContext->uniform_num = 0;
             }
 
+            vxZeroMemory(dst->memory.logicals[0], sizeof(vx_float32) * dst->width * dst->height);
+
             /*index = 0*/
             gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
@@ -357,7 +362,10 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
 
             kernelContext->params.kernel     = gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION;
 
-            kernelContext->params.xstep      = 1;
+            kernelContext->params.xstep      = width;
+            kernelContext->params.ystep      = height;
+            kernelContext->params.col        = width;
+            kernelContext->params.row        = height;
 
             kernelContext->node = node;
 
@@ -371,7 +379,6 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
 #endif
         }
     }
-
     return status;
 }
 #endif

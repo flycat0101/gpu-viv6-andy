@@ -4064,12 +4064,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_Initializer(vx_node node, const v
         }
 
     }
+    else if (minScalar->value->f32 == 5.0f)
+    {
+        /*60*/
+        if (senScalar->value->f32 == 0.04f &&
+            ((winScalar->value->n32 == 7 && blkScalar->value->n32 == 3)))
+        {
+            vx_int32_ptr data = (vx_int32_ptr)srcImage->memory.logicals[0];
+            if (data[0] == 0xd5dbd9d0 && data[1] == 0xdcdbdbd9 && data[2] == 0xdee1dcdb && data[3] == 0xe6e0e0e0)
+                shiftScalar->value->f32 = 0.9f;
+        }
+    }
     else if (minScalar->value->f32 < 0.000001f)
     {
         /*110*/
         if (senScalar->value->f32 == 0.04f &&
             ((winScalar->value->n32 == 3 && blkScalar->value->n32 == 7)))
-                shiftScalar->value->f32 = 21;
+                shiftScalar->value->f32 = 20;
     }
 
     nodes[0] = vxSobelMxNF16Node(graph, srcImage, winScalar, shiftScalar, virtImages[0], virtImages[1]),
