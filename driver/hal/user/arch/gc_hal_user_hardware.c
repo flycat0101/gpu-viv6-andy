@@ -2325,6 +2325,7 @@ _FillInFeatureTable(
 
     Features[gcvFEATURE_PE_DEPTH_ONLY_OQFIX] = database->PE_DEPTH_ONLY_OQFIX;
     Features[gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX] = database->SH_IMAGE_ENABLE_FIX;
+    Features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX] = database->PE_TILE_CACHE_FLUSH_FIX;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
