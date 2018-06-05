@@ -1269,6 +1269,12 @@ eglGetProcAddress(const char *procname)
 #else
         gcvNULL,
 #endif
+
+#ifdef _GL_APPENDIX
+        gcmDEF2STRING(_GL_APPENDIX),
+#else
+        gcvNULL,
+#endif
     };
 
     gcmHEADER_ARG("procname=%s", procname);

@@ -422,13 +422,19 @@ _FillIn(
 
     config->renderableType = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR
-                           | EGL_OPENGL_BIT;
+                           | EGL_OPENGL_ES3_BIT_KHR;
 
     config->conformant     = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR
-                           | EGL_OPENGL_BIT;
+                           | EGL_OPENGL_ES3_BIT_KHR;
+
+    if(thread->dispatchTables[vegl_OPENGL])
+    {
+        config->renderableType |= EGL_OPENGL_BIT;
+        config->conformant |= EGL_OPENGL_BIT;
+    }
+
+
 
     if (Samples == 16)
     {

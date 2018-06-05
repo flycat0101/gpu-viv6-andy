@@ -280,7 +280,6 @@ vdkSetupEGL(
             }
         }
 
-
         if (ConfigurationAttributes == VDK_CONFIG_RGB888_D16_GL)
         {
             defaultConfig     = 1;
@@ -292,7 +291,6 @@ vdkSetupEGL(
                 return 0;
             }
         }
-
 
         if (!eglChooseConfig(Egl->eglDisplay,
                                   defaultConfig
