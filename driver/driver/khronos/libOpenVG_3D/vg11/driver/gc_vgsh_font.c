@@ -34,13 +34,13 @@ void _VGFontDtor(gcoOS os, _VGFont *font)
     {
         if (font->glyphs.items[i].type == GLYPH_PATH)
         {
-            if (font->glyphs.items[i].path != VG_INVALID_HANDLE)
+            if (font->glyphs.items[i].path != (_VGPath *)VG_INVALID_HANDLE)
                 VGObject_Release(os, &font->glyphs.items[i].path->object);
         }
         else
         if (font->glyphs.items[i].type == GLYPH_IMAGE)
         {
-            if (font->glyphs.items[i].image != VG_INVALID_HANDLE)
+            if (font->glyphs.items[i].image != (_VGImage *)VG_INVALID_HANDLE)
                 VGObject_Release(os, &font->glyphs.items[i].image->object);
         }
     }
@@ -70,12 +70,12 @@ void _VGGlyphDtor(gcoOS os, _VGGlyph *glyph)
     gcmHEADER_ARG("os=0x%x glyph=0x%x",
                   os, glyph);
 
-    if (glyph->path != VG_INVALID_HANDLE)
+    if (glyph->path != (_VGPath *)VG_INVALID_HANDLE)
     {
         VGObject_Release(os, &glyph->path->object);
     }
     else
-    if (glyph->image != VG_INVALID_HANDLE)
+    if (glyph->image != (_VGImage *)VG_INVALID_HANDLE)
     {
         VGObject_Release(os, &glyph->image->object);
     }
