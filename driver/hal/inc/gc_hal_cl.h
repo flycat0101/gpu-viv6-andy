@@ -28,6 +28,7 @@ extern "C" {
 typedef struct _gcoCL_DEVICE_INFO
 {
     gctUINT             maxComputeUnits;
+    gctUINT             ShaderCoreCount;
     gctUINT             maxWorkItemDimensions;
     gctUINT             maxWorkItemSizes[3];
     gctUINT             maxWorkGroupSize;

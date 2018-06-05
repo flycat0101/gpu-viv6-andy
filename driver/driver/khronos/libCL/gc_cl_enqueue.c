@@ -5079,7 +5079,7 @@ clEnqueueNDRangeKernel(
             gcKERNEL_FUNCTION   kernelFunction = GetShaderCurrentKernelFunction(kernelBinary);
             gctUINT localMemoryReq = (gctUINT)(CommandQueue->device->deviceInfo.localMemSize / kernelFunction->localMemorySize);
             gctUINT maxFreeReg = 113;
-            gctUINT threadCount = 4 * CommandQueue->device->deviceInfo.maxComputeUnits;
+            gctUINT threadCount = 4 * CommandQueue->device->deviceInfo.ShaderCoreCount;
             gctUINT hwRegCount = (maxFreeReg * threadCount) / (localMemoryReq * workGroupSize);
             kernelBinary->RARegWaterMark = gcmMAX(kernelBinary->RARegWaterMark, hwRegCount);
         }
@@ -5570,12 +5570,12 @@ clEnqueueNDRangeKernel(
              if (Kernel->patchedStates->programState.hints->threadWalkerInPS)
             {
                 Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->patchedStates->programState.hints->fsMaxTemp)) *
-                    4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                    4 * Kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
             else
             {
                 Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->patchedStates->programState.hints->vsMaxTemp)) *
-                                        4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                                        4 * Kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
 
             /* maxWorkGroupSize should not over the device's maxWorkGroupSize. */

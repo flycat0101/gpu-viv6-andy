@@ -3220,7 +3220,7 @@ clCreateKernel(
     kernel->privateMemSize    = 0;
     kernel->constantMemSize   = 0;
     kernel->constantMemBuffer = gcvNULL;
-    kernel->preferredWorkGroupSizeMultiple = Program->devices[0]->deviceInfo.maxComputeUnits * 4;
+    kernel->preferredWorkGroupSizeMultiple = Program->devices[0]->deviceInfo.ShaderCoreCount * 4;
     kernel->patchNeeded       = gcvTRUE;    /* Force to check patch instructions for the moment. May hurt compiler performance. */
     kernel->states.binary     = gcvNULL;
     kernel->isPatched         = gcvFALSE;
@@ -3588,18 +3588,18 @@ OnSkipOutOfSampler:
             if(hasBarrier && hasImageWrite)
             {
                  kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp+3)) *
-                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                    4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
             else if(hasBarrier)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp)) *
-                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                    4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
 #if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
             else if(hasUniformWorkThreadCount)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp)) *
-                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                    4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
 #endif
             else
@@ -3612,18 +3612,18 @@ OnSkipOutOfSampler:
             if(hasBarrier && hasImageWrite)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp+3)) *
-                                       4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                                       4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
             else if(hasBarrier)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp)) *
-                                       4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                                       4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
 #if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
             else if(hasUniformWorkThreadCount)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp)) *
-                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+                    4 * kernel->program->devices[0]->deviceInfo.ShaderCoreCount;
             }
 #endif
             else

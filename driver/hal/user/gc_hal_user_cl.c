@@ -1189,11 +1189,12 @@ gcoCL_QueryDeviceInfo(
                                     gcvNULL,
                                     gcvNULL,
                                     gcvNULL,
-                                    &DeviceInfo->maxComputeUnits,
+                                    &DeviceInfo->ShaderCoreCount,
                                     &threadCount,
                                     gcvNULL,
                                     gcvNULL));
 
+    DeviceInfo->maxComputeUnits = 1;
     DeviceInfo->maxWorkItemDimensions = 3;
 
     /* The below restrictions are based on 16-bits for Global ID (per component)

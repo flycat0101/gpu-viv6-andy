@@ -39,7 +39,7 @@ static struct _cl_device_id _device =
     CL_DEVICE_TYPE_GPU,         /* Type             */
     clvDEVICE_VENDOR_ID,        /* Vendor ID        */
 
-    {0,0,{0,0,0},0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    {0,0,0,{0,0,0},0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
      gcvFALSE,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
      gcvFALSE,gcvFALSE,0,0,0,gcvFALSE,gcvFALSE,gcvFALSE,0, 0, 0},
                                 /* Device Info      */

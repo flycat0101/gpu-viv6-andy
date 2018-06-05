@@ -6508,16 +6508,7 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (LocalMemSize != gcvNULL)
     {
-        if (Hardware->config->chipModel == gcv4000)
-        {
-            /* Local memory size in bytes. */
-            *LocalMemSize = 8192;
-        }
-        else
-        {
-            /* Local memory size in bytes. */
-            *LocalMemSize = 1024;
-        }
+        *LocalMemSize = Hardware->config->localStorageSizeInKbyte * 1024;
     }
 
     if (AddressBits != gcvNULL)
@@ -6536,27 +6527,8 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (GlobalMemCacheSize != gcvNULL)
     {
-        /* globalMemCacheSize = 64*16*subbanks*banks
-         * gc4000: subbanks=4 banks=4
-         * gc2100: subbanks=4 banks=1
-         * gc2200: subbanks=4 banks=2
-         */
-        if (Hardware->config->chipModel == gcv4000)
-        {
-            /* Global Memory Cache size in bytes. */
-            *GlobalMemCacheSize = globalMemCachelineSize * 16 * 4 * 4;
-        }
-        else if (Hardware->config->chipModel == gcv2100
-             ||  (Hardware->config->chipModel == gcv2000 && Hardware->config->chipRevision == 0x5108))
-        {
-            /* Global Memory Cache size in bytes. */
-            *GlobalMemCacheSize = globalMemCachelineSize * 16 * 4 * 1;
-        }
-        else /* if (hardware->config->chipModel == gcv2200) */
-        {
-            /* Global Memory Cache size in bytes. */
-            *GlobalMemCacheSize = globalMemCachelineSize * 16 * 4 * 2;
-        }
+        /* Global Memory Cache size in bytes. */
+        *GlobalMemCacheSize = Hardware->config->l1CacheSizeInKbyte * 1024;
     }
 
     if (ClockFrequency != gcvNULL)
