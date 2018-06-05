@@ -1771,20 +1771,28 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
 
     case GL_MAX_VERTEX_ATOMIC_COUNTERS:
-    case GL_MAX_VERTEX_ATOMIC_COUNTER_BUFFERS:
         *ip++ = gc->constants.shaderCaps.maxVertAtomicCounters;
         break;
+    case GL_MAX_VERTEX_ATOMIC_COUNTER_BUFFERS:
+        *ip++ = gc->constants.shaderCaps.maxVertAtomicCounterBuffers;
+        break;
     case GL_MAX_FRAGMENT_ATOMIC_COUNTERS:
-    case GL_MAX_FRAGMENT_ATOMIC_COUNTER_BUFFERS:
         *ip++ = gc->constants.shaderCaps.maxFragAtomicCounters;
         break;
+    case GL_MAX_FRAGMENT_ATOMIC_COUNTER_BUFFERS:
+        *ip++ = gc->constants.shaderCaps.maxFragAtomicCounterBuffers;
+        break;
     case GL_MAX_COMPUTE_ATOMIC_COUNTERS:
-    case GL_MAX_COMPUTE_ATOMIC_COUNTER_BUFFERS:
         *ip++ = gc->constants.shaderCaps.maxCmptAtomicCounters;
         break;
+    case GL_MAX_COMPUTE_ATOMIC_COUNTER_BUFFERS:
+        *ip++ = gc->constants.shaderCaps.maxCmptAtomicCounterBuffers;
+        break;
     case GL_MAX_COMBINED_ATOMIC_COUNTERS:
-    case GL_MAX_COMBINED_ATOMIC_COUNTER_BUFFERS:
         *ip++ = gc->constants.shaderCaps.maxCombinedAtomicCounters;
+        break;
+    case GL_MAX_COMBINED_ATOMIC_COUNTER_BUFFERS:
+        *ip++ = gc->constants.shaderCaps.maxCombinedAtomicCounterBuffers;
         break;
     case GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS:
         *ip++ = gc->constants.shaderCaps.maxAtomicCounterBufferBindings;
@@ -1935,8 +1943,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.shaderCaps.maxTcsOutPatchVectors * 4;
         break;
     case GL_MAX_TESS_CONTROL_ATOMIC_COUNTERS_EXT:
-    case GL_MAX_TESS_CONTROL_ATOMIC_COUNTER_BUFFERS_EXT:
         *ip++ = gc->constants.shaderCaps.maxTcsAtomicCounters;
+        break;
+    case GL_MAX_TESS_CONTROL_ATOMIC_COUNTER_BUFFERS_EXT:
+        *ip++ = gc->constants.shaderCaps.maxTcsAtomicCounterBuffers;
         break;
     case GL_MAX_TESS_CONTROL_IMAGE_UNIFORMS_EXT:
         *ip++ = gc->constants.shaderCaps.maxTcsImageUniform;
@@ -1964,8 +1974,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.shaderCaps.maxTesOutVectors * 4;
         break;
     case GL_MAX_TESS_EVALUATION_ATOMIC_COUNTERS_EXT:
-    case GL_MAX_TESS_EVALUATION_ATOMIC_COUNTER_BUFFERS_EXT:
         *ip++ = gc->constants.shaderCaps.maxTesAtomicCounters;
+        break;
+    case GL_MAX_TESS_EVALUATION_ATOMIC_COUNTER_BUFFERS_EXT:
+        *ip++ = gc->constants.shaderCaps.maxTesAtomicCounterBuffers;
         break;
     case GL_MAX_TESS_EVALUATION_IMAGE_UNIFORMS_EXT:
         *ip++ = gc->constants.shaderCaps.maxTesImageUniform;
@@ -2014,8 +2026,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.shaderCaps.maxGsTextureImageUnits;
         break;
     case GL_MAX_GEOMETRY_ATOMIC_COUNTERS_EXT:
-    case GL_MAX_GEOMETRY_ATOMIC_COUNTER_BUFFERS_EXT:
         *ip++ = gc->constants.shaderCaps.maxGsAtomicCounters;
+        break;
+    case GL_MAX_GEOMETRY_ATOMIC_COUNTER_BUFFERS_EXT:
+        *ip++ = gc->constants.shaderCaps.maxGsAtomicCounterBuffers;
         break;
     case GL_MAX_GEOMETRY_IMAGE_UNIFORMS_EXT:
         *ip++ = gc->constants.shaderCaps.maxGsImageUniform;

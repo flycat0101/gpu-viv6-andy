@@ -662,7 +662,7 @@ _LoadBuiltInConstants(
     constantInfos[gcBIConst_MaxGSTotalOutputComponents].value[0].intValue = GetGLMaxGSOutTotalVectors() * 4;
     constantInfos[gcBIConst_MaxGSUniformComponents].value[0].intValue = GetGLMaxGSUniformVectors() * 4;
     constantInfos[gcBIConst_MaxGSAtomicCounters].value[0].intValue = GetGLMaxGSAtomicCounters();
-    constantInfos[gcBIConst_MaxGSAtomicCounterBuffers].value[0].intValue = GetGLMaxGSAtomicCounters();
+    constantInfos[gcBIConst_MaxGSAtomicCounterBuffers].value[0].intValue = GetGLMaxGSAtomicCounterBuffers();
 
     status = _AddBuiltInConstants(Compiler,
                                   BasicBuiltInTypeInfos,

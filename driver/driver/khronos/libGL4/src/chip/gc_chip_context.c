@@ -1253,24 +1253,33 @@ __glChipGetDeviceConstants(
     shaderCaps->maxVertAtomicCounters = 16;
     shaderCaps->maxFragAtomicCounters = 16;
     shaderCaps->maxCmptAtomicCounters = 16;
+    /*spec implicilty requied one atomic counter buffer has at least 8 atomic counters */
+    shaderCaps->maxVertAtomicCounters = shaderCaps->maxVertAtomicCounterBuffers * 8;
+    shaderCaps->maxVertAtomicCounters = shaderCaps->maxFragAtomicCounterBuffers * 8;
+    shaderCaps->maxCmptAtomicCounters = shaderCaps->maxCmptAtomicCounterBuffers * 8;
     if (tsAvailable)
     {
         /* minimal is 0 in spec */
         shaderCaps->maxTcsAtomicCounters = 16;
         shaderCaps->maxTesAtomicCounters = 16;
+        shaderCaps->maxTcsAtomicCounters = shaderCaps->maxTcsAtomicCounterBuffers * 8;
+        shaderCaps->maxTesAtomicCounters = shaderCaps->maxTesAtomicCounterBuffers * 8;
     }
     if (gsAvailable)
     {
         /* minimal is 0 in spec */
         shaderCaps->maxGsAtomicCounters = 16;
+        shaderCaps->maxGsAtomicCounters = shaderCaps->maxGsAtomicCounterBuffers * 8;
     }
-    shaderCaps->maxCombinedAtomicCounters = __GL_MAX(shaderCaps->maxVertAtomicCounters +
-                                                     shaderCaps->maxFragAtomicCounters +
-                                                     shaderCaps->maxTcsAtomicCounters  +
-                                                     shaderCaps->maxTesAtomicCounters  +
-                                                     shaderCaps->maxGsAtomicCounters,
-                                                     shaderCaps->maxCmptAtomicCounters);
-    shaderCaps->maxAtomicCounterBufferBindings = shaderCaps->maxCombinedAtomicCounters;
+    shaderCaps->maxCombinedAtomicCounterBuffers = __GL_MAX(shaderCaps->maxVertAtomicCounterBuffers +
+                                                           shaderCaps->maxFragAtomicCounterBuffers +
+                                                           shaderCaps->maxTcsAtomicCounterBuffers  +
+                                                           shaderCaps->maxTesAtomicCounterBuffers  +
+                                                           shaderCaps->maxGsAtomicCounterBuffers,
+                                                           shaderCaps->maxCmptAtomicCounterBuffers);
+
+    shaderCaps->maxCombinedAtomicCounters = shaderCaps->maxCombinedAtomicCounterBuffers * 8;
+    shaderCaps->maxAtomicCounterBufferBindings = 16;
     shaderCaps->maxAtomicCounterBufferSize = shaderCaps->maxCombinedAtomicCounters * sizeof(GLuint);
 
     shaderCaps->shaderStorageBufferOffsetAlignment = 4;

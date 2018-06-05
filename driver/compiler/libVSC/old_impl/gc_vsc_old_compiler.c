@@ -33011,17 +33011,28 @@ gcInitGLSLCaps(
     Caps->maxUniformBlockSize = 65536;
     Caps->maxUniformBufferBindings = Caps->maxCombinedUniformBlocks;
 
-    Caps->maxVertAtomicCounters = 16;
-    Caps->maxFragAtomicCounters = 16;
-    Caps->maxCmptAtomicCounters = 16;
-    Caps->maxTcsAtomicCounters = tsAvailable ? 16 : 0;
-    Caps->maxTesAtomicCounters = tsAvailable ? 16 : 0;
-    Caps->maxGsAtomicCounters = gsAvailable ? 16 : 0;
-    Caps->maxCombinedAtomicCounters = gcmMAX(Caps->maxVertAtomicCounters + Caps->maxFragAtomicCounters +
-                                             Caps->maxTcsAtomicCounters + Caps->maxTesAtomicCounters,
-                                             Caps->maxCmptAtomicCounters);
+    Caps->maxVertAtomicCounterBuffers = 16;
+    Caps->maxFragAtomicCounterBuffers = 16;
+    Caps->maxCmptAtomicCounterBuffers = 16;
+    /*glsl spec implicilty requied one atomic counter buffer has at least 8 atomic counters */
+    Caps->maxVertAtomicCounters = Caps->maxVertAtomicCounterBuffers * 8;
+    Caps->maxFragAtomicCounters = Caps->maxFragAtomicCounterBuffers * 8;
+    Caps->maxCmptAtomicCounters = Caps->maxCmptAtomicCounterBuffers * 8;
+    Caps->maxTcsAtomicCounterBuffers = tsAvailable ? 16 : 0;
+    Caps->maxTesAtomicCounterBuffers = tsAvailable ? 16 : 0;
+    Caps->maxGsAtomicCounterBuffers = gsAvailable ? 16 : 0;
+    Caps->maxTcsAtomicCounters = Caps->maxVertAtomicCounterBuffers * 8;
+    Caps->maxTesAtomicCounters = Caps->maxFragAtomicCounterBuffers * 8;
+    Caps->maxGsAtomicCounters = Caps->maxCmptAtomicCounterBuffers * 8;
+    Caps->maxCombinedAtomicCounterBuffers = gcmMAX(Caps->maxVertAtomicCounterBuffers +
+                                                   Caps->maxFragAtomicCounterBuffers +
+                                                   Caps->maxGsAtomicCounterBuffers +
+                                                   Caps->maxTcsAtomicCounterBuffers +
+                                                   Caps->maxTesAtomicCounterBuffers,
+                                                   Caps->maxCmptAtomicCounterBuffers);
 
-    Caps->maxAtomicCounterBufferBindings = Caps->maxCombinedAtomicCounters;
+    Caps->maxCombinedAtomicCounters = Caps->maxCombinedAtomicCounterBuffers * 8;
+    Caps->maxAtomicCounterBufferBindings = 16;
     Caps->maxAtomicCounterBufferSize = Caps->maxCombinedAtomicCounters * gcmSIZEOF(gctUINT32);
 
     Caps->shaderStorageBufferOffsetAlignment = 4;

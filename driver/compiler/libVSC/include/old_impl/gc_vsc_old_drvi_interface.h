@@ -1753,6 +1753,13 @@ typedef struct _gcsGLSLCaps
     gctUINT maxTesAtomicCounters;
     gctUINT maxGsAtomicCounters;
     gctUINT maxCombinedAtomicCounters;
+    gctUINT maxVertAtomicCounterBuffers;
+    gctUINT maxFragAtomicCounterBuffers;
+    gctUINT maxCmptAtomicCounterBuffers;
+    gctUINT maxTcsAtomicCounterBuffers;
+    gctUINT maxTesAtomicCounterBuffers;
+    gctUINT maxGsAtomicCounterBuffers;
+    gctUINT maxCombinedAtomicCounterBuffers;
     gctUINT maxAtomicCounterBufferBindings;
     gctUINT64 maxAtomicCounterBufferSize;
 
@@ -1880,14 +1887,14 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxComputeTextureImageUnits()    (gcGetGLSLCaps()->maxCmptTextureImageUnits)
 /* Atomic Counters. */
 #define GetGLMaxComputeAtomicCounters()       (gcGetGLSLCaps()->maxCmptAtomicCounters)
-#define GetGLMaxComputeAtomicCounterBuffers() (gcGetGLSLCaps()->maxCmptAtomicCounters)
+#define GetGLMaxComputeAtomicCounterBuffers() (gcGetGLSLCaps()->maxCmptAtomicCounterBuffers)
 #define GetGLMaxVertexAtomicCounters()        (gcGetGLSLCaps()->maxVertAtomicCounters)
 #define GetGLMaxFragmentAtomicCounters()      (gcGetGLSLCaps()->maxFragAtomicCounters)
 #define GetGLMaxCombinedAtomicCounters()      (gcGetGLSLCaps()->maxCombinedAtomicCounters)
 #define GetGLMaxAtomicCounterBindings()       (gcGetGLSLCaps()->maxAtomicCounterBufferBindings)
-#define GetGLMaxVertexAtomicCounterBuffers()  (gcGetGLSLCaps()->maxVertAtomicCounters)
-#define GetGLMaxFragmentAtomicCounterBuffers()(gcGetGLSLCaps()->maxFragAtomicCounters)
-#define GetGLMaxCombinedAtomicCounterBuffers()(gcGetGLSLCaps()->maxCombinedAtomicCounters)
+#define GetGLMaxVertexAtomicCounterBuffers()  (gcGetGLSLCaps()->maxVertAtomicCounterBuffers)
+#define GetGLMaxFragmentAtomicCounterBuffers()(gcGetGLSLCaps()->maxFragAtomicCounterBuffers)
+#define GetGLMaxCombinedAtomicCounterBuffers()(gcGetGLSLCaps()->maxCombinedAtomicCounterBuffers)
 #define GetGLMaxAtomicCounterBufferSize()     (gcGetGLSLCaps()->maxAtomicCounterBufferSize)
 #define GetGLMaxVaryingVectors()              (gcGetGLSLCaps()->maxVaryingVectors)
 /* Storage Buffer. */
@@ -1909,7 +1916,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxTCSInputVectors()             (gcGetGLSLCaps()->maxTcsInVectors)
 #define GetGLMaxTCSOutputVectors()            (gcGetGLSLCaps()->maxTcsOutVectors)
 #define GetGLMaxTCSAtomicCounters()           (gcGetGLSLCaps()->maxTcsAtomicCounters)
-#define GetGLMaxTCSAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTcsAtomicCounters)
+#define GetGLMaxTCSAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTcsAtomicCounterBuffers)
 #define GetGLMaxTCSImageUniforms()            (gcGetGLSLCaps()->maxTcsImageUniform)
 #define GetGLMaxTCSUniformBufferBindings()    (gcGetGLSLCaps()->maxTcsUniformBlocks)
 #define GetGLMaxTCSShaderStorageBufferBindings()     (gcGetGLSLCaps()->maxTcsShaderStorageBlocks)
@@ -1920,7 +1927,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxTESInputVectors()             (gcGetGLSLCaps()->maxTesInVectors)
 #define GetGLMaxTESOutputVectors()            (gcGetGLSLCaps()->maxTesOutVectors)
 #define GetGLMaxTESAtomicCounters()           (gcGetGLSLCaps()->maxTesAtomicCounters)
-#define GetGLMaxTESAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTesAtomicCounters)
+#define GetGLMaxTESAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTesAtomicCounterBuffers)
 #define GetGLMaxTESImageUniforms()            (gcGetGLSLCaps()->maxTesImageUniform)
 #define GetGLMaxTESUniformBufferBindings()    (gcGetGLSLCaps()->maxTesUniformBlocks)
 #define GetGLMaxTESShaderStorageBufferBindings()     (gcGetGLSLCaps()->maxTesShaderStorageBlocks)
@@ -1937,6 +1944,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxGSUniformVectors()            (gcGetGLSLCaps()->maxGsUniformVectors)
 #define GetGLMaxGSUniformBlocks()             (gcGetGLSLCaps()->maxGsUniformBlocks)
 #define GetGLMaxGSAtomicCounters()            (gcGetGLSLCaps()->maxGsAtomicCounters)
+#define GetGLMaxGSAtomicCounterBuffers()      (gcGetGLSLCaps()->maxGsAtomicCounterBuffers)
 #define GetGLMaxGSImageUniforms()             (gcGetGLSLCaps()->maxGsImageUniform)
 #define GetGLMaxGSOutVertices()               (gcGetGLSLCaps()->maxGsOutVertices)
 #define GetGLMaxGSInvocationCount()           (gcGetGLSLCaps()->maxGsInvocationCount)

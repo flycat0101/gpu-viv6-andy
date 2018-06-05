@@ -438,16 +438,26 @@ static void __vki_InitializeShaderCaps(
                                                 + shaderCaps->maxGsUniformBlocks * shaderCaps->maxUniformBlockSize / 4;
 
 
-    shaderCaps->maxVertAtomicCounters = 0;
-    shaderCaps->maxFragAtomicCounters = 0;
-    shaderCaps->maxCmptAtomicCounters = 0;
-    shaderCaps->maxTcsAtomicCounters = 0;
-    shaderCaps->maxTesAtomicCounters = 0;
-    shaderCaps->maxGsAtomicCounters = 0;
-    shaderCaps->maxCombinedAtomicCounters = shaderCaps->maxVertAtomicCounters + shaderCaps->maxFragAtomicCounters +
-                                            shaderCaps->maxTcsAtomicCounters + shaderCaps->maxTesAtomicCounters +
-                                            shaderCaps->maxGsAtomicCounters;
-    shaderCaps->maxAtomicCounterBufferBindings = shaderCaps->maxCombinedAtomicCounters;
+    shaderCaps->maxVertAtomicCounterBuffers = 0;
+    shaderCaps->maxFragAtomicCounterBuffers = 0;
+    shaderCaps->maxCmptAtomicCounterBuffers = 0;
+    shaderCaps->maxTcsAtomicCounterBuffers = 0;
+    shaderCaps->maxTesAtomicCounterBuffers = 0;
+    shaderCaps->maxGsAtomicCounterBuffers = 0;
+    shaderCaps->maxVertAtomicCounters = shaderCaps->maxVertAtomicCounterBuffers * 8;
+    shaderCaps->maxFragAtomicCounters = shaderCaps->maxFragAtomicCounterBuffers * 8;
+    shaderCaps->maxCmptAtomicCounters = shaderCaps->maxCmptAtomicCounterBuffers * 8;
+    shaderCaps->maxTcsAtomicCounters = shaderCaps->maxTcsAtomicCounterBuffers * 8;
+    shaderCaps->maxTesAtomicCounters = shaderCaps->maxTesAtomicCounterBuffers * 8;
+    shaderCaps->maxGsAtomicCounters = shaderCaps->maxGsAtomicCounterBuffers * 8;
+    shaderCaps->maxCombinedAtomicCounterBuffers = __VK_MAX(shaderCaps->maxVertAtomicCounterBuffers +
+                                                           shaderCaps->maxFragAtomicCounterBuffers +
+                                                           shaderCaps->maxTcsAtomicCounterBuffers +
+                                                           shaderCaps->maxTesAtomicCounterBuffers +
+                                                           shaderCaps->maxGsAtomicCounterBuffers,
+                                                           shaderCaps->maxCmptAtomicCounterBuffers);
+    shaderCaps->maxCombinedAtomicCounters = shaderCaps->maxCombinedAtomicCounterBuffers * 8;
+    shaderCaps->maxAtomicCounterBufferBindings = 0;
     shaderCaps->maxAtomicCounterBufferSize = 0;
 
     shaderCaps->shaderStorageBufferOffsetAlignment = (gctUINT)phyDevProp->limits.minStorageBufferOffsetAlignment;
