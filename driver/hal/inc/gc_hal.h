@@ -540,6 +540,7 @@ gckOS_WriteMemory(
     IN gctUINT32 Data
     )
 {
+    (void) Os;
     /* Write memory. */
     *(gctUINT32 *)Address = Data;
     return gcvSTATUS_OK;
