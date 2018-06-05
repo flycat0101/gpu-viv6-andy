@@ -623,15 +623,19 @@ gcoSURF_AppendTileStatus(
     )
 {
 #if gcdENABLE_3D
+    gceSURF_TYPE hints;
     gceSTATUS status;
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
-    if ((Surface->node.pool != gcvPOOL_USER) ||
-        (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN))
+    if (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
+
+    /* Temporilary remove NO_VIDMEM hint. */
+    hints = Surface->hints;
+    Surface->hints = (gceSURF_TYPE)(hints & ~gcvSURF_NO_VIDMEM);
 
     if ((Surface->type != gcvSURF_RENDER_TARGET) &&
         (Surface->type != gcvSURF_DEPTH))
@@ -647,6 +651,9 @@ gcoSURF_AppendTileStatus(
     gcmONERROR(gcoSURF_LockTileStatus(Surface));
 
 OnError:
+    /* Restore hints. */
+    Surface->hints = hints;
+
     gcmFOOTER();
     return status;
 #else
