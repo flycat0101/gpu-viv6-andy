@@ -32598,7 +32598,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
 /* There is no outputs in openCL */
 
     /* Get the return value */
-    if (Parameters->needROperand) {
+    if (Parameters->needROperand || Parameters->needLOperand) {
         clsIOPERAND intermIOperand[1];
         clsROPERAND rOperand[1];
         clsLOPERAND lOperand[1];
@@ -32627,7 +32627,12 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
                                      rOperand);
             if (gcmIS_ERROR(status)) return status;
 
-            clsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[i], intermIOperand);
+            if (Parameters->needROperand) {
+                clsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[i], intermIOperand);
+            }
+            if(Parameters->needLOperand) {
+                clsLOPERAND_InitializeUsingIOperand(&Parameters->lOperands[i], intermIOperand);
+            }
         }
         if(clmDECL_IsUnderlyingStructOrUnion(&PolynaryExpr->funcName->decl) &&
             clmNAME_VariableHasMemoryOffset(PolynaryExpr->funcName)) {
@@ -32684,7 +32689,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
     clmVERIFY_OBJECT(CodeGenerator, clvOBJ_CODE_GENERATOR);
     clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
     gcmASSERT(Parameters);
-    gcmASSERT(!Parameters->needLOperand);
+    gcmASSERT(!Parameters->needLOperand || clmDECL_IsPointerType(&PolynaryExpr->exprBase.decl));
 
     if (!PolynaryExpr->funcName->isBuiltin &&
         !PolynaryExpr->funcName->u.funcInfo.isIntrinsicCall && !PolynaryExpr->funcName->u.funcInfo.isFuncDef &&
