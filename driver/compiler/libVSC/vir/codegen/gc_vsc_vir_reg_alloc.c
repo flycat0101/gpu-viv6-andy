@@ -5115,6 +5115,10 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
         gctUINT     attrRegCount = VIR_Type_GetVirRegCount(pShader, attrType, -1);
         gctUINT     components = VIR_Symbol_GetComponents(attribute);
 
+        gctUINT         location;
+        VIR_IdList      *pLocationList = gcvNULL;
+        gctUINT         j;
+
         VIR_DEF_KEY     defKey;
         gctUINT         defIdx, webIdx;
         gctUINT         attFlags;
@@ -5169,6 +5173,117 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
             gcmASSERT(pLR);
             pLR->regNoRange = VIR_Type_GetVirRegCount(pShader, attrType, -1);
+
+            /* It has been assigned by other aliased attribute. */
+            if (!_VIR_RA_LS_IsInvalidLOWColor(_VIR_RA_GetLRColor(pLR)) || isLRSpilled(pLR))
+            {
+                continue;
+            }
+
+            /* Get the location and the location list. */
+            location = VIR_Symbol_GetLocation(attribute);
+            if (location != -1 && VIR_Shader_HasAliasedAttribute(pShader))
+            {
+                pLocationList = &VIR_Shader_GetAttributeAliasList(pShader)[location];
+            }
+            else
+            {
+                pLocationList = gcvNULL;
+            }
+
+            /* Check if any aliased attribute has been processed, if found, just use its info. */
+            if (pLocationList && VIR_IdList_Count(pLocationList) > 1)
+            {
+                VIR_RA_HWReg_Color  aliasedColor = InvalidColor;
+                gctUINT             spillOffset = NOT_ASSIGNED;
+                VIR_Symbol*         pCopySym = gcvNULL;
+                VIR_RA_LS_Liverange*pCopyLR = gcvNULL;
+
+                for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                {
+                    VIR_Symbol*             pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+                    gctUINT                 aliasedWebIdx;
+                    VIR_RA_LS_Liverange*    pAliasedLR = gcvNULL;
+
+                    defKey.pDefInst = VIR_INPUT_DEF_INST;
+                    defKey.regNo = VIR_Symbol_GetVariableVregIndex(pAliasedSym);
+                    defKey.channel = VIR_CHANNEL_ANY;
+                    defIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+
+                    if (VIR_INVALID_DEF_INDEX != defIdx)
+                    {
+                        aliasedWebIdx = _VIR_RA_LS_Def2Web(pRA, defIdx);
+                        pAliasedLR = _VIR_RA_LS_Web2LR(pRA, aliasedWebIdx);
+                        gcmASSERT(pAliasedLR);
+
+                        if (_VIR_RA_LS_IsInvalidLOWColor(_VIR_RA_GetLRColor(pAliasedLR)) && !isLRSpilled(pAliasedLR))
+                        {
+                            continue;
+                        }
+
+                        /* Find a valid LR, use it to set all the other aliased LR. */
+                        if (isLRSpilled(pAliasedLR))
+                        {
+                            spillOffset = _VIR_RA_GetLRSpillOffset(pAliasedLR);
+                        }
+                        else
+                        {
+                            aliasedColor = _VIR_RA_GetLRColor(pAliasedLR);
+                        }
+
+                        pCopySym = pAliasedSym;
+                        pCopyLR = pAliasedLR;
+
+                        for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                        {
+                            VIR_Symbol*             pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+                            gctUINT                 aliasedWebIdx;
+                            VIR_RA_LS_Liverange*    pAliasedLR = gcvNULL;
+
+                            if (pAliasedSym == pCopySym)
+                            {
+                                continue;
+                            }
+
+                            defKey.pDefInst = VIR_INPUT_DEF_INST;
+                            defKey.regNo = VIR_Symbol_GetVariableVregIndex(pAliasedSym);
+                            defKey.channel = VIR_CHANNEL_ANY;
+                            defIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+
+                            if (VIR_INVALID_DEF_INDEX != defIdx)
+                            {
+                                aliasedWebIdx = _VIR_RA_LS_Def2Web(pRA, defIdx);
+                                pAliasedLR = _VIR_RA_LS_Web2LR(pRA, aliasedWebIdx);
+                                gcmASSERT(pAliasedLR);
+
+                                pAliasedLR->colorFunc = pCopyLR->colorFunc;
+                                /* spill case */
+                                if (spillOffset != NOT_ASSIGNED)
+                                {
+                                    VIR_RA_LR_SetFlag(pAliasedLR, VIR_RA_LRFLAG_SPILLED);
+                                    _VIR_RA_SetLRSpillOffset(pAliasedLR, spillOffset);
+                                }
+                                else
+                                {
+                                    pAliasedLR->u1.color = aliasedColor;
+                                }
+
+                                VIR_Symbol_SetHwRegId(pAliasedSym, VIR_Symbol_GetHwRegId(pCopySym));
+                                VIR_Symbol_SetHwShift(pAliasedSym, VIR_Symbol_GetHwShift(pCopySym));
+                                VIR_Symbol_SetHIHwRegId(pAliasedSym, VIR_Symbol_GetHIHwRegId(pCopySym));
+                                VIR_Symbol_SetHIHwShift(pAliasedSym, VIR_Symbol_GetHIHwShift(pCopySym));
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            /* It has been assigned by other aliased attribute. */
+            if (!_VIR_RA_LS_IsInvalidLOWColor(_VIR_RA_GetLRColor(pLR)) || isLRSpilled(pLR))
+            {
+                continue;
+            }
 
             /* the attributes that is put into special register */
             if ((VIR_Symbol_GetName(attribute) == VIR_NAME_VERTEX_ID ||

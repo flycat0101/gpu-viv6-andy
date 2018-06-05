@@ -4569,6 +4569,68 @@ VIR_Shader_UpdateCallParmAssignment(
     return errCode;
 }
 
+VSC_ErrCode
+VIR_Shader_CreateAttributeAliasList(
+    IN OUT  VIR_Shader*     pShader
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_IdList*             pArrayList = VIR_Shader_GetAttributeAliasList(pShader);
+    VIR_IdList*             pList;
+    gctUINT                 i;
+
+    if (pArrayList != gcvNULL)
+    {
+        return errCode;
+    }
+
+    pArrayList = (VIR_IdList *)vscMM_Alloc(&pShader->pmp.mmWrapper,
+                                           MAX_SHADER_IO_NUM * sizeof(VIR_IdList));
+    if (pArrayList == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
+    memset(pArrayList, 0, MAX_SHADER_IO_NUM * sizeof(VIR_IdList));
+    VIR_Shader_SetAttributeAliasList(pShader, pArrayList);
+
+    for (i = 0; i < MAX_SHADER_IO_NUM; i++)
+    {
+        pList = &pArrayList[i];
+
+        VIR_IdList_Init(&pShader->pmp.mmWrapper, 2, &pList);
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Shader_DestroyAttributeAliasList(
+    IN OUT  VIR_Shader*     pShader
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_IdList*             pArrayList = VIR_Shader_GetAttributeAliasList(pShader);
+    VIR_IdList*             pList;
+    gctUINT                 i;
+
+    if (pArrayList == gcvNULL)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < MAX_SHADER_IO_NUM; i++)
+    {
+        pList = &pArrayList[i];
+        VIR_IdList_Finalize(pList);
+    }
+
+    vscMM_Free(&pShader->pmp.mmWrapper, pArrayList);
+
+    VIR_Shader_SetAttributeAliasList(pShader, gcvNULL);
+
+    return errCode;
+}
+
 /* types */
 void
 VIR_Type_SetAlignment(

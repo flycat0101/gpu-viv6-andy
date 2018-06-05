@@ -726,6 +726,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Shader_GetTypeNameString(Shader, Type)  (VIR_Shader_GetStringFromId((Shader), (Type)->u1.nameId))
 #define VIR_Shader_GetAttributes(Shader)            (&((Shader)->attributes))
+#define VIR_Shader_GetAttributeAliasList(Shader)    ((Shader)->attributeAliasList)
+#define VIR_Shader_SetAttributeAliasList(Shader, L) ((Shader)->attributeAliasList = (L))
 #define VIR_Shader_GetPerpatchAttributes(Shader)    (&((Shader)->perpatchInput))
 #define VIR_Shader_GetOutputs(Shader)               (&((Shader)->outputs))
 #define VIR_Shader_GetPerpatchOutputs(Shader)       (&((Shader)->perpatchOutput))
@@ -2682,6 +2684,7 @@ typedef enum VIR_SYMFLAG
 #define isSymAlwaysUsed(sym)                    (((sym)->flags & VIR_SYMFLAG_ALWAYSUSED) != 0)
 
 #define isSymVectorizedOut(sym)                 (((sym)->flags & VIR_SYMFLAG_VECTORIZED_OUT) != 0)
+#define isSymAttrLocSetByDriver(sym)            (((sym)->flags & VIR_SYMFLAG_LOC_SET_BY_DRIVER) != 0)
 
 /* function flags */
 #define isSymKernelFunction(sym)                (((sym)->flags & VIR_SYMFLAG_ISKERNEL) != 0)
@@ -4140,6 +4143,8 @@ typedef enum _VIR_SHADERFLAGS
                                                                     HW v6.0 does not support it yet */
     VIR_SHFLAG_HAS_VIV_VX_EXTENSION             = 0x10000000, /* the shader has Vivante VX extension */
     VIR_SHFLAG_PATCH_LIB                        = 0x20000000, /* this is a patch lib shader. */
+
+    VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE              = 0x40000000, /* APP sets the aliased attribute for this shader. */
 } VIR_ShaderFlags;
 
 #define VIR_Shader_GetFlags(Shader)                 (Shader)->flags)
@@ -4168,6 +4173,7 @@ typedef enum _VIR_SHADERFLAGS
 #define VIR_Shader_HasMova(Shader)                  (((Shader)->flags & VIR_SHFLAG_HAS_MOVA) != 0)
 #define VIR_Shader_HasVivVxExtension(Shader)        (((Shader)->flags & VIR_SHFLAG_HAS_VIV_VX_EXTENSION) != 0)
 #define VIR_Shader_IsPatchLib(Shader)               (((Shader)->flags & VIR_SHFLAG_PATCH_LIB) != 0)
+#define VIR_Shader_HasAliasedAttribute(Shader)      (((Shader)->flags & VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE) != 0)
 
 /* let the client make sure the shaderKind is right.
    Otherwise, it is wrong when the flag is used in !flag case. */
@@ -4432,6 +4438,7 @@ struct _VIR_SHADER
 
     /* Attributes. */
     VIR_AttributeIdList attributes;
+    VIR_AttributeIdList* attributeAliasList;     /* attribute alias list, <location, attributeSymId1, attributeSymId2... *> */
 
     /* Outputs. */
     VIR_OutputIdList    outputs;    /* the size of 'outputs' be allocated */
@@ -5115,6 +5122,16 @@ VIR_Shader_UpdateCallParmAssignment(
     IN  VIR_Instruction     *pCallerInst,
     IN  gctBOOL             bMapTemp,
     IN  VSC_HASH_TABLE      *pTempSet
+    );
+
+VSC_ErrCode
+VIR_Shader_CreateAttributeAliasList(
+    IN OUT  VIR_Shader*     pShader
+    );
+
+VSC_ErrCode
+VIR_Shader_DestroyAttributeAliasList(
+    IN OUT  VIR_Shader*     pShader
     );
 
 /* types */

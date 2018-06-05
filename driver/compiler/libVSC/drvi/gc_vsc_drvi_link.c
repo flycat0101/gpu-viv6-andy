@@ -761,7 +761,8 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
 static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                     VIR_Shader* pShader,
                                                     VIR_IdList* pVirIoIdLsts,
-                                                    gctBOOL bInput)
+                                                    gctBOOL bInput,
+                                                    VIR_IdList* pAliasListArray)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR             locationMask;
@@ -769,7 +770,10 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     gctUINT                    i, virIo, thisVirIoRegCount, location;
     gctUINT                    virIoCount = VIR_IdList_Count(pVirIoIdLsts);
 
-    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    if (!pAliasListArray)
+    {
+        vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    }
 
     for (virIo = 0; virIo < virIoCount; virIo ++)
     {
@@ -805,19 +809,32 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
                 gcmASSERT(i < MAX_SHADER_IO_NUM);
 #endif
 
-                if (vscBV_TestBit(&locationMask, i))
+                /* If the aliased list exist, just copy the symId. */
+                if (pAliasListArray)
                 {
-                    errCode = VSC_ERR_LOCATION_ALIASED;
-                    ON_ERROR(errCode, "Check aliased location");
+                    VIR_IdList_Add(&pAliasListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
                 }
+                else
+                {
+                    if (vscBV_TestBit(&locationMask, i))
+                    {
+                        errCode = VSC_ERR_LOCATION_ALIASED;
+                        ON_ERROR(errCode, "Check aliased location");
+                    }
 
-                vscBV_SetBit(&locationMask, i);
+                    vscBV_SetBit(&locationMask, i);
+                }
             }
         }
     }
 
+#if !SUPPORT_ATTR_ALIAS
 OnError:
-    vscBV_Finalize(&locationMask);
+#endif
+    if (!pAliasListArray)
+    {
+        vscBV_Finalize(&locationMask);
+    }
 
     return errCode;
 }
@@ -1036,13 +1053,15 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper,
                                                    pUpperShader,
                                                    pOutputIdLstsOfUpperShader,
-                                                   gcvFALSE);
+                                                   gcvFALSE,
+                                                   gcvNULL);
         CHECK_ERROR(errCode, "Check io aliased location");
 
         errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper,
                                                    pLowerShader,
                                                    pAttrIdLstsOfLowerShader,
-                                                   gcvTRUE);
+                                                   gcvTRUE,
+                                                   gcvNULL);
         CHECK_ERROR(errCode, "Check io aliased location");
     }
 
@@ -1344,8 +1363,9 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctUINT                    attrIdx, ioIdx = 0;
     gctUINT                    attrCount = VIR_IdList_Count(pAttrIdLsts);
     gctINT                     location;
+    VIR_IdList*                pLocationList = gcvNULL;
     VIR_Symbol*                pAttrSym;
-    gctUINT                    thisAttrRegCount, i;
+    gctUINT                    thisAttrRegCount, i, j;
     VSC_BIT_VECTOR             inputWorkingMask;
     gctBOOL                    bHasNoAssignedLocation = gcvFALSE;
     gctBOOL                    bDirectlyUseLocation = (pShader->shaderKind != VIR_SHADER_VERTEX) && bSeperatedShaders;
@@ -1359,6 +1379,19 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
         if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
         {
             thisAttrRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pAttrSym);
+
+            /* Get the location and the location list. */
+            location = VIR_Symbol_GetLocation(pAttrSym);
+            gcmASSERT(location < MAX_SHADER_IO_NUM);
+
+            if (location != -1 && VIR_Shader_HasAliasedAttribute(pShader))
+            {
+                pLocationList = &VIR_Shader_GetAttributeAliasList(pShader)[location];
+            }
+            else
+            {
+                pLocationList = gcvNULL;
+            }
 
             /* For vertex shader, GL spec demands location of attribute specified
                by shader can not exceeds HW supported count even if total used
@@ -1376,9 +1409,63 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                 }
             }
 
+            /* It has been assigned by other aliased attribute. */
+            if (VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED)
+            {
+                continue;
+            }
+
+            /* Check if any aliased attribute has been processed, if found, just use its info. */
+            if (pLocationList && VIR_IdList_Count(pLocationList) > 1)
+            {
+                gctUINT firstSlot = NOT_ASSIGNED;
+                VIR_Symbol* pCopySym = gcvNULL;
+
+                for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                {
+                    VIR_Symbol* pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+
+                    /* Find a valid symbol, use it to set all the other aliased symbol. */
+                    if (VIR_Symbol_GetFirstSlot(pAliasedSym) != NOT_ASSIGNED)
+                    {
+                        firstSlot = VIR_Symbol_GetFirstSlot(pAliasedSym);
+                        pCopySym = pAliasedSym;
+
+                        for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                        {
+                            pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+
+                            if (pCopySym == pAliasedSym)
+                            {
+                                continue;
+                            }
+
+                            /*
+                            ** For those aliased attributes that without firstSlot, update it.
+                            ** For those aliased attributes that with firstSlot, make sure that they are the same.
+                            */
+                            if (VIR_Symbol_GetFirstSlot(pAliasedSym) == NOT_ASSIGNED)
+                            {
+                                VIR_Symbol_SetFirstSlot(pAliasedSym, firstSlot);
+                            }
+                            else
+                            {
+                                gcmASSERT(VIR_Symbol_GetFirstSlot(pAliasedSym) == firstSlot);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            /* It has been assigned by other aliased attribute. */
+            if (VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED)
+            {
+                continue;
+            }
+
             if (bDirectlyUseLocation)
             {
-                location = VIR_Symbol_GetLocation(pAttrSym);
                 if (location != -1)
                 {
                     VIR_Symbol_SetFirstSlot(pAttrSym, (gctUINT)location);
@@ -1673,17 +1760,41 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList        workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
+    VIR_IdList*                pArrayList = gcvNULL;
+    VIR_IdList*                pList = gcvNULL;
+    gctUINT                    i;
+
+    /* So far, check the per-vertex attributes for VX only. */
+    if (pShader->shaderKind == VIR_SHADER_VERTEX)
+    {
+        VIR_Shader_CreateAttributeAliasList(pShader);
+        pArrayList = VIR_Shader_GetAttributeAliasList(pShader);
+        gcmASSERT(pArrayList);
+    }
 
     _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
-    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvTRUE);
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvTRUE, pArrayList);
     ON_ERROR(errCode, "Check io aliased location");
 
     /* Per prim */
-    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvTRUE);
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvTRUE, gcvNULL);
     ON_ERROR(errCode, "Check io aliased location");
+
+    /* Check if there is any aliased attribute. */
+    if (pArrayList)
+    {
+        for (i = 0; i < MAX_SHADER_IO_NUM; i++)
+        {
+            pList = &pArrayList[i];
+            if (VIR_IdList_Count(pList) > 1)
+            {
+                VIR_Shader_SetFlag(pShader, VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE);
+            }
+        }
+    }
 
 OnError:
     return errCode;
@@ -1699,11 +1810,11 @@ static VSC_ErrCode _CheckOutputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLink
                                          gcvFALSE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
-    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvFALSE);
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvFALSE, gcvNULL);
     ON_ERROR(errCode, "Check io aliased location");
 
     /* Per prim */
-    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvFALSE);
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvFALSE, gcvNULL);
     ON_ERROR(errCode, "Check io aliased location");
 
 OnError:
