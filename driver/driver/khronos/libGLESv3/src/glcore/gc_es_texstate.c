@@ -301,12 +301,14 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     GLint face, level;
     GLint requestedFormat;
     GLint faces, arrays;
+    GLint interalFormat;
 
     baseLevel = texObj->params.baseLevel;
     width = texObj->faceMipmap[0][baseLevel].width;
     height = texObj->faceMipmap[0][baseLevel].height;
     depth = texObj->faceMipmap[0][baseLevel].depth;
     baseFmtInfo = texObj->faceMipmap[0][baseLevel].formatInfo;
+    interalFormat = texObj->faceMipmap[0][baseLevel].interalFormat;
     requestedFormat = texObj->faceMipmap[0][baseLevel].requestedFormat;
     arrays = texObj->faceMipmap[0][baseLevel].arrays;
 
@@ -330,8 +332,9 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     if (GL_UNSIGNED_INT == baseFmtInfo->category || GL_INT == baseFmtInfo->category ||
         /* ES30 dis-allows linear filter for "TEXTURE_COMPARE_MODE=NONE" depth texture */
         (gc->apiVersion >= __GL_API_VERSION_ES30 && GL_NONE == compareMode &&
-         (GL_DEPTH_COMPONENT == baseFmtInfo->baseFormat || GL_DEPTH_STENCIL == baseFmtInfo->baseFormat)
-        )
+        /* Acoording to spec, here should be a sized internal depth or depth and stencil format */
+        (GL_DEPTH_COMPONENT16 == interalFormat || GL_DEPTH_COMPONENT24 == interalFormat || GL_DEPTH_COMPONENT32F == interalFormat ||
+         GL_DEPTH24_STENCIL8 == interalFormat || GL_DEPTH32F_STENCIL8 == interalFormat))
        )
     {
         if (magFilter != GL_NEAREST)
