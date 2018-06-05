@@ -15291,46 +15291,50 @@ gcSHADER_ReadBufferFromFile(
     status = gcoOS_Open(os, ShaderName, gcvFILE_READ, &filp);
     if (gcmIS_ERROR(status))
     {
-        gcoOS_Print("gcSHADER_ReadBufferFromFile: Cannot open the library file: %s\n", ShaderName);
-        gcmONERROR(status);
-    }
-
-    gcmONERROR(gcoOS_Seek(os, filp, 0,gcvFILE_SEEK_END));
-    gcmONERROR(gcoOS_GetPos(os, filp, &fileSize));
-
-    /*when other process write file,the filesize is 0*/
-    if(fileSize == 0)
-    {
-        status = gcvSTATUS_INVALID_DATA;
+        if (gcmOPT_DUMP_CODEGEN())
+        {
+            gcoOS_Print("gcSHADER_ReadBufferFromFile: Cannot open the library file: %s\n", ShaderName);
+        }
     }
     else
     {
-        status = gcoOS_Allocate(os,fileSize + 1,(gctPOINTER*)&buffer); /* one extra byte for '\0' end of string */
-        if (!gcmIS_SUCCESS(status))
+        gcmONERROR(gcoOS_Seek(os, filp, 0,gcvFILE_SEEK_END));
+        gcmONERROR(gcoOS_GetPos(os, filp, &fileSize));
+
+        /*when other process write file,the filesize is 0*/
+        if(fileSize == 0)
         {
-            gcoOS_Print("gcSHADER_ReadBufferFromFile:Failed to allocate the mem to buffer ");
+            status = gcvSTATUS_INVALID_DATA;
         }
         else
         {
-            *buf = buffer;
-            gcmONERROR(gcoOS_Seek(gcvNULL, filp, 0, gcvFILE_SEEK_SET));/*file pos to 0;*/
-
-            gcmONERROR(_ProcessShLockLibFile(filp, fileSize));
-            status = gcoOS_Read(os, filp ,fileSize, buffer, &bufferSize);
-            *bufSize = bufferSize;
-            if (gcmIS_SUCCESS(status) && (fileSize == bufferSize))
+            status = gcoOS_Allocate(os,fileSize + 1,(gctPOINTER*)&buffer); /* one extra byte for '\0' end of string */
+            if (!gcmIS_SUCCESS(status))
             {
-                if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
-                {
-                    gcoOS_Print("gcSHADER_ReadBufferFromFile: Successfully read file %s",ShaderName);
-                }
+                gcoOS_Print("gcSHADER_ReadBufferFromFile:Failed to allocate the mem to buffer ");
             }
             else
             {
-                gcoOS_Print("gcSHADER_ReadBufferFromFile: Failed to read file %s",ShaderName);
-                status = gcvSTATUS_INVALID_DATA;
+                *buf = buffer;
+                gcmONERROR(gcoOS_Seek(gcvNULL, filp, 0, gcvFILE_SEEK_SET));/*file pos to 0;*/
+
+                gcmONERROR(_ProcessShLockLibFile(filp, fileSize));
+                status = gcoOS_Read(os, filp ,fileSize, buffer, &bufferSize);
+                *bufSize = bufferSize;
+                if (gcmIS_SUCCESS(status) && (fileSize == bufferSize))
+                {
+                    if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
+                    {
+                        gcoOS_Print("gcSHADER_ReadBufferFromFile: Successfully read file %s",ShaderName);
+                    }
+                }
+                else
+                {
+                    gcoOS_Print("gcSHADER_ReadBufferFromFile: Failed to read file %s",ShaderName);
+                    status = gcvSTATUS_INVALID_DATA;
+                }
+                gcmONERROR(_ProcessUnLockLibFile(filp, fileSize));
             }
-            gcmONERROR(_ProcessUnLockLibFile(filp, fileSize));
         }
     }
 
