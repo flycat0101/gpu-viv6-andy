@@ -1371,6 +1371,63 @@ gcoSHADER_FreeVidMemForNoKernel(
     gctPOINTER vidMem
     );
 
+/* shader library file IO */
+/* Builtin library for HW that can't support IMG instructions.*/
+extern gcSHADER gcBuiltinLibrary0 ;
+/* Builtin library for HW taht can support IMG instructions. */
+extern gcSHADER gcBuiltinLibrary1 ;
+extern gcSHADER gcBlendEquationLibrary ;
+
+
+gceSTATUS
+gcSHADER_InitClBuiltinLibrary(
+    IN gcSHADER     Shader,
+    IN gctINT       ShaderType,
+    IN gcLibType    LibType,
+    OUT gcSHADER    *Binary,
+    OUT gctSTRING   *builtinSource);
+
+gceSTATUS
+gcSHADER_InitBuiltinLibrary(
+    IN gcSHADER     Shader,
+    IN gctINT       ShaderType,
+    IN gcLibType    LibType,
+    OUT gcSHADER    *Binary,
+    OUT gctSTRING   *sloBuiltinSource
+    );
+
+gctSTRING
+gcSHADER_GetLibFileName(
+    IN gctBOOL     isPatch,
+    IN gctBOOL     isSupportImgInst,
+    IN gcLibType   LibType
+    );
+
+gceSTATUS
+gcSHADER_ReadGCSLShaderFromFile(
+    IN gctSTRING     ShaderFileName,
+    OUT gcSHADER    *Binary
+    );
+
+gceSTATUS
+gcSHADER_WriteGCSLShaderToFile(
+    IN gcSHADER    Binary,
+    IN gctSTRING   ShaderFileName
+    );
+
+
+gceSTATUS
+gcSHADER_ReadVirLibFromFile(
+    IN gctSTRING          virLibName,
+    OUT SHADER_HANDLE    *VirShader
+    );
+
+gceSTATUS
+gcSHADER_WriteVirLibToFile(
+    IN gctSTRING        virLibName,
+    IN SHADER_HANDLE    VirShader
+    );
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_old_compiler_internal_h_ */

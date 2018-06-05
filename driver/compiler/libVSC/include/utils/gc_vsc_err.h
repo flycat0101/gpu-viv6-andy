@@ -178,6 +178,7 @@ void vscERR_ReportWarning(const char* file, gctUINT line, VSC_ErrCode status, co
     } while (0)
 
 gceSTATUS vscERR_CastErrCode2GcStatus(VSC_ErrCode _errCode);
+VSC_ErrCode vscERR_CastGcStatus2ErrCode(gceSTATUS Status);
 
 END_EXTERN_C()
 

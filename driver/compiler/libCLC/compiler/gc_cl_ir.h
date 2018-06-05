@@ -1426,6 +1426,39 @@ typedef struct _clsVTAB
 }
 clsVTAB;
 
+typedef enum _cleASM_MODIFIER_TYPE
+{
+    /* common */
+    cleASM_MODIFIER_OPND_PRECISION      = 0,
+    cleASM_MODIFIER_OPND_FORMAT         = 1,
+
+    /* lhs */
+    cleASM_MODIFIER_OPCODE_CONDITION    = 2,
+    cleASM_MODIFIER_OPCODE_THREAD_MODE  = 3,
+    cleASM_MODIFIER_OPCODE_ROUND        = 4,
+    cleASM_MODIFIER_OPCODE_SAT          = 5,
+
+    /* rhs */
+    cleASM_MODIFIER_OPND_ABS            = 2,
+    cleASM_MODIFIER_OPND_NEG            = 3,
+
+    cleASM_MODIFIER_COUNT               = 6,
+}
+cleASM_MODIFIER_TYPE;
+
+typedef struct _clsASM_MODIFIER
+{
+    cleASM_MODIFIER_TYPE type;
+    gctINT               value;
+}
+clsASM_MODIFIER;
+
+typedef struct _clsASM_MODIFIERS
+{
+    clsASM_MODIFIER modifiers[cleASM_MODIFIER_COUNT];
+}
+clsASM_MODIFIERS;
+
 #define cloIR_BASE_Initialize(base, finalVPtr, finalLineNo, finalStringNo) \
     do { \
         (base)->vptr        = (finalVPtr); \
@@ -1482,6 +1515,7 @@ struct _cloIR_EXPR
 {
     struct _cloIR_BASE base;
     clsDECL decl;
+    clsASM_MODIFIERS     *asmMods;
 };
 
 typedef struct _cloIR_EXPR *cloIR_EXPR;
@@ -1558,6 +1592,7 @@ IN clsNAME *FuncName
     do { \
       cloIR_BASE_Initialize(&(expr)->base, (finalVPtr), (finalLineNo), (finalStringNo)); \
       (expr)->decl = (exprDecl); \
+      (expr)->asmMods  = gcvNULL; \
     } while (gcvFALSE)
 
 #define clmIR_EXPR_IsUnaryType(expr, unaryType) \

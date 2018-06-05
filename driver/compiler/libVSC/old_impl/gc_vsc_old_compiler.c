@@ -2656,14 +2656,16 @@ gcSHADER_IsES32Compiler(
 /** SHADER binary file header format: -
        Word 1:  gcmCC('S', 'H', 'D', 'R') shader binary file signature
        Word 2:  ('\od' '\od' '\od' '\od') od = octal digits; binary file version
-       Word 3:  ('\E' '\S' '\0' '\0') | gcSHADER_TYPE_VERTEX << 16   or
+       Word 3: chipModel
+       Word 4: chipRevision
+       Word 5:  ('\E' '\S' '\0' '\0') | gcSHADER_TYPE_VERTEX << 16   or
                 ('E' 'S' '\0' '\0') | gcSHADER_TYPE_FRAGMENT << 16 or
                 ('C' 'L' '\0' '\0') | gcSHADER_TYPE_CL << 16
-       Word 4: ('\od' '\od' '\od' '\od') od = octal digits; compiler version
-       Word 5: flags of shader
-       Word 6: client api version.
-       Word 7: size of shader binary file in bytes excluding this header */
-#define _gcdShaderBinaryHeaderSize   (7 * 4)  /*Shader binary file header size in bytes*/
+       Word 6: ('\od' '\od' '\od' '\od') od = octal digits; compiler version
+       Word 7: flags of shader
+       Word 8: client api version.
+       Word 9: size of shader binary file in bytes excluding this header */
+#define _gcdShaderBinaryHeaderSize   (9 * 4)  /*Shader binary file header size in bytes*/
 
 static gctUINT32 _getShaderBinaryHeaderSize(gctUINT32 shaderVersion)
 {
@@ -3605,6 +3607,8 @@ gcSHADER_LoadHeader(
     gceOBJECT_TYPE * signature;
     gctUINT32 bytes;
     gctUINT32 *version;
+    gctUINT32 *chipModel;
+    gctUINT32 *chipRevision;
     gctUINT32 *flags;
     gctUINT32 *size;
     gctUINT32 *apiVersion;
@@ -3630,7 +3634,7 @@ gcSHADER_LoadHeader(
     signature = (gceOBJECT_TYPE *) Buffer;
     if (*signature != gcvOBJ_SHADER) {
         /* Signature mismatch. */
-        gcoOS_DebugFatal("gcSHADER_LoadHeader: Signature does not match with 'SHDR'");
+        gcoOS_Print("gcSHADER_LoadHeader: Signature does not match with 'SHDR'");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
     }
@@ -3647,7 +3651,7 @@ gcSHADER_LoadHeader(
 
         inputVerPtr = (gctUINT8 *) version;
         curVerPtr = (gctUINT8 *) curVer;
-        gcoOS_DebugFatal("gcSHADER_LoadHeader: shader binary file's version of %u.%u.%u:%u "
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's version of %u.%u.%u:%u "
                  "is not compatible with current version %u.%u.%u:%u\n"
                  "Please recompile source.",
                  inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
@@ -3656,16 +3660,33 @@ gcSHADER_LoadHeader(
         return gcvSTATUS_VERSION_MISMATCH;
     }
 
+    /* Word 3: chipModel */
+    chipModel = (gctUINT32 *) (version + 1);
+    if(*chipModel != gcGetHWCaps()->chipModel) {
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's chipModel 0x%x doesn't match current chipModel 0x%x.",
+                 *chipModel, gcGetHWCaps()->chipModel);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
+        return gcvSTATUS_VERSION_MISMATCH;
+    }
 
-    /* Word 3: language type and shader type */
-    version = (gctUINT32 *) (version + 1);
+    /* Word 4: chipRevision */
+    chipRevision = (gctUINT32 *) (chipModel + 1);
+    if(*chipRevision != gcGetHWCaps()->chipRevision) {
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's chipRevision 0x%x doesn't match current chipRevision 0x%x.",
+                 *chipRevision, gcGetHWCaps()->chipRevision);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
+        return gcvSTATUS_VERSION_MISMATCH;
+    }
+
+    /* Word 5: language type and shader type */
+    version = (gctUINT32 *) (chipRevision + 1);
     bytePtr = (gctUINT8 *) version;
     if (Shader->type == gcSHADER_TYPE_PRECOMPILED) {
         Shader->type = *version >> 16;
     }
     else {
         if ((gctUINT32)Shader->type != (*version >> 16)) {
-           gcoOS_DebugFatal("gcSHADER_LoadHeader: expected \"%s\" shader type does not exist in binary",
+           gcoOS_Print("gcSHADER_LoadHeader: expected \"%s\" shader type does not exist in binary",
                     Shader->type == gcSHADER_TYPE_VERTEX ? "vertex" :
                     (Shader->type == gcSHADER_TYPE_FRAGMENT ? "fragment" : "unknown"));
            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
@@ -3675,12 +3696,10 @@ gcSHADER_LoadHeader(
     switch(Shader->type) {
     case gcSHADER_TYPE_VERTEX:
     case gcSHADER_TYPE_FRAGMENT:
-#if DX_SHADER
     case gcSHADER_TYPE_LIBRARY:
-#endif
         if (bytePtr[0] != 'E' || bytePtr[1] != 'S')
         {
-            gcoOS_DebugFatal("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
+            gcoOS_Print("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -3689,7 +3708,7 @@ gcSHADER_LoadHeader(
     case gcSHADER_TYPE_CL:
         if (bytePtr[0] != 'C' || bytePtr[1] != 'L')
         {
-            gcoOS_DebugFatal("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
+            gcoOS_Print("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -3698,20 +3717,20 @@ gcSHADER_LoadHeader(
     case gcSHADER_TYPE_COMPUTE:
         if (bytePtr[0] != 'C' || bytePtr[1] != 'S')
         {
-            gcoOS_DebugFatal("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
+            gcoOS_Print("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
         break;
 
     default:
-        gcoOS_DebugFatal("gcSHADER_LoadHeader: Invalid shader type %d", Shader->type);
+        gcoOS_Print("gcSHADER_LoadHeader: Invalid shader type %d", Shader->type);
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
     }
     Shader->compilerVersion[0] = *version;
 
-    /* Word 4: compiler version */
+    /* Word 6: compiler version */
     version = (gctUINT32 *) (version + 1);
 
     if (Shader->type == gcSHADER_TYPE_VERTEX || Shader->type == gcSHADER_TYPE_FRAGMENT) {
@@ -3721,7 +3740,7 @@ gcSHADER_LoadHeader(
 
            inputVerPtr = (gctUINT8 *) version;
            curVerPtr = (gctUINT8 *)curVer;
-           gcoOS_DebugFatal("gcSHADER_LoadHeader: shader binary file's compiler version of %u.%u.%u:%u "
+           gcoOS_Print("gcSHADER_LoadHeader: shader binary file's compiler version of %u.%u.%u:%u "
                     "is newer than current version %u.%u.%u:%u\n",
                     inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
                     curVerPtr[0], curVerPtr[1], curVerPtr[2], curVerPtr[3]);
@@ -3736,7 +3755,7 @@ gcSHADER_LoadHeader(
 
            inputVerPtr = (gctUINT8 *) version;
            curVerPtr = (gctUINT8 *)&Shader->compilerVersion[1];
-           gcoOS_DebugFatal("gcSHADER_LoadHeader: shader binary file's compiler version of %u.%u.%u:%u "
+           gcoOS_Print("gcSHADER_LoadHeader: shader binary file's compiler version of %u.%u.%u:%u "
                     "is older than current version %u.%u.%u:%u\n"
                     "Please recompile source",
                     inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
@@ -3748,7 +3767,7 @@ gcSHADER_LoadHeader(
 
     Shader->compilerVersion[1] = *version;
 
-    /* Word 5: gcSL version for old shader, and flags for new shader */
+    /* Word 7: gcSL version for old shader, and flags for new shader */
     flags = (gctUINT32 *) (version + 1);
     Shader->flags = *flags;
     if ((*flags & gcSHADER_FLAG_OLDHEADER) != 0)
@@ -3758,16 +3777,16 @@ gcSHADER_LoadHeader(
 
     if (*ShaderVersion > gcdSL_SHADER_BINARY_VERSION_9_19_2013)
     {
-        /* Word 6: client api version. */
+        /* Word 8: client api version. */
         apiVersion = (gctUINT32 *)(flags + 1);
         Shader->clientApiVersion = (gceAPI)(*apiVersion);
 
-        /* Word 7: size of binary excluding header */
+        /* Word 9: size of binary excluding header */
         size = (gctUINT32 *) (apiVersion + 1);
     }
     else
     {
-        /* Word 6: size of binary excluding header */
+        /* Word 8: size of binary excluding header */
         size = (gctUINT32 *) (flags + 1);
     }
 
@@ -3776,7 +3795,7 @@ gcSHADER_LoadHeader(
     if (bytes != *size)
     {
         /* binary size mismatch. */
-        gcoOS_DebugFatal("gcSHADER_LoadHeader: shader binary size %u does not match actual file size %u",
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary size %u does not match actual file size %u",
                  bytes, *size);
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
@@ -6540,6 +6559,7 @@ gcSHADER_Load(
     )
 {
     gctUINT32           bytes;
+    gctUINT32           *codeCount;
     gctUINT16           *count;
     gctUINT16           *realCount;
     gceSTATUS           status;
@@ -8625,16 +8645,20 @@ gcSHADER_Load(
 
     /* _tempRegCount */
     curPos += sizeof(gctUINT16);
-    Shader->_tempRegCount = *(gctUINT16 *) curPos;
-    bytes -= sizeof(gctUINT16);
+    gcoOS_MemCopy(&Shader->_tempRegCount,
+                  curPos,
+                  sizeof(gctUINT32));
+    bytes -= sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    curPos += sizeof(gctUINT16);
-    Shader->_maxLocalTempRegCount = *(gctUINT16 *) curPos;
-    bytes -= sizeof(gctUINT16);
+    curPos += sizeof(gctUINT32);
+    gcoOS_MemCopy(&Shader->_maxLocalTempRegCount,
+                  curPos,
+                  sizeof(gctUINT32));
+    bytes -= sizeof(gctUINT32);
 
     /* constUniformBlockIndex */
-    curPos += sizeof(gctUINT16);
+    curPos += sizeof(gctUINT32);
     gcoOS_MemCopy(&Shader->constUniformBlockIndex,
                   curPos,
                   sizeof(gctINT));
@@ -8697,9 +8721,9 @@ gcSHADER_Load(
     /************************************************************************/
 
     /* Get the code count. */
-    count = (gctUINT16 *)curPos;
+    codeCount = (gctUINT32 *)curPos;
 
-    if (bytes < sizeof(gctUINT16))
+    if (bytes < sizeof(gctUINT32))
     {
         /* Invalid code count. */
         gcmFATAL("gcSHADER_Load: Invalid codeCount");
@@ -8708,11 +8732,11 @@ gcSHADER_Load(
     }
 
     /* Point to the code. */
-    code   = (gcSL_INSTRUCTION) (count + 1);
-    bytes -= sizeof(gctUINT16);
+    code   = (gcSL_INSTRUCTION) (codeCount + 1);
+    bytes -= sizeof(gctUINT32);
 
     /* Save the code count. */
-    Shader->lastInstruction = Shader->codeCount = *count;
+    Shader->lastInstruction = Shader->codeCount = *codeCount;
 
     /* Compute the number of bytes. */
     binarySize = Shader->codeCount * sizeof(struct _gcSL_INSTRUCTION);
@@ -9297,10 +9321,10 @@ gcSHADER_Save(
     bytes += sizeof(gctUINT16);
 
     /* _tempRegCount */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
 
     /* constUniformBlockIndex */
     bytes += sizeof(gctINT);
@@ -9324,7 +9348,7 @@ gcSHADER_Save(
     bytes += sizeof(gctINT32);
 
     /* Code. */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
     bytes += Shader->codeCount * sizeof(struct _gcSL_INSTRUCTION);
 
     /* Loadtime Optimization related data */
@@ -9408,23 +9432,31 @@ gcSHADER_Save(
     *(gctUINT32 *) buffer = gcdSL_SHADER_BINARY_FILE_VERSION;
     buffer += sizeof(gctUINT32);
 
-    /* Word 3: language type and shader type */
+    /* Word 3: chipModel */
+    *(gctUINT32 *) buffer = gcGetHWCaps()->chipModel;
+    buffer += sizeof(gctUINT32);
+
+    /* Word 4: chipRevision */
+    *(gctUINT32 *) buffer = gcGetHWCaps()->chipRevision;
+    buffer += sizeof(gctUINT32);
+
+    /* Word 5: language type and shader type */
     *(gctUINT32 *) buffer = Shader->compilerVersion[0];
     buffer += sizeof(gctUINT32);
 
-    /* Word 4: compiler version */
+    /* Word 6: compiler version */
     *(gctUINT32 *) buffer = Shader->compilerVersion[1];
     buffer += sizeof(gctUINT32);
 
-    /* Word 5: flags */
+    /* Word 7: flags */
     *(gctUINT32 *) buffer = Shader->flags;
     buffer += sizeof(gctUINT32);
 
-    /* Word 6: client api version. */
+    /* Word 8: client api version. */
     *(gctUINT32 *) buffer = Shader->clientApiVersion;
     buffer += sizeof(gctUINT32);
 
-    /* Word 7: size of binary excluding header */
+    /* Word 9: size of binary excluding header */
     *(gctUINT32 *) buffer = bytes - _gcdShaderBinaryHeaderSize;
     buffer += sizeof(gctUINT32);
 
@@ -9939,11 +9971,11 @@ gcSHADER_Save(
         binary->localVariableCount  = (gctINT16) function->localVariableCount;
         gcoOS_MemCopy(&binary->flags, &function->flags, sizeof(gctUINT32));
         gcoOS_MemCopy(&binary->intrinsicsKind, &function->intrinsicsKind, sizeof(gctUINT32));
-        binary->tempIndexStart      = (gctUINT16) function->tempIndexStart;
-        binary->tempIndexEnd        = (gctUINT16) function->tempIndexEnd;
-        binary->tempIndexCount      = (gctUINT16) function->tempIndexCount;
-        binary->codeStart           = (gctUINT16) function->codeStart;
-        binary->codeCount           = (gctUINT16) function->codeCount;
+        binary->tempIndexStart      = function->tempIndexStart;
+        binary->tempIndexEnd        = function->tempIndexEnd;
+        binary->tempIndexCount      = function->tempIndexCount;
+        binary->codeStart           = function->codeStart;
+        binary->codeCount           = function->codeCount;
         binary->label               = (gctINT16)function->label;
         binary->nameLength          = (gctINT16) function->nameLength;
 
@@ -10048,14 +10080,12 @@ gcSHADER_Save(
     buffer += sizeof(gctUINT16);
 
     /* _tempRegCount */
-    *(gctUINT16 *) buffer = (gctUINT16) Shader->_tempRegCount;
-    buffer += sizeof(gctUINT16);
-    gcmASSERT(Shader->_tempRegCount < 0x00FFFF);
+    gcoOS_MemCopy(buffer, &Shader->_tempRegCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    *(gctUINT16 *) buffer = (gctUINT16) Shader->_maxLocalTempRegCount;
-    buffer += sizeof(gctUINT16);
-    gcmASSERT(Shader->_maxLocalTempRegCount < 0x00FFFF);
+    gcoOS_MemCopy(buffer, &Shader->_maxLocalTempRegCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* constUniformBlockIndex */
     gcoOS_MemCopy(buffer, &Shader->constUniformBlockIndex, sizeof(Shader->constUniformBlockIndex));
@@ -10091,8 +10121,8 @@ gcSHADER_Save(
     buffer += sizeof(gctINT32);
 
     /* Code count. */
-    *(gctUINT16 *) buffer = (gctUINT16) Shader->codeCount;
-    buffer += sizeof(gctUINT16);
+    gcoOS_MemCopy(buffer, &Shader->codeCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* Copy the code. */
     bytes = Shader->codeCount * sizeof(struct _gcSL_INSTRUCTION);
@@ -10357,6 +10387,7 @@ gcSHADER_LoadEx(
     )
 {
     gctUINT32 bytes;
+    gctUINT32 * codeCount;
     gctUINT16 * count;
     gctUINT16 * privateMemorySize;
     gctUINT16 * constantMemorySize;
@@ -12992,16 +13023,20 @@ gcSHADER_LoadEx(
 
     /* _tempRegCount */
     curPos += sizeof(gctUINT16);
-    Shader->_tempRegCount = *(gctUINT16 *) curPos;
-    bytes -= sizeof(gctUINT16);
+    gcoOS_MemCopy(&Shader->_tempRegCount,
+                  curPos,
+                  sizeof(gctUINT32));
+    bytes -= sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    curPos += sizeof(gctUINT16);
-    Shader->_maxLocalTempRegCount = *(gctUINT16 *) curPos;
-    bytes -= sizeof(gctUINT16);
+    curPos += sizeof(gctUINT32);
+    gcoOS_MemCopy(&Shader->_maxLocalTempRegCount,
+                  curPos,
+                  sizeof(gctUINT32));
+    bytes -= sizeof(gctUINT32);
 
     /* WorkGroupSize. */
-    curPos += sizeof(gctUINT16);
+    curPos += sizeof(gctUINT32);
     Shader->shaderLayout.compute.isWorkGroupSizeFixed = (gctBOOL)(*(gctUINT16 *) curPos);
     bytes -= sizeof(gctUINT16);
 
@@ -13037,11 +13072,11 @@ gcSHADER_LoadEx(
     /************************************************************************/
 
     /* Get the code count. */
-    count = (gctUINT16 *) count;
+    codeCount = (gctUINT32 *) count;
 
-    gcoOS_MemCopy(&Shader->codeCount, count, sizeof(gctUINT16));
+    gcoOS_MemCopy(&Shader->codeCount, codeCount, sizeof(gctUINT32));
 
-    if ((bytes < sizeof(gctUINT16)) || (Shader->codeCount <= 0))
+    if ((bytes < sizeof(gctUINT32)) || (Shader->codeCount <= 0))
     {
         /* Invalid code count. */
         gcmFATAL("gcSHADER_LoadEx: Invalid codeCount");
@@ -13050,8 +13085,8 @@ gcSHADER_LoadEx(
     }
 
     /* Point to the code. */
-    code   = (gcSL_INSTRUCTION) (count + 1);
-    bytes -= sizeof(gctUINT16);
+    code   = (gcSL_INSTRUCTION) (codeCount + 1);
+    bytes -= sizeof(gctUINT32);
 
     /* Save the code count. */
     Shader->lastInstruction = Shader->codeCount;
@@ -13599,10 +13634,10 @@ gcSHADER_SaveEx(
     bytes += sizeof(gctUINT16);
 
     /* _tempRegCount */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
 
     /* workGroupSize for compute shader*/
     bytes += sizeof(gctUINT16);
@@ -13613,7 +13648,7 @@ gcSHADER_SaveEx(
     bytes += sizeof(gctUINT);
 
     /* Code. */
-    bytes += sizeof(gctUINT16);
+    bytes += sizeof(gctUINT32);
     bytes += Shader->codeCount * sizeof(struct _gcSL_INSTRUCTION);
 
     /* Loadtime Optimization related data */
@@ -13669,23 +13704,31 @@ gcSHADER_SaveEx(
     *(gctUINT32 *) buffer = gcdSL_SHADER_BINARY_FILE_VERSION;
     buffer += sizeof(gctUINT32);
 
-    /* Word 3: language type and shader type */
+    /* Word 3: chipModel */
+    *(gctUINT32 *) buffer = gcGetHWCaps()->chipModel;
+    buffer += sizeof(gctUINT32);
+
+    /* Word 4: chipRevision */
+    *(gctUINT32 *) buffer = gcGetHWCaps()->chipRevision;
+    buffer += sizeof(gctUINT32);
+
+    /* Word 5: language type and shader type */
     *(gctUINT32 *) buffer = Shader->compilerVersion[0];
     buffer += sizeof(gctUINT32);
 
-    /* Word 4: compiler version */
+    /* Word 6: compiler version */
     *(gctUINT32 *) buffer = Shader->compilerVersion[1];
     buffer += sizeof(gctUINT32);
 
-    /* Word 5: flags */
+    /* Word 7: flags */
     *(gctUINT32 *) buffer = Shader->flags;
     buffer += sizeof(gctUINT32);
 
-    /* Word 6: client api version. */
+    /* Word 8: client api version. */
     *(gctUINT32 *) buffer = Shader->clientApiVersion;
     buffer += sizeof(gctUINT32);
 
-    /* Word 7: size of binary excluding header */
+    /* Word 9: size of binary excluding header */
     *(gctUINT32 *) buffer = bytes - _gcdShaderBinaryHeaderSize;
     buffer += sizeof(gctUINT32);
 
@@ -14043,11 +14086,11 @@ gcSHADER_SaveEx(
         binary->localVariableCount  = (gctINT16) function->localVariableCount;
         gcoOS_MemCopy(&binary->flags, &function->flags, sizeof(gctUINT32));
         gcoOS_MemCopy(&binary->intrinsicsKind, &function->intrinsicsKind, sizeof(gctUINT32));
-        binary->tempIndexStart      = (gctUINT16) function->tempIndexStart;
-        binary->tempIndexEnd        = (gctUINT16) function->tempIndexEnd;
-        binary->tempIndexCount      = (gctUINT16) function->tempIndexCount;
-        binary->codeStart           = (gctUINT16) function->codeStart;
-        binary->codeCount           = (gctUINT16) function->codeCount;
+        binary->tempIndexStart      = function->tempIndexStart;
+        binary->tempIndexEnd        = function->tempIndexEnd;
+        binary->tempIndexCount      = function->tempIndexCount;
+        binary->codeStart           = function->codeStart;
+        binary->codeCount           = function->codeCount;
         binary->label               = (gctINT16)function->label;
         binary->nameLength          = (gctINT16) function->nameLength;
         binary->die                 = function->die;
@@ -14193,14 +14236,14 @@ gcSHADER_SaveEx(
         binary->samplerIndex        = (gctINT16) kernelFunction->samplerIndex;
         binary->imageSamplerCount   = (gctINT16) kernelFunction->imageSamplerCount;
         binary->localVariableCount  = (gctINT16) kernelFunction->localVariableCount;
-        binary->tempIndexStart      = (gctUINT16) kernelFunction->tempIndexStart;
-        binary->tempIndexEnd        = (gctUINT16) kernelFunction->tempIndexEnd;
-        binary->tempIndexCount      = (gctUINT16) kernelFunction->tempIndexCount;
+        binary->tempIndexStart      = kernelFunction->tempIndexStart;
+        binary->tempIndexEnd        = kernelFunction->tempIndexEnd;
+        binary->tempIndexCount      = kernelFunction->tempIndexCount;
         binary->propertyCount       = (gctINT16) kernelFunction->propertyCount;
         binary->propertyValueCount  = (gctINT16) kernelFunction->propertyValueCount;
-        binary->codeStart           = (gctUINT16) kernelFunction->codeStart;
-        binary->codeCount           = (gctUINT16) kernelFunction->codeCount;
-        binary->codeEnd             = (gctUINT16) kernelFunction->codeEnd;
+        binary->codeStart           = kernelFunction->codeStart;
+        binary->codeCount           = kernelFunction->codeCount;
+        binary->codeEnd             = kernelFunction->codeEnd;
         binary->isMain              = (gctUINT16) kernelFunction->isMain;
         binary->nameLength          = (gctINT16) kernelFunction->nameLength;
         binary->die                 = kernelFunction->die;
@@ -14482,14 +14525,12 @@ gcSHADER_SaveEx(
     buffer += sizeof(gctUINT16);
 
     /* _tempRegCount */
-    *(gctUINT16 *) buffer = (gctUINT16) Shader->_tempRegCount;
-    buffer += sizeof(gctUINT16);
-    gcmASSERT(Shader->_tempRegCount < 0x00FFFF);
+    gcoOS_MemCopy(buffer, &Shader->_tempRegCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* _maxLocalTempRegCount */
-    *(gctUINT16 *) buffer = (gctUINT16) Shader->_maxLocalTempRegCount;
-    buffer += sizeof(gctUINT16);
-    gcmASSERT(Shader->_maxLocalTempRegCount < 0x00FFFF);
+    gcoOS_MemCopy(buffer, &Shader->_maxLocalTempRegCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* WorkGroupSize. */
     *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.isWorkGroupSizeFixed;
@@ -14507,9 +14548,9 @@ gcSHADER_SaveEx(
     buffer += sizeof(gctUINT);
 
     /* Code count. */
-    /**(gctUINT16 *) buffer = (gctUINT16) Shader->codeCount;*/
-    gcoOS_MemCopy(buffer, &Shader->codeCount, sizeof(gctUINT16));
-    buffer += sizeof(gctUINT16);
+    /**(gctUINT32 *) buffer = (gctUINT32) Shader->codeCount;*/
+    gcoOS_MemCopy(buffer, &Shader->codeCount, sizeof(gctUINT32));
+    buffer += sizeof(gctUINT32);
 
     /* Copy the code. */
     bytes = Shader->codeCount * sizeof(struct _gcSL_INSTRUCTION);
@@ -26975,6 +27016,31 @@ gcGetOptionFromEnv(
                 {
                     /* turn on ocl long support in VIR*/
                     Option->oclInt64InVir = gcvTRUE;
+                }
+            }
+
+            /*
+              * write/read Shader info to/from file function in old compiler
+              *
+              *   VC_OPTION=-LIBSHADERFILE:0|1
+              *
+              */
+            gcoOS_StrStr(p, "-LIBSHADERFILE:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-LIBSHADERFILE:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off shader file in old compiler */
+                    Option->enableLibShaderFile = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on shader file in old compiler*/
+                    Option->enableLibShaderFile = gcvTRUE;
                 }
             }
 

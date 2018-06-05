@@ -212,7 +212,7 @@ _LinkLib_Transform(
     );
 
 VSC_ErrCode
-VIR_CreateIntrinsicLib(
+VIR_GetIntrinsicLib(
     IN VSC_HW_CONFIG            *pHwCfg,
     IN VSC_MM                   *pMM,
     IN gctBOOL                  forOCL,

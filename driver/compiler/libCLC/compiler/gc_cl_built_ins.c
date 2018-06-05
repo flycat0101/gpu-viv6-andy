@@ -514,6 +514,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(ADD)
         __BUILD_BUILT_IN(SUB)
         __BUILD_BUILT_IN(MUL)
+        __BUILD_BUILT_IN(MUL_Z)
         __BUILD_BUILT_IN(FADD)
         __BUILD_BUILT_IN(FSUB)
         __BUILD_BUILT_IN(FMUL)
@@ -601,6 +602,9 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(COSPI)
         __BUILD_BUILT_IN(TANPI)
 
+        __BUILD_BUILT_IN(ARCTRIG0)
+        __BUILD_BUILT_IN(ARCTRIG1)
+
         __BUILD_BUILT_IN(POW)
         __BUILD_BUILT_IN(EXP2)
         __BUILD_BUILT_IN(LOG2)
@@ -682,6 +686,9 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(INTRINSIC)
         __BUILD_BUILT_IN(INTRINSIC_ST)
         __BUILD_BUILT_IN(CLAMP0MAX)
+
+        __BUILD_BUILT_IN(FMA_MUL)
+        __BUILD_BUILT_IN(FMA_ADD)
 
     };
 

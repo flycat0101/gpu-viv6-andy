@@ -90,7 +90,7 @@ VIR_IO_Init(VIR_Shader_IOBuffer *Buf, VIR_Shader *Shader, gctUINT Size, gctBOOL 
 }
 
 void
-VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf)
+VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf, gctBOOL bFreeBuffer)
 {
 #if _DEBUG_VIR_IO_COPY
     {
@@ -104,7 +104,7 @@ VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf)
         }
     }
 #endif
-    if (Buf->buffer)
+    if (bFreeBuffer && Buf->buffer)
     {
         gcmOS_SAFE_FREE(gcvNULL, Buf->buffer);
     }
@@ -800,10 +800,8 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
             ON_ERROR0(VIR_IO_writeUint(Buf, VIR_INVALID_ID));
         }
     }
-#if defined(_DEBUG)
     /* debug help */
     ON_ERROR0(VIR_IO_writeUint(Buf, INST_SIG));
-#endif
 
 OnError:
     return errCode;
@@ -962,10 +960,8 @@ VIR_IO_writeValueList(
                 pValueList->count * pValueList->elemSize));
         }
     }
-#if defined(_DEBUG)
     /* debug help */
     ON_ERROR0(VIR_IO_writeUint(Buf, DBUG_SIG));
-#endif
 
 OnError:
     return errCode;
@@ -979,10 +975,8 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
     VIR_OperandKind opndKind = (VIR_OperandKind)VIR_Operand_GetOpKind(pOperand);
 
     /* operand header */
-#if defined(_DEBUG)
     /* debug help */
     ON_ERROR0(VIR_IO_writeUint(Buf, DBUG_SIG));
-#endif
     val = *(gctUINT*)&pOperand->header;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
@@ -1325,6 +1319,10 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     gctUINT i;
 
     VIR_IO_writeInt(buf, SHDR_SIG);
+    VIR_IO_writeInt(buf, gcdVIR_SHADER_BINARY_FILE_VERSION);
+    VIR_IO_writeInt(buf, gcGetHWCaps()->chipModel);
+    VIR_IO_writeInt(buf, gcGetHWCaps()->chipRevision);
+
     VIR_IO_writeInt(buf, pShader->clientApiVersion);
     VIR_IO_writeUint(buf, pShader->_id);
     VIR_IO_writeUint(buf, pShader->_constVectorId);
@@ -2366,11 +2364,9 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
             VIR_Inst_SetSource(pInst, i, gcvNULL);
         }
     }
-#if defined(_DEBUG)
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     /* debug help: check INST_SIG */
     gcmASSERT(uVal == INST_SIG);
-#endif
 OnError:
     return errCode;
 }
@@ -2580,11 +2576,9 @@ VIR_IO_readValueList(VIR_Shader_IOBuffer *Buf, VIR_ValueList** pValueList, READ_
             ON_ERROR0(VIR_IO_readBlock(Buf, list->values, sz));
         }
     }
-#if defined(_DEBUG)
     ON_ERROR0(VIR_IO_readUint(Buf, &sz));
     /* debug help: check DBUG_SIG */
     gcmASSERT(sz == DBUG_SIG);
-#endif
 OnError:
     return errCode;
 }
@@ -2598,11 +2592,9 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
     VIR_OperandKind opndKind;
 
     /* operand header */
-#if defined(_DEBUG)
     ON_ERROR0(VIR_IO_readUint(Buf, &val));
     /* debug help: check DBUG_SIG */
     gcmASSERT(val == DBUG_SIG);
-#endif
     ON_ERROR0(VIR_IO_readUint(Buf, &val));
     pOperand->header = *(VIR_Operand_Header*)&val;
     opndKind = (VIR_OperandKind)VIR_Operand_GetOpKind(pOperand);
@@ -2944,15 +2936,37 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     VSC_ErrCode errCode= VSC_ERR_NONE;
     gctUINT     i;
     gctUINT     uVal;
+    gctUINT     binaryFileVersion, chipModel, chipRevision;
     VSC_MM *    memPool    = &pShader->pmp.mmWrapper;
 
     VIR_IO_readUint(buf, &uVal);
     if (uVal != SHDR_SIG)
     {
-        gcmASSERT(gcvFALSE);
         errCode = VSC_ERR_INVALID_DATA;
         ON_ERROR(errCode, "Invalid shader signature 0x%x.", uVal);
     }
+    VIR_IO_readUint(buf, &binaryFileVersion);
+    if (binaryFileVersion != gcdVIR_SHADER_BINARY_FILE_VERSION)
+    {
+        errCode = VSC_ERR_VERSION_MISMATCH;
+        ON_ERROR(errCode, "Shader file version 0x%x doesn't match current version 0x%x.",
+                 binaryFileVersion, gcdVIR_SHADER_BINARY_FILE_VERSION);
+    }
+    VIR_IO_readUint(buf, &chipModel);
+    if (chipModel != gcGetHWCaps()->chipModel)
+    {
+        errCode = VSC_ERR_VERSION_MISMATCH;
+        ON_ERROR(errCode, "Shader file chipModel 0x%x doesn't match current chipModel 0x%x.",
+                 chipModel, gcGetHWCaps()->chipModel);
+    }
+    VIR_IO_readUint(buf, &chipRevision);
+    if (chipRevision != gcGetHWCaps()->chipRevision)
+    {
+        errCode = VSC_ERR_VERSION_MISMATCH;
+        ON_ERROR(errCode, "Shader file chipRevision 0x%x doesn't match current chipRevision 0x%x.",
+                 chipRevision, gcGetHWCaps()->chipRevision);
+    }
+
     VIR_IO_readInt(buf, (gctINT*)&pShader->clientApiVersion);
     VIR_IO_readUint(buf, &pShader->_id);
     VIR_IO_readUint(buf, &pShader->_constVectorId);

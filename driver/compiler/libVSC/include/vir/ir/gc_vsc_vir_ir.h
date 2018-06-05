@@ -6763,7 +6763,7 @@ VSC_ErrCode
 VIR_IO_Init(VIR_Shader_IOBuffer *buf, VIR_Shader *shader, gctUINT size, gctBOOL QueryOnly);
 
 void
-VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf);
+VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf, gctBOOL bFreeBuffer);
 
 VSC_ErrCode
 VIR_IO_writeInt(VIR_Shader_IOBuffer *buf, gctINT val);

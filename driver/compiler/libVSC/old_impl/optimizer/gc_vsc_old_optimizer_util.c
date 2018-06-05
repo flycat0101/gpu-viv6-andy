@@ -374,6 +374,11 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvTRUE, /* CLUseVIRCodeGen; */
 
+    /* Enable write/read Shader info to/from file:
+     *   VC_OPTION=-LIBSHADERFILE:0|1
+     */
+    gcvTRUE, /* enableLibShaderFile; */
+
 };
 
 const struct _gcSL_INSTRUCTION gcvSL_NOP_INSTR =

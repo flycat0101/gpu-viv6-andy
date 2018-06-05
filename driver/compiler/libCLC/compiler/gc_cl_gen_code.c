@@ -210,6 +210,7 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_ADD */ gcvTRUE,
     /* clvOPCODE_SUB */ gcvTRUE,
     /* clvOPCODE_MUL */ gcvTRUE,
+    /* clvOPCODE_MUL_Z */ gcvTRUE,
     /* clvOPCODE_FADD */ gcvTRUE,
     /* clvOPCODE_FSUB */ gcvTRUE,
     /* clvOPCODE_FMUL */ gcvTRUE,
@@ -294,6 +295,9 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_SINPI */ gcvTRUE,
     /* clvOPCODE_COSPI */ gcvTRUE,
     /* clvOPCODE_TANPI */ gcvTRUE,
+
+    /* clvOPCODE_ARCTRIG0 */ gcvFALSE,
+    /* clvOPCODE_ARCTRIG1 */ gcvFALSE,
 
     /* clvOPCODE_POW */ gcvTRUE,
     /* clvOPCODE_EXP2 */ gcvTRUE,
@@ -1437,6 +1441,7 @@ clGetOpcodeName(
     case clvOPCODE_ADD:         return "+";
     case clvOPCODE_SUB:         return "-";
     case clvOPCODE_MUL:         return "*";
+    case clvOPCODE_MUL_Z:       return "mul_z";
     case clvOPCODE_DIV:         return "divide#";
     case clvOPCODE_IDIV:     return "divide_int#";
     case clvOPCODE_IMUL:     return "mul_int#";
@@ -1517,6 +1522,9 @@ clGetOpcodeName(
     case clvOPCODE_SINPI:       return "sinpi";
     case clvOPCODE_COSPI:       return "cospi";
     case clvOPCODE_TANPI:       return "tanpi";
+
+    case clvOPCODE_ARCTRIG0:    return "arctrig0";
+    case clvOPCODE_ARCTRIG1:    return "arctrig1";
 
     case clvOPCODE_MULLO:       return "viv_mul_lo";
     case clvOPCODE_ADDLO:       return "viv_add_lo";
@@ -10342,6 +10350,7 @@ clGenArithmeticExprCode(
       /* Not matrix multiply: proceed forward */
       switch(Opcode) {
       case clvOPCODE_MUL:
+      case clvOPCODE_MUL_Z:
       case clvOPCODE_FMUL:
       case clvOPCODE_MUL_RTZ:
       case clvOPCODE_MUL_RTNE:
@@ -11034,6 +11043,7 @@ clGenArithmeticExprCode(
     case clvOPCODE_SUB:
     case clvOPCODE_FSUB:
     case clvOPCODE_MUL:
+    case clvOPCODE_MUL_Z:
     case clvOPCODE_FMUL:
     case clvOPCODE_MULLO:
     case clvOPCODE_DIV:
@@ -14090,6 +14100,7 @@ clGenGenericCode2(
     case clvOPCODE_SUB:
     case clvOPCODE_FSUB:
     case clvOPCODE_MUL:
+    case clvOPCODE_MUL_Z:
     case clvOPCODE_MULLO:
     case clvOPCODE_FMUL:
 
@@ -14141,6 +14152,8 @@ clGenGenericCode2(
 
     case clvOPCODE_DOT:
     case clvOPCODE_CROSS:
+    case clvOPCODE_ARCTRIG0:
+    case clvOPCODE_ARCTRIG1:
         ROperand0 = _ResolveComponentSelection(Compiler,
                                                LineNo,
                                                StringNo,
@@ -30592,6 +30605,39 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_MergeAsmMods(
+    IN cloCOMPILER Compiler,
+    IN clsASM_MODIFIERS * AsmMods,
+    IN OUT clsGEN_CODE_PARAMETERS * Parameters
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+
+    if (AsmMods->modifiers[cleASM_MODIFIER_OPND_FORMAT].type < cleASM_MODIFIER_COUNT)
+    {
+        if (Parameters->needLOperand)
+        {
+            for (i = 0; i < Parameters->operandCount; i++)
+            {
+                Parameters->lOperands[i].dataType.elementType = (cltELEMENT_TYPE)AsmMods->modifiers[cleASM_MODIFIER_OPND_FORMAT].value;
+            }
+        }
+
+        if (Parameters->needROperand)
+        {
+            for (i = 0; i < Parameters->operandCount; i++)
+            {
+                Parameters->rOperands[i].dataType.elementType = (cltELEMENT_TYPE)AsmMods->modifiers[cleASM_MODIFIER_OPND_FORMAT].value;
+            }
+        }
+    }
+
+
+    return status;
+}
+
 gceSTATUS
 cloIR_POLYNARY_EXPR_GenOperandsCode(
     IN cloCOMPILER Compiler,
@@ -30670,6 +30716,16 @@ cloIR_POLYNARY_EXPR_GenOperandsCode(
                                          &CodeGenerator->visitor,
                                          &operandsParameters[i]);
             if (gcmIS_ERROR(status)) break;
+
+            /* Merge the asm modifiers. */
+            if (operand->asmMods != gcvNULL)
+            {
+                operandsParameters[i].expr = operand;
+                status = _MergeAsmMods(Compiler,
+                                       operand->asmMods,
+                                       &operandsParameters[i]);
+                if (gcmIS_ERROR(status)) break;
+            }
 
             i++;
         }
@@ -32069,7 +32125,28 @@ clGenBuiltInAsmCode(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    opcode = (gcSL_OPCODE)operandsParameters[0].rOperands[0].u.constant.values[0].intValue;
+    opcode = (cleOPCODE)operandsParameters[0].rOperands[0].u.constant.values[0].intValue;
+    if(operandsParameters[0].expr &&
+       operandsParameters[0].expr->asmMods->modifiers[cleASM_MODIFIER_OPCODE_ROUND].type == cleASM_MODIFIER_OPCODE_ROUND)
+    {
+        if(operandsParameters[0].expr->asmMods->modifiers[cleASM_MODIFIER_OPCODE_ROUND].value == gcSL_ROUND_RTZ)
+        {
+            switch(opcode)
+            {
+                case clvOPCODE_MUL:
+                    opcode = clvOPCODE_MUL_RTZ;
+                    break;
+                case clvOPCODE_ADD:
+                    opcode = clvOPCODE_ADD_RTZ;
+                    break;
+                case clvOPCODE_MULLO:
+                    opcode = clvOPCODE_MULLO_RTZ;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
 
     if(operandCount >= 2 &&
        opcode != clvOPCODE_BARRIER &&
@@ -32146,6 +32223,7 @@ clGenBuiltInAsmCode(
         break;
 
       case clvOPCODE_MUL:
+      case clvOPCODE_MUL_Z:
       case clvOPCODE_FMUL:
       case clvOPCODE_MUL_RTZ:
       case clvOPCODE_MUL_RTNE:
@@ -32154,6 +32232,9 @@ clGenBuiltInAsmCode(
       case clvOPCODE_FADD:
       case clvOPCODE_ADD_RTZ:
       case clvOPCODE_ADD_RTNE:
+
+      case clvOPCODE_FMA_MUL:
+      case clvOPCODE_FMA_ADD:
 
       case clvOPCODE_SUB:
       case clvOPCODE_FSUB:
@@ -32326,6 +32407,9 @@ clGenBuiltInAsmCode(
 
     case clvOPCODE_DOT:
     case clvOPCODE_CROSS:
+
+    case clvOPCODE_ARCTRIG0:
+    case clvOPCODE_ARCTRIG1:
         if(operandCount != 4)
         {
             status = gcvSTATUS_INVALID_ARGUMENT;

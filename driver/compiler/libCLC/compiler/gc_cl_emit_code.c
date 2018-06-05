@@ -243,6 +243,7 @@ IN gcSL_OPCODE Opcode
     case gcSL_JMP:      return "gcSL_JMP";
     case gcSL_ADD:      return "gcSL_ADD";
     case gcSL_MUL:      return "gcSL_MUL";
+    case gcSL_MUL_Z:    return "gcSL_MUL_Z";
     case gcSL_MOD:      return "gcSL_MOD";
     case gcSL_DIV:      return "gcSL_DIV";
     case gcSL_RSHIFT:   return "gcSL_RSHIFT";
@@ -334,6 +335,9 @@ IN gcSL_OPCODE Opcode
     case gcSL_TANPI:    return "gcSL_TANPI";
 
     case gcSL_POPCOUNT: return "gcSL_POPCOUNT";
+
+    case gcSL_ARCTRIG0:      return "gcSL_ARCTRIG0";
+    case gcSL_ARCTRIG1:      return "gcSL_ARCTRIG1";
 
     case gcSL_LONGLO:        return "gcSL_LONGLO";
     case gcSL_LONGHI:        return "gcSL_LONGHI";
@@ -4129,6 +4133,7 @@ _ConvOpcode(
     case clvOPCODE_SUB:              return gcSL_SUB;
     case clvOPCODE_IMUL:
     case clvOPCODE_MUL:              return gcSL_MUL;
+    case clvOPCODE_MUL_Z:            return gcSL_MUL_Z;
     case clvOPCODE_DIV:              return gcSL_DIV;
     case clvOPCODE_IDIV:             return gcSL_DIV;
     case clvOPCODE_MOD:              return gcSL_MOD;
@@ -4207,6 +4212,9 @@ _ConvOpcode(
     case clvOPCODE_SINPI:            return gcSL_SINPI;
     case clvOPCODE_COSPI:            return gcSL_COSPI;
     case clvOPCODE_TANPI:            return gcSL_TANPI;
+
+    case clvOPCODE_ARCTRIG0:         return gcSL_ARCTRIG0;
+    case clvOPCODE_ARCTRIG1:         return gcSL_ARCTRIG1;
 
     case clvOPCODE_MULLO:            return gcSL_MULLO;
     case clvOPCODE_ADDLO:            return gcSL_ADDLO;

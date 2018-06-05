@@ -21,6 +21,9 @@
 
 #define _SUPPORT_LONG_ULONG_DATA_TYPE  1
 
+#define _OCL_USE_INTRINSIC_FOR_IMAGE   0
+#define _SUPPORT_NATIVE_IMAGE_READ     0
+
 #include "gc_hal_engine.h"
 #include "old_impl/gc_vsc_old_gcsl.h"
 
@@ -1483,6 +1486,13 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     CLUseVIRCodeGen;
 
+    /* Enable write/read Shader info to/from file:
+
+        VC_OPTION=-LIBSHADERFILE:0|1
+
+    */
+    gctBOOL     enableLibShaderFile;
+
     /* NOTE: when you add a new option, you MUST initialize it with default
        value in theOptimizerOption too */
 } gcOPTIMIZER_OPTION;
@@ -1583,6 +1593,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_PatchShader()        (gcmGetOptimizerOption()->patchShader)
 #define gcmOPT_PatchShaderStart()   (gcmGetOptimizerOption()->_patchShaderStart)
 #define gcmOPT_PatchShaderEnd()     (gcmGetOptimizerOption()->_patchShaderEnd)
+#define gcmOPT_LibShaderFile()       (gcmGetOptimizerOption()->enableLibShaderFile)
 
 #define gcmOPT_SetOclPackedBasicType(val) do { (gcmGetOptimizerOption()->oclPackedBasicType = (val)); } while(0)
 
@@ -7178,6 +7189,64 @@ gcLinkShaders(
     IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
+/*******************************************************************************************
+**  Initialize libfile
+*/
+gceSTATUS
+gcInitializeLibFile(void);
+
+/*******************************************************************************************
+**  Finalize libfile.
+**
+*/
+gceSTATUS
+gcFinalizeLibFile(void);
+
+/*******************************************************************************
+**                                gcSHADER_WriteShaderToFile
+********************************************************************************
+**
+**    write user shader info into file
+**
+**    INPUT:
+**
+**        gcSHADER    Binary,
+**            Pointer to a gcSHADER object holding information about the shader
+**
+**        gctSTRING    ShaderName
+**            Pointer to a gcSHADER name
+**
+**    OUTPUT:none
+**
+*/
+gceSTATUS
+gcSHADER_WriteShaderToFile(
+    IN gcSHADER    Binary,
+    IN gctSTRING    ShaderName
+    );
+
+/*******************************************************************************
+**                                gcSHADER_ReadShaderFromFile
+********************************************************************************
+**
+**    read user shader info from file
+**
+**    INPUT:
+**        gctSTRING    ShaderName
+**            Pointer to a gcSHADER name
+**
+**
+**    OUTPUT:
+**        gcSHADER    Binary,
+**            Pointer to a gcSHADER object holding information about the shader
+**
+*/
+gceSTATUS
+gcSHADER_ReadShaderFromFile(
+    IN gctSTRING    ShaderName,
+    OUT gcSHADER    *Binary
+    );
+
 /*******************************************************************************
 **                                gcLinkProgram
 ********************************************************************************
@@ -7500,6 +7569,8 @@ gcQueryOutputConversionDirective(
     OUT  gctUINT *            Layers
     );
 
+gceSTATUS gcLockLoadLibrary(void);
+gceSTATUS gcUnLockLoadLibrary(void);
 /*******************************************************************************************
 **  Initialize recompilation
 */

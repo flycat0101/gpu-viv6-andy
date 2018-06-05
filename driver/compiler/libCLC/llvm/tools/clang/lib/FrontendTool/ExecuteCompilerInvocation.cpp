@@ -173,9 +173,20 @@ GetTemporaryDir(char *dirnamebuf, gctSIZE_T bufsize) {
   }
   if (!TmpDir) {
     gcoOS_GetEnv(gcvNULL,
-                 "/tmp",
+                 "TEMPDIR",
                  &TmpDir);
   }
+#if defined(LINUX) && !defined(ANDROID)
+  if (!TmpDir) {
+    FILE *fp = fopen("/tmp", "r");
+    if (fp != gcvNULL)
+    {
+        /* /tmp is exist and readable, use it as temp directory */
+      TmpDir = "/tmp";
+      fclose(fp);
+    }
+  }
+#endif
   if (!TmpDir)
   {
 #if defined(UNDER_CE)

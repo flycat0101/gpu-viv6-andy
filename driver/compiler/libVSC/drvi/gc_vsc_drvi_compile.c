@@ -574,7 +574,7 @@ gceSTATUS vscLoadShaderFromBinary(void*          pBinary,
     ON_ERROR(errCode, "Shader Load");
     if (bFreeBinary)
     {
-        VIR_IO_Finalize(&buf);  /* reclaim allocated buffer */
+        VIR_IO_Finalize(&buf, bFreeBinary);  /* reclaim allocated buffer */
     }
     vscReferenceShader(readShader);
 
@@ -582,7 +582,10 @@ gceSTATUS vscLoadShaderFromBinary(void*          pBinary,
     return gcvSTATUS_OK;
 
 OnError:
-    VIR_IO_Finalize(&buf);  /* reclaim allocated buffer */
+    if (bFreeBinary)
+    {
+        VIR_IO_Finalize(&buf, bFreeBinary);  /* reclaim allocated buffer */
+    }
     if (readShader)
     {
         gcoOS_Free(gcvNULL, readShader);

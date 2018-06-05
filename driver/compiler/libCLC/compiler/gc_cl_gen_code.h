@@ -207,6 +207,7 @@ typedef enum _cleOPCODE
     clvOPCODE_ADD,
     clvOPCODE_SUB,
     clvOPCODE_MUL,
+    clvOPCODE_MUL_Z,
     clvOPCODE_FADD,
     clvOPCODE_FSUB,
     clvOPCODE_FMUL,
@@ -292,6 +293,9 @@ typedef enum _cleOPCODE
     clvOPCODE_SINPI,
     clvOPCODE_COSPI,
     clvOPCODE_TANPI,
+
+    clvOPCODE_ARCTRIG0,
+    clvOPCODE_ARCTRIG1,
 
     clvOPCODE_POW,
     clvOPCODE_EXP2,

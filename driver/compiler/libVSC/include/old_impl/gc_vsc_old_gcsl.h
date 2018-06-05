@@ -20,6 +20,12 @@
 
 BEGIN_EXTERN_C()
 
+#if (PTRDIFF_MAX  == INT32_MAX)
+#define SHADER_64BITMODE  0
+#else
+#define SHADER_64BITMODE  1
+#endif
+
 #if gcdRENDER_QUALITY_CHECK
 #define TEMP_OPT_CONSTANT_TEXLD_COORD    0
 #else
@@ -91,10 +97,12 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.19 for uniform physical addr on 09/06/2017 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_RES_OP_FLAG gcmCC(0, 0, 1, 19)
 
-/* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 20)
+/* bump up version to 1.20 for new header with chipModel and chpRevision on 11/30/2017 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVEING_CHIPMODEL gcmCC(0, 0, 1, 20)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(0, 0, 1, 20)
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 21)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 21)
 
 typedef union _gcsValue
 {
@@ -3677,11 +3685,11 @@ typedef struct _gcBINARY_FUNCTION
     /* the number of arguments be packed away by _packingArugments() */
     gctUINT16                       packedAwayArgNo;
     gctINT16                        localVariableCount;
-    gctUINT16                       tempIndexStart;
-    gctUINT16                       tempIndexEnd;
-    gctUINT16                       tempIndexCount;
-    gctUINT16                       codeStart;
-    gctUINT16                       codeCount;
+    gctUINT32                       tempIndexStart;
+    gctUINT32                       tempIndexEnd;
+    gctUINT32                       tempIndexCount;
+    gctUINT32                       codeStart;
+    gctUINT32                       codeCount;
 
     gctINT16                        label;
 
@@ -3866,15 +3874,15 @@ typedef struct _gcBINARY_KERNEL_FUNCTION
     gctINT16                        samplerIndex;
     gctINT16                        imageSamplerCount;
     gctINT16                        localVariableCount;
-    gctUINT16                       tempIndexStart;
-    gctUINT16                       tempIndexEnd;
-    gctUINT16                       tempIndexCount;
+    gctUINT32                       tempIndexStart;
+    gctUINT32                       tempIndexEnd;
+    gctUINT32                       tempIndexCount;
     gctINT16                        propertyCount;
     gctINT16                        propertyValueCount;
 
-    gctUINT16                       codeStart;
-    gctUINT16                       codeCount;
-    gctUINT16                       codeEnd;
+    gctUINT32                       codeStart;
+    gctUINT32                       codeCount;
+    gctUINT32                       codeEnd;
 
     gctUINT16                       isMain;
     gctUINT16                       die;
