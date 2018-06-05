@@ -4147,40 +4147,44 @@ _AddExtraSampler(
     VIR_Uniform         *sampler = VIR_Symbol_GetSampler(samplerSym);
     VIR_Symbol          *extraLayerSym;
     VIR_Uniform         *extraLayer;
-    VIR_SymId           extraLayerSymId;
-    VIR_NameId          nameId;
-    gctCHAR             name[128] = "#";
+    VIR_SymId           extraLayerSymId = sampler->u.samplerOrImageAttr.extraImageLayer;
 
     gcmASSERT(sampler);
 
-    gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
-    gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$ExtraLayer");
-    errCode = VIR_Shader_AddString(pShader,
-                                    name,
-                                    &nameId);
-    ON_ERROR(errCode, "VIR_Shader_AddString");
+    if (extraLayerSymId == VIR_INVALID_ID)
+    {
+        VIR_NameId      nameId;
+        gctCHAR         name[128] = "#";
 
-    errCode = VIR_Shader_AddSymbol(pShader,
-                                   VIR_SYM_SAMPLER,
-                                   nameId,
-                                   VIR_Symbol_GetType(samplerSym),
-                                   VIR_STORAGE_UNKNOWN,
-                                   &extraLayerSymId);
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$ExtraLayer");
+        errCode = VIR_Shader_AddString(pShader,
+                                        name,
+                                        &nameId);
+        ON_ERROR(errCode, "VIR_Shader_AddString");
 
-    ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_SAMPLER,
+                                       nameId,
+                                       VIR_Symbol_GetType(samplerSym),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &extraLayerSymId);
 
-    extraLayerSym = VIR_Shader_GetSymFromId(pShader, extraLayerSymId);
-    sampler->u.samplerOrImageAttr.extraImageLayer = extraLayerSymId;
-    VIR_Symbol_SetFlag(extraLayerSym, VIR_SYMFLAG_COMPILER_GEN);
-    VIR_Symbol_SetPrecision(extraLayerSym, VIR_Symbol_GetPrecision(samplerSym));
-    VIR_Symbol_SetUniformKind(extraLayerSym, VIR_UNIFORM_EXTRA_LAYER);
-    VIR_Symbol_SetAddrSpace(extraLayerSym, VIR_AS_CONSTANT);
-    VIR_Symbol_SetTyQualifier(extraLayerSym, VIR_Symbol_GetTyQualifier(samplerSym));
-    extraLayerSym->layout = samplerSym->layout;
+        ON_ERROR(errCode, "VIR_Shader_AddSymbol");
 
-    extraLayer = VIR_Symbol_GetSampler(extraLayerSym);
-    extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
-    extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+        extraLayerSym = VIR_Shader_GetSymFromId(pShader, extraLayerSymId);
+        sampler->u.samplerOrImageAttr.extraImageLayer = extraLayerSymId;
+        VIR_Symbol_SetFlag(extraLayerSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(extraLayerSym, VIR_Symbol_GetPrecision(samplerSym));
+        VIR_Symbol_SetUniformKind(extraLayerSym, VIR_UNIFORM_EXTRA_LAYER);
+        VIR_Symbol_SetAddrSpace(extraLayerSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(extraLayerSym, VIR_Symbol_GetTyQualifier(samplerSym));
+        extraLayerSym->layout = samplerSym->layout;
+
+        extraLayer = VIR_Symbol_GetSampler(extraLayerSym);
+        extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
+        extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+    }
 
     /* New a operand with this extra image layer.  */
     errCode = VIR_Function_NewOperand(pFunc, newOpnd);
