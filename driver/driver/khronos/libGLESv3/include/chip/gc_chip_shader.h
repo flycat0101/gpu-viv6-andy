@@ -656,6 +656,7 @@ struct __GLchipSLProgramRec
     GLuint                              inMaxNameLen;
     __GLchipSLInput*                    inputs;
 
+    gctBOOL                             hasAliasedAttrib;
     __GLchipSLBinding*                  attribBinding;
     __GLchipSLLocation*                 attribLocation;
     /* The table maps app visible location to program attrib index */

@@ -7087,6 +7087,7 @@ __glChipCreateProgram(
     program->inMaxNameLen         = 0;
     program->inputs               = gcvNULL;
 
+    program->hasAliasedAttrib     = gcvFALSE;
     program->attribBinding        = gcvNULL;
     program->attribLinkage        = gcvNULL;
     program->attribLocation       = gcvNULL;
@@ -7365,6 +7366,7 @@ __glChipLinkProgram(
     gcsPROGRAM_STATE programState = {0};
     gceSHADER_FLAGS flags;
     gceSHADER_SUB_FLAGS subFlags;
+    gcSHADER vsBinary = gcvNULL;
     gcSHADER_KIND shaderTypes[] =
     {
         gcSHADER_TYPE_VERTEX,
@@ -7587,6 +7589,24 @@ __glChipLinkProgram(
 
     /* Call the HAL backend linker. */
     gcSetGLSLCompiler(chipCtx->pfCompile);
+
+    /* set attribute location */
+    vsBinary = masterPgInstance->binaries[__GLSL_STAGE_VS];
+    if (vsBinary && !gcShader_IsES11Compiler(vsBinary) && program->hasAliasedAttrib)
+    {
+        status = gcvSTATUS_LINK_INVALID_SHADERS;
+        gcmONERROR(status);
+    }
+
+    if (vsBinary && gcShader_IsES11Compiler(vsBinary) && program->hasAliasedAttrib)
+    {
+        __GLchipSLBinding *binding;
+        for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
+        {
+            gcmONERROR(gcSHADER_SetAttrLocationByDriver(vsBinary, binding->name, binding->index));
+        }
+    }
+
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                              masterPgInstance->binaries,
                              flags,
@@ -8457,6 +8477,11 @@ __glChipBindAttributeLocation(
             binding->index = index;
             gcmFOOTER_ARG("return=%d", GL_TRUE);
             return GL_TRUE;;
+        }
+        /* Check aliased attrib */
+        else if (binding->index == (GLint)index)
+        {
+            program->hasAliasedAttrib = gcvTRUE;
         }
     }
 
