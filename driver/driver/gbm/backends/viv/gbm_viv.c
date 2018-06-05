@@ -357,7 +357,7 @@ gbm_viv_bo_import(
     gceTILING tiling = 0;
     int ret;
 
-    if (type == GBM_BO_IMPORT_WL_BUFFER)
+    if (type == GBM_BO_IMPORT_EGL_IMAGE)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
