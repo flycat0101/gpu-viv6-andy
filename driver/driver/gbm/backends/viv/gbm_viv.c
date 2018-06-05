@@ -890,8 +890,9 @@ gbm_viv_create_buffers(
             {
                 /* Calculate tile status buffer addresses, this path can't work, disable it. */
                 gcmONERROR(gcoSURF_AppendTileStatus(rtSurf));
-
+#if gcdENABLE_3D
                 rtSurf->compressFormat = 3;
+#endif
             }
 
             gcmONERROR(gcoSURF_Lock(rtSurf, gcvNULL, gcvNULL));
@@ -966,6 +967,7 @@ _sync_tilestatus_buffer(
    gcoSURF       surface
    )
 {
+#if gcdENABLE_3D
     gctPOINTER tileStatusLogical = {0};
     int size = surface->tileStatusNode.size;
     tileStatusLogical = surface->tileStatusNode.logical + surface->tileStatusNode.bufferOffset;
@@ -974,6 +976,7 @@ _sync_tilestatus_buffer(
     {
         memcpy(_bo->map + _bo->tileStatusOffset, tileStatusLogical, size);
     }
+#endif
 }
 
 static struct gbm_bo *
