@@ -375,6 +375,18 @@ static VkResult __vki_PresentSwapChainImage(
 
     __VK_ONERROR(__vk_EndCommandBuffer(sc->cmdBuf));
 
+    __VK_MEMZERO(&si, sizeof(VkSubmitInfo));
+    si.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    si.commandBufferCount = 1;
+    si.pCommandBuffers    = &sc->cmdBuf;
+
+    __VK_ONERROR(__vk_QueueSubmit(
+        queue,
+        1,
+        &si,
+        VK_NULL_HANDLE
+        ));
+
 #if __VK_NEW_DEVICE_QUEUE
     {
         gcsHAL_INTERFACE iface;
@@ -392,6 +404,8 @@ static VkResult __vki_PresentSwapChainImage(
         iface.u.Signal.process    = gcmPTR2INT32(gcoOS_GetCurrentProcessID());
         iface.u.Signal.fromWhere  = gcvKERNEL_PIXEL;
         __VK_ONERROR(__vk_QueueAppendEvent((__vkDevQueue *)queue, &iface));
+
+        __VK_ONERROR(__vk_QueueCommitEvents((__vkDevQueue *)queue, VK_FALSE));
     }
 #else
     /* Signal buffer swap complete */
@@ -409,19 +423,9 @@ static VkResult __vki_PresentSwapChainImage(
         gcmPTR2INT32(gcoOS_GetCurrentProcessID()),
         gcvKERNEL_PIXEL
         ));
+
+    __VK_ONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
 #endif
-
-    __VK_MEMZERO(&si, sizeof(VkSubmitInfo));
-    si.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    si.commandBufferCount = 1;
-    si.pCommandBuffers    = &sc->cmdBuf;
-
-    __VK_ONERROR(__vk_QueueSubmit(
-        queue,
-        1,
-        &si,
-        VK_NULL_HANDLE
-        ));
 
      gcmDUMP(gcvNULL,
             "@[swap 0x%08X %dx%d +%u]",
