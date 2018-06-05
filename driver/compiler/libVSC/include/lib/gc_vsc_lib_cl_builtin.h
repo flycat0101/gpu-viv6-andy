@@ -293,6 +293,20 @@ static gctSTRING gcCLLibASIN_Funcs_halti2 =
 "   result = result * a;\n"
 "   return result;\n"
 "}\n"
+"float8 _viv_asin_float8(float8 a)\n"
+"{\n"
+"   float8 result;\n"
+"   result.s0123 = _viv_asin_float4(a.s0123);\n"
+"   result.s4567 = _viv_asin_float4(a.s4567);\n"
+"   return result;\n"
+"}\n"
+"float16 _viv_asin_float16(float16 a)\n"
+"{\n"
+"   float16 result;\n"
+"   result.s01234567 = _viv_asin_float8(a.s01234567);\n"
+"   result.s89abcdef = _viv_asin_float8(a.s89abcdef);\n"
+"   return result;\n"
+"}\n"
 ;
 
 static gctSTRING gcCLLibASIN_Funcs_halti5 =
