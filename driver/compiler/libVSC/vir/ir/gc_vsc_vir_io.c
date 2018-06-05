@@ -2939,27 +2939,27 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     gctUINT     binaryFileVersion, chipModel, chipRevision;
     VSC_MM *    memPool    = &pShader->pmp.mmWrapper;
 
-    VIR_IO_readUint(buf, &uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != SHDR_SIG)
     {
         errCode = VSC_ERR_INVALID_DATA;
         ON_ERROR(errCode, "Invalid shader signature 0x%x.", uVal);
     }
-    VIR_IO_readUint(buf, &binaryFileVersion);
+    ON_ERROR0(VIR_IO_readUint(buf, &binaryFileVersion));
     if (binaryFileVersion != gcdVIR_SHADER_BINARY_FILE_VERSION)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
         ON_ERROR(errCode, "Shader file version 0x%x doesn't match current version 0x%x.",
                  binaryFileVersion, gcdVIR_SHADER_BINARY_FILE_VERSION);
     }
-    VIR_IO_readUint(buf, &chipModel);
+    ON_ERROR0(VIR_IO_readUint(buf, &chipModel));
     if (chipModel != gcGetHWCaps()->chipModel)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
         ON_ERROR(errCode, "Shader file chipModel 0x%x doesn't match current chipModel 0x%x.",
                  chipModel, gcGetHWCaps()->chipModel);
     }
-    VIR_IO_readUint(buf, &chipRevision);
+    ON_ERROR0(VIR_IO_readUint(buf, &chipRevision));
     if (chipRevision != gcGetHWCaps()->chipRevision)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
@@ -2967,44 +2967,44 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
                  chipRevision, gcGetHWCaps()->chipRevision);
     }
 
-    VIR_IO_readInt(buf, (gctINT*)&pShader->clientApiVersion);
-    VIR_IO_readUint(buf, &pShader->_id);
-    VIR_IO_readUint(buf, &pShader->_constVectorId);
-    VIR_IO_readUint(buf, &pShader->_dummyUniformCount);
-    VIR_IO_readUint(buf, &pShader->_orgTempCount);
-    VIR_IO_readUint(buf, &pShader->_tempRegCount);
-    VIR_IO_readUint(buf, &pShader->_anonymousNameId);
-    VIR_IO_readInt(buf, (gctINT*)&pShader->shLevel);
-    VIR_IO_readInt(buf, (gctINT*)&pShader->shaderKind);
-    VIR_IO_readInt(buf, (gctINT*)&pShader->flags);
-    VIR_IO_readUint(buf, &pShader->compilerVersion[0]);
-    VIR_IO_readUint(buf, &pShader->compilerVersion[1]);
-    VIR_IO_readInt(buf, &pShader->constUniformBlockIndex);
-    VIR_IO_readInt(buf, &pShader->defaultUniformBlockIndex);
-    VIR_IO_readUint(buf, &pShader->maxKernelFunctionArgs);
-    VIR_IO_readUint(buf, &pShader->privateMemorySize);
-    VIR_IO_readUint(buf, &pShader->localMemorySize);
+    ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->clientApiVersion));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_id));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_constVectorId));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_dummyUniformCount));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_orgTempCount));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_tempRegCount));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->_anonymousNameId));
+    ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->shLevel));
+    ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->shaderKind));
+    ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->flags));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->compilerVersion[0]));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->compilerVersion[1]));
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->constUniformBlockIndex));
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->defaultUniformBlockIndex));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->maxKernelFunctionArgs));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->privateMemorySize));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->localMemorySize));
 
-    VIR_IO_readInt(buf, &pShader->constUBOSize);
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->constUBOSize));
     if (pShader->constUBOSize)
     {
         pShader->constUBOData = (gctUINT32 *)vscMM_Alloc(memPool, pShader->constUBOSize * 16);
         if (pShader->constUBOData == gcvNULL)
         {
-            return VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
         }
 
         errCode = VIR_IO_readBlock(buf, (gctCHAR *)pShader->constUBOData, pShader->constUBOSize * 16);
         ON_ERROR(errCode, "Fail to read constUBOData, sz: %d.", pShader->constUBOSize * 16);
     }
 
-    VIR_IO_readUint(buf, &pShader->constantMemorySize);
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->constantMemorySize));
     if (pShader->constantMemorySize > 0)
     {
         pShader->constantMemoryBuffer = (gctCHAR *)vscMM_Alloc(memPool, pShader->constantMemorySize);
         if (pShader->constantMemoryBuffer == gcvNULL)
         {
-            return VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
         }
         errCode = VIR_IO_readBlock(buf, (gctCHAR *)pShader->constantMemoryBuffer, pShader->constantMemorySize);
         ON_ERROR(errCode, "Fail to read constantMemoryBuffer, sz: %d.", pShader->constantMemorySize);
@@ -3034,10 +3034,10 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     errCode = VIR_IO_readIdList(buf, &pShader->uniforms);
     ON_ERROR(errCode, "Fail to read uniforms id list.");
 
-    VIR_IO_readUint(buf, &pShader->uniformVectorCount);
-    VIR_IO_readInt(buf, &pShader->samplerIndex);
-    VIR_IO_readUint(buf, &pShader->baseSamplerId);
-    VIR_IO_readInt(buf, &pShader->samplerBaseOffset);
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->uniformVectorCount));
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->samplerIndex));
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->baseSamplerId));
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->samplerBaseOffset));
 
     /* save layout info */
     switch (pShader->shaderKind)
@@ -3074,26 +3074,26 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     ON_ERROR(errCode, "Fail to read ioBlocks id list.");
 
     /* LTC info */
-    VIR_IO_readInt(buf, &pShader->ltcUniformCount);
+    ON_ERROR0(VIR_IO_readInt(buf, &pShader->ltcUniformCount));
     if (pShader->ltcUniformCount)
     {
-        VIR_IO_readUint(buf, &pShader->ltcUniformBegin);
-        VIR_IO_readUint(buf, &pShader->ltcInstructionCount);
+        ON_ERROR0(VIR_IO_readUint(buf, &pShader->ltcUniformBegin));
+        ON_ERROR0(VIR_IO_readUint(buf, &pShader->ltcInstructionCount));
         pShader->ltcCodeUniformIndex =
             (gctINT32 *)vscMM_Alloc(memPool, pShader->ltcUniformCount * sizeof(gctINT));
         if (pShader->ltcCodeUniformIndex == gcvNULL)
         {
-            return VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
         }
         for (i = 0; i < pShader->ltcInstructionCount; i++)
         {
-            VIR_IO_readInt(buf, &pShader->ltcCodeUniformIndex[i]);
+            ON_ERROR0(VIR_IO_readInt(buf, &pShader->ltcCodeUniformIndex[i]));
         }
         pShader->ltcExpressions =
             (VIR_Instruction *)vscMM_Alloc(memPool, pShader->ltcInstructionCount * sizeof(VIR_Instruction));
         if (pShader->ltcCodeUniformIndex == gcvNULL)
         {
-            return VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
         }
         for (i = 0; i < pShader->ltcInstructionCount; i++)
         {
@@ -3102,10 +3102,10 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
         }
     }
 
-    VIR_IO_readUint(buf, &pShader->optimizationOption);
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->optimizationOption));
 
     /* Source code string */
-    VIR_IO_readUint(buf, &pShader->sourceLength);
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->sourceLength));
     if (pShader->sourceLength)
     {
         /* write the string */
@@ -3119,24 +3119,24 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
         ON_ERROR(errCode, "Fail to read source.");
     }
 
-    VIR_IO_readUint(buf, &pShader->replaceIndex);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->memoryAccessFlag);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->vsPositionZDependsOnW);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->psHasDiscard);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->useEarlyFragTest);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->hasDsx);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->hasDsy);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->useLastFragData);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsDual16Shader);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsMasterDual16Shader);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->packUnifiedSampler);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->needToAdjustSamplerPhysical);
-    VIR_IO_readUint(buf, (gctUINT*)&pShader->_enableDefaultUBO);
+    ON_ERROR0(VIR_IO_readUint(buf, &pShader->replaceIndex));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->memoryAccessFlag));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->vsPositionZDependsOnW));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->psHasDiscard));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->useEarlyFragTest));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->hasDsx));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->hasDsy));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->useLastFragData));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsDual16Shader));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsMasterDual16Shader));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->packUnifiedSampler));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->needToAdjustSamplerPhysical));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->_enableDefaultUBO));
 
     errCode = VIR_IO_readStringTable(buf, &pShader->stringTable);
     ON_ERROR(errCode, "Fail to read string table.");
 
-    VIR_IO_readUint(buf, &uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != STRTBL_SIG)
     {
         gcmASSERT(gcvFALSE);
@@ -3145,7 +3145,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     errCode = VIR_IO_readTypeTable(buf, &pShader->typeTable);
     ON_ERROR(errCode, "Fail to read type table.");
 
-    VIR_IO_readUint(buf, &uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != TYTBL_SIG)
     {
         gcmASSERT(gcvFALSE);
@@ -3157,7 +3157,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     errCode = VIR_IO_readSymTable(buf, &pShader->symTable);
     ON_ERROR(errCode, "Fail to read sym table.");
 
-    VIR_IO_readUint(buf, &uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != SYMTBL_SIG)
     {
         gcmASSERT(gcvFALSE);
@@ -3185,7 +3185,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
             }
             sym = VIR_Shader_GetSymFromId(buf->shader, val);
             gcmASSERT(sym != gcvNULL);
-            VIR_Shader_AddFunctionContent(buf->shader, sym, &func, gcvTRUE);
+            ON_ERROR0(VIR_Shader_AddFunctionContent(buf->shader, sym, &func, gcvTRUE));
         } while (1);
 
         /* read the function bodies */
@@ -3240,15 +3240,15 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     pShader->hasCRegSpill = uVal;
 
-    VIR_IO_readBlock(buf, (gctCHAR *)pShader->psInputPosCompValid, sizeof(pShader->psInputPosCompValid));
+    ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->psInputPosCompValid, sizeof(pShader->psInputPosCompValid)));
 
-    VIR_IO_readBlock(buf, (gctCHAR *)pShader->psInputPCCompValid, sizeof(pShader->psInputPCCompValid));
+    ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->psInputPCCompValid, sizeof(pShader->psInputPCCompValid)));
 
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     pShader->inLinkedShaderStage = (VIR_ShaderKind)uVal;
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     pShader->outLinkedShaderStage = (VIR_ShaderKind)uVal;
-    VIR_IO_readUint(buf, &uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != ENDS_SIG)
     {
         gcmASSERT(gcvFALSE);
