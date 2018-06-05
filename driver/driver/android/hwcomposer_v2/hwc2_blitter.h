@@ -221,6 +221,8 @@ struct blitter_display
     /* Surface information >>>. */
     gcoSURF surface;
     struct surface sur;
+
+    gcoSURF surfaceRef;
     /* <<< End surface information. */
 
     gcsRECT fullScreen;

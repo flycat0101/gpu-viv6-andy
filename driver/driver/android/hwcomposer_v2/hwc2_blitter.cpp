@@ -1614,6 +1614,7 @@ static inline void refresh_geometry(__hwc2_device_t *dev,
 
 
 
+/* TODO: unnecessary code. */
 static inline void update_ref_buffer(__hwc2_display_t *dpy,
                         buffer_handle_t buffer)
 {
@@ -1754,7 +1755,7 @@ static inline void refresh_damage_region(__hwc2_display_t *dpy,
         /*
          * Output buffer should not be null when layout not changed.
          */
-        LOG_ALWAYS_FATAL_IF(!dpy->blt.bufferRef, "No previous buffer");
+        LOG_ALWAYS_FATAL_IF(!dpy->blt.surfaceRef, "No previous buffer");
         add_alloc_area(dpy, damage, &screen, 0ull);
 
         for (uint32_t i = 0; i < dpy->blt.numBltLayers; i++) {
@@ -2257,7 +2258,21 @@ static inline void acquire_output_buffer(__hwc2_device_t *dev,
  */
 static inline void release_output_buffer(__hwc2_device *dev, __hwc2_display_t *dpy)
 {
+    /* NULL -> surfaceRef. */
+    if (dpy->blt.surfaceRef) {
+        gcoSURF_Unlock(dpy->blt.surfaceRef, gcvNULL);
+        gcoSURF_Destroy(dpy->blt.surfaceRef);
+        dpy->blt.surfaceRef = NULL;
+    }
+
+    /* surface -> surfaceRef. */
+    dpy->blt.surfaceRef = dpy->blt.surface;
+
     if (dpy->blt.surface) {
+        /* Keep reference to this buffer. */
+        gcoSURF_ReferenceSurface(dpy->blt.surfaceRef);
+        gcoSURF_Lock(dpy->blt.surfaceRef, gcvNULL, gcvNULL);
+
         unlock_surface(dev, &dpy->blt.sur);
         dpy->blt.surface = NULL;
 
@@ -2493,16 +2508,13 @@ static void program_copy_region(__hwc2_device_t *device,
     __hwc2_trace(0, "");
     blitter_device_t *blt = &device->blt;
 
-    gc_native_handle_t *handle = gc_native_handle_get(dpy->blt.bufferRef);
-    gcoSURF prev = (gcoSURF)handle->surface;
-
     /* Disable blending and premultiply. */
     gcmONERROR(gco2D_DisableAlphaBlend(blt->engine));
     gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
             gcv2D_COLOR_MULTIPLY_DISABLE, gcv2D_COLOR_MULTIPLY_DISABLE,
             gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE, gcv2D_COLOR_MULTIPLY_DISABLE));
 
-    gcmONERROR(gcoSURF_Set2DSource(prev, gcvSURF_0_DEGREE));
+    gcmONERROR(gcoSURF_Set2DSource(dpy->blt.surfaceRef, gcvSURF_0_DEGREE));
     gcmONERROR(gco2D_SetBitBlitMirror(blt->engine, gcvFALSE, gcvFALSE));
 
     __hwc2_list_for_each(pos, &dpy->blt.copyArea) {
