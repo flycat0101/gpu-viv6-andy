@@ -1281,6 +1281,10 @@ _GetIndexedRegisterIndex(
     }
     else
     {
+        if (VIR_Operand_isSymLocal(Operand))
+        {
+            VIR_Id_SetFunctionScope(relIndexing);
+        }
         if (VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE)
         {
             gcmASSERT(!VirInst->_parentUseBB &&

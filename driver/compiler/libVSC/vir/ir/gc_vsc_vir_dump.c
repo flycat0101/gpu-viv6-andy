@@ -678,8 +678,13 @@ _DumpIndexed(
         VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE &&
         VIR_Operand_GetRelAddrMode(Operand) < VIR_INDEXED_AL)
     {
-        VIR_Symbol *sym = VIR_Function_GetSymFromId(Func,
-            VIR_Operand_GetRelIndexing(Operand));
+        VIR_Symbol *sym = gcvNULL;
+        VIR_SymId symId = VIR_Operand_GetRelIndexing(Operand);
+        if (VIR_Operand_isSymLocal(Operand))
+        {
+           VIR_Id_SetFunctionScope(symId);
+        }
+        sym = VIR_Function_GetSymFromId(Func, symId);
         errCode = _DumpSymbol(Dumper, sym, gcvFALSE, gcvFALSE);
         CHECK_ERROR(errCode, "_DumpIndexed");
 

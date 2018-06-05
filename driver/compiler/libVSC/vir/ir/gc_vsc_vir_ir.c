@@ -12220,6 +12220,11 @@ VIR_Operand_SetRelIndexing(
     gcmASSERT(!VIR_Operand_isHighLevel(Operand));
     Operand->u.n.u2.vlInfo._isConstIndexing = 0;
     Operand->u.n.u2.vlInfo._relIndexing = IndexSym;
+    /*operand relindex is 20 bit, set symbol local if needed*/
+    if (VIR_Id_isFunctionScope(IndexSym))
+    {
+        VIR_Operand_SetIsSymLocal(Operand, 1);
+    }
 }
 
 void
