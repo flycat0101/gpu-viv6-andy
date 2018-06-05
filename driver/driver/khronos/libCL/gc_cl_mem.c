@@ -684,6 +684,11 @@ clfExecuteCommandWriteBuffer(
         hwCopy = gcvFALSE;
     }
 
+    if(buffer->flags & CL_MEM_USE_HOST_PTR)
+    {
+        hwCopy = hwCopy && (!(gcmPTR2INT(buffer->u.buffer.logical) & 0xFF));
+    }
+
      /*Try Hardware Copy*/
     if (hwCopy)
     {
@@ -908,6 +913,16 @@ clfExecuteCommandCopyBuffer(
     srcBuffer   = copyBuffer->srcBuffer;
     dstBuffer   = copyBuffer->dstBuffer;
 
+    if(srcBuffer->flags & CL_MEM_USE_HOST_PTR)
+    {
+        hwCopy = hwCopy && (!(gcmPTR2INT(srcBuffer->u.buffer.logical) & 0xFF));
+    }
+
+    if(dstBuffer->flags & CL_MEM_USE_HOST_PTR)
+    {
+        hwCopy = hwCopy && (!(gcmPTR2INT(dstBuffer->u.buffer.logical) & 0xFF));
+    }
+    
     if (hwCopy)
     {
         if (gcmIS_ERROR(clfExecuteHWCopy(Command)))

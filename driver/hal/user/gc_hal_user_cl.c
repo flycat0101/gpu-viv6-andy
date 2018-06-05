@@ -193,7 +193,7 @@ gcoCL_AllocateMemory(
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
-    gctUINT alignBytes = 128;
+    gctUINT alignBytes = 256;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
@@ -1275,8 +1275,8 @@ gcoCL_QueryDeviceInfo(
 
     DeviceInfo->maxPrintfBufferSize   = 1024 * 1024;
 
-    /* Size (in bits) of the largest OpenCL built-in data type (long16) */
-    DeviceInfo->memBaseAddrAlign      = 1024;
+    /* Todo: need to check with HW the alignment requirement of BLT engine */
+    DeviceInfo->memBaseAddrAlign      = 2048;
 
     /* Size (in bytes) of the largest OpenCL builtin data type (long16) */
     DeviceInfo->minDataTypeAlignSize  = 128;
