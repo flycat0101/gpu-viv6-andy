@@ -147,6 +147,7 @@
     gcSHADER_GetConstantMemorySize;
     gcSHADER_GetPrivateMemorySize;
     gcSHADER_GetLocalMemorySize;
+	gcSHADER_GetWorkGroupSize;
     gcSHADER_GetType;
     gcSHADER_FindLabel;
     gcSHADER_LinkLibFunction;

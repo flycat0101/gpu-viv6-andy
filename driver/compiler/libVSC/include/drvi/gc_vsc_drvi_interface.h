@@ -204,7 +204,9 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxResultCacheWinSize;
     gctUINT              vsSamplerNoBaseInInstruction;
     gctUINT              psSamplerNoBaseInInstruction;
-    gctUINT              defaultWorkGroupSize;
+
+    /* Caps for workGroupSize. */
+    gctUINT              initWorkGroupSizeToCalcRegCount;
     gctUINT              maxWorkGroupSize;
     gctUINT              minWorkGroupSize;
 

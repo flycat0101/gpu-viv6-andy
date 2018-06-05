@@ -1860,7 +1860,13 @@ VIR_Shader_Construct0(
     /* initialize the default workGroupSize. */
     if (VIR_Shader_GetKind(Shader) == VIR_SHADER_COMPUTE)
     {
-        VIR_Shader_SetAdjustedWorkGroupSize(Shader, __DEFAULT_WORK_GROUP_SIZE__);
+        /*
+        ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
+        ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
+        **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
+        */
+        VIR_Shader_SetWorkGroupSizeAdjusted(Shader, gcvFALSE);
+        VIR_Shader_SetAdjustedWorkGroupSize(Shader, GetHWMaxWorkGroupSize());
 
         /* Default, for CS, WorkGroupSize is fixed, for OCL, it is floating. */
         if (VIR_Shader_IsGlCompute(Shader))
@@ -16379,6 +16385,23 @@ VIR_Shader_GetShareMemorySize(
 }
 
 gctBOOL
+VIR_Shader_CheckWorkGroupSizeFixed(
+    IN VIR_Shader      *pShader
+    )
+{
+    /* Check CS/CL only. */
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE)
+    {
+        if (!VIR_Shader_IsWorkGroupSizeFixed(pShader))
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Shader_AdjustWorkGroupSize(
     IN VIR_Shader      *pShader,
     IN VSC_HW_CONFIG   *pHwCfg,
@@ -16391,9 +16414,10 @@ VIR_Shader_AdjustWorkGroupSize(
     gctUINT             maxWorkGroupSize = pHwCfg->maxWorkGroupSize;
     gctUINT             minWorkGroupSize = pHwCfg->minWorkGroupSize;
 
-    if (VIR_Shader_IsCL(pShader))
+    /* Adjust the workGroupSize only it is not fixed. */
+    if (!VIR_Shader_CheckWorkGroupSizeFixed(pShader))
     {
-        if (!VIR_Shader_IsWorkGroupSizeFixed(pShader))
+        if (VIR_Shader_IsCL(pShader))
         {
             workGroupSize = VIR_Shader_GetAdjustedWorkGroupSize(pShader);
 

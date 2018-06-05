@@ -50,6 +50,7 @@ static void __vki_InitializeHWcapsForVSC(
     gctBOOL unifiedConst;
     uint32_t vsConstBase, psConstBase, vsConstMax, psConstMax, constMax;
     gctBOOL supportInteger, needFixForCLX, needFixForCLXE;
+    uint32_t maxWorkGroupSize = 0;
 
     /* Need special handle for CL_X. */
     needFixForCLX =  ((chipModel == gcv2100) ||
@@ -253,6 +254,28 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->maxUSCAttribBufInKbyte = database->REG_Halti5 ? attribBufSizeInKbyte : 0;
     pVscHwCfg->maxLocalMemSizeInByte = attribBufSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize = database->RESULT_WINDOW_MAX_SIZE;
+
+    /*
+    ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
+    ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
+    **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
+    */
+    if (pVscHwCfg->maxCoreCount >= 4)
+    {
+        maxWorkGroupSize = 256;
+    }
+    else if (pVscHwCfg->maxCoreCount == 2)
+    {
+        maxWorkGroupSize = 64;
+    }
+    else
+    {
+        gcmASSERT(pVscHwCfg->maxCoreCount == 1);
+        maxWorkGroupSize = 32;
+    }
+    pVscHwCfg->initWorkGroupSizeToCalcRegCount       =
+    pVscHwCfg->maxWorkGroupSize                      =
+    pVscHwCfg->minWorkGroupSize                      = maxWorkGroupSize;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0 = database->REG_Halti0;
     pVscHwCfg->hwFeatureFlags.hasHalti1 = database->REG_Halti1;

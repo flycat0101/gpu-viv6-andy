@@ -3165,6 +3165,24 @@ void _VIR_RA_LS_SetMaxAllocReg(
     }
 }
 
+gctBOOL
+_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(
+    VIR_RA_LS   *pRA
+    )
+{
+    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
+
+    if (VIR_Shader_HasBarrier(pShader))
+    {
+        /* if compute shader has barrier, the temp count must follow
+            ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
+            */
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 gctUINT
 _VIR_RA_LS_GetMaxReg(
     VIR_RA_LS   *pRA,
@@ -3185,7 +3203,7 @@ _VIR_RA_LS_GetMaxReg(
             maxReg -= 1;
         }
 
-        if (VIR_Shader_HasBarrier(pShader))
+        if (_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(pRA))
         {
             /* if compute shader has barrier, the temp count must follow
                ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
@@ -3200,6 +3218,15 @@ _VIR_RA_LS_GetMaxReg(
 
             if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
             {
+                /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
+                if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
+                    !VIR_Shader_IsWorkGroupSizeFixed(pShader))
+                {
+                    gcmASSERT(GetHWMaxWorkGroupSize() == VIR_Shader_GetWorkGroupSize(pShader));
+
+                    VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
+                    VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
+                }
                 workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
                 maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
             }
@@ -11881,10 +11908,21 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                     else if (retValue == VSC_RA_ERR_OUT_OF_REG_FAIL)
                     {
                         /* Check if we can reduce the workGroupSize to use more temp registers. */
-                        if (VIR_Shader_AdjustWorkGroupSize(pShader, pHwCfg, gcvTRUE, 8))
+                        if (_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(&ra) && !VIR_Shader_CheckWorkGroupSizeFixed(pShader))
                         {
-                            reColor = gcvTRUE;
-                            break;
+                            gctUINT preMaxGRReg = _VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, reservedDataReg);
+                            gctUINT curMaxGRReg = preMaxGRReg;
+
+                            while (VIR_Shader_AdjustWorkGroupSize(pShader, pHwCfg, gcvTRUE, 8) && preMaxGRReg == curMaxGRReg)
+                            {
+                                curMaxGRReg = _VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, reservedDataReg);
+                            }
+
+                            if (curMaxGRReg > preMaxGRReg)
+                            {
+                                reColor = gcvTRUE;
+                                break;
+                            }
                         }
                     }
 

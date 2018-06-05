@@ -1825,6 +1825,10 @@ extern gcsHWCaps *
 #define GetHWVertexSamplerBase()              (gcGetHWCaps()->vsSamplerRegNoBase)
 #define GetHWFragmentSamplerBase()            (gcGetHWCaps()->psSamplerRegNoBase)
 
+#define GetHWInitWorkGroupSizeToCalcRegCount()(gcGetHWCaps()->initWorkGroupSizeToCalcRegCount)
+#define GetHWMaxWorkGroupSize()               (gcGetHWCaps()->maxWorkGroupSize)
+#define GetHWMinWorkGroupSize()               (gcGetHWCaps()->minWorkGroupSize)
+
 /* GLSL caps. */
 extern gcsGLSLCaps gcGLSLCaps;
 extern gcsGLSLCaps *
@@ -6010,6 +6014,26 @@ gcSHADER_GetLocalMemorySize(
     OUT gctUINT32 * LocalMemorySize
     );
 
+/*******************************************************************************
+**  gcSHADER_GetWorkGroupSize
+**
+**  Get the workGroupSize of a gcSHADER object.
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**  OUTPUT:
+**
+**      gctUINT32 * WorkGroupSize
+**          Pointer to a variable receiving workGroupSize
+*/
+gceSTATUS
+gcSHADER_GetWorkGroupSize(
+    IN gcSHADER Shader,
+    OUT gctUINT * WorkGroupSize
+    );
 
 /*******************************************************************************
 **  gcSHADER_CheckValidity

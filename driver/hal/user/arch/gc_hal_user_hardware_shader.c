@@ -38,6 +38,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     gctUINT32 fragmentSizeInKbyte = 0;
     gctUINT32 attribBufSizeInKbyte = 0;
     gctUINT32 threadCount = 0;
+    gctUINT32 maxWorkGroupSize = 0;
 
     gcmHEADER_ARG("Hardware=0x%x pVscHwCfg=%d", Hardware, pVscHwCfg);
 
@@ -177,14 +178,26 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->maxResultCacheWinSize                 = Hardware->config->resultWindowMaxSize;
 
     /*
-    ** We use a 128 as workgroupsize for computation.
-    ** At runtime, if the real workgroupsize is smaller than 128,
-    ** we need to adjust hwRegCount to make sure that the number of workgroup
-    ** fit the local memory size requirement.
+    ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
+    ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
+    **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
     */
-    pVscHwCfg->defaultWorkGroupSize                  = 128;
-    pVscHwCfg->maxWorkGroupSize                      = gcmMIN(threadCount, 256);
-    pVscHwCfg->minWorkGroupSize                      = 1;
+    if (pVscHwCfg->maxCoreCount >= 4)
+    {
+        maxWorkGroupSize = 256;
+    }
+    else if (pVscHwCfg->maxCoreCount == 2)
+    {
+        maxWorkGroupSize = 64;
+    }
+    else
+    {
+        gcmASSERT(pVscHwCfg->maxCoreCount == 1);
+        maxWorkGroupSize = 32;
+    }
+    pVscHwCfg->initWorkGroupSizeToCalcRegCount       =
+    pVscHwCfg->maxWorkGroupSize                      =
+    pVscHwCfg->minWorkGroupSize                      = maxWorkGroupSize;
 
     pVscHwCfg->hwFeatureFlags.hasHalti0              = IS_HW_SUPPORT(gcvFEATURE_HALTI0);
     pVscHwCfg->hwFeatureFlags.hasHalti1              = IS_HW_SUPPORT(gcvFEATURE_HALTI1);

@@ -30,14 +30,6 @@ BEGIN_EXTERN_C()
 
 #define VIR_FUNC_OPNDTBL_SZ         4*1024
 
-/*
-** We use a 128 as workgroupsize for computation.
-** At runtime, if the real workgroupsize is smaller than 128,
-** we need to adjust hwRegCount to make sure that the number of workgroup
-** fit the local memory size requirement.
-*/
-#define __DEFAULT_WORK_GROUP_SIZE__             128
-
 #define __USE_CONST_REG_SAVE_PUSH_CONST__       1
 
 /* forward declarations */
@@ -6679,6 +6671,11 @@ VIR_Shader_ComputeWorkGroupNum(
 gctUINT
 VIR_Shader_GetShareMemorySize(
     IN VIR_Shader *        pShader
+    );
+
+gctBOOL
+VIR_Shader_CheckWorkGroupSizeFixed(
+    IN VIR_Shader      *pShader
     );
 
 gctBOOL

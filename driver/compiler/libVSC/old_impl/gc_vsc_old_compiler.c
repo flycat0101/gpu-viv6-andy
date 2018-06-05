@@ -1665,6 +1665,72 @@ gcSHADER_GetLocalMemorySize(
 }
 
 /*******************************************************************************
+**  gcSHADER_GetWorkGroupSize
+**
+**  Get the workGroupSize of a gcSHADER object.
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**  OUTPUT:
+**
+**      gctUINT32 * WorkGroupSize
+**          Pointer to a variable receiving workGroupSize
+*/
+gceSTATUS
+gcSHADER_GetWorkGroupSize(
+    IN gcSHADER Shader,
+    OUT gctUINT * WorkGroupSize
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT workGroupSize = 0;
+
+    gcmHEADER_ARG("Shader=0x%x, WorkGroupSize=0x%x", Shader, WorkGroupSize);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+    if (GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE)
+    {
+        workGroupSize = Shader->shaderLayout.compute.workGroupSize[0] *
+                        Shader->shaderLayout.compute.workGroupSize[1] *
+                        Shader->shaderLayout.compute.workGroupSize[2];
+    }
+    else
+    {
+        gcmASSERT(GetShaderType(Shader) == gcSHADER_TYPE_CL);
+
+        if (Shader->shaderLayout.compute.isWorkGroupSizeFixed)
+        {
+            workGroupSize = Shader->shaderLayout.compute.workGroupSize[0] *
+                            Shader->shaderLayout.compute.workGroupSize[1] *
+                            Shader->shaderLayout.compute.workGroupSize[2];
+        }
+        else
+        {
+            workGroupSize = Shader->shaderLayout.compute.adjustedWorkGroupSize;
+        }
+    }
+
+    if (workGroupSize == 0)
+    {
+        workGroupSize = 1;
+    }
+
+    if (WorkGroupSize)
+    {
+        *WorkGroupSize = workGroupSize;
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return status;
+}
+
+/*******************************************************************************
 **  gcSHADER_SetMaxKernelFunctionArgs
 **
 **  Set the maximum number of kernel function arguments of a gcSHADER object.
