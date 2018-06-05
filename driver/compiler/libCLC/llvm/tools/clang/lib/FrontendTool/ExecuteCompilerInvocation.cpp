@@ -238,6 +238,7 @@ GetTemporaryDir(char *dirnamebuf, gctSIZE_T bufsize) {
 
 /***************************************************************************************
 ***************************************************************************************/
+#if !_USE_FILE_LOCK_FOR_RD_WR
 // Computes file length.
 static gctUINT32
 _Flength(gctFILE Fptr)
@@ -248,6 +249,7 @@ _Flength(gctFILE Fptr)
         gcoOS_Seek(gcvNULL, Fptr, 0, gcvFILE_SEEK_SET);
     return length;
 }
+#endif
 
 #ifdef _WIN32
     #if !defined(UNDER_CE)
@@ -689,7 +691,9 @@ unsigned *pped_count)
 
     llvm::OwningPtr<FrontendAction> Act(new PrintPreprocessedAction());
     Success = true;
+#if !_USE_FILE_LOCK_FOR_RD_WR
     gctFILE fptr = NULL;
+#endif
 
     for(unsigned int i=0; i < count; i++) {
       if(!NoPreprocess) {
