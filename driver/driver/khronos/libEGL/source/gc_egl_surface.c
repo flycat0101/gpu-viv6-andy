@@ -1789,12 +1789,13 @@ veglCreateRenderTarget(
         gctPOINTER memory[3] = {gcvNULL};
         gctUINT8_PTR bits;
         gctINT bitsStride;
+        gctUINT alHeight;
 
         /* Get the stride of render target. */
         gcmONERROR(gcoSURF_GetAlignedSize(
             Surface->renderTarget,
             gcvNULL,
-            gcvNULL,
+            &alHeight,
             &bitsStride
             ));
 
@@ -1808,7 +1809,7 @@ veglCreateRenderTarget(
         bits = (gctUINT8_PTR) memory[0];
         gcoOS_ZeroMemory(
             bits,
-            bitsStride * Surface->config.height
+            bitsStride * alHeight
             );
 
         gcmONERROR(gcoSURF_Unlock(
