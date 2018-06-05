@@ -214,6 +214,7 @@ typedef struct __vkPipelineRec
 
     VkFlags dynamicStates;
     __vkDynamicScissorState scissorState;
+    __vkDynamicViewportState viewportState;
 
     VkBool32 rasterDiscard;
     VkBool32 depthBiasEnable;

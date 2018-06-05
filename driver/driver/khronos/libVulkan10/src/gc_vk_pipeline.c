@@ -472,6 +472,14 @@ static VkResult __vki_CreateGraphicsPipeline(
             info->pViewportState->scissorCount * sizeof(VkRect2D));
     }
 
+    if ((!(pip->dynamicStates & __VK_DYNAMIC_STATE_VIEWPORT_BIT))
+        && info->pViewportState)
+    {
+        pip->viewportState.viewportCount = info->pViewportState->viewportCount;
+        __VK_MEMCOPY(&pip->viewportState.viewports[0], info->pViewportState->pViewports,
+            info->pViewportState->viewportCount * sizeof(VkRect2D));
+    }
+
     if (info->pDepthStencilState)
     {
         __VK_MEMCOPY(&pip->dsInfo, info->pDepthStencilState, sizeof(VkPipelineDepthStencilStateCreateInfo));

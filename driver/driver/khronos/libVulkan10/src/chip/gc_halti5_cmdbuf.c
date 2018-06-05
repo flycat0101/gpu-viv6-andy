@@ -3119,6 +3119,8 @@ VkResult halti5_setScissor(
     gctINT fixBottomClip;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     const gcsFEATURE_DATABASE *database = cmdBuf->devCtx->database;
+    __vkDynamicViewportState *viewportState;
+    uint32_t vpLeft, vpTop, vpRight, vpBottom;
 
     if (pip->dynamicStates & __VK_DYNAMIC_STATE_SCISSOR_BIT)
     {
@@ -3127,6 +3129,15 @@ VkResult halti5_setScissor(
     else
     {
         scissorState = &pip->scissorState;
+    }
+
+    if (pip->dynamicStates & __VK_DYNAMIC_STATE_VIEWPORT_BIT)
+    {
+        viewportState = &((__vkCommandBuffer *)cmdBuf)->bindInfo.dynamicStates.viewport;
+    }
+    else
+    {
+        viewportState = &pip->viewportState;
     }
 
     if (pip->rasterDiscard && !database->HWTFB)
@@ -3165,6 +3176,17 @@ VkResult halti5_setScissor(
     scTop     = gcmMIN(gcmMAX(0, scissorState->scissors[0].offset.y), rtHeight);
     scRight   = gcmMIN(gcmMAX(0, scissorState->scissors[0].offset.x + (int32_t)scissorState->scissors[0].extent.width), rtWidth);
     scBottom  = gcmMIN(gcmMAX(0, scissorState->scissors[0].offset.y + (int32_t)scissorState->scissors[0].extent.height), rtHeight);
+
+    vpLeft   = (uint32_t)viewportState->viewports[0].x;
+    vpTop    = (uint32_t)viewportState->viewports[0].y;
+    vpRight  = (uint32_t)(viewportState->viewports[0].x + viewportState->viewports[0].width);
+    vpBottom = (uint32_t)(viewportState->viewports[0].y + viewportState->viewports[0].height);
+
+    /* Intersect scissor with viewport. */
+    scLeft   = gcmMAX(scLeft, vpLeft);
+    scTop    = gcmMAX(scTop, vpTop);
+    scRight  = gcmMIN(scRight, vpRight);
+    scBottom = gcmMIN(scBottom, vpBottom);
 
     /* Trivial case. */
     if ((scLeft >= scRight) || (scTop >= scBottom))
