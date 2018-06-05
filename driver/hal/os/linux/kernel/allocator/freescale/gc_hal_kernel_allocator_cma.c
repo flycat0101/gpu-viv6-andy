@@ -214,8 +214,10 @@ _CMAFSLGetSGT(
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
-    page = phys_to_page (mdlPriv->physical);
+#if !defined(phys_to_page)
+    page = virt_to_page(mdlPriv->kvaddr);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+    page = phys_to_page(mdlPriv->physical);
 #else
     page = phys_to_page(dma_to_phys(&Allocator->os->device->platform->device->dev, mdl_priv->physical));
 #endif

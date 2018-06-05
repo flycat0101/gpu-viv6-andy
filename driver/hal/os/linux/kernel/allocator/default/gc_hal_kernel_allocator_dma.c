@@ -250,14 +250,13 @@ _DmaGetSGT(
     {
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
-#if defined(CONFIG_X86)
+
+#if !defined(phys_to_page)
     page = virt_to_page(mdlPriv->kvaddr);
-#else
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
-    page = phys_to_page (mdlPriv->dmaHandle);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+    page = phys_to_page(mdlPriv->dmaHandle);
 #else
     page = phys_to_page(dma_to_phys(&Allocator->os->device->platform->device->dev, mdlPriv->dmaHandle));
-#endif
 #endif
 
     for (i = 0; i < numPages; ++i)
