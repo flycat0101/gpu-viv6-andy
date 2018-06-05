@@ -682,6 +682,8 @@ VX_API_ENTRY vx_array VX_API_CALL vxCreateArray(vx_context context, vx_enum item
 
 VX_API_ENTRY vx_array VX_API_CALL vxCreateVirtualArray(vx_graph graph, vx_enum itemType, vx_size capacity)
 {
+    vx_array array;
+
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
 
     if (itemType != VX_TYPE_INVALID)
@@ -692,7 +694,13 @@ VX_API_ENTRY vx_array VX_API_CALL vxCreateVirtualArray(vx_graph graph, vx_enum i
         }
     }
 
-    return (vx_array)vxoArray_Create(graph->base.context, itemType, capacity, vx_true_e, VX_TYPE_ARRAY);
+    array = vxoArray_Create(graph->base.context, itemType, capacity, vx_true_e, VX_TYPE_ARRAY);
+
+    if (vxoReference_GetStatus((vx_reference)array) != VX_SUCCESS) return array;
+
+    array->base.scope = (vx_reference)graph;
+
+    return array;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseArray(vx_array *array)
