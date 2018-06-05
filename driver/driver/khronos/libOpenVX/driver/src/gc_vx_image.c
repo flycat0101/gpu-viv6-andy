@@ -2383,7 +2383,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
 #if !SYNC_OUTPUT_MEMORY && !defined(WIN32)
                     if (image->memory.logicals[p] && image->memory.wrappedSize[p])
                     {
-                        gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                        gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     }
 #endif
                     prev_ptrs[p] = image->memory.logicals[p];
