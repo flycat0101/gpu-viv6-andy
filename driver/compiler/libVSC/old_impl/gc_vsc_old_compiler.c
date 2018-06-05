@@ -1989,6 +1989,23 @@ gcSHADER_Construct(
     shader->InstNum                         = 0;
 #endif
 
+    /* initialize the default workGroupSize. */
+    if (shader->type == gcSHADER_TYPE_COMPUTE || shader->type == gcSHADER_TYPE_CL)
+    {
+        /* Use the maxWorkGroupSize as the initialized value. */
+        shader->shaderLayout.compute.adjustedWorkGroupSize = GetHWMaxWorkGroupSize();
+
+        /* Default, for CS, WorkGroupSize is fixed, for OCL, it is floating. */
+        if (shader->type == gcSHADER_TYPE_COMPUTE)
+        {
+            shader->shaderLayout.compute.isWorkGroupSizeFixed = gcvTRUE;
+        }
+        else
+        {
+            shader->shaderLayout.compute.isWorkGroupSizeFixed = gcvFALSE;
+        }
+    }
+
     /* Return gcSHADER object pointer. */
     *Shader = shader;
 
