@@ -74,10 +74,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDebugReportCallbackEXT(
     const VkAllocationCallbacks* pAllocator
     )
 {
-    /*__vkInstance *inst = (__vkInstance *)instance;*/
+    __vkInstance *inst = (__vkInstance *)instance;
     __vkDebugCallbackEXT *dcb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDebugCallbackEXT *, callback);
 
-    __VK_SET_ALLOCATIONCB(pAllocator);
+    __VK_SET_API_ALLOCATIONCB(&inst->memCb);
 
     __VK_FREE(dcb);
 }
