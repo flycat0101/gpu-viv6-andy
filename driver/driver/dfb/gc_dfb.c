@@ -1515,7 +1515,7 @@ gal_setup_device( CoreGraphicsDevice *device,
         /* Initialize the index color table. */
         vdev->palette = NULL;
         vdev->color_table_len = 0;
-        memset( vdev->color_table, 0, 256 );
+        memset( vdev->color_table, 0, sizeof(vdev->color_table) );
 
         /* Initialize configurations. */
         if (gal_config_init( vdev, &vdev->config ) != DFB_OK) {
