@@ -6510,8 +6510,8 @@ gco2D_MultiSourceBlit(
 
         if ((srcRect->right < srcRect->left)
             || (srcRect->bottom < srcRect->top)
-            || (srcRect->right > w)
-            || (srcRect->bottom > h))
+            || (srcRect->right - srcRect->left > w)
+            || (srcRect->bottom - srcRect->top > h))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }

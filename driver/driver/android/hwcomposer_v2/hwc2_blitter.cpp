@@ -3757,7 +3757,10 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
                     continue;
 
                 gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, j));
+
                 program_fake_source(device, sur, dx, dy, rotation, width, height);
+                gcmONERROR(gco2D_SetSource(blt->engine, &fakeRect));
+
                 gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
 
                 solidColorMask &= ~(1 << j);
@@ -3837,6 +3840,7 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
     uint32_t sourceMask = 0;
     uint32_t sourceNum  = 0;
 
+    gcsRECT srcRect;
     gcsRECT dstRect = {
         rect->left,  rect->top,
         rect->right, rect->bottom
@@ -3856,7 +3860,7 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
 
         if (layer->blt.surface) {
             if (blt->multiBlt2) {
-                gcsRECT sourceCrop = {
+                srcRect = (gcsRECT) {
                     (gctINT)ceilf (layer->blt.sourceCropD.left),
                     (gctINT)ceilf (layer->blt.sourceCropD.top),
                     (gctINT)floorf(layer->blt.sourceCropD.right),
@@ -3869,7 +3873,7 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
                     layer->displayFrame.bottom,
                 };
 
-                gcmONERROR(gco2D_SetSource(blt->engine, &sourceCrop));
+                gcmONERROR(gco2D_SetSource(blt->engine, &srcRect));
                 gcmONERROR(gco2D_SetTargetRect(blt->engine, &displayFrame));
                 gcmONERROR(gco2D_SetClipping(blt->engine, &dstRect));
 
@@ -3877,8 +3881,6 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
                          layer->blt.rotation,
                          layer->blt.hMirror, layer->blt.vMirror);
             } else {
-                gcsRECT srcRect;
-
                 calculate_source_clip(layer, &dstRect, &srcRect);
 
                 /* Set source rect. */
@@ -3906,6 +3908,7 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
                 gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, j));
                 gcmONERROR(gcoSURF_Set2DSource(
                         layer->blt.surface, layer->blt.rotation));
+                gcmONERROR(gco2D_SetSource(blt->engine, &srcRect));
 
                 gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
 
