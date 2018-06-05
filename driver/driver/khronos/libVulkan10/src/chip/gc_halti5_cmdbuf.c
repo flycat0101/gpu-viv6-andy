@@ -3177,10 +3177,16 @@ VkResult halti5_setScissor(
     scRight   = gcmMIN(gcmMAX(0, scissorState->scissors[0].offset.x + (int32_t)scissorState->scissors[0].extent.width), rtWidth);
     scBottom  = gcmMIN(gcmMAX(0, scissorState->scissors[0].offset.y + (int32_t)scissorState->scissors[0].extent.height), rtHeight);
 
+    /* The application can specify a negative term for height, which has the effect of negating the y coordinate in clip space
+    ** before performing the transform. When using a negative height, the application should also adjust the y value to point to
+    ** the lower left corner of the viewport instead of the upper left corner.
+    ** So, befor intersect scissor with viewport, adjust the top/bottom. */
     vpLeft   = (uint32_t)viewportState->viewports[0].x;
-    vpTop    = (uint32_t)viewportState->viewports[0].y;
+    vpTop = (viewportState->viewports[0].height > 0) ?
+            (uint32_t)viewportState->viewports[0].y : (uint32_t)(viewportState->viewports[0].y + viewportState->viewports[0].height);
     vpRight  = (uint32_t)(viewportState->viewports[0].x + viewportState->viewports[0].width);
-    vpBottom = (uint32_t)(viewportState->viewports[0].y + viewportState->viewports[0].height);
+    vpBottom = (viewportState->viewports[0].height > 0) ?
+        ((uint32_t)(viewportState->viewports[0].y + viewportState->viewports[0].height)) : (uint32_t)viewportState->viewports[0].y;
 
     /* Intersect scissor with viewport. */
     scLeft   = gcmMAX(scLeft, vpLeft);
