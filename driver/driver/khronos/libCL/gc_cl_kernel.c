@@ -3542,8 +3542,32 @@ OnSkipOutOfSampler:
     if(gcShaderHasInt64(kernelBinary))
         kernel->patchNeeded = gcvTRUE;
 
+        /* Get the number of attributes. */
+    gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
+
+
+    /* Get the number of uniforms. */
+    gcmVERIFY_OK(gcSHADER_GetKernelUniformCount(kernelBinary, &kernel->numArgs));
+
+    /* Allocate kernel arguments. */
+    clmONERROR(clfAllocateKernelArgs(kernel), CL_OUT_OF_HOST_MEMORY);
+
     if(programState.hints)
     {
+#if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
+        gctBOOL hasUniformWorkThreadCount = gcvFALSE;
+        for(j = 0; j < kernel->numArgs; j++)
+        {
+            gcUNIFORM uniform;
+
+            gcSHADER_GetUniform((gcSHADER) kernel->states.binary, i, &uniform);
+            if(isUniformWorkThreadCount(uniform))
+            {
+                hasUniformWorkThreadCount = gcvTRUE;
+            }
+        }
+#endif
+
         /* relax the maxworkgroupsize while shader used barrier as HW limit*/
         for (j = 0; j < GetShaderCodeCount(kernelBinary); j++)
         {
@@ -3566,10 +3590,21 @@ OnSkipOutOfSampler:
                  kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp+3)) *
                     4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
-            else
+            else if(hasBarrier)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp)) *
                     4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+#if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
+            else if(hasUniformWorkThreadCount)
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->fsMaxTemp)) *
+                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+#endif
+            else
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)kernel->context->devices[0]->deviceInfo.maxWorkGroupSize;
             }
         }
         else
@@ -3579,10 +3614,21 @@ OnSkipOutOfSampler:
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp+3)) *
                                        4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
-            else
+            else if(hasBarrier)
             {
                 kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp)) *
                                        4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+#if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
+            else if(hasUniformWorkThreadCount)
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)(maxRegCount / gcmMAX(2, kernel->states.programState.hints->vsMaxTemp)) *
+                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+#endif
+            else
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)kernel->context->devices[0]->deviceInfo.maxWorkGroupSize;
             }
         }
     }
@@ -3600,21 +3646,6 @@ OnSkipOutOfSampler:
              kernel->maxWorkGroupSize = gcmMIN(kernel->maxWorkGroupSize, 480);
         }
     }
-
-    /* Set attributes - global id, local id, and group id. */
-
-    /* Get the number of vertex attributes. */
-
-    /* Get the number of attributes. */
-
-    gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
-
-
-    /* Get the number of uniforms. */
-    gcmVERIFY_OK(gcSHADER_GetKernelUniformCount(kernelBinary, &kernel->numArgs));
-
-    /* Allocate kernel arguments. */
-    clmONERROR(clfAllocateKernelArgs(kernel), CL_OUT_OF_HOST_MEMORY);
 
     /* Create thread lock mutex for argument setting/using. */
     clmONERROR(gcoOS_CreateMutex(gcvNULL,
