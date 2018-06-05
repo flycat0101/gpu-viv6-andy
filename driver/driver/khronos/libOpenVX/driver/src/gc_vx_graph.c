@@ -797,6 +797,34 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
     return vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 }
 
+VX_PRIVATE_API vx_bool vxoGraph_IsParentGraphScope(vx_reference scope, vx_graph graph)
+{
+    vx_bool flag = vx_false_e;
+    vx_graph nextGpraph = graph;
+
+    vxmASSERT(graph);
+    vxmASSERT(scope);
+
+    if (vxoReference_GetType(scope) != VX_TYPE_GRAPH)
+        return flag;
+
+    do
+    {
+        if(scope == (vx_reference)nextGpraph)
+        {
+            flag = vx_true_e;
+            break;
+        }
+        else
+        {
+            nextGpraph = nextGpraph->parentGraph;
+        }
+
+    }while (nextGpraph != NULL);
+
+    return flag;
+}
+
 VX_PRIVATE_API vx_status vxoGraph_InitMetaFormatData(vx_graph graph, vx_node node, vx_uint32 paramIndex, vx_reference_s **vRef, vx_meta_format* metaFormat, vx_status* status)
 {
     *vRef = node->paramTable[paramIndex];
@@ -808,9 +836,7 @@ VX_PRIVATE_API vx_status vxoGraph_InitMetaFormatData(vx_graph graph, vx_node nod
     }
     else
     {
-        if ((*vRef)->scope->type == VX_TYPE_GRAPH &&
-            (*vRef)->scope != (vx_reference_s *)graph &&
-            (*vRef)->scope != (vx_reference_s *)graph->parentGraph)
+        if (!vxoGraph_IsParentGraphScope((*vRef)->scope, graph))
         {
             *status = VX_ERROR_INVALID_SCOPE;
             vxAddLogEntry((vx_reference)(*vRef), *status, "Virtual Reference is in the wrong scope, created from another graph!\n");
@@ -1404,10 +1430,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
 
                 if (paramRef->isVirtual)
                 {
-                        if (vxoReference_GetType(paramRef->scope) == VX_TYPE_GRAPH
-                            && (vx_graph)paramRef->scope != graph
-                            && paramRef->scope != (vx_reference)graph->parentGraph
-                            )
+                    if (!vxoGraph_IsParentGraphScope(paramRef->scope, graph))
                     {
                         vxError("Node %p(\"%s\") in Graph %p: No.%d virtual parameter has an invalid scope, %p",
                                 node, node->kernel->name, graph, paramIndex, paramRef->scope);

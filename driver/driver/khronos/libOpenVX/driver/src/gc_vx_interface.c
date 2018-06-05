@@ -1021,6 +1021,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
     graph = vxCreateGraph(context);
 
     if (graph == NULL) return VX_ERROR_INVALID_PARAMETERS;
+    graph->parentGraph = node->graph;
 
     vxReadScalarValue((vx_scalar)parameters[2], &kernelSize);
 
@@ -1222,6 +1223,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Initializer(vx_node node, c
     graph       = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     srcImage = (vx_image)parameters[0];
     dstImage = (vx_image)parameters[1];
@@ -1565,6 +1567,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Initializer(vx_node node, const
     context       = vxGetContext((vx_reference)node);
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     vxQueryImage(outputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
     vxQueryImage(outputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
@@ -1976,6 +1979,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Initializer(vx_node nod
     graph = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -2180,6 +2184,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
     graph = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -2519,6 +2524,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const 
     graph    = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     if (vxQueryNode(node, VX_NODE_BORDER, &border, sizeof(border)) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -2894,6 +2900,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Initializer(vx_node node, cons
     graph       = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     vxQueryImage(inputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
     vxQueryImage(inputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
@@ -3299,6 +3306,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, cons
     graph        = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     for (i = 0; i < vxmLENGTH_OF(virtImages); i++)
     {
@@ -4030,6 +4038,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_Initializer(vx_node node, const v
     shiftScalar = vxCreateScalar(context, VX_TYPE_FLOAT32, &ds);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     i = 0;
     ds = 0;
@@ -4218,6 +4227,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
     graph         = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(vx_border_t));
 
@@ -4441,6 +4451,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_Initializer(vx_node nod
     context       = vxGetContext((vx_reference)node);
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     /* generate original, new and scharr images */
     vxQueryPyramid(oldPyramid, VX_PYRAMID_LEVELS, &maxLevel, sizeof(maxLevel));
@@ -4936,6 +4947,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Initializer(vx_node node, const v
     context       = vxGetContext((vx_reference)node);
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     vxQueryImage(inputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
     vxQueryImage(inputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
@@ -5284,6 +5296,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_Initializer(vx_node node, cons
     context       = vxGetContext((vx_reference)node);
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
 
     normImage   = (vx_image)parameters[0];
     threshold   = (vx_threshold)parameters[1];
@@ -5519,6 +5532,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_Initializer(vx_node node, const vx_r
     status |= vxQueryImage(right, VX_IMAGE_HEIGHT, &height, sizeof(height));
     context = vxGetContext((vx_reference)node);
     graph = vxCreateGraph(context);
+    if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+    graph->parentGraph = node->graph;
+
     cost = vxCreateImage(context, width * range, height, VX_DF_IMAGE_U16);
     path = vxCreateImage(context, width * range, height, VX_DF_IMAGE_U16);
     disp_range = vxCreateScalar(context, VX_TYPE_UINT32, &range);
