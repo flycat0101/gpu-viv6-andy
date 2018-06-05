@@ -281,6 +281,10 @@ typedef enum _cleELEMENT_TYPE
  (((EType) >= cldLowestRankedFloat && (EType) <= cldHighestRankedFloat) || \
   (EType) == clvTYPE_HALF_PACKED)
 
+#define clmIsElementTypeHalf(EType) \
+ ((EType) == clvTYPE_HALF || \
+  (EType) == clvTYPE_HALF_PACKED)
+
 #define clmIsElementTypePacked(EType) \
  (((EType) >= cldFirstPackedType && (EType) <= cldLastPackedType) || \
   clmIsElementTypePackedGenType(EType))
@@ -347,6 +351,11 @@ typedef enum _cleELEMENT_TYPE
  ((Decl)->array.numDim == 0  && \
   (Decl)->ptrDscr == gcvNULL && \
   clmIsElementTypeFloating((Decl)->dataType->elementType))
+
+#define clmDECL_IsHalfType(Decl) \
+ ((Decl)->array.numDim == 0  && \
+  (Decl)->ptrDscr == gcvNULL && \
+  clmIsElementTypeHalf((Decl)->dataType->elementType))
 
 #define clmDECL_IsArithmeticType(Decl) \
  (clmDECL_IsPointerType(Decl) || \

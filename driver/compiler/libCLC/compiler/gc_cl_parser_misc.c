@@ -3180,6 +3180,16 @@ IN cloIR_EXPR Operand
         return gcvNULL;
     }
 
+    if (clmDECL_IsHalfType(&Operand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        Operator->lineNo,
+                                        Operator->stringNo,
+                                        clvREPORT_ERROR,
+                                        "operand of type half not supported in unary operator '%s'",
+                                        _GetBinaryOperatorName(Operator->u.operator)));
+        return gcvNULL;
+    }
+
     switch (Operator->u.operator) {
     case '-':
         exprType = clvUNARY_NEG; /* fall through */
@@ -6083,6 +6093,17 @@ IN cloIR_EXPR RightOperand
         return gcvNULL;
     }
 
+    if (clmDECL_IsHalfType(&LeftOperand->decl) ||
+        clmDECL_IsHalfType(&RightOperand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        Operator->lineNo,
+                                        Operator->stringNo,
+                                        clvREPORT_ERROR,
+                                        "operands of type half not supported in binary operator '%s'",
+                                        _GetBinaryOperatorName(Operator->u.operator)));
+        return gcvNULL;
+    }
+
     switch (Operator->u.operator) {
     case T_LSHIFT_OP:
     case T_RSHIFT_OP:
@@ -6534,6 +6555,17 @@ clParseSelectionExpr(
                                         CondExpr->base.stringNo,
                                         clvREPORT_ERROR,
                                         "_viv_gentype_packed operands not allowed in ternery operator '?:'"));
+        return gcvNULL;
+    }
+
+    if (clmDECL_IsHalfType(&CondExpr->decl) ||
+        clmDECL_IsHalfType(&TrueOperand->decl) ||
+        clmDECL_IsHalfType(&FalseOperand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        CondExpr->base.lineNo,
+                                        CondExpr->base.stringNo,
+                                        clvREPORT_ERROR,
+                                        "operands of type half not allowed in ternery operator '?:'"));
         return gcvNULL;
     }
 

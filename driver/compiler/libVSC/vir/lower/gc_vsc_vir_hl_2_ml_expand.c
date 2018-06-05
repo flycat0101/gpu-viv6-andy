@@ -2312,7 +2312,8 @@ _processEvisIntrinsic(
     VIR_Inst_SetSrcNum(pInst, VIR_OPCODE_GetSrcOperandNum(opCode));
     for (i=0; i<argList->argNum; i++)
     {
-        VIR_Inst_SetSource(pInst, i, argList->args[i]);
+        VIR_Operand * arg = argList->args[i];
+        VIR_Inst_SetSource(pInst, i, arg);
         /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
         if (VIR_OPCODE_isVXOnly(opCode))
         {
@@ -2336,6 +2337,20 @@ _processEvisIntrinsic(
                 /* check img_load offset operand */
                 VIR_Operand * opnd = VIR_Inst_GetSource(pInst, i);
                 VIR_IMG_LOAD_SetImmOffset(pShader, pInst,opnd, gcvTRUE /* encoded */);
+            }
+            else
+            {
+                VIR_TypeId typeId;
+                VIR_Symbol    *sym;
+
+                sym = VIR_Operand_GetSymbol(arg);
+                typeId = VIR_Symbol_GetTypeId(sym);
+                if(VIR_GetTypeComponentType(typeId) == VIR_TYPE_FLOAT16)
+                {
+                    fprintf(stderr, "Error: %s operand of type half is not supported.\n",
+                            VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)));
+                    return VSC_ERR_NOT_SUPPORTED;
+                }
             }
         }
     }
