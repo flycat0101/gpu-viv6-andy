@@ -4319,6 +4319,11 @@ IN OUT clsARRAY *Array
 
        case clvIR_POLYNARY_EXPR:
           polynaryExpr = (cloIR_POLYNARY_EXPR) member;
+          if(polynaryExpr->type == clvPOLYNARY_FUNC_CALL ||
+             polynaryExpr->type == clvPOLYNARY_BUILT_IN_ASM_CALL)
+          {
+              return 0;
+          }
           FOR_EACH_DLINK_NODE(&polynaryExpr->operands->members, struct _cloIR_EXPR, operand) {
              if(cloIR_OBJECT_GetType(&operand->base) == clvIR_CONSTANT) continue;
              else return 0;

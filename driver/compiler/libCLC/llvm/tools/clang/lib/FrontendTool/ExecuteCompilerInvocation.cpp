@@ -11,6 +11,7 @@
 // minimize the impact of pulling in essentially everything else in Clang.
 //
 //===----------------------------------------------------------------------===//
+#include <stdio.h>
 #include "gc_cl_compiler_int.h"
 #include "llvm/Config/config.h"
 #include "clang/FrontendTool/Utils.h"
