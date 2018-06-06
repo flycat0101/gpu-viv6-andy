@@ -223,6 +223,9 @@ static int create_vivante_drm_buffer_surface(buffer_handle_t handle,
 
     size = (gctSIZE_T)param;
 
+    /* Indicate display buffer. */
+    type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
+
     /* Append no-vidmem hint to type. */
     type |= gcvSURF_NO_VIDMEM;
 
@@ -337,6 +340,10 @@ static int create_generic_drm_buffer_surface(buffer_handle_t handle,
         ALOGE("%s: invalid fd=%d", __func__, fd);
         return -EINVAL;
     }
+
+    /* Indicate display buffer. */
+    type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
+
 
     /* TODO: Attach tile status from generic drm buffer. */
     status = gcoSURF_WrapUserMemory(gcvNULL,

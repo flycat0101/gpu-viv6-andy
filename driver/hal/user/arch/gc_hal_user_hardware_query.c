@@ -5270,10 +5270,18 @@ gcoHARDWARE_AlignToTile(
                              Hardware->features[gcvFEATURE_SUPERTILED_TEXTURE];
             }
 
-            if ((Hint & gcvSURF_CREATE_AS_DISPLAYBUFFER) &&
-                 (gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_TILED_DISPLAY_BUFFER)))
+            if (Hint & gcvSURF_CREATE_AS_DISPLAYBUFFER)
             {
-                superTiled = gcvFALSE;
+                /* Override for display buffer. */
+                if (gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_TILED_DISPLAY_BUFFER))
+                {
+                    superTiled = gcvFALSE;
+                }
+                else
+                {
+                    superTiled = Hardware->features[gcvFEATURE_SUPER_TILED] ||
+                                 Hardware->features[gcvFEATURE_MULTI_PIXELPIPES];
+                }
             }
 
             tiling = superTiled ? gcvSUPERTILED : gcvTILED;
@@ -5648,7 +5656,7 @@ gcoHARDWARE_AlignToTileCompatible(
     prevType = tls->currentType;
     tls->currentType = gcvHARDWARE_3D;
 
-    status = gcoHARDWARE_AlignToTile(Hardware, Type, Hint, Format, Width, Height,
+    status = gcoHARDWARE_AlignToTile(gcvNULL, Type, Hint, Format, Width, Height,
                                      Depth, Tiling, SuperTiled, hAlignment);
 
     /* Set back to previous type. */
