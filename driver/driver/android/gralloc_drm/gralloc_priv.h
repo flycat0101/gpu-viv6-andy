@@ -75,7 +75,8 @@ struct private_handle_t {
     int usage;
     int pid;    /* owner of data (for validation) */
 
-    uint64_t fsl_reserved[4] __attribute__((aligned(8)));
+    uint64_t fsl_reserved[3] __attribute__((aligned(8)));
+    uint64_t surface;
 
     /* pointer to some bo struct. */
     uint64_t data __attribute__((aligned(8)));
