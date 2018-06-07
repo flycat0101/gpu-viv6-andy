@@ -82,8 +82,8 @@ msg_buf_add_msg(struct buf_msg *buf_msg, const char *fmt, ...)
 		 *  We can't be sure that twice the buffer will actually be sufficient,
 		 *  so we overwrite it with that value.
 		 */
-		if (buf_msg->allocated < buf_msg->msg_pos + size) {
-			buf_msg->allocated = buf_msg->msg_pos + size;
+		if (buf_msg->allocated < buf_msg->pos + size) {
+			buf_msg->allocated = buf_msg->pos + size;
 		}
 
 		buf_msg->buf = realloc(buf_msg->buf, 
