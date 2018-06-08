@@ -167,8 +167,6 @@ struct g2d_surface
 
     //rotation degree
     enum g2d_rotation rot;
-
-    int deinterlace;
 };
 
 struct g2d_surface_pair
