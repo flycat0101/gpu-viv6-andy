@@ -1494,7 +1494,15 @@ _BindWindow(
             free(path);
             if (ret == 0 && renderMode > VEGL_DIRECT_RENDERING_NOFC)
             {
-                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+                if(gcoHAL_QuerySeparated2D(gcvNULL)
+                    ||gcoHAL_QueryHybrid2D(gcvNULL))
+                {
+                    renderMode = VEGL_DIRECT_RENDERING_NOFC;
+                }
+                else
+                {
+                    renderMode = VEGL_INDIRECT_RENDERING;
+                }
                 egl_surface->enable_tile_status = 0;
             }
         }
