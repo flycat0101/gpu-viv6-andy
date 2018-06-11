@@ -937,7 +937,7 @@ int main(int argc, char*argv[])
                  iAo_on_imx6 = ((unsigned int)(As * src.global_alpha / 255) * 255 + (unsigned int)Ad * (255 - (As * src.global_alpha / 255))) / 255;
 
                  iCo_on_imx8 = ((unsigned int)Cs * 255 + (unsigned int)Cd * (255 - src.global_alpha)) / 255;
-                 iAo_on_imx8 = ((unsigned int)As * 255 + (unsigned int)Ad * (255 - src.global_alpha)) / 255;
+                 iAo_on_imx8 = ((unsigned int)As * src.global_alpha + (unsigned int)Ad * (255 - src.global_alpha)) / 255;
 
                  Co_on_imx6 = (iCo_on_imx6 > 255) ? 255 : (unsigned char)iCo_on_imx6;
                  Ao_on_imx6 = (iAo_on_imx6 > 255) ? 255 : (unsigned char)iAo_on_imx6;
