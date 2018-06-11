@@ -809,6 +809,74 @@ int main(int argc, char*argv[])
          }
     }
 
+    //Global Alpha: alpha blending mode G2D_ONE, G2D_ONE_MINUS_SRC_ALPHA
+    //set test data in src buffer
+    for(i=0; i<test_height; i++)
+    {
+         for(j=0; j<test_width; j++)
+         {
+             char* p = (char *)(((char*)s_buf->buf_vaddr) + (i*test_width+j)*4);
+             p[0] = p[1] = p[2] = p[3] = (i*test_width+j + 64) % 255;
+
+             p = (char *)(((char*)d_buf->buf_vaddr) + (i*test_width+j)*4);
+             p[0] = p[1] = p[2] = p[3] = ((i*test_width+j + 128) % 255);
+         }
+    }
+
+    src.blendfunc = G2D_ONE;
+    dst.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
+
+    src.global_alpha = 0x69;
+    dst.global_alpha = 0xff;
+
+    g2d_enable(handle,G2D_BLEND);
+    g2d_enable(handle,G2D_GLOBAL_ALPHA);
+
+    g2d_blit(handle, &src, &dst);
+
+    g2d_disable(handle,G2D_GLOBAL_ALPHA);
+    g2d_disable(handle,G2D_BLEND);
+
+    g2d_finish(handle);
+
+    for(i=0; i<test_height; i++)
+    {
+         for(j=0; j<test_width; j++)
+         {
+             unsigned int k, iCo_on_imx6, iAo_on_imx6, iCo_on_imx8, iAo_on_imx8;
+             unsigned char Cs,As,Cd,Ad,Co_on_imx6,Ao_on_imx6,Co_on_imx8,Ao_on_imx8;
+
+             unsigned char* p = (unsigned char *)(((char*)d_buf->buf_vaddr) + (i*test_width+j)*4);
+
+             if(p[0] != p[1] || p[0] != p[2])
+             {
+                printf("2d blended r/g/b values(%d/%d/%d) are not same in SRC IN mode!\n", p[0], p[1], p[2]);
+             }
+
+             Cs = As = ((i*test_width+j + 64) % 255);
+             Cd = Ad = ((i*test_width+j + 128) % 255);
+
+             /* different behaviour of global alpha between imx6 and imx8 */
+             iCo_on_imx6 = ((unsigned int)Cs * src.global_alpha + (unsigned int)Cd * (255 - (As * src.global_alpha / 255))) / 255;
+             iAo_on_imx6 = ((unsigned int)(As * src.global_alpha / 255) * 255 + (unsigned int)Ad * (255 - (As * src.global_alpha / 255))) / 255;
+
+             iCo_on_imx8 = ((unsigned int)Cs * src.global_alpha + (unsigned int)Cd * (255 - src.global_alpha)) / 255;
+             iAo_on_imx8 = ((unsigned int)As * src.global_alpha + (unsigned int)Ad * (255 - src.global_alpha)) / 255;
+
+             Co_on_imx6 = (iCo_on_imx6 > 255) ? 255 : (unsigned char)iCo_on_imx6;
+             Ao_on_imx6 = (iAo_on_imx6 > 255) ? 255 : (unsigned char)iAo_on_imx6;
+             Co_on_imx8 = (iCo_on_imx8 > 255) ? 255 : (unsigned char)iCo_on_imx8;
+             Ao_on_imx8 = (iAo_on_imx8 > 255) ? 255 : (unsigned char)iAo_on_imx8;
+
+             //compare the result with +/-1 threshold
+             if((abs(Co_on_imx6 - p[0]) > 2 || abs(Ao_on_imx6 - p[3]) > 2) && (abs(Co_on_imx8 - p[0]) > 2 || abs(Ao_on_imx8 - p[3]) > 2))
+             {
+                printf("2d blended color(%d) or alpha(%d) is incorrect Cs %d, As %d, Cd %d, Ad %d, Co %d, Ao %d, global alpha=%d\n",
+                            p[0],p[3],Cs,As,Cd,Ad,Co_on_imx6,Ao_on_imx6, src.global_alpha);
+             }
+         }
+    }
+
     //Pre-multipied & de-muliply test: alpha blending mode G2D_ONE, G2D_ONE_MINUS_SRC_ALPHA
     //set test data in src buffer
     for(i=0; i<test_height; i++)
