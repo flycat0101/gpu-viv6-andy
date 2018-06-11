@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante GAL"
 endef
 
-NAME=GAL
+NAME=libGAL
 
 include $(qnx_build_dir)/common.mk
 
@@ -103,11 +103,12 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += $(STATIC_LIBS)
-LIBS += socket halarchuser
+LIBS += halarchuser
+LDOPTS += -lsocket
 ifeq ($(USE_FAST_MEM_COPY), 1)
 LIBS += fastmemcpyS
 endif
-LIBS += screen
+LDOPTS += -lscreen
 
 include $(qnx_build_dir)/math.mk
 

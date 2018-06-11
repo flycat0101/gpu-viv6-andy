@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="OpenVX"
 endef
 
-NAME=OpenVX
+NAME=libOpenVX
 
 
 include $(qnx_build_dir)/common.mk
@@ -144,7 +144,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += LLVM_viv CLC VSC GAL
+LDOPTS += -lLLVM_viv -lCLC -lVSC -lGAL
 
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS

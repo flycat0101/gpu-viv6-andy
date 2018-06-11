@@ -140,14 +140,6 @@ elif [ "$hasVG" == "0" ]; then
 fi
 echo
 
-echo "Creating links..."
-pushd $dstDir
-for f in "${linkList[@]}"; do
-  makeLink $f
-done
-popd
-echo
-
 echo "Driver installation done."
 
 exit 0

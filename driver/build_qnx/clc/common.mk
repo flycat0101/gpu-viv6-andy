@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante CLC library"
 endef
 
-NAME=CLC
+NAME=libCLC
 
 include $(qnx_build_dir)/common.mk
 
@@ -85,7 +85,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += VSC GAL LLVM_viv
+LDOPTS += -lVSC -lGAL -lLLVM_viv
 
 CCFLAGS += -Wno-error=unused-value
 

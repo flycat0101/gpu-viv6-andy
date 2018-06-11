@@ -92,7 +92,7 @@ endif
 
 CCFLAGS += -D__GL_EXPORTS
 
-LIBS += VSC GAL EGL_viv
+LDOPTS += -lVSC -lGAL -lEGL_viv
 
 include $(qnx_build_dir)/math.mk
 

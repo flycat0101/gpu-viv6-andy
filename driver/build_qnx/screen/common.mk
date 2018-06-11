@@ -49,11 +49,11 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL
+LDOPTS += -lGAL
 ifeq ($(USE_FAST_MEM_COPY), 1)
 LIBS += fastmemcpyS
 endif
-LIBS += $(SCREEN_LIBS)
+LDOPTS += $(SCREEN_LIBS)
 
 include $(qnx_build_dir)/math.mk
 

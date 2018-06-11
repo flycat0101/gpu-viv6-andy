@@ -69,7 +69,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += VSC GAL EGL_viv
+LDOPTS += -lVSC -lGAL -lEGL_viv
 CCFLAGS += -O1
 
 

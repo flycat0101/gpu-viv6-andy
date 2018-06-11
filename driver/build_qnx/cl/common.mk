@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante OpenCL"
 endef
 
-NAME=OpenCL
+NAME=libOpenCL
 
 include $(qnx_build_dir)/common.mk
 
@@ -68,7 +68,8 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL GLESv2 EGL VSC $(STATIC_LIBS)
+LIBS += $(STATIC_LIBS)
+LDOPTS += -lGAL -lGLESv2 -lEGL -lVSC
 
 CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS

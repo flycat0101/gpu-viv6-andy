@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante OpenGLES 2.0 SC(end)"
 endef
 
-NAME=VSC
+NAME=libVSC
 
 include $(qnx_build_dir)/common.mk
 
@@ -170,7 +170,8 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += GAL $(STATIC_LIBS)
+LIBS += $(STATIC_LIBS)
+LDOPTS += -lGAL
 
 include $(qnx_build_dir)/math.mk
 

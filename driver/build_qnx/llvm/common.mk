@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="LLVM for CLC library"
 endef
 
-NAME=LLVM_viv
+NAME=libLLVM_viv
 
 include $(qnx_build_dir)/common.mk
 
@@ -244,7 +244,7 @@ CCFLAGS += -Wno-error=maybe-uninitialized
 CCFLAGS += -D_LIB -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS
 CCFLAGS += -DBUILD_OPENCL_12=1
 
-LIBS += VSC GAL
+LDOPTS += -lVSC -lGAL
 
 CCFLAGS += -Wno-error=unused-value -Wno-attributes
 

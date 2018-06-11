@@ -77,7 +77,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL EGL_viv
+LDOPTS += -lGAL -lEGL_viv
 
 include $(qnx_build_dir)/math.mk
 

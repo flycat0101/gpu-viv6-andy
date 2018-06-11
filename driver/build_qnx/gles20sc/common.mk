@@ -86,7 +86,8 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += VSC GAL $(STATIC_LIBS)
+LIBS += $(STATIC_LIBS)
+LDOPTS += -lVSC -lGAL
 
 include $(qnx_build_dir)/math.mk
 
