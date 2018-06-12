@@ -235,7 +235,10 @@ int hwc_lockSurface(buffer_handle_t hnd)
 
     ret = gralloc_buffer_create_surface(hnd, &surface);
 
-    if (ret) return -1;
+    if (ret) {
+        g2d_printf("create surface from handle fail (at %p)", hnd);
+        return -1;
+    }
 
     handle->surface = (uint64_t) surface;
 
@@ -275,9 +278,12 @@ int hwc_unlockSurface(buffer_handle_t hnd)
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D);
 
     surface = (gcoSURF) (handle->surface);
-    gcoSURF_Unlock(surface, gcvNULL);
-    gcoSURF_Destroy(surface);
-    handle->surface = (uint64_t) NULL;
+
+    if (surface != NULL) {
+        gcoSURF_Unlock(surface, gcvNULL);
+        gcoSURF_Destroy(surface);
+        handle->surface = (uint64_t) NULL;
+    }
 
     gcmVERIFY_OK(
           gcoHAL_SetHardwareType(gcvNULL, currentType));
