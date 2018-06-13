@@ -483,15 +483,9 @@ gckOS_Construct(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-#if defined(IMX) && defined(AARCH64)
-    if (shm_ctl_special(
+    if (shm_ctl(
             os->extraPageFd, SHMCTL_ANON | SHMCTL_PHYS,
-            0, os->extraPageSize, AARCH64_AP_RW) == -1)
-#else
-    if (shm_ctl_special(
-            os->extraPageFd, SHMCTL_ANON | SHMCTL_PHYS,
-            0, os->extraPageSize, ARM_PTE_RW) == -1)
-#endif
+            0, os->extraPageSize) == -1)
     {
         close(os->extraPageFd);
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
@@ -3000,8 +2994,7 @@ gckOS_AllocatePagedMemoryEx(
         slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_open failed. error %s", strerror( errno ) );
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
-#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
-    /* Special flags for this shm, to make it write combine (or bufferable). */
+
     /* Virtual memory doesn't need to be physically contiguous. */
     /* Allocations would be page aligned. */
     rc = shm_ctl(fd,
@@ -3013,24 +3006,6 @@ gckOS_AllocatePagedMemoryEx(
         close(fd);
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
-#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
-    /* Special flags for this shm, to make it write buffered. */
-    /* Virtual memory doesn't need to be physically contiguous. */
-    /* Allocations would be page aligned. */
-    rc = shm_ctl_special(fd,
-                         shm_ctl_flags,
-                         0,
-                         Bytes,
-                         ARM_PTE_RW);
-    if (rc == -1) {
-        gcmkPRINT("[VIV]: %s:%d: shm_ctl_special failed. error %s\n",
-            __FUNCTION__, __LINE__, strerror(errno));
-
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl_special failed. error %s", strerror( errno ) );
-        close(fd);
-        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
-#endif
 
     /* Setup the node structure. */
     node->type       = gcvPHYSICAL_TYPE_PAGED_MEMORY;

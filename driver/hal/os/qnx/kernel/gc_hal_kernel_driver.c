@@ -1183,16 +1183,28 @@ gckSHM_POOL drv_shmpool_create(
 #if defined(AARCH64)
     /* Map this memory inside user and galcore. */
     saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, posix_mem_fd, 0);
+    if (saddr == MAP_FAILED) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't mmap memory of size: %u, Pid: %u [errno: %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ));
+        close(fd);
+        pthread_mutex_destroy(&shm->mutex);
+        if (shm->poolSize > 512*1024*1024) {
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_CRITICAL, "shm->poolSize (%u) is suspiciously large -- forcing core dump!", shm->poolSize);
+            *((int*)1) = 0;
+        }
+        free(shm);
+        return gcvNULL;
+    }
 
     if (posix_mem_offset64(saddr, shm->poolSize, &pt_offset, &pt_contig_len, &pt_fildes) == -1) {
         fprintf(stderr, "%s: posix_mem_offset64 failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                                                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         return gcvNULL;
-    }
+	}
 
     /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
     if (CacheFlag == 0x1) {
@@ -1203,11 +1215,11 @@ gckSHM_POOL drv_shmpool_create(
     }
     if (rc) {
         fprintf(stderr, "%s: shm_ctl_special failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                                                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         return gcvNULL;
     }
     if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
@@ -1224,12 +1236,11 @@ gckSHM_POOL drv_shmpool_create(
 
     if (rc) {
         fprintf(stderr, "%s: shm_ctl failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
-
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                                                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
 
         return gcvNULL;
     }
