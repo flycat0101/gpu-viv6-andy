@@ -427,7 +427,7 @@ gcChipInitExtension(
     __glExtension[__GL_EXTID_OES_required_internalformat].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_OES_surfaceless_context].bEnabled = GL_TRUE;
 
-#ifdef ANDROID
+#if defined(ANDROID) || defined(__QNXNTO__)
     __glExtension[__GL_EXTID_OES_EGL_image_external].bEnabled = GL_TRUE;
 #endif
 
