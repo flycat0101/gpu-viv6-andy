@@ -102,6 +102,12 @@ else
 DRM_GRALLOC      := 0
 endif
 
+ifneq ($(filter libdrm_imx,$(BOARD_GPU_LIBDRM)),)
+LIBDRM_IMX      := 1
+else
+LIBDRM_IMX      := 0
+endif
+
 # Path to hold built modules besides $(PRODUCT_OUT)
 # deprecated.
 VIV_OUT       ?= $(AQROOT)/build
