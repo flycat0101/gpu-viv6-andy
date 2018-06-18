@@ -510,11 +510,15 @@ int init_gpu_opp_table(struct device *dev)
     priv->imx_gpu_govern.current_mode = OVERDRIVE;
 
     prop = of_find_property(dev->of_node, "operating-points", NULL);
-    if (!prop)
+    if (!prop) {
+	dev_err(dev, "operating-points missing. Frequency scaling will not work\n");
         return -ENODEV;
+    }
 
-    if (!prop->value)
+    if (!prop->value) {
+	dev_err(dev, "operating-points invalid. Frequency scaling will not work\n");
         return -ENODATA;
+    }
 
     /*
      * Each OPP is a set of tuples consisting of frequency and
@@ -567,7 +571,7 @@ int init_gpu_opp_table(struct device *dev)
     {
         ret = driver_create_file(dev->driver, &driver_attr_gpu_govern);
         if (ret)
-            dev_err(dev, "create gpu_mode attr failed (%d)\n", ret);
+            dev_err(dev, "create gpu_govern attr failed (%d)\n", ret);
     }
 
     return ret;
@@ -1136,7 +1140,9 @@ static inline int get_power(struct device *pdev)
 #endif
 
 #if defined(CONFIG_PM_OPP)
-    init_gpu_opp_table(pdev);
+    ret = init_gpu_opp_table(pdev);
+    if (ret)
+	dev_err(pdev, "OPP init failed!\n");
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
