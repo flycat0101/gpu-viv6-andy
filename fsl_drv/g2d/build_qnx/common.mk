@@ -8,7 +8,7 @@ include $(MKFILES_ROOT)/qmacros.mk
 # Target platform name. Change to your board according $QNX_TARGET/<arch name>/usr/lib/graphics/<platform>
 #
 ifeq ($(QNX_TARGET_PLATFORM),)
-  QNX_TARGET_PLATFORM=iMX8DV
+  QNX_TARGET_PLATFORM=iMX8QM
 endif
 
 #
@@ -37,6 +37,8 @@ VIVANTE_SDK_INC=$(VIVANTE_SDK_DIR)/sdk/inc
 
 install_dir=$(qnx_build_dir)/platform_binaries/$(QNX_TARGET_PLATFORM)/$(QNX_TARGET_ARCH)
 INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib/graphics/$(QNX_TARGET_PLATFORM))
+EXTRA_LIBVPATH += $(INSTALL_ROOT_nto)/$(CPUVARDIR)/$(INSTALLDIR)
+POST_INSTALL += $(CP_HOST) $(BUILDNAME) $(INSTALL_DIRECTORY)-debug/libScreenBlit.so;
 
 USEFILE=
 

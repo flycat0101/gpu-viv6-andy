@@ -11,7 +11,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante Screen Blit Module"
 endef
 
-NAME=ScreenBlit
+NAME=libScreenBlit
 
 include $(qnx_build_dir)/common.mk
 
@@ -37,7 +37,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL g2d
+LDOPTS += -lGAL -lg2d
 #LIBPREF_g2d = -Bstatic
 #LIBPOST_g2d = -Bdynamic
 
