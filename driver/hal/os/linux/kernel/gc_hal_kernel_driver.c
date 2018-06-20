@@ -76,9 +76,9 @@ MODULE_LICENSE("Dual MIT/GPL");
 #define USE_MSI     1
 #endif
 
-static struct class* gpuClass;
+static struct class* gpuClass = NULL;
 
-static gcsPLATFORM *platform;
+static gcsPLATFORM *platform = NULL;
 
 static gckGALDEVICE galDevice;
 
@@ -870,7 +870,7 @@ int viv_drm_probe(struct device *dev);
 int viv_drm_remove(struct device *dev);
 #endif
 
-struct device *galcore_device;
+struct device *galcore_device = NULL;
 
 #if USE_LINUX_PCIE
 static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -883,7 +883,10 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif /* USE_LINUX_PCIE */
 {
     int ret = -ENODEV;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
     static u64 dma_mask = ~0ULL;
+#endif
 
     gcsMODULE_PARAMETERS moduleParam = {
         .irqLine            = irqLine,
@@ -924,7 +927,16 @@ static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
     platform->device = pdev;
     galcore_device = &pdev->dev;
 
+    /*
+     * This will point to garbage when the driver gets reloaded as the address
+     * of dma_mask will no longer be available even if it is declared static.
+     *
+     * Besides platform_device_register will set-up the dma_mask to ~0 so
+     * there's no need for us to use it.
+     */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
     galcore_device->dma_mask = &dma_mask;
+#endif
 
 #if USE_LINUX_PCIE
     if (pci_enable_device(pdev)) {
@@ -1026,6 +1038,7 @@ static void gpu_remove(struct pci_dev *pdev)
     gcmkFOOTER_NO();
     return;
 #else
+    galcore_device = NULL;
     gcmkFOOTER_NO();
     return 0;
 #endif
