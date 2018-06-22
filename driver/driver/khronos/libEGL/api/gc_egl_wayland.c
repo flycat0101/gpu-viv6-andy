@@ -2106,6 +2106,13 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
     if (display)
     {
         roundtrip_queue(display->wl_dpy, display->wl_queue);
+        roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
+    }
+
+    if (egl_surface->commit_queue != gcvNULL)
+    {
+       wl_event_queue_destroy(egl_surface->commit_queue);
+       egl_surface->commit_queue = gcvNULL;
     }
 
     free(egl_surface->buffers);
