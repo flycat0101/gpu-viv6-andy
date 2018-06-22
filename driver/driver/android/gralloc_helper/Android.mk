@@ -1,5 +1,5 @@
 #
-# libgralloc_helper.so
+# libv_gralloc.a
 #
 LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/../../../Android.mk.def
@@ -26,16 +26,31 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/os/linux/user \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/compiler/libVSC/include \
-	$(AQROOT)/driver/android/gralloc_drm \
-        $(IMX_PATH)/libdrm-imx/vivante \
-        $(IMX_PATH)/libdrm-imx/include/drm
+	$(AQROOT)/driver/android/gralloc_drm
+
+ifeq ($(LIBDRM_IMX),1)
+LOCAL_C_INCLUDES += \
+       $(IMX_PATH)/libdrm-imx/vivante \
+       $(IMX_PATH)/libdrm-imx/include/drm
+else
+LOCAL_C_INCLUDES += \
+        external/libdrm/vivante \
+        external/libdrm/include/drm
+endif
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
-    libdrm_android \
     libdrm_vivante \
     libGAL
+
+ifeq ($(LIBDRM_IMX),1)
+LOCAL_SHARED_LIBRARIES += \
+       libdrm_android
+else
+LOCAL_SHARED_LIBRARIES += \
+        libdrm
+endif
 
 LOCAL_C_INCLUDES += \
     $(IMX_PATH)/imx/include
