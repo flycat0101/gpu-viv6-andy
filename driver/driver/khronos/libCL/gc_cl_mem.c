@@ -362,11 +362,25 @@ clfExecuteHWCopy(
                 if (src == readBuffer->ptr)
                 {
                     EVENT_SET_CPU_RUNNING(Command);
+
+                    gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_ALL);
+                    gcoCL_InvalidateMemoryCache(srcBuffer->u.buffer.node, readBuffer->ptr, size);
+
                     return gcvSTATUS_OK;
                 }
 
                 gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
                 gcsSURF_NODE_GetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ);
+
+                EVENT_SET_GPU_RUNNING(Command, engine);
+                gcmONERROR(gcoCL_MemBltCopy(srcPhysical, dstPhysical, size, engine));
+
+                gcoCL_MemWaitAndGetFence(node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_ALL);
+                gcoCL_InvalidateMemoryCache(node, readBuffer->ptr, size);
+
+                gcoCL_FreeMemory(gcvNULL, gcvNULL, 0, node);
+
+                return gcvSTATUS_OK;
             }
             break;
 
@@ -378,7 +392,7 @@ clfExecuteHWCopy(
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
 
-                gcoCL_FlushMemory(gcvNULL, (gctPOINTER)writeBuffer->ptr, size);
+                gcoCL_FlushMemory(dstBuffer->u.buffer.node, (gctPOINTER)writeBuffer->ptr, size);
 
                 logical = (gctPOINTER) (gcmPTR2INT(dstBuffer->u.buffer.logical) + writeBuffer->offset);
                 if (logical == writeBuffer->ptr)
@@ -473,12 +487,6 @@ clfExecuteCommandReadBuffer(
         if (gcmIS_ERROR(clfExecuteHWCopy(Command)))
         {
             hwCopy = gcvFALSE;
-        }
-        else
-        {
-            /* need wait for fence before invalidate cpu cache */
-            gcoCL_MemWaitAndGetFence(buffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_ALL);
-            gcoCL_InvalidateMemoryCache(gcvNULL, readBuffer->ptr, readBuffer->cb);
         }
     }
 
