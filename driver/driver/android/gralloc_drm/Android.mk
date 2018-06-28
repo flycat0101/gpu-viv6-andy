@@ -72,7 +72,7 @@ LOCAL_CFLAGS := \
 ifeq ($(LIBDRM_IMX),1)
 LOCAL_C_INCLUDES := \
     $(IMX_PATH)/libdrm-imx/vivante \
-    $(IMX_PATH)/libdrm-imx/include/drm \
+    $(IMX_PATH)/libdrm-imx/include/drm
 else
 LOCAL_C_INCLUDES += \
         external/libdrm/vivante \
