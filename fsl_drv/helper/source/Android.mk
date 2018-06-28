@@ -10,7 +10,13 @@ LOCAL_CFLAGS += $(CFLAGS)
 LOCAL_CFLAGS += -DLINUX -DgcdENABLE_VG=1
 LOCAL_CFLAGS += -DLOG_TAG=\"helper\"
 
-LOCAL_SHARED_LIBRARIES := libutils libc liblog libbinder libGAL libEGL libdrm_vivante libdrm_android
+LOCAL_SHARED_LIBRARIES := libutils libc liblog libbinder libGAL libEGL libdrm_vivante
+ifeq ($(LIBDRM_IMX),1)
+    LOCAL_SHARED_LIBRARIES += libdrm_android
+else
+    LOCAL_SHARED_LIBRARIES += libdrm
+endif
+
 LOCAL_STATIC_LIBRARIES := libv_gralloc
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include\
