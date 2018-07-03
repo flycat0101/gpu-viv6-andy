@@ -1531,6 +1531,89 @@ gckGALDEVICE_Stop_Threads(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gckGALDEVICE_QueryFrequency(
+    IN gckGALDEVICE Device
+    )
+{
+    gctUINT64 mcStart[gcvCORE_COUNT], shStart[gcvCORE_COUNT];
+    gctUINT32 mcClk[gcvCORE_COUNT], shClk[gcvCORE_COUNT];
+    gckHARDWARE hardware = gcvNULL;
+    gceSTATUS status;
+    gctUINT i;
+
+    gcmkHEADER_ARG("Device=0x%p", Device);
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+#if gcdENABLE_VG
+        if (i == gcvCORE_VG)
+        {
+            continue;
+        }
+#endif
+
+        if (Device->kernels[i])
+        {
+            hardware = Device->kernels[i]->hardware;
+
+            mcStart[i] = shStart[i] = 0;
+
+            if (Device->args.powerManagement)
+            {
+                gcmkONERROR(gckHARDWARE_SetPowerManagement(
+                    hardware, gcvFALSE
+                    ));
+            }
+
+            gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+                hardware, gcvPOWER_ON_AUTO
+                ));
+
+            gckHARDWARE_EnterQueryClock(hardware,
+                                        &mcStart[i], &shStart[i]);
+        }
+    }
+
+    gcmkONERROR(gckOS_Delay(Device->os, 50));
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+        mcClk[i] = shClk[i] = 0;
+
+#if gcdENABLE_VG
+        if (i == gcvCORE_VG)
+        {
+            continue;
+        }
+#endif
+
+        if (Device->kernels[i] && mcStart[i])
+        {
+            hardware = Device->kernels[i]->hardware;
+
+            if (Device->args.powerManagement)
+            {
+                gcmkONERROR(gckHARDWARE_SetPowerManagement(
+                    hardware, gcvTRUE
+                    ));
+            }
+
+            gckHARDWARE_ExitQueryClock(hardware,
+                                       mcStart[i], shStart[i],
+                                       &mcClk[i], &shClk[i]);
+
+            hardware->mcClk = mcClk[i];
+            hardware->shClk = shClk[i];
+        }
+    }
+
+OnError:
+    gcmkFOOTER_NO();
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gckGALDEVICE_Start
@@ -1563,6 +1646,8 @@ gckGALDEVICE_Start(
 
     /* Start the daemon thread. */
     gcmkVERIFY_OK((status = gckGALDEVICE_Start_Threads(Device)));
+
+    gcmkONERROR(gckGALDEVICE_QueryFrequency(Device));
 
     if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
     {

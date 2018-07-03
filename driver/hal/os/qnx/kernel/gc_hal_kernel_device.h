@@ -165,4 +165,9 @@ gceSTATUS gckGALDEVICE_Destroy(
     IN gckGALDEVICE Device
     );
 
+gceSTATUS
+gckGALDEVICE_QueryFrequency(
+    IN gckGALDEVICE Device
+    );
+
 #endif /* __gc_hal_kernel_device_h_ */

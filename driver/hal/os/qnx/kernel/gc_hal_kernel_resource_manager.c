@@ -38,6 +38,7 @@ static struct rsmgr resources[] = {
 	{ -1, RESOURCE_VERSION, R_VERSION, gc_version_show, NULL },
 	{ -1, RESOURCE_VIDMEM, R_VIDMEM, gc_vidmem_show, gc_vidmem_write },
 	{ -1, RESOURCE_DUMP_TRIGGER, R_DUMP_TRIGGER, gc_dump_trigger_show, gc_dump_trigger_write },
+	{ -1, RESOURCE_CLOCK, R_CLOCK, gc_clk_show, NULL },
 };
 
 static struct rsmgr

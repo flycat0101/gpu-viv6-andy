@@ -70,6 +70,7 @@ gc_info_show(void *data)
 	gctUINT32 productID = 0;
 	gctUINT32 ecoID = 0;
 
+
 	for (i = 0; i < gcdMAX_GPU_COUNT; i++)
 	{
 		if (device->kernels[i])
@@ -617,5 +618,41 @@ gc_dump_trigger_write(void *data)
 {
 	struct write_msg *wmsg = (struct write_msg *) data;
 	dumpCore = strtoul(wmsg->buf, NULL, 10);
+	return 0;
+}
+
+int gc_clk_show(void *data)
+{
+	struct buf_msg *m = (struct buf_msg *) data;
+	gckGALDEVICE device = m->thread->device;
+	gctUINT i;
+
+	gckGALDEVICE_QueryFrequency(device);
+
+	for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+	{
+		if (device->kernels[i])
+		{
+			gckHARDWARE hardware = device->kernels[i]->hardware;
+
+#if gcdENABLE_VG
+			if (i == gcvCORE_VG)
+			{
+				continue;
+			}
+#endif
+
+			if (hardware->mcClk)
+			{
+				msg_buf_add_msg(m, "gpu%d mc clock: %d HZ.\n", i, hardware->mcClk);
+			}
+
+			if (hardware->shClk)
+			{
+				msg_buf_add_msg(m, "gpu%d sh clock: %d HZ.\n", i, hardware->shClk);
+			}
+		}
+	}
+
 	return 0;
 }
