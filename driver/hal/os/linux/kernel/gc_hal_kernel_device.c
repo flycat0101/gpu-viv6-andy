@@ -70,6 +70,10 @@ static gckGALDEVICE galDevice;
 
 extern gcTA globalTA[16];
 
+gceSTATUS
+gckGALDEVICE_QueryFrequency( IN gckGALDEVICE Device);
+
+
 /******************************************************************************\
 ******************************** Debugfs Support *******************************
 \******************************************************************************/
@@ -697,6 +701,8 @@ static int gc_clk_show(struct seq_file* m, void* data)
     gcsINFO_NODE *node = m->private;
     gckGALDEVICE device = node->device;
     gctUINT i;
+
+    gckGALDEVICE_QueryFrequency(device);
 
     for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
     {
