@@ -272,6 +272,8 @@ typedef struct _gcoWorkerInfo
 {
     gctBOOL                     commit;
     gctSIGNAL                   signal;
+
+    gctPOINTER                  mutex;
     gcoBUFFER                   buffer;
 
     gceHARDWARE_TYPE            hardwareType;

@@ -887,57 +887,6 @@ OnError:
     return status;
 }
 
-gceSTATUS
-gcoCleanupWorker(
-    gcoBUFFER Buffer
-   )
-{
-    gctUINT32 i = 0;
-    gcoQUEUE queue = gcvNULL;
-    gcoWorkerInfo * Worker = gcvNULL;
-    gcoCommitWorker *commitWorker = gcvNULL;
-
-    if (!Buffer)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    Worker = gcoGetWorker(gcvNULL, Buffer, gcvTRUE);
-    if (!Worker)
-    {
-        return gcvSTATUS_INVALID_REQUEST;
-    }
-
-    queue = Worker->queue;
-
-    Worker->queue = gcvNULL;
-    gcoSubmitWorker(Buffer, Worker, gcvFALSE);
-
-    gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL, Worker->signal, gcvINFINITE));
-    Worker->queue = queue;
-
-    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Worker->signal, gcvTRUE));
-
-    commitWorker = Buffer->commitWorker;
-
-    for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
-    {
-        Worker = commitWorker->workerFifo[i];
-
-        if(Worker->buffer == Buffer)
-        {
-            if (Worker->commit)
-            {
-                gcmPRINT("%s, worker has buffer to be committed, sync error!\n", __FUNCTION__);
-            }
-
-            Worker->buffer = gcvNULL;
-        }
-    }
-
-    return gcvSTATUS_OK;
-}
-
 gcoWorkerInfo*
 gcoCreateWorker(
     gcoOS Os,
@@ -953,6 +902,8 @@ gcoCreateWorker(
     gcmONERROR(gcoOS_AllocateSharedMemory(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&worker->commandBuffer));
 
     gcmONERROR(gcoQUEUE_Construct(Os, Engine, &worker->queue));
+
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &worker->mutex));
 
     gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &worker->signal));
 
@@ -973,6 +924,11 @@ OnError:
         if (worker->queue)
         {
             gcoOS_Free(Os, worker->queue);
+        }
+
+        if (worker->mutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, worker->mutex);
         }
 
         gcoOS_Free(Os, worker);
@@ -1085,6 +1041,11 @@ gcoFreeWorker(
         gcmVERIFY_OK(gcoQUEUE_Destroy(Worker->buffer, Worker->queue));
     }
 
+    if (Worker->mutex)
+    {
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Worker->mutex));
+    }
+
     if (Worker->stateDelta)
     {
         gcmVERIFY_OK(gcoFreeWorkerDelta(Worker));
@@ -1100,8 +1061,10 @@ gcoSubmitWorker(
     gctBOOL Stall
     )
 {
+    gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Worker->mutex, gcvINFINITE));
     Worker->buffer = Buffer;
     Worker->commit = gcvTRUE;
+    gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Worker->mutex));
 
     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->commitWorker->startSignal, gcvTRUE));
 
@@ -1181,14 +1144,8 @@ gceSTATUS MergeStateDelta(
 
 gceSTATUS
 gcoBUFFER_Commit_Worker(
-    IN gcoHARDWARE Hardware,
-    IN gcoCMDBUF CommandBuffer,
-    IN gctUINT32 CurrentCoreIndex,
-    IN gceHARDWARE_TYPE HardwareType,
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gctUINT32 Context,
-    IN gctUINT32_PTR Contexts,
-    IN gcoQUEUE Queue
+    IN gcoWorkerInfo *Worker,
+    IN gcsSTATE_DELTA_PTR StateDelta
     );
 
 gctTHREAD_RETURN
@@ -1198,6 +1155,7 @@ gcoBufferCommitWorker(
 {
     gctUINT32 i = 0;
     gctBOOL bStop = gcvFALSE;
+    gctBOOL commit = gcvFALSE;
     gcoWorkerInfo *currWorker = gcvNULL;
     gcoWorkerInfo *deltaWorker = gcvNULL;
     gcoCommitWorker *commitWorker = gcvNULL;
@@ -1230,18 +1188,12 @@ gcoBufferCommitWorker(
                 break;
             }
 
-            if (currWorker->commit != gcvTRUE)
+            gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, currWorker->mutex, gcvINFINITE));
+            commit = currWorker->commit;
+            gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, currWorker->mutex));
+
+            if (commit != gcvTRUE)
             {
-                break;
-            }
-
-            if (!currWorker->queue)
-            {
-                currWorker->commit = gcvFALSE;
-
-                gcmVERIFY_OK(gcoOS_Signal(gcvNULL, currWorker->signal, gcvTRUE));
-                commitWorker->workerHead = (commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo);
-
                 break;
             }
 
@@ -1249,12 +1201,17 @@ gcoBufferCommitWorker(
             {
                 gcoWorkerInfo *nextWorker = commitWorker->workerFifo[(commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo)];
 
-                while (nextWorker != currWorker && nextWorker->commit == gcvTRUE &&
-                       nextWorker->buffer == currWorker->buffer &&
-                       nextWorker->emptyBuffer == gcvTRUE)
+                while (nextWorker != currWorker)
                 {
-                    gcoOS_MemoryBarrier(gcvNULL, nextWorker->queue);
-                    if (!nextWorker->queue) break;
+                    gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, nextWorker->mutex, gcvINFINITE));
+                    commit = nextWorker->commit;
+                    gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, nextWorker->mutex));
+
+                    if (commit != gcvTRUE || nextWorker->emptyBuffer != gcvTRUE
+                       || nextWorker->buffer != currWorker->buffer)
+                    {
+                         break;
+                    }
 
                     /* Merge all queue events into current worker */
                     currWorker->queue->tail->next = gcmPTR_TO_UINT64(nextWorker->queue->head);
@@ -1271,19 +1228,18 @@ gcoBufferCommitWorker(
                 }
             }
 
-            deltaWorker = currWorker->buffer->deltaWorker;
-            gcoBUFFER_Commit_Worker(currWorker->buffer->hardware,
-                                    currWorker->emptyBuffer == gcvFALSE ?
-                                    currWorker->commandBuffer : gcvNULL,
-                                    currWorker->currentCoreIndex,
-                                    currWorker->hardwareType,
-                                    currWorker->stateDelta != gcvNULL ?
-                                    deltaWorker->stateDelta : gcvNULL,
-                                    currWorker->context,
-                                    currWorker->contexts,
-                                    currWorker->queue);
+            if ((currWorker->hardwareType != gcvHARDWARE_2D) && !currWorker->emptyBuffer)
+            {
+                deltaWorker = currWorker->buffer->deltaWorker;
+            }
+            else
+            {
+                deltaWorker = gcvNULL;
+            }
 
-            if ((currWorker->hardwareType != gcvHARDWARE_2D) && currWorker->stateDelta && !currWorker->emptyBuffer)
+            gcoBUFFER_Commit_Worker(currWorker, deltaWorker ? deltaWorker->stateDelta : gcvNULL);
+
+            if (deltaWorker && currWorker->stateDelta)
             {
                 if (deltaWorker->stateDelta == gcvNULL)
                 {
@@ -2097,10 +2053,6 @@ gcoBUFFER_Destroy(
 
             Buffer->hal->commitWorker = gcvNULL;
         }
-        else
-        {
-            gcoCleanupWorker(Buffer);
-        }
 
         gcoResumeWorker(Buffer);
     }
@@ -2719,32 +2671,22 @@ gcoBUFFER_Commit(
 
 gceSTATUS
 gcoBUFFER_Commit_Worker(
-    IN gcoHARDWARE Hardware,
-    IN gcoCMDBUF CommandBuffer,
-    IN gctUINT32 CurrentCoreIndex,
-    IN gceHARDWARE_TYPE HardwareType,
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gctUINT32 Context,
-    IN gctUINT32_PTR Contexts,
-    IN gcoQUEUE Queue
+    IN gcoWorkerInfo *Worker,
+    IN gcsSTATE_DELTA_PTR StateDelta
     )
 {
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
+    gcoQUEUE Queue = Worker->queue;
 
-    gcmHEADER_ARG("CommandBuffer=0x%x Queue=0x%x",
-                  CommandBuffer, Queue);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
-    gcmVERIFY_OBJECT(CommandBuffer, gcvOBJ_COMMANDBUFFER);
+    gcmHEADER_ARG("Worker=0x%x StateDelta=0x%x", Worker, StateDelta);
 
     iface.ignoreTLS     = gcvTRUE;
-    iface.hardwareType  = HardwareType;
-    iface.coreIndex     = CurrentCoreIndex;
+    iface.hardwareType  = Worker->hardwareType;
+    iface.coreIndex     = Worker->currentCoreIndex;
 
     /* Send for execution. */
-    if (CommandBuffer == gcvNULL)
+    if (Worker->emptyBuffer)
     {
         if (Queue != gcvNULL && Queue->head != gcvNULL)
         {
@@ -2768,6 +2710,8 @@ gcoBUFFER_Commit_Worker(
     {
         gctUINT coreCount = 1;
         gcoCMDBUF *commandBufferMirrors;
+        gcoHARDWARE Hardware = Worker->buffer->hardware;
+        gcoCMDBUF CommandBuffer = Worker->commandBuffer;
 
         commandBufferMirrors = CommandBuffer->mirrors;
         gcoHARDWARE_Query3DCoreCount(Hardware, &coreCount);
@@ -2780,7 +2724,7 @@ gcoBUFFER_Commit_Worker(
         /* Send command and context buffer to hardware. */
 #if gcdENABLE_3D
         iface.u.Commit.contexts[0] = (CommandBuffer->using2D && !CommandBuffer->using3D)
-                               ? 0 : Context;
+                               ? 0 : Worker->context;
 #else
         iface.u.Commit.contexts[0] = 0;
 #endif
@@ -2797,6 +2741,7 @@ gcoBUFFER_Commit_Worker(
         if (Queue->engine == gcvENGINE_RENDER)
         {
             gctUINT32 i;
+            gctUINT32_PTR Contexts =  Worker->contexts;
 
             for (i = 1; i < coreCount; i++)
             {
