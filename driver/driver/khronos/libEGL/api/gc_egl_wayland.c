@@ -895,7 +895,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     struct wl_egl_display *display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
     struct wl_event_queue *commit_queue = egl_surface->commit_queue;
-    int x, y, width, height;
+    int x, y, width, height, i;
     int ret = 0;
 
     make_bounding_box(buffer, damage, &x, &y, &width, &height);
@@ -903,8 +903,12 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     pthread_mutex_lock(&egl_surface->commit_mutex);
 
     /* Make sure previous frame with this buffer is done. */
-    while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+    for(i = 0; i < egl_surface->nr_buffers; i ++)
+    {
+        struct wl_egl_buffer * egl_buffer = &egl_surface->buffers[i];
+        while (egl_buffer->frame_callback && ret != -1)
+            ret = dispatch_queue(wl_dpy, commit_queue, 100);
+    }
 
     if (ret == -1)
     {
