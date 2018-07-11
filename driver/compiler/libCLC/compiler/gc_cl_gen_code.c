@@ -30273,7 +30273,6 @@ cloIR_SELECTION_GenCode(
     gctBOOL        emptySelection;
     clsGEN_CODE_PARAMETERS    condParameters, trueParameters, falseParameters;
     clsSELECTION_CONTEXT    selectionContext;
-    gctBOOL        trueOperandHasReturn;
     clsLOPERAND    lOperand[1];
     clsIOPERAND    iOperand[1];
     clsIOPERAND    *intermIOperand = gcvNULL;
@@ -30463,18 +30462,15 @@ cloIR_SELECTION_GenCode(
                         &trueParameters.rOperands[0]);
             if (gcmIS_ERROR(status)) return status;
         }
+
+        status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                 Selection->trueOperand->endLineNo,
+                                                 0,
+                                                 CodeGenerator,
+                                                 &selectionContext,
+                                                 cloIR_BASE_HasReturn(Compiler, Selection->trueOperand));
+        if (gcmIS_ERROR(status)) return status;
     }
-
-    trueOperandHasReturn = (Selection->trueOperand != gcvNULL
-                            && cloIR_BASE_HasReturn(Compiler, Selection->trueOperand));
-
-    status = clDefineSelectionTrueOperandEnd(Compiler,
-                        Selection->trueOperand->endLineNo,
-                        0,
-                        CodeGenerator,
-                        &selectionContext,
-                        trueOperandHasReturn);
-    if (gcmIS_ERROR(status)) return status;
 
     /* Generate the code of the false operand */
     if (Selection->falseOperand != gcvNULL)
