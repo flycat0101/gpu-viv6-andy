@@ -3359,64 +3359,10 @@ int g2d_free(struct g2d_buf *buf)
     return -1;
 }
 
-struct g2d_buf * g2d_buf_from_fd(int fd)
-{
-    gceSTATUS status;
-
-    gctUINT32 node;
-    gctUINT32 physAddr = 0;
-    gctPOINTER virtAddr = gcvNULL;
-
-    struct g2d_buf *buf = NULL;
-    struct g2d_buf_context *bufctx = NULL;
-
-    /* Wrap handles into Vivante HAL. */
-    gcsUSER_MEMORY_DESC desc;
-
-    desc.flag = gcvALLOC_FLAG_DMABUF;
-    desc.handle = (unsigned int)fd;
-
-    /* Wrap user memory to a video memory node. */
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
-
-    /* Lock the video memory. */
-    gcmONERROR(
-        gcoOS_LockVideoMemory(gcvNULL, gcmINT2PTR(node), gcvTRUE, gcvFALSE, &physAddr, &virtAddr));
-
-    /* Construct g2d_buf */
-    buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
-    if(!buf)
-    {
-        g2d_printf("%s: Invalid g2d_buf !\n", __FUNCTION__);
-        return NULL;
-    }
-    bufctx = (struct g2d_buf_context *)malloc(sizeof(struct g2d_buf_context));
-    if(!bufctx)
-    {
-        g2d_printf("%s: malloc g2d_buf_context fail !\n", __FUNCTION__);
-        free(buf); buf = NULL;
-        return NULL;
-    }
-
-    bufctx->handle = (void *)gcmINT2PTR(node);
-    bufctx->physical = (int)physAddr;
-
-    buf->buf_handle = (void *)bufctx;
-    buf->buf_paddr = (int)physAddr;
-    buf->buf_vaddr = (void *)virtAddr;
-
-    return buf;
-
-OnError:
-    g2d_printf("%s, Failed to get g2d_buf from dma buffer fd, fd=%i, status=%d", __FUNCTION__, fd, status);
-    return NULL;
-}
-
 int g2d_buf_export_fd(struct g2d_buf *buf)
 {
     return G2D_STATUS_NOT_SUPPORTED;
 }
-
 
 #if defined(LINUX)
 #if !defined(ANDROID)
@@ -3425,51 +3371,133 @@ int g2d_buf_export_fd(struct g2d_buf *buf)
  * ------------------------
  */
 #include <linux/ion.h>
+#include <linux/version.h>
+#include <linux/dma-buf.h>
+
 const char *dev_ion = "/dev/ion";
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
+static int
+g2d_ion_phys_dma(int fd, int dmafd, gctUINT32 *paddr, size_t *size)
+{
+    int ret;
+    struct ion_phys_dma_data data = {
+        .phys   = 0,
+        .size   = 0,
+        .dmafd  = dmafd,
+    };
+
+    struct ion_custom_data custom = {
+        .cmd = ION_IOC_PHYS_DMA,
+        .arg = (uintptr_t)&data,
+    };
+
+    ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
+    if(ret < 0)
+        return ret;
+
+    *paddr = data.phys;
+    *size  = data.size;
+
+    return 0;
+}
 
 struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size)
 {
-	int ret;
-	int fd;
+    int ret;
+    int fd;
 
-	if(!vaddr)
-		return NULL;
+    if(!vaddr)
+        return NULL;
 
-	fd = open(dev_ion, O_RDWR);
-	if(fd < 0)
-	{
-		g2d_printf("open %s failed!\n", dev_ion);
-		return NULL;
-	}
+    fd = open(dev_ion, O_RDWR);
+    if(fd < 0)
+    {
+        g2d_printf("open %s failed!\n", dev_ion);
+        return NULL;
+    }
 
-	struct ion_phys_virt_data data = {
-		.virt   = (unsigned long)vaddr,
-		.phys   = 0,
-		.size   = size,
-	};
+    struct ion_phys_virt_data data = {
+        .virt   = (unsigned long)vaddr,
+        .phys   = 0,
+        .size   = size,
+    };
 
-	struct ion_custom_data custom = {
-		.cmd = ION_IOC_PHYS_VIRT,
-		.arg = (uintptr_t)&data,
-	};
+    struct ion_custom_data custom = {
+        .cmd = ION_IOC_PHYS_VIRT,
+        .arg = (uintptr_t)&data,
+    };
 
-	ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
-	close(fd);
-	if(ret < 0)
-		return NULL;
+    ret = ioctl(fd, ION_IOC_CUSTOM, &custom);
+    close(fd);
+    if(ret < 0)
+        return NULL;
 
-	struct g2d_buf *buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
-	if(!buf)
-	{
-		g2d_printf("%s: malloc g2d_buf fail !\n", __FUNCTION__);
-		return NULL;
-	}
+    struct g2d_buf *buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
+    if(!buf)
+    {
+        g2d_printf("%s: malloc g2d_buf fail !\n", __FUNCTION__);
+        return NULL;
+    }
 
-	buf->buf_paddr = data.phys;
-	buf->buf_vaddr = vaddr;
-	buf->buf_size = data.size;
+    buf->buf_paddr = data.phys;
+    buf->buf_vaddr = vaddr;
+    buf->buf_size = data.size;
 
-	return buf;
+    return buf;
 }
+#else
+static int
+g2d_ion_phys_dma(int fd, int dmafd, gctUINT32 *paddr, size_t *size)
+{
+    int ret = 0;
+    struct dma_buf_phys query;
+
+    ret = ioctl(dmafd, DMA_BUF_IOCTL_PHYS, &query);
+    *paddr = query.phys;
+
+    return ret;
+}
+
+struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size)
+{
+    g2d_printf("%s: g2d_buf_alloc_from_virt_addr not supported !\n", __FUNCTION__);
+    return NULL;
+}
+#endif
+
+struct g2d_buf * g2d_buf_from_fd(int fd)
+{
+    gctUINT32 physAddr = 0;
+    size_t size = 0;
+    struct g2d_buf *buf = NULL;
+
+    int ion_fd, ret;
+    ion_fd = open(dev_ion, O_RDWR);
+    if(ion_fd < 0)
+    {
+        g2d_printf("open %s failed!\n", dev_ion);
+        return NULL;
+    }
+
+    ret = g2d_ion_phys_dma(ion_fd, fd, &physAddr, &size);
+    close(ion_fd);
+    if(ret < 0)
+        return NULL;
+
+    /* Construct g2d_buf */
+    buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
+    if(!buf)
+    {
+        g2d_printf("%s: Invalid g2d_buf !\n", __FUNCTION__);
+        return NULL;
+    }
+
+    buf->buf_paddr = (int)physAddr;
+    buf->buf_size  = size;
+
+    return buf;
+}
+
 #endif
 #endif

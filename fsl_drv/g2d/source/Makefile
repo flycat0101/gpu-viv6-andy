@@ -42,6 +42,8 @@ SONAME := $(LIBRARY).$(API)
 TARGET := libg2d-viv.so
 
 CFLAGS += -I ../include -fPIC -I $(AQROOT)/sdk/inc -I $(AQROOT)/hal/inc -I $(ROOTFS_USR)/include -DgcdENABLE_VG=1 -Dg2dENABLE_VG=$(G2D_VG)
+CFLAGS += -I $(ROOTFS_USR)/imx/include
+CFLAGS += -I $(ROOTFS_USR)/imx/include/drm
 CFLAGS += -DLINUX
 
 ifeq ($(SDK_BUILD), 1)
