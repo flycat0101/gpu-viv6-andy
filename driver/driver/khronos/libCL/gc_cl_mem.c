@@ -353,11 +353,6 @@ clfExecuteHWCopy(
                 srcBuffer = readBuffer->buffer;
                 /* wrap dest */
                 size = readBuffer->cb;
-
-                /* src address */
-                srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + readBuffer->offset;
-                gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
-
                 src = (gctPOINTER) (gcmPTR2INT(srcBuffer->u.buffer.logical) + readBuffer->offset);
                 if (src == readBuffer->ptr)
                 {
@@ -368,9 +363,12 @@ clfExecuteHWCopy(
 
                     return gcvSTATUS_OK;
                 }
+                /* src address */
+                srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + readBuffer->offset;
+                gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
 
                 gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
-                gcsSURF_NODE_GetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ);
+                gcsSURF_NODE_GetFence(node, engine, gcvFENCE_TYPE_READ);
 
                 EVENT_SET_GPU_RUNNING(Command, engine);
                 gcmONERROR(gcoCL_MemBltCopy(srcPhysical, dstPhysical, size, engine));
@@ -392,16 +390,16 @@ clfExecuteHWCopy(
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
 
-                gcoCL_FlushMemory(dstBuffer->u.buffer.node, (gctPOINTER)writeBuffer->ptr, size);
-
                 logical = (gctPOINTER) (gcmPTR2INT(dstBuffer->u.buffer.logical) + writeBuffer->offset);
                 if (logical == writeBuffer->ptr)
                 {
                     EVENT_SET_CPU_RUNNING(Command);
+                    gcoCL_FlushMemory(dstBuffer->u.buffer.node, logical, size);
                     return gcvSTATUS_OK;
                 }
 
                 gcmONERROR(gcoCL_WrapUserMemory((gctPOINTER)writeBuffer->ptr, size, gcvFALSE, &srcPhysical, &node));
+                gcoCL_FlushMemory(node, (gctPOINTER)writeBuffer->ptr, size);
 
                 /* dst address */
                 dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + writeBuffer->offset;
@@ -651,7 +649,8 @@ clfExecuteCommandWriteBuffer(
     buffer      = writeBuffer->buffer;
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
-    if (writeBuffer->cb < HW_COPY_SIZE)
+    if ((gcmPTR2INT(writeBuffer->ptr) & 0x3F)
+       || (writeBuffer->cb < HW_COPY_SIZE))
     {
         hwCopy = gcvFALSE;
     }

@@ -293,15 +293,15 @@ clfLoadKernelArgValues(
             gcmASSERT(memObj);
             if (memObj->type == CL_MEM_OBJECT_BUFFER)
             {
+                /* Is this buffer for read or write?  Get render fence, and wait from render->blt engine result */
+                gcoCL_MemWaitAndGetFence(memObj->u.buffer.node,gcvENGINE_RENDER, gcvFENCE_TYPE_ALL, gcvFENCE_TYPE_ALL);
+
                 if (memObj->u.buffer.wrapped && ((memObj->flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV) == 0))
                 {
                     gcsSURF_NODE_PTR surfNode = memObj->u.buffer.node;
 
                     gcoOS_CacheInvalidate(gcvNULL, surfNode->u.normal.node, memObj->u.buffer.logical, memObj->u.buffer.allocatedSize);
                 }
-
-                /* Is this buffer for read or write?  Get render fence, and wait from render->blt engine result */
-                gcoCL_MemWaitAndGetFence(memObj->u.buffer.node,gcvENGINE_RENDER, gcvFENCE_TYPE_ALL, gcvFENCE_TYPE_ALL);
 
                 data = (gctINT *) &memObj->u.buffer.physical;
             }
