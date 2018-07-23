@@ -957,6 +957,9 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     surface = buffer->info.surface;
 
+    if(!surface)
+        goto out;
+
     if(egl_surface->enable_tile_status)
     {
         wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
