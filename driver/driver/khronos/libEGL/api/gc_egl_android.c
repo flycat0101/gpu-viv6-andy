@@ -300,7 +300,11 @@ struct eglWindowInfo
     struct
     {
         void *          handle;
+        int             fd;
+        void *          data;
+
         gcoSURF         surface;
+        int             tsFd;
         EGLint          age;
     } bufferCache[32];
 };
@@ -1341,6 +1345,9 @@ _CreateVivanteDrmBufferSurface(
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
 
+    /* Indicate can exported as dma-buf fd */
+    type |= gcvSURF_DMABUF_EXPORTABLE;
+
     /* Append no-vidmem hint to type. */
     type |= gcvSURF_NO_VIDMEM;
 
@@ -1349,6 +1356,9 @@ _CreateVivanteDrmBufferSurface(
                                  Buffer->width, Buffer->height, 1,
                                  type, Format, (gcePOOL)pool,
                                  &surface));
+
+    /* Set 128B cache mode. */
+    surface->cacheMode = gcvCACHE_128;
 
     /* Reference and get node. */
     err = drm_vivante_bo_ref_node(Bo->bo, &node, &tsNode);
@@ -1389,11 +1399,6 @@ _CreateVivanteDrmBufferSurface(
                                 gcvSURF_FLAG_CONTENT_YINVERTED,
                                 gcvTRUE));
 
-    /* Corrent tile status state. */
-    surface->tileStatusDisabled[0] =
-            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
-            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
-
     if (RenderMode >= 0)
     {
         gceTILING tiling = gcvINVALIDTILED;
@@ -1418,7 +1423,20 @@ _CreateVivanteDrmBufferSurface(
             return EGL_FALSE;
         }
 
+        /* Set default tile status state for Producer. */
+        tilingArgs.ts_mode = surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
+                           : surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_DISABLED
+                           : surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
+                           : DRM_VIV_GEM_TS_NORMAL;
+
         drm_vivante_bo_set_tiling(Bo->bo, &tilingArgs);
+    }
+    else
+    {
+        /* Corrent tile status state. */
+        surface->tileStatusDisabled[0] =
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
     }
 
     *Surface = surface;
@@ -1505,6 +1523,9 @@ _CreateGenericDrmBufferSurface(
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
 
+    /* Indicate can exported as dma-buf fd */
+    type |= gcvSURF_DMABUF_EXPORTABLE;
+
     /* TODO: Attach tile status from generic drm buffer. */
     status = gcoSURF_WrapUserMemory(gcvNULL,
                                     Buffer->width,
@@ -1522,6 +1543,9 @@ _CreateGenericDrmBufferSurface(
         gcoSURF_SetFlags(surface,
                          gcvSURF_FLAG_CONTENT_YINVERTED,
                          gcvTRUE);
+
+        /* Set 128B cache mode. */
+        surface->cacheMode = gcvCACHE_128;
     }
 
     if ((RenderMode == VEGL_DIRECT_RENDERING_FCFILL) &&
@@ -1759,6 +1783,12 @@ _InvalidateBufferCache(
         {
             /* Unref the surface. */
             gcoSURF_Destroy(info->bufferCache[i].surface);
+
+            if (info->bufferCache[i].tsFd >= 0)
+            {
+                close(info->bufferCache[i].tsFd);
+                info->bufferCache[i].tsFd = -1;
+            }
         }
     }
 
@@ -1774,17 +1804,36 @@ _UpdateBufferCache(
 {
     EGLint i;
     VEGLWindowInfo info = EglSurface->winInfo;
-    void * handle = (void *) Buffer->handle;
-    void * bo = NULL;
+    native_handle_t *handle = (native_handle_t *)Buffer->handle;
     gcoSURF surface;
+    int fd;
+    int tsFd = -1;
+    void * data;
+    EGLBoolean invalidate = EGL_FALSE;
+
+    fd = (int)handle->data[0];
+
+#ifdef DRM_GRALLOC
+    data = gralloc_vivante_bo_from_handle(Buffer->handle);
+#else
+    data = (void *)(intptr_t)gc_native_handle_get(Buffer->handle)->surface;
+#endif
 
     for (i = 0; i < info->bufferCacheCount; i++)
     {
         if (info->bufferCache[i].handle == handle)
         {
-            /* The buffer handle is already cached. */
-            *Surface = info->bufferCache[i].surface;
-            return EGL_TRUE;
+            if (info->bufferCache[i].fd == fd &&
+                info->bufferCache[i].data == data)
+            {
+                /* The buffer handle is already cached. */
+                *Surface = info->bufferCache[i].surface;
+                return EGL_TRUE;
+            }
+
+            LOGV("%s: buffer out of data: buffer=%p", __func__, handle);
+            invalidate = EGL_TRUE;
+            break;
         }
     }
 
@@ -1793,6 +1842,11 @@ _UpdateBufferCache(
     {
         /* Seems buffers are out of date. */
         LOGV("%s: buffers out of data: buffer=%p", __func__, handle);
+        invalidate = EGL_TRUE;
+    }
+
+    if (invalidate)
+    {
         _InvalidateBufferCache(EglSurface);
         i = 0;
     }
@@ -1805,9 +1859,22 @@ _UpdateBufferCache(
         return EGL_FALSE;
     }
 
+#ifdef DRM_GRALLOC
+    /* Get ready for meta date for framebuffer. */
+    if (data && info->hwFramebuffer)
+    {
+        /* Export ts fd for metadata. */
+        gctUINT32 tsNode = surface->tileStatusNode.u.normal.node;
+        gcmVERIFY_OK(gcoHAL_ExportVideoMemory(tsNode, O_RDWR, &tsFd));
+    }
+#endif
+
     /* Not cached yet, cache it. */
     info->bufferCache[i].handle  = handle;
+    info->bufferCache[i].fd      = fd;
+    info->bufferCache[i].data    = data;
     info->bufferCache[i].surface = surface;
+    info->bufferCache[i].tsFd    = tsFd;
     info->bufferCache[i].age     = 0;
 
     /* This assignment should be atomic to support concurrent. */
@@ -2803,6 +2870,33 @@ _PushBufferStatus(
 }
 #endif
 
+#ifdef DRM_GRALLOC
+static EGLBoolean
+_UpdateBufferMetadata(
+    IN VEGLSurface EglSurface,
+    IN gcoSURF Surface
+    )
+{
+    EGLint i;
+    VEGLWindowInfo info = EglSurface->winInfo;
+
+    for (i = 0; i < info->bufferCacheCount; i++)
+    {
+        if (info->bufferCache[i].surface == Surface)
+        {
+            break;
+        }
+    }
+
+    if (i < info->bufferCacheCount && info->bufferCache[i].tsFd >= 0)
+    {
+        gcoSURF_UpdateMetadata(Surface, info->bufferCache[i].tsFd);
+    }
+
+    return EGL_TRUE;
+}
+#endif
+
 static EGLBoolean
 _PostWindowBackBuffer(
     IN VEGLDisplay Display,
@@ -2826,6 +2920,9 @@ _PostWindowBackBuffer(
 #ifdef DRM_GRALLOC
     /* Update buffer ts info and timestamp. */
     _PushBufferStatus(buffer, BackBuffer->surface);
+
+    /* Update surface metadata. */
+    _UpdateBufferMetadata(Surface, BackBuffer->surface);
 #else
     /* Surface has changed. */
     gcmVERIFY_OK(gcoSURF_UpdateTimeStamp(BackBuffer->surface));
@@ -2868,6 +2965,9 @@ _PostWindowBackBufferFence(
 #ifdef DRM_GRALLOC
     /* Update buffer ts info and timestamp. */
     _PushBufferStatus(buffer, BackBuffer->surface);
+
+    /* Update surface metadata. */
+    _UpdateBufferMetadata(Surface, BackBuffer->surface);
 #else
     /* Surface has changed. */
     gcmVERIFY_OK(gcoSURF_UpdateTimeStamp(BackBuffer->surface));
