@@ -461,6 +461,10 @@ static int g2d_clear_2d(void *handle, struct g2d_surface *area)
         dstBits = 32;
         dstFormat = gcvSURF_R8G8B8X8;
         break;
+      case G2D_YUYV:
+        dstBits = 16;
+        dstFormat = gcvSURF_YUY2;
+        break;
       default:
         g2d_printf("%s: surface format %d is not supported !\n", __FUNCTION__, area->format);
         return -1;
@@ -1254,7 +1258,6 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         break;
       case G2D_YUYV:
         dstBits = 16;
-        filterblit = gcvTRUE;
         dstFormat = gcvSURF_YUY2;
         break;
       default:
