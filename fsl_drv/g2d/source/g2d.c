@@ -1259,6 +1259,7 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
       case G2D_YUYV:
         dstBits = 16;
         dstFormat = gcvSURF_YUY2;
+        filterblit = gcoHAL_IsFeatureAvailable(context->hal, gcvFEATURE_2D_ONE_PASS_FILTER) == gcvSTATUS_TRUE;
         break;
       default:
         g2d_printf("%s: Invalid dst format %d!\n", __FUNCTION__, dst->format);
@@ -1751,6 +1752,12 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
 
             gctINT vKernel = (vFactor == 1.0f / 1) ? 1U
                             : (vFactor >= 1.0f / 2) ? 3U : 9U;
+
+            if (dstFormat == gcvSURF_YUY2)
+            {
+                /* Enable one pass filter */
+                hKernel = vKernel = 5U;
+            }
 
             /* Set kernel size. */
             gcmONERROR(gco2D_SetKernelSize(context->engine2D, hKernel, vKernel));
