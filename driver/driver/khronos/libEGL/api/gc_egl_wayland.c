@@ -1351,6 +1351,8 @@ _BindWindow(
             EGLint i;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
             EGLBoolean indirect = EGL_FALSE;
+            gceCHIPMODEL chipModel;
+            gctUINT32 chipRevision;
 
             /* Get patch id. */
             gcoHAL_GetPatchID(gcvNULL, &patchId);
@@ -1453,6 +1455,13 @@ _BindWindow(
             if (status == gcvSTATUS_TRUE)
             {
                 texMode = VEGL_DIRECT_RENDERING;
+            }
+
+            gcmVERIFY_OK((gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL)));
+            if (chipModel == 0x600 && chipRevision == 0x4653)
+            {
+                /*XXX: use 'direct rendering without tile status' by default. */
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
             }
 
             if ((texMode >= VEGL_DIRECT_RENDERING_NOFC) && fcFill)
