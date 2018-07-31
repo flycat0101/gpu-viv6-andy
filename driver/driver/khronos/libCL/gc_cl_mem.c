@@ -339,6 +339,7 @@ clfExecuteHWCopy(
     gcsSURF_NODE_PTR node0 = gcvNULL;
     gcsSURF_NODE_PTR node1 = gcvNULL;
     gceENGINE engine = gcvENGINE_RENDER;
+    clsCommandReadBuffer_PTR readBuffer = gcvNULL;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
@@ -346,7 +347,6 @@ clfExecuteHWCopy(
     {
         case clvCOMMAND_READ_BUFFER:
             {
-                clsCommandReadBuffer_PTR readBuffer = gcvNULL;
                 gctPOINTER      src = gcvNULL;
 
                 readBuffer  = &Command->u.readBuffer;
@@ -363,22 +363,13 @@ clfExecuteHWCopy(
 
                     return gcvSTATUS_OK;
                 }
+
+                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
+                gcoCL_FlushMemory(node, (gctPOINTER)readBuffer->ptr, size);
+
                 /* src address */
                 srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + readBuffer->offset;
                 gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
-
-                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
-                gcsSURF_NODE_GetFence(node, engine, gcvFENCE_TYPE_READ);
-
-                EVENT_SET_GPU_RUNNING(Command, engine);
-                gcmONERROR(gcoCL_MemBltCopy(srcPhysical, dstPhysical, size, engine));
-
-                gcoCL_MemWaitAndGetFence(node, gcvENGINE_CPU, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_ALL);
-                gcoCL_InvalidateMemoryCache(node, readBuffer->ptr, size);
-
-                gcoCL_FreeMemory(gcvNULL, gcvNULL, 0, node);
-
-                return gcvSTATUS_OK;
             }
             break;
 
@@ -386,6 +377,7 @@ clfExecuteHWCopy(
             {
                 clsCommandWriteBuffer_PTR writeBuffer = gcvNULL;
                 gctPOINTER logical = gcvNULL;
+
                 writeBuffer  = &Command->u.writeBuffer;
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
@@ -394,7 +386,10 @@ clfExecuteHWCopy(
                 if (logical == writeBuffer->ptr)
                 {
                     EVENT_SET_CPU_RUNNING(Command);
+
+                    gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
                     gcoCL_FlushMemory(dstBuffer->u.buffer.node, logical, size);
+
                     return gcvSTATUS_OK;
                 }
 
@@ -404,8 +399,6 @@ clfExecuteHWCopy(
                 /* dst address */
                 dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + writeBuffer->offset;
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine);
-
-                gcsSURF_NODE_GetFence(dstBuffer->u.buffer.node, engine, gcvFENCE_TYPE_WRITE);
             }
             break;
 
@@ -444,6 +437,13 @@ clfExecuteHWCopy(
 OnError:
     if (node)
     {
+        gcoCL_Flush(gcvTRUE);
+
+        if (readBuffer)
+        {
+            gcoCL_InvalidateMemoryCache(node, readBuffer->ptr, size);
+        }
+
         gcoCL_FreeMemory(gcvNULL, gcvNULL, 0, node);
     }
 
@@ -650,7 +650,8 @@ clfExecuteCommandWriteBuffer(
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
     if ((gcmPTR2INT(writeBuffer->ptr) & 0x3F)
-       || (writeBuffer->cb < HW_COPY_SIZE))
+       || (writeBuffer->cb < HW_COPY_SIZE)
+       || (writeBuffer->cb & 0x3F))
     {
         hwCopy = gcvFALSE;
     }
@@ -1937,8 +1938,12 @@ clfExecuteCommandUnmapMemObject(
                     1
                     );
             }
-           /* TODO - if mapped for write, need to flush memory. */
-            /*gcoCL_FlushMemory(memObj->u.buffer.node, memObj->u.buffer.logical, cb);*/
+
+            if (memObj->mapFlag & CL_MAP_WRITE)
+            {
+               gcoCL_FlushMemory(memObj->u.buffer.node, memObj->u.buffer.logical, memObj->u.buffer.allocatedSize);
+            }
+
 #if gcdDUMP
             gcmDUMP_BUFFER(gcvNULL,
                             "memory",
