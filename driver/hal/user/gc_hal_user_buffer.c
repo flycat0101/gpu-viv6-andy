@@ -887,6 +887,57 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoFlushCommitWorker(
+    gcoBUFFER Buffer
+   )
+{
+    gctUINT32 i = 0;
+    gcoWorkerInfo * Worker = gcvNULL;
+    gcoCommitWorker *commitWorker = gcvNULL;
+
+    if (!Buffer)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    Worker = gcoGetWorker(gcvNULL, Buffer, gcvTRUE);
+    if (!Worker)
+    {
+        return gcvSTATUS_OUT_OF_RESOURCES;
+    }
+
+    gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Worker->mutex, gcvINFINITE));
+
+    Worker->buffer = gcvNULL;
+    Worker->commit = gcvTRUE;
+
+    gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Worker->mutex));
+
+    commitWorker = Buffer->commitWorker;
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, commitWorker->startSignal, gcvTRUE));
+
+    gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL, Worker->signal, gcvINFINITE));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Worker->signal, gcvTRUE));
+
+    for (i = 0; i < gcmCOUNTOF(commitWorker->workerFifo); i++)
+    {
+        Worker = commitWorker->workerFifo[i];
+
+        if(Worker->buffer == Buffer)
+        {
+            if (Worker->commit)
+            {
+                gcmPRINT("%s, commit worker has the unfinished task, flush error!\n", __FUNCTION__);
+            }
+
+            Worker->buffer = gcvNULL;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
 gcoWorkerInfo*
 gcoCreateWorker(
     gcoOS Os,
@@ -1194,6 +1245,16 @@ gcoBufferCommitWorker(
 
             if (commit != gcvTRUE)
             {
+                break;
+            }
+
+            if (!currWorker->buffer)
+            {
+                currWorker->commit = gcvFALSE;
+
+                gcmVERIFY_OK(gcoOS_Signal(gcvNULL, currWorker->signal, gcvTRUE));
+                commitWorker->workerHead = (commitWorker->workerHead + 1) % gcmCOUNTOF(commitWorker->workerFifo);
+
                 break;
             }
 
@@ -1952,6 +2013,12 @@ gcoBUFFER_Destroy(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Buffer, gcvOBJ_BUFFER);
+
+    gcoSuspendWorker(Buffer);
+
+    gcoFlushCommitWorker(Buffer);
+
+    gcoResumeWorker(Buffer);
 
     /* Destroy all command buffers. */
     while (Buffer->commandBufferList != gcvNULL)
