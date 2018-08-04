@@ -2032,15 +2032,7 @@ _SwapBuffersRegion(
         if ((dpy->workerThread == gcvNULL) || synchronous)
         {
             /* Commit-stall. */
-            if(platform->platform == EGL_PLATFORM_GBM_VIV)
-            {
-                /*Use the KMS fence to sync the display buffer*/
-                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-            }
-            else
-            {
-                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-            }
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
             if (!platform->postWindowBackBuffer(dpy, draw,
