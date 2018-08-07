@@ -696,6 +696,7 @@ gcoBUFOBJ_Upload (
     gctBOOL bDisableFenceAndDynamicStream;
     gctBOOL bGPUupload = gcvFALSE;
     gctBOOL bWaitFence = gcvFALSE;
+    gctSIZE_T extraSize = 0;
 
     gcmHEADER_ARG("BufObj=0x%x Buffer=0x%x Offset=%u Bytes=%lu, Dynamic=%d",
                    BufObj, Buffer, Offset, Bytes, Usage);
@@ -855,9 +856,15 @@ gcoBUFOBJ_Upload (
             break;
         }
 
+        if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX) &&
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
+        {
+            extraSize = 15;
+        }
+
         gcmONERROR(gcsSURF_NODE_Construct(
             &memory,
-            allocationSize,
+            allocationSize + extraSize,
             alignment,
             BufObj->surfType,
             gcvALLOC_FLAG_NONE,
