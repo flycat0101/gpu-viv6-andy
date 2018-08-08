@@ -3386,7 +3386,7 @@ int g2d_buf_export_fd(struct g2d_buf *buf)
 
 const char *dev_ion = "/dev/ion";
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static int
 g2d_ion_phys_dma(int fd, int dmafd, gctUINT32 *paddr, size_t *size)
 {
