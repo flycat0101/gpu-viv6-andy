@@ -24,7 +24,7 @@
 
 #define _GC_OBJ_ZONE            gcvZONE_BUFFER
 
-#define gcmMAX_TEMPCMD_BUFFER_SIZE  0x20000
+#define gcmMAX_TEMPCMD_BUFFER_SIZE  gcdCMD_BUFFER_SIZE
 
 #define gcmWORKER_FIFO_SIZE     24
 /******************************************************************************\

@@ -364,7 +364,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         Number of bytes in a command buffer.
 */
 #ifndef gcdCMD_BUFFER_SIZE
-#   define gcdCMD_BUFFER_SIZE                   (128 << 10)
+#   define gcdCMD_BUFFER_SIZE                   (256 << 10)
 #endif
 
 /*
