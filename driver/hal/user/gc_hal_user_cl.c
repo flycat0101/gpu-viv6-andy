@@ -193,7 +193,7 @@ gcoCL_AllocateMemory(
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
-    gctUINT alignBytes = 256;
+    gctUINT alignBytes = 128;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
@@ -742,20 +742,31 @@ gcoCL_FlushSurface(
                 return status;
             }
 
-            status = gcoOS_CacheFlush(gcvNULL,
+            gcmONERROR(gcoOS_CacheFlush(gcvNULL,
                                            Surface->node.u.normal.node,
                                            Surface->node.logical,
-                                           Surface->size);
+                                           Surface->size));
+
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
+                                          Surface->node.logical,
+                                          Surface->size,
+                                          gcvCACHE_INVALIDATE));
         }
         else
         {
-            status = gcoSURF_NODE_Cache(&Surface->node,
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
                                         srcMemory[0],
                                         Surface->size,
-                                        gcvCACHE_FLUSH);
+                                        gcvCACHE_FLUSH));
+
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
+                                        srcMemory[0],
+                                        Surface->size,
+                                        gcvCACHE_INVALIDATE));
         }
     }
 
+OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -1275,8 +1286,8 @@ gcoCL_QueryDeviceInfo(
 
     DeviceInfo->maxPrintfBufferSize   = 1024 * 1024;
 
-    /* Todo: need to check with HW the alignment requirement of BLT engine */
-    DeviceInfo->memBaseAddrAlign      = 2048;
+    /* Size (in bits) of the largest OpenCL built-in data type (long16) */
+    DeviceInfo->memBaseAddrAlign      = 1024;
 
     /* Size (in bytes) of the largest OpenCL builtin data type (long16) */
     DeviceInfo->minDataTypeAlignSize  = 128;

@@ -2975,6 +2975,7 @@ clCreateBuffer(
     gceCHIPMODEL  chipModel;
     gctUINT32 chipRevision;
     gctBOOL   disableByChip = gcvTRUE;
+    gctBOOL   bwrap  = gcvFALSE;
 #endif
     gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
                    Context, Size, HostPtr, Flags);
@@ -3050,20 +3051,29 @@ clCreateBuffer(
          && !disableByChip)
     {
         gctUINT32 physical;
+	gctINT    status;
 
         if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV))
-            gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node);
+            status = gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node);
         else
-            gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node);
+            status = gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node);
 
         buffer->u.buffer.allocatedSize  = Size;
         buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
         buffer->u.buffer.logical        = HostPtr;
         buffer->u.buffer.wrapped        = gcvTRUE;
-
-        gcoCL_FlushMemory(buffer->u.buffer.node, HostPtr, Size);
+	if (clmNO_ERROR(status))
+        {
+            buffer->u.buffer.allocatedSize  = Size;
+            buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
+            buffer->u.buffer.logical        = HostPtr;
+            buffer->u.buffer.wrapped        = gcvTRUE;
+            gcoCL_FlushMemory(buffer->u.buffer.node, HostPtr, Size);
+	    bwrap  = gcvTRUE;
+	}
     }
-    else
+
+    if (!bwrap)
 #endif
     {
         gctUINT32 memFlag = 0;
@@ -3636,7 +3646,7 @@ clCreateImage(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if(!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
@@ -3885,7 +3895,7 @@ clCreateImage2D(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if(!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
@@ -4147,7 +4157,7 @@ clCreateImage3D(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if(!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
