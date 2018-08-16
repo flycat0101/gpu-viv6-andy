@@ -111,8 +111,8 @@ int main(void)
     dst.height = test_height;
     dst.rot    = G2D_ROTATION_0;
 
-    *( (int *)((int)s_buf->buf_vaddr) ) = 0x1a2b3c4d;
-    *( (int *)((int)d_buf->buf_vaddr) ) = 0x0;
+    *((int *)((long)s_buf->buf_vaddr) ) = 0x1a2b3c4d;
+    *((int *)((long)d_buf->buf_vaddr) ) = 0x0;
     gettimeofday(&tv1, NULL);
     
     for(i=0; i<TEST_LOOP; i++)
@@ -142,8 +142,8 @@ int main(void)
         goto FAIL;
     }
 
-    *( (int *)((int)s_buf->buf_vaddr) ) = 0x12345678;
-    *( (int *)((int)d_buf->buf_vaddr) ) = 0x0;
+    *((int *)((long)s_buf->buf_vaddr) ) = 0x12345678;
+    *((int *)((long)d_buf->buf_vaddr) ) = 0x0;
 
     for(n = 0; n < layers; n++)
     {
@@ -207,7 +207,7 @@ int main(void)
         {
             for(j=0; j<test_width; j++)
             {
-                *(int *)(((int)mul_s_buf[n]->buf_vaddr) + (i*test_width+j)*4) = (i*test_width+j) + n*10;
+                *(int *)(((long)mul_s_buf[n]->buf_vaddr) + (i*test_width+j)*4) = (i*test_width+j) + n*10;
             }
         }
     }
@@ -292,8 +292,8 @@ int main(void)
         for(j=0; j<test_width; j++)
         {
             int layer = ((i >= test_height/2)? 4 : 0) + j/(test_width/4);
-            int correct_val = *(int *)(((int)mul_s_buf[layer]->buf_vaddr) + (i*test_width+j)*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layer]->buf_vaddr) + (i*test_width+j)*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(correct_val != rotated_val)
             {
                 printf("[%d][%d]: 0 rotation value should be %d instead of %d(0x%x)\n", 
@@ -340,7 +340,7 @@ int main(void)
     {
         for(j = 0; j < test_height; j++)
         {
-            *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (i*test_height+j)*4) = i*test_height+j + (layers-1)*10;
+            *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (i*test_height+j)*4) = i*test_height+j + (layers-1)*10;
         }
     }
    
@@ -391,8 +391,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            int correct_val = *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (j*test_height + test_height - i - 1)*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (j*test_height + test_height - i - 1)*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(correct_val != rotated_val)
             {
                 printf("[%d][%d]: 90 rotation value should be %d instead of %d(0x%x)\n", 
@@ -433,7 +433,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width+j)*4) = i*test_width+j + (layers-1)*10;
+            *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width+j)*4) = i*test_width+j + (layers-1)*10;
         }
     }
 
@@ -484,8 +484,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            int correct_val = *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + ((test_height - i - 1)*test_width + (test_width - j -1))*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + ((test_height - i - 1)*test_width + (test_width - j -1))*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(rotated_val != correct_val)
             {
                 printf("[%d][%d]: 180 rotation value should be %d instead of %d(0x%x)\n", 
@@ -528,7 +528,7 @@ int main(void)
     {
         for(j=0; j<test_height; j++)
         {
-            *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (i*test_height+j)*4) = i*test_height+j + (layers-1)*10;
+            *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (i*test_height+j)*4) = i*test_height+j + (layers-1)*10;
         }
     }
 
@@ -580,8 +580,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            int correct_val = *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + ((test_width - j - 1)*test_height + i)*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + ((test_width - j - 1)*test_height + i)*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(correct_val != rotated_val)
             {
                 printf("[%d][%d]: 270 rotation value should be %d instead of %d(0x%x)\n", i, j, correct_val, rotated_val, rotated_val);
@@ -620,7 +620,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width+j)*4) = i*test_width+j + (layers-1)*10;
+            *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width+j)*4) = i*test_width+j + (layers-1)*10;
         }
     }
 
@@ -670,8 +670,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            int correct_val = *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width + (test_width-j-1))*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + (i*test_width + (test_width-j-1))*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(correct_val != rotated_val)
             {
                 printf("[%d][%d]: flip-h value should be %d instead of %d(0x%x)\n", 
@@ -734,8 +734,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            int correct_val = *(int *)(((int)mul_s_buf[layers-1]->buf_vaddr) + ((test_height - i - 1)*test_width+j)*4);
-            int rotated_val = *(int *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            int correct_val = *(int *)(((long)mul_s_buf[layers-1]->buf_vaddr) + ((test_height - i - 1)*test_width+j)*4);
+            int rotated_val = *(int *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(correct_val != rotated_val)
             {
                 printf("[%d][%d]: flip-v value should be %d instead of %d(0x%x)\n", i, j, correct_val, rotated_val, rotated_val);
@@ -758,7 +758,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char *p = (char *)(((int)s_buf->buf_vaddr) + (i*test_width+j)*4);
+            char *p = (char *)(((long)s_buf->buf_vaddr) + (i*test_width+j)*4);
             p[0] = p[1] = p[2] = p[3] = (i*test_width+j) % 255;
         }
     }
@@ -811,15 +811,15 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char *sp0 = (char *)(((int)s_buf->buf_vaddr) + (i*test_width+j)*4*2);
-            char *sp1 = (char *)(((int)s_buf->buf_vaddr) + (i*test_width+j)*4*2 + 4);
+            char *sp0 = (char *)(((long)s_buf->buf_vaddr) + (i*test_width+j)*4*2);
+            char *sp1 = (char *)(((long)s_buf->buf_vaddr) + (i*test_width+j)*4*2 + 4);
             
             char Y0 = 0.257*sp0[0] + 0.504*sp0[1] + 0.098*sp0[2] + 16;
             char U0 = -0.148*sp0[0] - 0.291*sp0[1] + 0.439*sp0[2] + 128;
             char Y1 = 0.257*sp1[0] + 0.504*sp1[1] + 0.098*sp1[2] + 16;
             char V0 = 0.439*sp0[0] - 0.368*sp0[1] -0.071*sp0[2] + 128;
 
-            char *p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char *p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             
             if(abs(Y0 - p[0]) > 2 || abs(U0 - p[1]) > 2 || abs(Y1 - p[2]) > 2 || abs(V0 - p[3]) > 2)
             {
@@ -873,7 +873,7 @@ int main(void)
         {
             for(j=0; j<test_width; j++)
             {
-                char* p = (char *)(((int)mul_s_buf[n]->buf_vaddr) + (i*test_width+j)*4);
+                char* p = (char *)(((long)mul_s_buf[n]->buf_vaddr) + (i*test_width+j)*4);
                 p[0] = p[1] = p[2] = p[3] = 4*n % 255;
             }
         }
@@ -942,7 +942,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if(p[0] != 0x64 || p[1] != 0x64 || p[2] != 0x64 || p[3] != 0x64)
             {
                 printf("alpha blending mode 1 fail!!!\n");
@@ -1004,10 +1004,10 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* sp0 = (char *)(((int)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp3 = (char *)(((int)mul_s_buf[3]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp7 = (char *)(((int)mul_s_buf[7]->buf_vaddr) + (i*test_width+j)*4);
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* sp0 = (char *)(((long)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp3 = (char *)(((long)mul_s_buf[3]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp7 = (char *)(((long)mul_s_buf[7]->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( abs(sp0[0]+sp3[0]+sp7[0]+0x64 - p[0]) > 2
                 || abs(sp0[1]+sp3[1]+sp7[1]+0x64 - p[1]) > 2 
                 || abs(sp0[2]+sp3[2]+sp7[2]+0x64 - p[2]) > 2 
@@ -1060,15 +1060,15 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* sp0 = (char *)(((int)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp1 = (char *)(((int)mul_s_buf[1]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp2 = (char *)(((int)mul_s_buf[2]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp3 = (char *)(((int)mul_s_buf[3]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp4 = (char *)(((int)mul_s_buf[4]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp5 = (char *)(((int)mul_s_buf[5]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp6 = (char *)(((int)mul_s_buf[6]->buf_vaddr) + (i*test_width+j)*4);
-            char* sp7 = (char *)(((int)mul_s_buf[7]->buf_vaddr) + (i*test_width+j)*4);
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* sp0 = (char *)(((long)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp1 = (char *)(((long)mul_s_buf[1]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp2 = (char *)(((long)mul_s_buf[2]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp3 = (char *)(((long)mul_s_buf[3]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp4 = (char *)(((long)mul_s_buf[4]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp5 = (char *)(((long)mul_s_buf[5]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp6 = (char *)(((long)mul_s_buf[6]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp7 = (char *)(((long)mul_s_buf[7]->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( abs(sp0[0]+sp1[0]+sp2[0]+sp3[0]+sp4[0]+sp5[0]+sp6[0]+sp7[0]+0x64 - p[0]) > 2 
                  || abs(sp0[1]+sp1[1]+sp2[1]+sp3[1]+sp4[1]+sp5[1]+sp6[1]+sp7[1]+0x64 - p[1]) > 2
                  || abs(sp0[2]+sp1[2]+sp2[2]+sp3[2]+sp4[2]+sp5[2]+sp6[2]+sp7[2]+0x64 - p[2]) > 2
@@ -1103,7 +1103,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( (abs(p[0] - 60) > 3) || (abs(p[1] - 60) > 3) || (abs(p[2] - 60) > 3) || (abs(p[3] - 60) > 3) )
             {
                 printf("alpha blending mode 4 fail!!!\n");
@@ -1140,7 +1140,7 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( (abs(p[0] - 154) > 3) || (abs(p[1] - 154) > 3) || (abs(p[2] - 154) > 3) || (abs(p[3] - 154) > 3) )
             {
                 printf("alpha blending mode 5 fail!!!\n");
@@ -1191,8 +1191,8 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* sp0 = (char *)(((int)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* sp0 = (char *)(((long)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( abs(sp0[0]*0x80/0xff + 0x64 - p[0]) > 3 || abs(sp0[3]*0x80/0xff + 0x64 - p[3]) > 3 )
             {
                 printf("global alpha fails!!!\n");
@@ -1231,9 +1231,9 @@ int main(void)
     {
         for(j=0; j<test_width; j++)
         {
-            char* sp0 = (char *)(((int)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
+            char* sp0 = (char *)(((long)mul_s_buf[0]->buf_vaddr) + (i*test_width+j)*4);
             char correct_val = ( sp0[0]*0x80/0xff ) + 0x64 - ( sp0[0]*0x80*0x64/0xff/0xff ); 
-            char* p = (char *)(((int)d_buf->buf_vaddr) + (i*test_width+j)*4);
+            char* p = (char *)(((long)d_buf->buf_vaddr) + (i*test_width+j)*4);
             if( abs(correct_val - p[0]) > 3 || abs(correct_val - p[3]) > 3) 
             {
                 printf("global alpha fails!!!\n");
