@@ -3350,23 +3350,29 @@ int g2d_free(struct g2d_buf *buf)
     gceSTATUS Status = gcvSTATUS_OK;
     struct g2d_buf_context *bufctx = NULL;
 
-    if(!buf || !buf->buf_handle)
+    if(!buf)
     {
-        g2d_printf("%s: invalid g2d buf handle !\n", __FUNCTION__);
+        g2d_printf("%s: invalid g2d_buf !\n", __FUNCTION__);
         return -1;
     }
 
-    bufctx = (struct g2d_buf_context *)buf->buf_handle;
-
-    Status = gcoOS_FreeVideoMemory(gcvNULL, (gctPOINTER)bufctx->handle);
-    if(Status == gcvSTATUS_OK)
+    if(buf->buf_handle)
     {
-        free(buf);
+        bufctx = (struct g2d_buf_context *)buf->buf_handle;
+
+        Status = gcoOS_FreeVideoMemory(gcvNULL, (gctPOINTER)bufctx->handle);
+        if(Status != gcvSTATUS_OK)
+        {
+            free(bufctx);
+            free(buf);
+            g2d_printf("%s: g2d_free fail !\n", __FUNCTION__);
+            return -1;
+        }
         free(bufctx);
-        return 0;
     }
 
-    return -1;
+    free(buf);
+    return 0;
 }
 
 int g2d_buf_export_fd(struct g2d_buf *buf)
@@ -3443,7 +3449,7 @@ struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size)
     if(ret < 0)
         return NULL;
 
-    struct g2d_buf *buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
+    struct g2d_buf *buf = (struct g2d_buf *)calloc(1, sizeof(struct g2d_buf));
     if(!buf)
     {
         g2d_printf("%s: malloc g2d_buf fail !\n", __FUNCTION__);
@@ -3453,6 +3459,7 @@ struct g2d_buf *g2d_buf_from_virt_addr(void *vaddr, int size)
     buf->buf_paddr = data.phys;
     buf->buf_vaddr = vaddr;
     buf->buf_size = data.size;
+    buf->buf_handle = NULL;
 
     return buf;
 }
@@ -3496,7 +3503,7 @@ struct g2d_buf * g2d_buf_from_fd(int fd)
         return NULL;
 
     /* Construct g2d_buf */
-    buf = (struct g2d_buf *)malloc(sizeof(struct g2d_buf));
+    buf = (struct g2d_buf *)calloc(1, sizeof(struct g2d_buf));
     if(!buf)
     {
         g2d_printf("%s: Invalid g2d_buf !\n", __FUNCTION__);
@@ -3505,6 +3512,8 @@ struct g2d_buf * g2d_buf_from_fd(int fd)
 
     buf->buf_paddr = (int)physAddr;
     buf->buf_size  = size;
+    buf->buf_handle = NULL;
+    buf->buf_vaddr = NULL;
 
     return buf;
 }
