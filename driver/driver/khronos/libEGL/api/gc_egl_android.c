@@ -3156,7 +3156,11 @@ _SynchronousPost(
          */
         else if (patchId == gcvPATCH_ANDROID_COMPOSITOR)
         {
+#if ANDROID_SDK_VERSION >= 27
+            sync = EGL_FALSE;
+#else
             sync = EGL_TRUE;
+#endif
             break;
         }
 
@@ -3187,7 +3191,11 @@ _SynchronousPost(
         /* Synchronous for the compositor. */
         if (!info->queuesToComposer)
         {
+#if ANDROID_SDK_VERSION >= 27
+            sync = EGL_FALSE;
+#else
             sync = EGL_TRUE;
+#endif
             break;
         }
     }
