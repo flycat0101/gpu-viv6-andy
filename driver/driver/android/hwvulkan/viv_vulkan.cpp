@@ -20,6 +20,7 @@
 
 #include <errno.h>
 #include <dlfcn.h>
+#include <string.h>
 
 static int hwvulkan_device_open(const struct hw_module_t * module,
                 const char * name, struct hw_device_t ** device);

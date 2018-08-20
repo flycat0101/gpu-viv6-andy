@@ -25,14 +25,28 @@ VIVANTE_ANDROID_MK_DEF := 1
 FIXED_ARCH_TYPE              ?=
 
 # Set this variable to Kernel directory.
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+ifeq ($(KERNEL_OUT),)
+KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
+endif
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+KERNEL_DIR                   ?= $(abspath $(OUT_DIR))/../$(KERNEL_OUT)
+else ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
 KERNEL_DIR                   ?= $(ANDROID_BUILD_TOP)/$(KERNEL_OUT)
 else
 KERNEL_DIR                   ?= $(ANDROID_BUILD_TOP)/kernel_imx
 endif
 
 # Cross compiler for building kernel module.
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+  ifeq ($(TARGET_ARCH),arm64)
+    CROSS_COMPILE            ?= $(abspath $(OUT_DIR))/../prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+  else
+    CROSS_COMPILE            ?= $(abspath $(OUT_DIR))/../prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
+  endif
+else ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
   ifeq ($(TARGET_ARCH),arm64)
     CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
   else
@@ -155,8 +169,12 @@ CFLAGS        += -Wno-typedef-redefinition
 endif
 
 # For clang.
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
+else
 ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
 CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
+endif
 endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
