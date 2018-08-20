@@ -175,6 +175,7 @@ viv_handle_create_buffer(struct wl_client *client,
 
     /* Set tile status disabled by default for compositor. */
     surface->tileStatusDisabled[0] = gcvTRUE;
+    surface->cacheMode = gcvCACHE_128;
 #endif
 
     if ((type & 0xFF) != gcvSURF_BITMAP)
