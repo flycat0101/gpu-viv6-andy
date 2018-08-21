@@ -1130,31 +1130,6 @@ _PushGenericDrmBufferStatus(
     android_native_buffer_t * Buffer
     )
 {
-    /*XXX:
-     * For generic dma buffer, imx8mscale temporilary put ts at the end of
-     * master buffer.
-     */
-#if ANDROID_SDK_VERSION >= 27
-    if (Buffer->usage & GRALLOC_USAGE_TS_VIV)
-    {
-        gctINT32 stride;
-        gctUINT32 height;
-        gctUINT32 size;
-
-        gctPOINTER memory[3];
-        gctPOINTER ts;
-
-        gcoSURF_GetAlignedSize(Surface, gcvNULL, &height, &stride);
-        size = stride * height;
-
-        gcoSURF_Lock(Surface, gcvNULL, memory);
-
-        ts = (gctUINT8_PTR)memory[0] + size;
-        memcpy(ts, Surface->tileStatusNode.logical, Surface->tileStatusNode.size);
-
-        gcoSURF_Unlock(Surface, memory[0]);
-    }
-#endif
     return EGL_TRUE;
 }
 
@@ -1554,18 +1529,6 @@ _CreateGenericDrmBufferSurface(
     {
         status = gcoSURF_AppendTileStatus(surface);
     }
-
-    /*
-     * XXX: im8mscale: need append tile status as we cannot wrap
-     * external tile status node.
-     */
-#if ANDROID_SDK_VERSION >= 27
-    if ((RenderMode == VEGL_DIRECT_RENDERING))
-    {
-        surface->cacheMode = gcvCACHE_128;
-        status = gcoSURF_AppendTileStatus(surface);
-    }
-#endif
 
     *Surface = surface;
     return gcmIS_SUCCESS(status) ? EGL_TRUE : EGL_FALSE;
