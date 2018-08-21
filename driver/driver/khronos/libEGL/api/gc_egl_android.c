@@ -2273,6 +2273,19 @@ _QueryRenderMode(
             gcoHAL_SetHardwareType(gcvNULL, currentType);
         }
 
+        /* Use 'direct rendering without tile status' by default for imx845s and imx7ulp. */
+        {
+            gceCHIPMODEL chipModel;
+            gctUINT32 chipRevision;
+
+            gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
+            if (chipModel == gcv600 && chipRevision == 0x4653)
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+            }
+        }
+
         /* Determine render into window mode. */
         if ((mode3D >= VEGL_DIRECT_RENDERING_NOFC) &&
             ((mode2D >= VEGL_DIRECT_RENDERING_NOFC) || (mode2D == -1)) &&
