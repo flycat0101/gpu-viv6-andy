@@ -15177,6 +15177,85 @@ gcoHARDWARE_CopyPixels(
         tmpOrigin.x = srcOrigin->x - origin.x;
         tmpOrigin.y = srcOrigin->y - origin.y;
 
+        if (Hardware->features[gcvFEATURE_BLT_ENGINE]
+            && !(gcmPTR2INT(dstSurf->node.logical) & 0x3F)
+            && !(dstSurf->size & 0x3F)
+            && !tmpOrigin.x && !tmpOrigin.y
+            && size.x * dstFmtInfo->bitsPerPixel == dstSurf->stride * 8
+        )
+        {
+            gctUINT32 node = 0;
+            gcsUSER_MEMORY_DESC desc;
+            gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _gcoSURF),(gctPOINTER*)&tmpSurf));
+
+            gcoOS_MemCopy(tmpSurf, dstSurf, gcmSIZEOF(struct _gcoSURF));
+            gcoOS_ZeroMemory(&tmpSurf->node, gcmSIZEOF(gcsSURF_NODE));
+
+            /* Allocate node. */
+            gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
+            desc.flag     = gcvALLOC_FLAG_USERMEMORY;
+            desc.logical  = gcmPTR_TO_UINT64(dstSurf->node.logical);
+            desc.physical = gcvINVALID_ADDRESS;
+            desc.size     = dstSurf->size;
+
+            /* Map the host ptr to a vidmem node. */
+            gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
+            gcmONERROR(gcoOS_CreateMutex(gcvNULL, &tmpSurf->node.sharedMutex));
+
+            if (dstSurf->node.pool == gcvPOOL_USER)
+            {
+                tmpSurf->node.u.normal.cacheable = gcvTRUE;
+            }
+            else
+            {
+                tmpSurf->node.u.normal.cacheable = dstSurf->node.u.normal.cacheable;
+            }
+
+            tmpSurf->node.u.normal.node = node;
+            tmpSurf->node.pool = gcvPOOL_VIRTUAL;
+
+#if gcdENABLE_3D
+            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * tmpSurf->requestD, (gctPOINTER*)&tmpSurf->fcValue));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * tmpSurf->requestD, (gctPOINTER*)&tmpSurf->fcValueUpper));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * tmpSurf->requestD, (gctPOINTER*)&tmpSurf->tileStatusDisabled));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * tmpSurf->requestD, (gctPOINTER*)&tmpSurf->dirty));
+
+            gcoOS_ZeroMemory(tmpSurf->fcValue, gcmSIZEOF(gctUINT) * tmpSurf->requestD);
+            gcoOS_ZeroMemory(tmpSurf->fcValueUpper, gcmSIZEOF(gctUINT) * tmpSurf->requestD);
+            gcoOS_ZeroMemory(tmpSurf->tileStatusDisabled, gcmSIZEOF(gctBOOL) * tmpSurf->requestD);
+            gcoOS_ZeroMemory(tmpSurf->dirty, gcmSIZEOF(gctBOOL) * tmpSurf->requestD);
+#endif
+            tmpView.surf = tmpSurf;
+            tmpView.firstSlice = 0;
+            tmpView.numSlices = 1;
+
+            rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+            rlvArgs.uArgs.v2.yInverted = Args->uArgs.v2.yInverted;
+            rlvArgs.uArgs.v2.srcOrigin = *srcOrigin;
+            rlvArgs.uArgs.v2.dstOrigin = tmpOrigin;
+            rlvArgs.uArgs.v2.rectSize  = size;
+            rlvArgs.uArgs.v2.numSlices = 1;
+
+            gcmONERROR(gcoHARDWARE_Lock(&tmpSurf->node, gcvNULL, (gctPOINTER*)&tmpBase));
+
+            if (gcvSTATUS_OK == gcoHARDWARE_ResolveRect(Hardware, SrcView, &tmpView, &rlvArgs))
+            {
+                /* Stall the hardware. */
+                gcmONERROR(gcoHARDWARE_Commit(Hardware));
+                gcmONERROR(gcoHARDWARE_Stall(Hardware));
+
+                gcmONERROR(gcoSURF_NODE_Cache(&tmpSurf->node, tmpBase, tmpSurf->size, gcvCACHE_INVALIDATE));
+
+                goto OnExit;
+            }
+            else
+            {
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+            }
+        }
+
         /* Create a temporary surface. */
         gcmONERROR(gcoHARDWARE_AllocTmpSurface(Hardware,
                                                 size.x,
@@ -15526,6 +15605,40 @@ OnError:
         {
             gcmVERIFY_OK(gcoHARDWARE_Unlock(&dstSurf->node, dstSurf->type));
         }
+    }
+
+    if (tmpSurf && tmpSurf != srcSurf && tmpSurf != &Hardware->tmpSurf)
+    {
+        if (tmpSurf->node.pool != gcvPOOL_UNKNOWN)
+        {
+            gcoHARDWARE_UnlockEx(&tmpSurf->node, gcvENGINE_RENDER, tmpSurf->type);
+
+            /* Free the video memory. */
+            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&tmpSurf->node));
+
+            /* Mark the memory as freed. */
+            tmpSurf->node.pool = gcvPOOL_UNKNOWN;
+        }
+
+#if gcdENABLE_3D
+        if (tmpSurf->fcValue)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tmpSurf->fcValue));
+        }
+        if (tmpSurf->fcValueUpper)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tmpSurf->fcValueUpper));
+        }
+        if (tmpSurf->tileStatusDisabled)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tmpSurf->tileStatusDisabled));
+        }
+        if (tmpSurf->dirty)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tmpSurf->dirty));
+        }
+#endif
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tmpSurf));
     }
 
     /* Return the status. */
