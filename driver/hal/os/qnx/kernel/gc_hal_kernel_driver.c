@@ -389,12 +389,13 @@ drv_mempool_init()
 {
     off64_t paddr;
     void* addr;
-    size_t pcontig;
     int rc, err;
 #if defined(AARCH64)
     size_t pt_contig_len = 0;
     int pt_fildes = NOFD;
     off64_t pt_offset;
+#else
+    size_t pcontig;
 #endif
 
     DEFINE_CLOCK(clock);
@@ -431,11 +432,11 @@ drv_mempool_init()
 
 #if defined(AARCH64)
     /* Map this memory inside user and galcore. */
-    unsigned prot_flags = PROT_READ | PROT_WRITE | PROT_NOCACHE;
+    unsigned prot_flags = PROT_READ|PROT_WRITE;
     unsigned map_flags = 0;
 
     START_CLOCK(clock);
-    addr = mmap64(0, memPool.poolSize, prot_flags, MAP_SHARED, posix_mem_fd, 0);
+    addr = mmap64(0, memPool.poolSize, prot_flags, MAP_SHARED|MAP_NOINIT, posix_mem_fd, 0);
     err = errno;
     STOP_CLOCK(clock, "mmap64 prot_flags = 0x%x", prot_flags);
     if (addr == MAP_FAILED) {
@@ -456,6 +457,7 @@ drv_mempool_init()
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
     }
+    paddr = pt_offset;
     /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
     /* cacheable, write back == lazy write */
     START_CLOCK(clock);
@@ -468,6 +470,27 @@ drv_mempool_init()
         close(memPool.fd);
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
+    }
+
+    {
+        void *taddr = mmap64( 0, memPool.poolSize, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_NOINIT, memPool.fd, 0);
+        if( taddr == MAP_FAILED ) {
+            munmap(addr,memPool.poolSize);
+            close(memPool.fd);
+            memPool.fd = -1;
+            return gcvSTATUS_GENERIC_IO;
+        }
+
+        rc = mprotect( addr, memPool.poolSize, PROT_NONE );
+        if (rc == -1) {
+            munmap(taddr, memPool.poolSize);
+            munmap(addr, memPool.poolSize);
+            close(memPool.fd);
+            memPool.fd = -1;
+            return gcvSTATUS_GENERIC_IO;
+        }
+        addr = taddr;
+
     }
 
 #else
@@ -522,6 +545,9 @@ drv_mempool_init()
 #endif
     memPool.addr = addr;
 
+#if defined(AARCH64)
+    paddr = pt_offset;
+#else
     while (1) {
       START_CLOCK(clock);
       if (mem_offset64(addr, NOFD, memPool.poolSize, &paddr, &pcontig) == -1) {
@@ -538,6 +564,7 @@ drv_mempool_init()
         break;
       }
     }
+#endif
 
 #if defined(IMX6X) || defined(IMX8X) || defined(IMX)
     STOP_CLOCK(total, "total poolSize = %uMB%s%s", memPool.poolSize / 1048576, prot_flags & PROT_NOCACHE ? " PROT_NOCACHE" : "", map_flags & MAP_NOINIT ? " MAP_NOINIT" : "");
@@ -1182,7 +1209,7 @@ gckSHM_POOL drv_shmpool_create(
      */
 #if defined(AARCH64)
     /* Map this memory inside user and galcore. */
-    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, posix_mem_fd, 0);
+    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, posix_mem_fd, 0);
     if (saddr == MAP_FAILED) {
         slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't mmap memory of size: %u, Pid: %u [errno: %s]",
                 __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ));
@@ -1208,10 +1235,9 @@ gckSHM_POOL drv_shmpool_create(
 
     /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
     if (CacheFlag == 0x1) {
-        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
-    } else {
-        /* Cachable, write back == lazy write */
         rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WB | ARM_SHMCTL_SH);
+    } else {
+        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
     }
     if (rc) {
         fprintf(stderr, "%s: shm_ctl_special failed: %s\n", __FUNCTION__, strerror( errno ) );
@@ -1225,7 +1251,7 @@ gckSHM_POOL drv_shmpool_create(
     if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
         caddr = saddr;
     } else {
-        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, fd, 0);
+        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE,  MAP_SHARED, fd, 0);
     }
 #else
     if (CacheFlag == 0x1) {
