@@ -15233,7 +15233,7 @@ OnError:
     {
         gcoOS_Close(os, filp);
     }
-    gcmONERROR(_ThreadUnLockLibFile());
+    _ThreadUnLockLibFile();
     return status;
 }
 
