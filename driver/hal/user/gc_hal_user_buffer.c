@@ -27,6 +27,8 @@
 #define gcmMAX_TEMPCMD_BUFFER_SIZE  gcdCMD_BUFFER_SIZE
 
 #define gcmWORKER_FIFO_SIZE     24
+
+#define SYNC_COMMIT_MODE        0
 /******************************************************************************\
 ********************************** Structures **********************************
 \******************************************************************************/
@@ -1118,6 +1120,11 @@ gcoSubmitWorker(
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Worker->mutex));
 
     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->commitWorker->startSignal, gcvTRUE));
+
+#if SYNC_COMMIT_MODE
+    gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL, Worker->signal, gcvINFINITE));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Worker->signal, gcvTRUE));
+#endif
 
     if (Stall)
     {
