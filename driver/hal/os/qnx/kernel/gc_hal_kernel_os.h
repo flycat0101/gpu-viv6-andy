@@ -281,4 +281,10 @@ munmap_peer(pid_t pid, void *addr, size_t len);
 void *
 mmap64_peer(pid_t pid, void *addr, size_t len, int prot, int flags, int fd, off64_t off);
 
+int
+mlock_peer(pid_t pid, const uintptr_t addr, size_t len);
+
+int
+munlock_peer(pid_t pid, const uintptr_t addr, size_t len);
+
 #endif /* __gc_hal_kernel_os_h_ */

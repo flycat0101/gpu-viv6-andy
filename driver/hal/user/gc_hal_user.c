@@ -3143,18 +3143,10 @@ gcoHAL_WrapUserMemory(
 {
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
-#if defined(__QNXNTO__)
-    gctPOINTER lock_addr = gcmINT2PTR(gcmPTR2INT(UserMemoryDesc->logical) & ~(__PAGESIZE - 1));    /* Get the address aligned to pagesize */
-    size_t lock_size = (gcmPTR2INT(UserMemoryDesc->logical) & (__PAGESIZE - 1)) + UserMemoryDesc->size;        /* Get the size to lock (from the address + size */
-#endif
 
     gcmHEADER_ARG("UserMemoryDesc=%d", UserMemoryDesc);
 
     iface.command = gcvHAL_WRAP_USER_MEMORY;
-
-#if defined(__QNXNTO__)
-    gcmONERROR(mlock(lock_addr, lock_size));  /* Lock the user memory, so mem_offset64 can be used */
-#endif
 
     gcoOS_MemCopy(&iface.u.WrapUserMemory.desc, UserMemoryDesc, gcmSIZEOF(gcsUSER_MEMORY_DESC));
 

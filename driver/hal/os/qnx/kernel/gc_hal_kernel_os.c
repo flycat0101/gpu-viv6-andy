@@ -261,6 +261,10 @@ _IsMemoryContiguous(
     }
     else
     {
+        if (mlock_peer(pid, (uintptr_t)logical, size) != 0)           /* Lock the user memory, so mem_offset64_peer can be used */
+        {
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
         if (mem_offset64_peer(pid, (uintptr_t)logical, size, &paddr, &len) != 0)
         {
             gcmkONERROR(gcvSTATUS_GENERIC_IO);
@@ -336,6 +340,10 @@ _MapPages(
         /* fd should be NOFD here, to get physical address. */
         if (InUserSpace)
         {
+            if (mlock_peer((pid_t)pid, (uintptr_t)addr, (size_t)bytes) != 0) /* Lock the user memory, so mem_offset64_peer can be used */
+            {
+                gcmkONERROR(gcvSTATUS_GENERIC_IO);
+            }
             rc = mem_offset64_peer(pid, (uintptr_t)addr, bytes, &offset, &contigLen);
         }
         else
@@ -1536,6 +1544,10 @@ gceSTATUS gckOS_UserLogicalToPhysical(
             break;
         }
 
+        if (mlock_peer((pid_t)pid, (uintptr_t)Logical, 1) != 0)       /* Lock the user memory, so mem_offset64_peer can be used */
+        {
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
         /* Get the physical address. */
         rc = mem_offset64_peer(pid, (const uintptr_t)Logical, 1, &offset, &length);
 
@@ -3828,6 +3840,10 @@ gckOS_MapUserPointer(
             /* Got it! */
             break;
         }
+        if (mlock_peer((pid_t)pid, (uintptr_t) Pointer, Size) != 0)   /* Lock the user memory, so mem_offset64_peer can be used */
+        {
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
 
         /* Check the mempool. */
         if (mem_offset64_peer(pid, (uintptr_t) Pointer, Size, &offset, &bytes) == 0)
@@ -4255,6 +4271,7 @@ memmgr_peer_sendnc(pid_t pid, int coid, void *smsg, size_t sbytes, void *rmsg, s
     peer.i.type = _MEM_PEER;
     peer.i.peer_msg_len = sizeof(peer);
     peer.i.pid = pid;
+    peer.i.reserved1 = 0;
 
     SETIOV(siov + 0, &peer, sizeof peer);
     SETIOV(siov + 1, smsg, sbytes);
@@ -4299,17 +4316,24 @@ mmap64_peer(pid_t pid, void *addr, size_t len, int prot, int flags, int fd, off6
     return _mmap2_peer(pid, addr, len, prot, flags, fd, off, 0, 0, 0, 0);
 }
 
-int
-munmap_flags_peer(pid_t pid, void *addr, size_t len, unsigned flags) {
+static int
+mctrl_peer(pid_t pid, const uintptr_t addr, size_t len, unsigned ctrl_type, unsigned flags)
+{
     mem_ctrl_t msg;
 
     msg.i.type = _MEM_CTRL;
-    msg.i.subtype = _MEM_CTRL_UNMAP;
-    msg.i.addr = (uintptr_t)addr;
+    msg.i.subtype = ctrl_type;
+    msg.i.addr = addr;
     msg.i.len = len;
     msg.i.flags = flags;
     return memmgr_peer_sendnc(pid, MEMMGR_COID, &msg.i, sizeof msg.i, 0, 0);
 }
+
+int
+munmap_flags_peer(pid_t pid, void *addr, size_t len, unsigned flags) {
+    return mctrl_peer(pid, (uintptr_t) addr, len, _MEM_CTRL_UNMAP, flags);
+}
+
 
 int
 munmap_peer(pid_t pid, void *addr, size_t len) {
@@ -4321,6 +4345,18 @@ munmap_peer(pid_t pid, void *addr, size_t len) {
         rc = 0;
     }
     return rc;
+}
+
+int
+mlock_peer(pid_t pid, const uintptr_t addr, size_t len)
+{
+    return mctrl_peer(pid, addr, len, _MEM_CTRL_LOCK, 0);
+}
+
+int
+munlock_peer(pid_t pid, const uintptr_t addr, size_t len)
+{
+    return mctrl_peer(pid, addr, len, _MEM_CTRL_UNLOCK, 0);
 }
 
 int
