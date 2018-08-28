@@ -1579,7 +1579,7 @@ veglInitilizeDisplay(
             Display->workerThread = gcvNULL;
 #endif
 
-#elif gcdANDROID_NATIVE_FENCE_SYNC >= 2
+#elif defined(ANDROID) && gcdANDROID_NATIVE_FENCE_SYNC >= 2
             /*
              * Swap worker is not required when android native fence sync
              * is enabled in app side.
