@@ -6052,7 +6052,7 @@ gcoOS_DestroySignal(
     /* Acquire the mutex. */
     pthread_mutex_lock(&signal->mutex);
 
-    if (signal->pending != signal->received)
+    if ((signal->pending != signal->received) || !signal->pending)
     {
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
                       "%s(%d): Signal=0x%x Pending=%d Received=%d.",
@@ -6301,12 +6301,15 @@ gcoOS_SignalPending(
     {
         gcmONERROR(gcvSTATUS_GENERIC_IO);
     }
-
-    Signal->pending++;
-
-    /* Release the mutex. */
-    pthread_mutex_unlock(&Signal->mutex);
-
+    if (Signal->destroyed) {
+        _DestroySignal(Os, Signal);
+    }
+    else
+    {
+        Signal->pending++;
+        /* Release the mutex. */
+        pthread_mutex_unlock(&Signal->mutex);
+    }
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
