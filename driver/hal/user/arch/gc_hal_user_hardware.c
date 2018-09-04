@@ -15183,7 +15183,7 @@ gcoHARDWARE_CopyPixels(
             && !(gcmPTR2INT(dstSurf->node.logical) & 0x3F)
             && !(dstSurf->size & 0x3F)
             && !tmpOrigin.x && !tmpOrigin.y
-            && size.x * dstFmtInfo->bitsPerPixel == dstSurf->stride * 8
+            && size.x * dstFmtInfo->bitsPerPixel == (gctINT32)dstSurf->stride * 8
         )
         {
             gctUINT32 node = 0;
@@ -15613,8 +15613,6 @@ OnError:
     {
         if (tmpSurf->node.pool != gcvPOOL_UNKNOWN)
         {
-            gcoHARDWARE_UnlockEx(&tmpSurf->node, gcvENGINE_RENDER, tmpSurf->type);
-
             /* Free the video memory. */
             gcmVERIFY_OK(gcsSURF_NODE_Destroy(&tmpSurf->node));
 
