@@ -1033,6 +1033,9 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         case VIR_OPND_VEC_INDEXING:
             ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetSymbolId_(pOperand)));
             break;
+        case VIR_OPND_NAME:
+            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetNameId(pOperand)));
+            break;
         case VIR_OPND_INTRINSIC:
             ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetIntrinsicKind(pOperand)));
             break;
@@ -2665,6 +2668,10 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
                 VIR_Operand_SetSym(pOperand, sym);
             }
             break;
+        case VIR_OPND_NAME:
+            ON_ERROR0(VIR_IO_readUint(Buf, &val));
+            VIR_Operand_SetName(pOperand, (VIR_NameId)val);
+            break;
         case VIR_OPND_INTRINSIC:
             ON_ERROR0(VIR_IO_readUint(Buf, &val));
             VIR_Operand_SetIntrinsicKind(pOperand, (VIR_IntrinsicsKind)val);
@@ -4126,6 +4133,7 @@ VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand)
     case VIR_OPND_IMMEDIATE:
     case VIR_OPND_EVIS_MODIFIER:
     case VIR_OPND_CONST:
+    case VIR_OPND_NAME:
     case VIR_OPND_INTRINSIC:
         break;
     case VIR_OPND_PARAMETERS:

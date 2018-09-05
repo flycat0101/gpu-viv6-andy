@@ -7165,3 +7165,320 @@ VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+/* dfs recursive to check src0 of ATOM* instruction is same address for all threads in a shader group.
+ * if src0 is defined by const/uniform/attribute-VIR_NAME_WORK_GROUP_ID, it would be fine
+ * others return false now
+ */
+static gctBOOL _vscVIR_CheckAtomSrcIsSameAddrForAllthreads(
+    VIR_Instruction *inst,
+    VIR_Operand *srcOpnd,
+    VIR_DEF_USAGE_INFO*        pDuInfo)
+{
+    VIR_OperandInfo         srcOpndInfo;
+    VIR_Symbol *srcSym = VIR_Operand_GetSymbol(srcOpnd);
+
+    gcmASSERT(inst && srcOpnd);
+
+    if (VIR_Operand_isImm(srcOpnd) || VIR_Operand_isConst(srcOpnd) ||
+        (srcSym && VIR_Symbol_isUniform(srcSym)))
+    {
+        return gcvTRUE;
+    }
+
+    VIR_Operand_GetOperandInfo(inst, srcOpnd, &srcOpndInfo);
+    if (VIR_OpndInfo_Is_Virtual_Reg(&srcOpndInfo))
+    {
+        /* if src is indexing, return false */
+        if (srcOpndInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+        {
+            return gcvFALSE;
+        }
+        /* check def symbol recursively */
+        {
+            VIR_GENERAL_UD_ITERATOR udIter;
+            VIR_DEF             *pDef;
+            gctBOOL             earlyExit = gcvFALSE;
+            vscVIR_InitGeneralUdIterator(&udIter,
+                                          pDuInfo, inst, srcOpnd, gcvFALSE, gcvFALSE);
+            for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+                 pDef != gcvNULL;
+                 pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+            {
+                VIR_Instruction *pDefInst = pDef->defKey.pDefInst;
+                gcmASSERT(pDefInst);
+                /* if src is gl_WorkGroupID, return true since it's same value for a workgroup */
+                if (VIR_IS_IMPLICIT_DEF_INST(pDefInst))
+                {
+                    VIR_Symbol *attr = VIR_Operand_GetSymbol(srcOpnd);
+                    if (attr && (VIR_Symbol_GetName(attr) == VIR_NAME_WORK_GROUP_ID))
+                    {
+                        continue;
+                    }
+                    /* other input, return false now */
+                    earlyExit = gcvTRUE;
+                    break;
+                }
+                /* if definition is memory instruction, return false */
+                else if (pDefInst > 0 && VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pDefInst)))
+                {
+                    /* value from memory load is complex, return false */
+                    earlyExit = gcvTRUE;
+                    break;
+                }
+                else
+                {
+                    gctUINT i;
+                    for (i = 0; i < VIR_Inst_GetSrcNum(pDefInst); i++)
+                    {
+                        VIR_Operand *src = VIR_Inst_GetSource(pDefInst, i);
+                        if(src && !_vscVIR_CheckAtomSrcIsSameAddrForAllthreads(pDefInst, src, pDuInfo))
+                        {
+                            earlyExit = gcvTRUE;
+                            break;
+                        }
+                    }
+                }
+                if (earlyExit)
+                {
+                    break; /* return false */
+                }
+            }
+            /* all source are checked */
+            if (!earlyExit)
+            {
+                return gcvTRUE;
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
+
+static void _vscVIR_ConstructAtomFuncName(
+    VIR_Instruction *pInst,
+    gctUINT         maxcore,
+    OUT gctSTRING   *pLibFuncName          /* returned lib function name if needed */
+    )
+{
+    gctUINT srcNum = VIR_Inst_GetSrcNum(pInst);
+    gctUINT i;
+    gctCHAR name[256] = "";
+
+    switch (VIR_Inst_GetOpcode(pInst))
+    {
+        case VIR_OP_ATOMADD: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomadd"); break;
+        case VIR_OP_ATOMSUB: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomsub"); break;
+        case VIR_OP_ATOMXCHG: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomxchg"); break;
+        case VIR_OP_ATOMCMPXCHG: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomcmpxchg"); break;
+        case VIR_OP_ATOMMIN: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atommin"); break;
+        case VIR_OP_ATOMMAX: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atommax"); break;
+        case VIR_OP_ATOMOR: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomor"); break;
+        case VIR_OP_ATOMAND: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomand"); break;
+        case VIR_OP_ATOMXOR: gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_atomxor"); break;
+        default: gcmASSERT(0); break; /*unsupported atom */
+    }
+
+    /* get dest type */
+    gcmASSERT(VIR_Inst_GetDest(pInst) != gcvNULL);
+    if (VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)) == VIR_TYPE_UINT32) {
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint");
+    }
+    else if (VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)) == VIR_TYPE_FLOAT32)
+    {
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float");
+    }
+    else
+    {
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int");
+    }
+    /* skip last _undef src in ML*/
+    for (i = 0; i < srcNum-1; i++)
+    {
+        VIR_Operand *src = VIR_Inst_GetSource(pInst, i);
+        VIR_TypeId srcTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(src));;
+        if (srcTypeId == VIR_TYPE_UINT32)
+        {
+            /* special deal to atomcmpxchg, src2 store two values */
+            if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint2");
+            }
+            else
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint");
+            }
+        }
+        else if (srcTypeId == VIR_TYPE_INT32)
+        {
+            /* special deal to atomcmpxchg, src2 store two values */
+            if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int2");
+            }
+            else
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int");
+            }
+        }
+        else if (srcTypeId == VIR_TYPE_FLOAT32)
+        {
+            /* special deal to atomcmpxchg, src2 store two values */
+            if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float2");
+            }
+            else
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float");
+            }
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+    }
+
+    switch(maxcore)
+    {
+        case 1:
+        {
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_core1");
+            break;
+        }
+        case 2:
+        {
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_core2");
+            break;
+        }
+        case 4:
+        {
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_core4");
+            break;
+        }
+        case 8:
+        {
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_core8");
+            break;
+        }
+        default:
+            gcmASSERT(0); break;
+    }
+
+    gcoOS_StrDup(gcvNULL, name, pLibFuncName);
+
+}
+
+static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
+    VIR_Instruction *pInst,
+    gctUINT         maxcoreCount)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    /**/
+    gctSTRING           libFuncName = gcvNULL;
+    VIR_Function *func = VIR_Inst_GetFunction(pInst);
+    VIR_Operand  *funcName;
+    VIR_NameId    funcNameId;
+    VIR_Operand  *parameters;
+    VIR_ParmPassing *parm;
+    gctINT argCount = VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(pInst)) - 1; /* last argument is undef in ML IR */
+    gctINT   i;
+    {
+        _vscVIR_ConstructAtomFuncName(pInst, maxcoreCount, &libFuncName);
+        /* create FuncOperand*/
+        ON_ERROR(VIR_Function_NewOperand(func, &funcName), "Failed to new operand");
+        ON_ERROR(VIR_Shader_AddString(func->hostShader, libFuncName, &funcNameId), "");
+        VIR_Operand_SetName(funcName, funcNameId);
+        ON_ERROR(VIR_Function_NewOperand(func, &parameters), "Failed to new operand");
+
+        /* create a new VIR_ParmPassing */
+        ON_ERROR(VIR_Function_NewParameters(func, argCount, &parm), "Failed to copy operand");
+        for (i = 0; i < argCount; i++)
+        {
+             VIR_Operand_Copy(parm->args[i], VIR_Inst_GetSource(pInst, i));
+        }
+
+        /* set parameters to new operand */
+        VIR_Operand_SetParameters(parameters, parm);
+
+        VIR_Inst_SetSource(pInst, 0, funcName);
+        VIR_Inst_SetSource(pInst, 1, parameters);
+        VIR_Inst_SetOpcode(pInst, VIR_OP_EXTCALL);
+        VIR_Inst_SetSrcNum(pInst, 2);
+
+        gcoOS_Free(gcvNULL, libFuncName);
+
+        return errCode;
+    }
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_GenExternalAtomicCall)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_ILF_LINK; /* enable/disable according to pass VIR_LinkInternalLibFunc */
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VIR_Shader *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    gctUINT     maxcoreCount = pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
+    VIR_FuncIterator func_iter;
+    VIR_FunctionNode* func_node;
+    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+
+    /* skip this pass according to hwcfg */
+    if ((!pHwCfg->hwFeatureFlags.supportUSC) || pHwCfg->hwFeatureFlags.hasUSCAtomicFix2)
+    {
+        return errCode;
+    }
+
+    /* now lib function only support opencl(openvx), remove this if () if opengl/vulkan is supported */
+    if ((pPassWorker->pCompilerParam->cfg.ctx.clientAPI != gcvAPI_OPENCL))
+    {
+        return errCode;
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for(func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function     *func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction  *inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Inst_GetOpcode(inst) >= VIR_OP_ATOMADD && VIR_Inst_GetOpcode(inst) <= VIR_OP_ATOMXOR)
+            {
+                /*check src0 of atom* */
+                if (!_vscVIR_CheckAtomSrcIsSameAddrForAllthreads(inst, VIR_Inst_GetSource(inst, 0), pDuInfo))
+                {
+                    _vscVIR_ReplaceAtomWithExtCall(inst, maxcoreCount);
+                    VIR_Shader_SetFlags(pShader, VIR_SHFLAG_HAS_EXTCALL_ATOM);
+                }
+            }
+        }
+    }
+    /* invalid callgraph resource if EXTCALL generated*/
+    if (VIR_Shader_HasExtcallAtomic(pShader))
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+    }
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After Generating Atom EXTCALL", pShader, gcvTRUE);
+    }
+
+    return errCode;
+}
+
+

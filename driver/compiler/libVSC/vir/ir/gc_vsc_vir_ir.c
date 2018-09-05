@@ -12097,6 +12097,17 @@ VIR_Operand_SetFunction(
 }
 
 void
+VIR_Operand_SetName(
+    IN OUT VIR_Operand *    Operand,
+    IN  VIR_NameId          Name
+    )
+{
+    VIR_Operand_SetOpKind(Operand, VIR_OPND_NAME);
+    VIR_Operand_SetTypeId(Operand, VIR_TYPE_UNKNOWN);
+    Operand->u.n.u1.name  = Name;
+}
+
+void
 VIR_Operand_SetIntrinsic(
     IN OUT VIR_Operand *    Operand,
     IN  VIR_IntrinsicsKind  Intrinsic
@@ -14358,7 +14369,7 @@ VIR_Operand_GetPrecision(
         }
     }
 
-    if (opndKind == VIR_OPND_INTRINSIC || opndKind == VIR_OPND_PARAMETERS)
+    if (opndKind == VIR_OPND_INTRINSIC || opndKind == VIR_OPND_PARAMETERS || opndKind == VIR_OPND_NAME)
     {
         return VIR_PRECISION_HIGH;
     }
@@ -16007,6 +16018,8 @@ VIR_Operand_Check4Dual16(
         }
     case VIR_OPND_LABEL:
     case VIR_OPND_CONST:
+        break;
+    case VIR_OPND_NAME:
         break;
     case VIR_OPND_FUNCTION:
     case VIR_OPND_PARAMETERS:

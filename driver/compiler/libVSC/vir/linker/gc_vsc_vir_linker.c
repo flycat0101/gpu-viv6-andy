@@ -920,6 +920,7 @@ _CreateCLIntrinsicLib(
     gctSIZE_T   length;
     gctINT      i, stringNum = 0;
     gctBOOL     locked = gcvFALSE;
+    gctBOOL     needAtomicPatch = (pHwCfg->hwFeatureFlags.supportUSC) && (!pHwCfg->hwFeatureFlags.hasUSCAtomicFix2);
     gctSTRING   log    = gcvNULL;
     VIR_Shader* virCLIntrinsicLibrary = gcvNULL;
     VIR_Shader** virCLIntrinsicLibraryPtr = gcvNULL;
@@ -932,6 +933,7 @@ _CreateCLIntrinsicLib(
         gcCLLibRelational_Funcs_packed,
     };
 
+    virCLIntrinsicLibraryPtr = &virCLIntrinsicLibrary;
     gcmONERROR(gcLockLoadLibrary());
     locked = gcvTRUE;
 
@@ -978,6 +980,28 @@ _CreateCLIntrinsicLib(
             {
                 gcoOS_StrCatSafe(builtinSource,
                                  __LL_LIB_LENGTH__, builtinLib_common_packed[i]);
+            }
+        }
+
+        /* add atomic patch according to pHwCfg */
+        if (needAtomicPatch)
+        {
+            gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcCLLibGetLocalID);
+            if (pHwCfg->maxCoreCount == 1)
+            {
+                gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core1_Str);
+            }
+            else if (pHwCfg->maxCoreCount == 2)
+            {
+                gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core2_Str);
+            }
+            else if (pHwCfg->maxCoreCount == 4)
+            {
+                gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core4_Str);
+            }
+            else if (pHwCfg->maxCoreCount == 8)
+            {
+                gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core8_Str);
             }
         }
 
@@ -1132,6 +1156,7 @@ VIR_GetIntrinsicLib(
     IN gctBOOL                  forOCL,
     IN gctBOOL                  forGraphics,
     IN gctBOOL                   DumpShader,
+    IN gctBOOL                   hasExtcallAtomic,
     OUT VIR_Shader              **pOutLib
     )
 {
@@ -1156,7 +1181,7 @@ VIR_GetIntrinsicLib(
     if (forOCL)
     {
         if(gcmOPT_oclPackedBasicType()||
-           _OCL_USE_INTRINSIC_FOR_IMAGE)
+           _OCL_USE_INTRINSIC_FOR_IMAGE || hasExtcallAtomic)
         {
             errCode = _CreateCLIntrinsicLib(pHwCfg, pMM, DumpShader, pOutLib);
         }
@@ -1812,7 +1837,7 @@ _IntrisicImageFetchFuncName(
 }
 
 static void
-_IntrisicFuncName(
+_IntrisicOrExtFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -1827,6 +1852,16 @@ _IntrisicFuncName(
     VIR_Operand *imageOpnd = gcvNULL;
     VIR_Symbol *imageSym = gcvNULL;
     VIR_TypeId imageTypeId = VIR_INVALID_ID;
+
+    /* handle EXTCALL first which already has the function name id in instruction */
+    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EXTCALL)
+    {
+        VIR_NameId nameId;
+        gcmASSERT(VIR_Operand_GetOpKind(src0Opnd) == VIR_OPND_NAME);
+        nameId = VIR_Operand_GetNameId(src0Opnd);
+        gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, VIR_Shader_GetStringFromId(pShader, nameId));
+        return;
+    }
 
     /* Get parameters */
     parmOpnd = VIR_Operand_GetParameters(src1Opnd);
@@ -2180,43 +2215,6 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         }
         /* Copy the operand type. */
         VIR_Operand_SetTypeId(pOpnd, origTypeId);
-
-        if (libSym != gcvNULL)
-        {
-            if (VIR_Symbol_isVariable(libSym))
-            {
-                if (!VIR_Symbol_isParamVariable(libSym))
-                {
-                    libName = VIR_Shader_GetSymNameString(pLibShader, libSym);
-                    newVarSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_VARIABLE, libName);
-
-                    if (newVarSym == gcvNULL)
-                    {
-                        errCode = VIR_Shader_AddString(pShader,
-                                                       libName,
-                                                       &nameId);
-                        /* add a variable */
-                        errCode = VIR_Shader_AddSymbol(pShader,
-                                                       VIR_Symbol_GetKind(libSym),
-                                                       nameId,
-                                                       VIR_Shader_GetTypeFromId(pShader, pTyId),
-                                                       VIR_STORAGE_UNKNOWN,
-                                                       &newVarId);
-
-                        newVarSym = VIR_Function_GetSymFromId(pFunc, newVarId);
-                    }
-
-                    gcmASSERT(newVirRegSym && newVarSym);
-                    VIR_Symbol_SetVregVariable(newVirRegSym, newVarSym);
-                }
-            }
-            else
-            {
-                /* get the variable of struct type which this field is in */
-                gcmASSERT(VIR_Symbol_isField(libSym) ||
-                          opndKind == VIR_OPND_SAMPLER_INDEXING);
-            }
-        }
     }
     else if (opndKind == VIR_OPND_IMMEDIATE)
     {
@@ -2405,6 +2403,15 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             VIR_Operand_SetTexldFetchMS(pOpnd, newOperand);
         }
     }
+    else if (opndKind == VIR_OPND_NAME)
+    {
+        /* copy name string from lib shader to host shader */
+        gctSTRING nameStr = VIR_Shader_GetStringFromId(pLibShader, VIR_Operand_GetNameId(libOpnd));
+        VIR_NameId nameId;
+        errCode = VIR_Shader_AddString(pShader, nameStr, &nameId);
+
+        VIR_Operand_SetName(pOpnd, nameId);
+    }
     else if (opndKind == VIR_OPND_INTRINSIC)
     {
         VIR_Operand_SetIntrinsic(pOpnd, VIR_Operand_GetIntrinsicKind(libOpnd));
@@ -2556,7 +2563,7 @@ _VIR_LinkIntrinsicLib_CopyInst(
 
             callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
             callInstNode->inst = newInst;
-            callInstNode->intrinsicKind = VIR_IK_NONE;
+            callInstNode->u.intrinsicKind = VIR_IK_NONE;
 
             VIR_LIB_CallSitesQueue(pMM, pCallSites, callInstNode);
 
@@ -3395,14 +3402,15 @@ VIR_Lib_UpdateCallSites(
     {
         VIR_LIB_CallSitesDequeue(pMM, pCallSites, &pCallInstNode);
         pCallerInst = pCallInstNode->inst;
-        intrinsicsKind = pCallInstNode->intrinsicKind;
+        intrinsicsKind = pCallInstNode->u.intrinsicKind;
 
         callerInstResOpType = VIR_Inst_GetResOpType(pCallerInst);
         destOpnd = VIR_Inst_GetDest(pCallerInst);
 
         pCallerFunc = VIR_Inst_GetFunction(pCallerInst);
 
-        if (VIR_Inst_GetOpcode(pCallerInst) == VIR_OP_INTRINSIC)
+        if (VIR_Inst_GetOpcode(pCallerInst) == VIR_OP_INTRINSIC ||
+            VIR_Inst_GetOpcode(pCallerInst) == VIR_OP_EXTCALL)
         {
             /* Update operand parameter list if needed. */
             _UpdateOperandParameterForIntrinsicCall(pShader, pHwCfg, pCallerInst, intrinsicsKind);
@@ -3745,7 +3753,7 @@ _TranspointsDequeue(
 
 /*********** functions for intrinsic function name LinkLib *************/
 static void
-_GetIntrinsicFunc(
+_GetIntrinsicOrExtFunc(
     IN VIR_LinkLibContext         *Context,
     OUT VIR_TRANS_WORKLIST        *Worklist
     )
@@ -3779,7 +3787,18 @@ _GetIntrinsicFunc(
 
                 callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
                 callInstNode->inst = inst;
-                callInstNode->intrinsicKind = ik;
+                callInstNode->u.intrinsicKind = ik;
+
+                _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+            }
+            else if (VIR_Inst_GetOpcode(inst) == VIR_OP_EXTCALL)
+            {
+                VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
+                VIR_NameId nameId = VIR_Operand_GetNameId(src0);
+
+                callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+                callInstNode->inst = inst;
+                callInstNode->u.extFuncName = nameId;
 
                 _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
             }
@@ -3788,7 +3807,7 @@ _GetIntrinsicFunc(
 }
 
 static VSC_ErrCode
-_GetIntrinsicFuncName(
+_GetIntrinsicOrextFuncName(
     IN  VIR_LinkLibContext          *Context,
     IN void                         *TransPoint,
     IN  gctSTRING                   *LibFuncName
@@ -3800,10 +3819,10 @@ _GetIntrinsicFuncName(
     VIR_LINKER_CALL_INST_NODE   *callInstNode = (VIR_LINKER_CALL_INST_NODE*) TransPoint;
 
     /* Get the intrisic function name. */
-    _IntrisicFuncName(pShader,
-                      pHwCfg,
-                      callInstNode->inst,
-                      LibFuncName);
+    _IntrisicOrExtFuncName(pShader,
+                           pHwCfg,
+                           callInstNode->inst,
+                           LibFuncName);
 
     return errCode;
 }
@@ -5192,6 +5211,12 @@ _LinkLib_Transform(
         ON_ERROR(errCode, "_LinkLib_Transform");
     }
 
+    /* clear the flag: extcall atomic should be link the lib and replace by call */
+    if (VIR_Shader_HasExtcallAtomic(pShader))
+    {
+        VIR_Shader_ClrFlag(pShader, VIR_SHFLAG_HAS_EXTCALL_ATOM);
+    }
+
 OnError:
 
     if (str)
@@ -5410,8 +5435,8 @@ VIR_LinkLibLibrary(
                         linkPoint,
                         0,
                         gcvNULL,
-                        _GetIntrinsicFunc,
-                        _GetIntrinsicFuncName,
+                        _GetIntrinsicOrExtFunc,
+                        _GetIntrinsicOrextFuncName,
                         _InsertIntrinsicFunc);
                 break;
 
@@ -5521,6 +5546,7 @@ DEF_QUERY_PASS_PROP(VIR_LinkInternalLibFunc)
 
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_ILF_LINK;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
 VSC_ErrCode
@@ -5551,6 +5577,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                 (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL),
                 VIR_Shader_IsGraphics(pShader),
                 gcvFALSE,
+                VIR_Shader_HasExtcallAtomic(pShader),
                 &pIntrinsicLib);
             CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
         }
