@@ -363,10 +363,19 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
 
             if (xfbObj->active && !xfbObj->paused)
             {
-                GLuint numPrims = vertexCount;
-                GLuint numVerts = vertexCount;
+                GLuint numPrims = 0;
+                GLuint numVerts = 0;
 
                 __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN];
+
+                if (vertexCount > 0)
+                {
+                   /* Check if the calculation will overflow */
+                   if ((((GLsizei)(((gctINT64)1 << (((sizeof(GLsizei)) << 3) - 1)) - 1)) / vertexCount) < instanceCount)
+                   {
+                      __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                   }
+                }
 
                 switch (mode)
                 {
@@ -377,6 +386,10 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
                 case GL_LINES:
                     numPrims = (vertexCount / 2) * instanceCount;
                     numVerts = numPrims * 2;
+                    break;
+                case GL_POINTS:
+                    numPrims = vertexCount * instanceCount;
+                    numVerts = numPrims;
                     break;
                 }
 
