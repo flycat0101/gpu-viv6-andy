@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante CLC library"
 endef
 
-NAME=CLC
+NAME=libCLC
 
 include $(qnx_build_dir)/common.mk
 

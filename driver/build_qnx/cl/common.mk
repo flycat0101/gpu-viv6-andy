@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante OpenCL"
 endef
 
-NAME=OpenCL
+NAME=libOpenCL
 
 include $(qnx_build_dir)/common.mk
 

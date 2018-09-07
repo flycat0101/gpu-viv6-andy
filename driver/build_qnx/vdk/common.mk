@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante VDK"
 endef
 
-NAME=VDK
+NAME=libVDK
 
 include $(qnx_build_dir)/common.mk
 

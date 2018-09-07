@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="LLVM for CLC library"
 endef
 
-NAME=LLVM_viv
+NAME=libLLVM_viv
 
 include $(qnx_build_dir)/common.mk
 

@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="OpenVX"
 endef
 
-NAME=OpenVX
+NAME=libOpenVX
 
 
 include $(qnx_build_dir)/common.mk

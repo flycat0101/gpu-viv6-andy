@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante OpenGLES 2.0 SC(end)"
 endef
 
-NAME=VSC
+NAME=libVSC
 
 include $(qnx_build_dir)/common.mk
 

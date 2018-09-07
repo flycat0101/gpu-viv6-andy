@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante GAL"
 endef
 
-NAME=GAL
+NAME=libGAL
 
 include $(qnx_build_dir)/common.mk
 

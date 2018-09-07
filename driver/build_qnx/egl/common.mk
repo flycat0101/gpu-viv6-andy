@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante EGL"
 endef
 
-NAME=EGL_viv
+NAME=libEGL_viv
 
 include $(qnx_build_dir)/common.mk
 
