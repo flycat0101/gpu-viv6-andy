@@ -3159,7 +3159,7 @@ gckKERNEL_Dispatch(
             ));
 
         gcmkONERROR(gckOS_ReleaseMutex(Kernel->os,
-            Kernel->device->commitMutex,
+            Kernel->device->commitMutex
             ));
 
         commitMutexAcquired = gcvFALSE;
