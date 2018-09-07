@@ -4841,7 +4841,10 @@ _CheckErrorForArithmeticExpr(
         {
             if (!IsMul)
             {
-                if (!slsDATA_TYPE_IsFloat(RightOperand->toBeDataType))
+                if (!slsDATA_TYPE_IsFloat(RightOperand->toBeDataType)
+                    && !(slsDATA_TYPE_IsMat(RightOperand->toBeDataType)
+                        && slmDATA_TYPE_matrixSize_GET(LeftOperand->toBeDataType)
+                        == slmDATA_TYPE_matrixSize_GET(RightOperand->toBeDataType)))
                 {
                     gcmVERIFY_OK(sloCOMPILER_Report(
                                                     Compiler,
@@ -4849,7 +4852,7 @@ _CheckErrorForArithmeticExpr(
                                                     RightOperand->base.stringNo,
                                                     slvREPORT_ERROR,
                                                     "require a float or mat%d expression",
-                                                    LeftOperand->toBeDataType->matrixSize));
+                                                    slmDATA_TYPE_matrixSize_GET(LeftOperand->toBeDataType)));
 
                     status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                     gcmFOOTER();
@@ -6254,7 +6257,10 @@ _CheckErrorForArithmeticAssignmentExpr(
         }
         else if (slsDATA_TYPE_IsMat(LeftOperand->toBeDataType))
         {
-            if (!slsDATA_TYPE_IsFloat(RightOperand->toBeDataType))
+            if (!slsDATA_TYPE_IsFloat(RightOperand->toBeDataType)
+                && !(slsDATA_TYPE_IsMat(RightOperand->toBeDataType)
+                    && slmDATA_TYPE_matrixSize_GET(LeftOperand->toBeDataType)
+                    == slmDATA_TYPE_matrixSize_GET(RightOperand->toBeDataType)))
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(
                                                 Compiler,
@@ -6262,7 +6268,7 @@ _CheckErrorForArithmeticAssignmentExpr(
                                                 RightOperand->base.stringNo,
                                                 slvREPORT_ERROR,
                                                 "require a float or mat%d expression",
-                                                LeftOperand->toBeDataType->matrixSize));
+                                                slmDATA_TYPE_matrixSize_GET(LeftOperand->toBeDataType)));
 
                 status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                 gcmFOOTER();
