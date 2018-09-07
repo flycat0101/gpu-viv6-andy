@@ -130,6 +130,8 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
 
     if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS) return program;
 
+    gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
+
     if ((*pBinary == FULL_PROGRAM_BINARY_SIG_1) &&  (*(pBinary+1) == FULL_PROGRAM_BINARY_SIG_2))
     {
         program->linked = gcvTRUE;
@@ -140,8 +142,6 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
     }
     else
     {
-        gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
-
         /* Construct binary. */
         gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shaderBinary));
 
