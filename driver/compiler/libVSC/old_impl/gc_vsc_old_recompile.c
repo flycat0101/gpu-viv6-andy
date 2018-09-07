@@ -4816,7 +4816,7 @@ gcLoadCLPatchLibrary(
                 status =  gcSHADER_ReadGCSLShaderFromFile(gcCLPatchLibFileName[j], &library);
             }
             if ((status == gcvSTATUS_VERSION_MISMATCH) || (library == gcvNULL) ||
-                (gcShaderHasInt64Patch(library) == gcmOPT_oclInt64InVIR()))
+                (j == LONG_ULONG_LIB_INDEX && (gcShaderHasInt64Patch(library) == gcmOPT_oclInt64InVIR())))
             {
                 gctBOOL int64Patch = gcvFALSE;
 
