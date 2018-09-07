@@ -1731,6 +1731,34 @@ gcChipValidateProgramSamplersCB(
             }
         }
 
+        /* As webgl spec is inconsistent with oes spec when fetch a texel outside of the texture's size.
+           Es would return undefined result but webgl hopes(0,0,0,0). */
+        if (gcdPROC_IS_WEBGL(chipCtx->patchId) &&
+            (program->samplerMap[sampler].uniform != gcvNULL ) &&
+            __glBitmaskTest(&gc->shaderProgram.samplerTexelFetchDirty, sampler) &&
+            chipCtx->chipFeature.hwFeature.hasTxBorderClamp)
+        {
+            if ((chipCtx->texture.halTexture[unit].s == gcvTEXTURE_CLAMP) ||
+                (chipCtx->texture.halTexture[unit].t == gcvTEXTURE_CLAMP) ||
+                (chipCtx->texture.halTexture[unit].r == gcvTEXTURE_CLAMP))
+            {
+                gctFLOAT bordercolor[4] = {0.0f};
+                __GL_MEMCOPY(chipCtx->texture.halTexture[unit].borderColor, bordercolor, 4 * gcmSIZEOF(gctFLOAT));
+            }
+            if (chipCtx->texture.halTexture[unit].s == gcvTEXTURE_CLAMP)
+            {
+                chipCtx->texture.halTexture[unit].s = gcvTEXTURE_BORDER;
+            }
+            if (chipCtx->texture.halTexture[unit].t == gcvTEXTURE_CLAMP)
+            {
+                chipCtx->texture.halTexture[unit].t = gcvTEXTURE_BORDER;
+            }
+            if (chipCtx->texture.halTexture[unit].r == gcvTEXTURE_CLAMP)
+            {
+                chipCtx->texture.halTexture[unit].r = gcvTEXTURE_BORDER;
+            }
+        }
+
         if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER
          || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
         {
