@@ -742,20 +742,31 @@ gcoCL_FlushSurface(
                 return status;
             }
 
-            status = gcoOS_CacheFlush(gcvNULL,
+            gcmONERROR(gcoOS_CacheFlush(gcvNULL,
                                            Surface->node.u.normal.node,
                                            Surface->node.logical,
-                                           Surface->size);
+                                           Surface->size));
+
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
+                                          Surface->node.logical,
+                                          Surface->size,
+                                          gcvCACHE_INVALIDATE));
         }
         else
         {
-            status = gcoSURF_NODE_Cache(&Surface->node,
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
                                         srcMemory[0],
                                         Surface->size,
-                                        gcvCACHE_FLUSH);
+                                        gcvCACHE_FLUSH));
+
+            gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
+                                        srcMemory[0],
+                                        Surface->size,
+                                        gcvCACHE_INVALIDATE));
         }
     }
 
+OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
