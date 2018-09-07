@@ -252,7 +252,7 @@ typedef struct _gcsSIGNAL
     gctUINT32 id;
 
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
     /* Parent timeline. */
     struct sync_timeline * timeline;
 #  else

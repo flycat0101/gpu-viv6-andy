@@ -5569,7 +5569,7 @@ gckOS_CreateSignal(
     atomic_set(&signal->ref, 1);
 
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
     signal->timeline = gcvNULL;
 #  else
     signal->fence = gcvNULL;
@@ -5692,7 +5692,7 @@ gckOS_Signal(
     gceSTATUS status;
     gcsSIGNAL_PTR signal;
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
     struct sync_timeline * timeline = gcvNULL;
 #  else
     struct fence * fence = gcvNULL;
@@ -5739,7 +5739,7 @@ gckOS_Signal(
         wake_up(&signal->wait);
 
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
         timeline = signal->timeline;
 #  else
         fence = signal->fence;
@@ -5755,7 +5755,7 @@ gckOS_Signal(
     spin_unlock(&signal->lock);
 
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
     /* Signal timeline. */
     if (timeline)
     {
@@ -6667,7 +6667,7 @@ gckOS_DetectProcessByName(
 }
 
 #if gcdLINUX_SYNC_FILE
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+#ifndef CONFIG_SYNC_FILE
 gceSTATUS
 gckOS_CreateSyncTimeline(
     IN gckOS Os,
@@ -6941,7 +6941,7 @@ OnError:
     return status;
 }
 
-#  else /* v4.9.0 */
+#  else /* !CONFIG_SYNC_FILE */
 
 gceSTATUS
 gckOS_CreateSyncTimeline(
@@ -7053,6 +7053,24 @@ OnError:
     return status;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+/**
+ * sync_file_fdget() - get a sync_file from an fd
+ * @fd:     fd referencing a fence
+ *
+ * Ensures @fd references a valid sync_file, increments the refcount of the
+ * backing file. Returns the sync_file or NULL in case of error.
+ */
+static struct sync_file *sync_file_fdget(int fd)
+{
+    struct file *file = fget(fd);
+
+    if (!file)
+        return NULL;
+
+    return file->private_data;
+}
+
 gceSTATUS
 gckOS_WaitNativeFence(
     IN gckOS Os,
@@ -7061,13 +7079,82 @@ gckOS_WaitNativeFence(
     IN gctUINT32 Timeout
     )
 {
-    struct fence *fence;
     struct viv_sync_timeline *timeline;
     gceSTATUS status = gcvSTATUS_OK;
     unsigned int i;
-    unsigned int numFences;
-    struct fence **fences;
     unsigned long timeout;
+    unsigned int numFences;
+    struct sync_file *sync_file;
+
+    timeline = (struct viv_sync_timeline *) Timeline;
+
+    sync_file = sync_file_fdget(FenceFD);
+
+    if (!sync_file)
+    {
+        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+    }
+
+    numFences = sync_file->num_fences;
+
+    timeout = msecs_to_jiffies(Timeout);
+
+    for (i = 0; i < numFences; i++)
+    {
+        struct fence *f = sync_file->cbs[i].fence;
+        fence_get(f);
+
+        if (f->context != timeline->context &&
+            !fence_is_signaled(f))
+        {
+            signed long ret;
+            ret = fence_wait_timeout(f, 1, timeout);
+
+            if (ret == -ERESTARTSYS)
+            {
+                status = gcvSTATUS_INTERRUPTED;
+                fence_put(f);
+                break;
+            }
+            else if (ret <= 0)
+            {
+                status = gcvSTATUS_TIMEOUT;
+                fence_put(f);
+                break;
+            }
+            else
+            {
+                /* wait success. */
+                timeout -= ret;
+            }
+        }
+
+        fence_put(f);
+    }
+
+    return gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+#    else
+
+gceSTATUS
+gckOS_WaitNativeFence(
+    IN gckOS Os,
+    IN gctHANDLE Timeline,
+    IN gctINT FenceFD,
+    IN gctUINT32 Timeout
+    )
+{
+    struct viv_sync_timeline *timeline;
+    gceSTATUS status = gcvSTATUS_OK;
+    unsigned int i;
+    unsigned long timeout;
+    unsigned int numFences;
+    struct fence *fence;
+    struct fence **fences;
 
     timeline = (struct viv_sync_timeline *) Timeline;
 
@@ -7100,7 +7187,7 @@ gckOS_WaitNativeFence(
             !fence_is_signaled(f))
         {
             signed long ret;
-            ret = fence_wait_timeout(fence, 1, timeout);
+            ret = fence_wait_timeout(f, 1, timeout);
 
             if (ret == -ERESTARTSYS)
             {
@@ -7128,7 +7215,8 @@ OnError:
     return status;
 }
 
-#  endif /* v4.9.0 */
+#    endif
+#  endif
 #endif
 
 #if gcdSECURITY
