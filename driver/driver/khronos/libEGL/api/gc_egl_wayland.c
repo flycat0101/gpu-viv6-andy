@@ -43,13 +43,17 @@
 #define WL_EGL_NUM_BACKBUFFERS          3
 #define WL_EGL_MAX_NUM_BACKBUFFERS      8
 
+#define WAYLAND_VERSION_CT ((WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13))
+
 struct wl_egl_display
 {
     struct wl_display * wl_dpy;
     struct wl_viv * wl_viv;
     struct wl_registry * registry;
     struct wl_event_queue * wl_queue;
-    struct wl_event_queue * commit_queue;
+#if (WAYLAND_VERSION_CT)
+    struct wl_display * wrap_dpy;
+#endif
 };
 
 struct wl_egl_window
@@ -80,6 +84,13 @@ struct wl_egl_window
     int32_t commit_signal;
     pthread_mutex_t commit_mutex;
 
+    VEGLThreadData winthread;
+    struct wl_event_queue * wl_queue;
+    struct wl_event_queue * commit_queue;
+
+#if (WAYLAND_VERSION_CT)
+        struct wl_surface * wrap_surface;
+#endif
     struct wl_surface * surface;
     struct wl_list link;
 };
@@ -223,6 +234,16 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
 
     done = 0;
 
+#if (WAYLAND_VERSION_CT)
+    {
+        struct wl_display *wrapped_display;
+        wrapped_display = (struct wl_display *)wl_proxy_create_wrapper((void *)wl_dpy);
+        wl_proxy_set_queue((struct wl_proxy *) wrapped_display, wl_queue);
+        callback = wl_display_sync(wrapped_display);
+        wl_proxy_wrapper_destroy((void *)wrapped_display);
+        wl_callback_add_listener(callback, &sync_listener, &done);
+    }
+#else
     /*
      * This is to block read & dispatch events in other threads, so that the
      * callback is with correct queue and listener when 'done' event.
@@ -245,6 +266,7 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
     wl_callback_add_listener(callback, &sync_listener, &done);
 
     wl_display_cancel_read(wl_dpy);
+#endif
 
     while (!done && ret >= 0)
         ret = dispatch_queue(wl_dpy, wl_queue, 100);
@@ -323,14 +345,17 @@ wl_egl_display_create(struct wl_display *wl_dpy)
     memset(display, 0, sizeof(*display));
 
     display->wl_dpy   = wl_dpy;
+#if (WAYLAND_VERSION_CT)
+    display->wrap_dpy = (struct wl_display * )wl_proxy_create_wrapper((void *)wl_dpy);
+#endif
     display->wl_queue = wl_display_create_queue(wl_dpy);
-    display->commit_queue = wl_display_create_queue(wl_dpy);
+
     display->registry = wl_display_get_registry(wl_dpy);
 
     wl_proxy_set_queue((struct wl_proxy *)display->registry, display->wl_queue);
     wl_registry_add_listener(display->registry, &registry_listener, display);
-
     roundtrip_queue(display->wl_dpy, display->wl_queue);
+
 
     return display;
 }
@@ -364,33 +389,53 @@ wl_egl_display_destroy(struct wl_egl_display *display)
         {
             struct wl_egl_buffer *buffer = &window->buffers[i];
 
-            if (buffer->frame_callback)
+            if (buffer->frame_callback && window->commit_queue)
             {
                 int ret = 0;
 
                 pthread_mutex_lock(&window->commit_mutex);
                 while (buffer->frame_callback && ret != -1)
                 {
-                    ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+                    ret = dispatch_queue(display->wl_dpy, window->commit_queue, 100);
                 }
                 pthread_mutex_unlock(&window->commit_mutex);
             }
         }
 
+        if (window->commit_queue)
+            roundtrip_queue(display->wl_dpy, window->commit_queue);
+
+        if (window->wl_queue)
+            roundtrip_queue(display->wl_dpy, window->wl_queue);
+
+        if (window->commit_queue)
+            wl_event_queue_destroy(window->commit_queue);
+
+        if (window->wl_queue)
+            wl_event_queue_destroy(window->wl_queue);
+
+
+#if (WAYLAND_VERSION_CT)
+        if (window->wrap_surface)
+            wl_proxy_wrapper_destroy((void *)window->wrap_surface);
+#endif
+        window->commit_queue = gcvNULL;
+        window->wl_queue = gcvNULL;
         window->display = NULL;
     }
 
     pthread_mutex_unlock(&egl_window_mutex);
 
+
     roundtrip_queue(display->wl_dpy, display->wl_queue);
-    roundtrip_queue(display->wl_dpy, display->commit_queue);
+
+#if (WAYLAND_VERSION_CT)
+    wl_proxy_wrapper_destroy(display->wrap_dpy);
+#endif
 
     wl_registry_destroy(display->registry);
     wl_viv_destroy(display->wl_viv);
     wl_event_queue_destroy(display->wl_queue);
-
-    wl_event_queue_destroy(display->commit_queue);
-
     free(display);
 }
 
@@ -416,6 +461,30 @@ wl_egl_window_validate(struct wl_egl_window *window)
 
     return -EINVAL;
 }
+
+static int
+wl_egl_window_check()
+{
+    struct wl_egl_window *win;
+    VEGLThreadData thread = gcvNULL;
+    int sync = 0;
+
+    pthread_once(&once_control, once_init);
+
+    pthread_mutex_lock(&egl_window_mutex);
+
+    wl_list_for_each(win, &egl_window_list, link)
+    {
+        if (thread == gcvNULL)
+            thread = win->winthread;
+        if (thread != win->winthread)
+            sync = 1;
+    }
+
+    pthread_mutex_unlock(&egl_window_mutex);
+    return sync;
+}
+
 
 static void
 wl_egl_window_register(struct wl_egl_window *window)
@@ -646,7 +715,6 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         struct wl_egl_buffer *buffer)
 {
     struct wl_egl_display *display = window->display;
-    int ret = 0;
     int done = 0;
 
     if (!buffer->info.surface)
@@ -656,12 +724,25 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
 
     if (display)
     {
+#if (WAYLAND_VERSION_CT)
         struct wl_callback *callback;
-        struct wl_display *wl_dpy = display->wl_dpy;
-        struct wl_event_queue *wl_queue = display->wl_queue;
         struct wl_egl_buffer * wrapper;
 
+        /* Use a wrapper struct to allow modifications in original one. */
+        wrapper = malloc(sizeof(*buffer));
+        memcpy(wrapper, buffer, sizeof(*buffer));
 
+        callback = wl_display_sync(display->wrap_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)callback, window->wl_queue);
+        wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
+        buffer->info.surface = gcvNULL;
+        done = 1;
+#else
+        struct wl_callback *callback;
+        struct wl_display *wl_dpy = display->wl_dpy;
+        struct wl_event_queue *wl_queue = window->wl_queue;
+        struct wl_egl_buffer * wrapper;
+        int ret = 0;
         /*
          * This is to block read & dispatch events in other threads, so that the
          * callback is with correct queue and listener when 'done' event.
@@ -676,7 +757,7 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
             memcpy(wrapper, buffer, sizeof(*buffer));
 
             callback = wl_display_sync(display->wl_dpy);
-            wl_proxy_set_queue((struct wl_proxy *)callback, display->wl_queue);
+            wl_proxy_set_queue((struct wl_proxy *)callback, window->wl_queue);
             wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
 
             wl_display_cancel_read(wl_dpy);
@@ -685,6 +766,7 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
 
             done = 1;
         }
+#endif
     }
 
     if (!done)
@@ -757,7 +839,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 {
     struct wl_egl_buffer *buffer = NULL;
     struct wl_display *wl_dpy = window->display->wl_dpy;
-    struct wl_event_queue *wl_queue = window->display->wl_queue;
+    struct wl_event_queue *wl_queue = window->wl_queue;
     int ret = 0;
 
     if (window->indequeue)
@@ -768,8 +850,10 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     window->indequeue = 1;
 
+
     /* Try to read and dispatch some events. */
     dispatch_queue(wl_dpy, wl_queue, 1);
+
 
     if (window->nr_buffers > 1)
     {
@@ -805,6 +889,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
             }
             loop++;
         }
+
     }
     else
     {
@@ -884,6 +969,7 @@ make_bounding_box(struct wl_egl_buffer *buffer, const struct eglRegion *region,
     }
 }
 
+#if (WAYLAND_VERSION_CT)
 static int
 wl_egl_window_queue_buffer(struct wl_egl_window *window,
         struct wl_egl_buffer *buffer,
@@ -892,7 +978,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     gcoSURF surface = NULL;
     struct wl_egl_display *display = window->display;
     struct wl_display *wl_dpy = display->wl_dpy;
-    struct wl_event_queue *commit_queue = display->commit_queue;
+    struct wl_event_queue *commit_queue = window->commit_queue;
     int x, y, width, height;
     int ret = 0;
 
@@ -902,7 +988,89 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     /* Make sure previous frame with this buffer is done. */
     while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+
+    if (ret == -1)
+    {
+        /* fatal error, can not recover. */
+        goto out;
+    }
+
+    while (!window->commit_signal && ret != -1)
+        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+
+    if (ret == -1)
+    {
+        /* fatal error, can not recover. */
+        goto out;
+    }
+
+    if (window->swap_interval > 0)
+    {
+        buffer->frame_callback = wl_surface_frame(window->wrap_surface);
+        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
+        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+    }
+
+    /* buffer is queued to compositor. */
+    buffer->state = BUFFER_STATE_QUEUED;
+    window->dx = 0;
+    window->dy = 0;
+
+    surface = buffer->info.surface;
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+        !surface->tileStatusDisabled[0], surface->compressed,
+        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+
+    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
+
+    wl_surface_attach(window->wrap_surface, buffer->wl_buf, window->dx, window->dy);
+    wl_surface_damage(window->wrap_surface, x, y, width, height);
+    wl_surface_commit(window->wrap_surface);
+
+    window->commit_signal--;
+
+    /*
+     * If we're not waiting for a frame callback then we'll at least throttle
+     * to a sync callback so that we always give a chance for the compositor to
+     * handle the commit and send a release event before checking for a free
+     * buffer
+     */
+    if (buffer->frame_callback == NULL)
+    {
+        buffer->frame_callback = wl_display_sync(display->wrap_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
+        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+    }
+
+    /* flush events. */
+    wl_display_flush(wl_dpy);
+
+out:
+    pthread_mutex_unlock(&window->commit_mutex);
+
+    return ret;
+}
+#else
+static int
+wl_egl_window_queue_buffer(struct wl_egl_window *window,
+        struct wl_egl_buffer *buffer,
+        struct eglRegion *damage)
+{
+    gcoSURF surface = NULL;
+    struct wl_egl_display *display = window->display;
+    struct wl_display *wl_dpy = display->wl_dpy;
+    struct wl_event_queue *commit_queue = window->commit_queue;
+    int x, y, width, height;
+    int ret = 0;
+
+    make_bounding_box(buffer, damage, &x, &y, &width, &height);
+
+    pthread_mutex_lock(&window->commit_mutex);
+
+    /* Make sure previous frame with this buffer is done. */
+    while (buffer->frame_callback && ret != -1)
+        ret = dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -943,7 +1111,6 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     /* buffer is queued to compositor. */
     buffer->state = BUFFER_STATE_QUEUED;
-
     window->dx = 0;
     window->dy = 0;
 
@@ -995,6 +1162,7 @@ out:
 
     return ret;
 }
+#endif
 
 static int
 wl_egl_window_cancel_buffer(struct wl_egl_window *window,
@@ -1163,6 +1331,15 @@ _ConnectWindow(
 
     gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
     wl_egl_window_set_format(window, gcvSURF_BITMAP, Surface->renderTargetFormat);
+
+    if (window->wl_queue == gcvNULL)
+    {
+        window->wl_queue = wl_display_create_queue(window->display->wl_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)window->display->wl_viv, window->wl_queue);
+    }
+
+    if (window->commit_queue == gcvNULL)
+        window->commit_queue = wl_display_create_queue(window->display->wl_dpy);
 
     /* Save window info structure. */
     Surface->winInfo = (void *) 1;
@@ -1470,6 +1647,8 @@ _BindWindow(
 #endif
     }
 
+    window->winthread = veglGetThreadData();
+
     *RenderMode = renderMode;
     return EGL_TRUE;
 }
@@ -1489,6 +1668,7 @@ _UnbindWindow(
 
     /* Do not throttle the swap thread. */
     window->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
+    window->winthread = gcvNULL;
 
     return EGL_TRUE;
 }
@@ -1615,6 +1795,18 @@ _SynchronousPost(
     if (window->nr_buffers == 1)
     {
         return EGL_TRUE;
+    }
+
+    /* If there are mulitithreads and each thread has its own window,
+     * for window with <swap_interval = 0>, current thread is used to swap frame into screen instead of swapthread.
+     * When mulitithread, all rendering requests will be put into swapthread and will be processed one by one,
+     * but the requests for <interval = 0> should be handled faster than requests for <interval = 1>, the processing rate is decided by the slow ones,
+     * this means <interval = 0> will not work.
+     */
+    if (wl_egl_window_check())
+    {
+        if (window->swap_interval == 0)
+            return EGL_TRUE;
     }
 
     return EGL_FALSE;
@@ -2008,6 +2200,10 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     memset(window, 0, sizeof (struct wl_egl_window));
     window->surface = surface;
 
+#if (WAYLAND_VERSION_CT)
+    window->wrap_surface = (struct wl_surface *)wl_proxy_create_wrapper((void *)surface);
+#endif
+
     window->nr_buffers  = WL_EGL_NUM_BACKBUFFERS;
 
     window->width  = width;
@@ -2029,6 +2225,7 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
     {
         window->swap_interval = 1;
     }
+
 
     pthread_mutex_init(&window->commit_mutex, NULL);
 
@@ -2090,7 +2287,7 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
             pthread_mutex_lock(&window->commit_mutex);
             while (buffer->frame_callback && ret != -1)
             {
-                ret = dispatch_queue(display->wl_dpy, display->commit_queue, 100);
+                ret = dispatch_queue(display->wl_dpy, window->commit_queue, 100);
             }
             pthread_mutex_unlock(&window->commit_mutex);
         }
@@ -2100,8 +2297,29 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
 
     if (display)
     {
-        roundtrip_queue(display->wl_dpy, display->wl_queue);
+        roundtrip_queue(display->wl_dpy, window->commit_queue);
+        roundtrip_queue(display->wl_dpy, window->wl_queue);
     }
+
+    if (window->wl_queue == gcvNULL)
+    {
+        wl_event_queue_destroy(window->wl_queue);
+        window->wl_queue = gcvNULL;
+    }
+
+    if (window->commit_queue == gcvNULL)
+    {
+        wl_event_queue_destroy(window->commit_queue);
+        window->commit_queue = gcvNULL;
+    }
+
+#if (WAYLAND_VERSION_CT)
+    if (window->wrap_surface)
+    {
+        wl_proxy_wrapper_destroy((void *)window->wrap_surface);
+        window->wrap_surface = gcvNULL;
+    }
+#endif
 
     free(window->buffers);
     window->buffers   = NULL;
@@ -2124,7 +2342,7 @@ void wl_egl_window_resize(struct wl_egl_window *window,
 
         if (display)
         {
-            roundtrip_queue(display->wl_dpy, display->wl_queue);
+            roundtrip_queue(display->wl_dpy, window->wl_queue);
         }
 
         window->width  = width;
@@ -2471,5 +2689,4 @@ veglCreateWaylandBufferFromImage(
 OnError:
     return wl_buf;
 }
-
 
