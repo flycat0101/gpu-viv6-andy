@@ -17892,14 +17892,6 @@ _setDestSymIdPlusThree(
     return gcvTRUE;
 }
 
-static gctBOOL
-_setSrc0NotConstIndexing(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-}
-
 /* attr_st gl_TessLevelOuter accessed by dynamic indexing
 ATTR_ST            hp temp(5).hp.x, int 0, int mp  temp(9).mp.x, hp  temp(277).hp.x
 =>
