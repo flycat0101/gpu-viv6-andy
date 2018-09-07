@@ -713,7 +713,7 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
     if (context == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
 
-    vxmASSERT(vxContextGlobalLock);
+    if (vxContextGlobalLock == VX_NULL) return VX_FAILURE;
     vxAcquireMutex(vxContextGlobalLock);
 
     gcfVX_Flush(gcvTRUE);
