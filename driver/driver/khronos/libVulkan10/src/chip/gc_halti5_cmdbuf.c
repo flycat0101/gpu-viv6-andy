@@ -3476,7 +3476,15 @@ VkResult halti5_setRenderTargets(
 #endif
                     );
 
-                __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0518, VK_FALSE, 2, baseAddresses);
+                if (database->NumPixelPipes == 1)
+                {
+                    __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0518, VK_FALSE, 1, baseAddresses);
+                }
+                else
+                {
+                    __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0518, VK_FALSE, 2, baseAddresses);
+                }
+
                 __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050D, VK_FALSE, (uint32_t)pLevel->stride);
 
                 if (database->REG_GeometryShader)
@@ -3571,8 +3579,16 @@ VkResult halti5_setRenderTargets(
                     break;
                 }
 
-                __vkCmdLoadBatchHWStates(&pCmdBuffer, (0x5200 + (hwRtIndex-1)*8), VK_FALSE,
-                    2, baseAddresses);
+                if (database->NumPixelPipes == 1)
+                {
+                    __vkCmdLoadBatchHWStates(&pCmdBuffer, (0x5200 + (hwRtIndex - 1) * 8), VK_FALSE,
+                        1, baseAddresses);
+                }
+                else
+                {
+                    __vkCmdLoadBatchHWStates(&pCmdBuffer, (0x5200 + (hwRtIndex - 1) * 8), VK_FALSE,
+                        2, baseAddresses);
+                }
 
                 __vkCmdLoadSingleHWState(&pCmdBuffer, (0x5240 + (hwRtIndex-1)), VK_FALSE,
                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3653,7 +3669,15 @@ VkResult halti5_setRenderTargets(
  27:27) + 1))))))) << (0 ? 27:27))));
 
         baseAddresses[0] = baseAddresses[1] = rtBaseAddr;
-        __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0520, VK_FALSE, 2, baseAddresses);
+
+        if (database->NumPixelPipes == 1)
+        {
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0520, VK_FALSE, 1, baseAddresses);
+        }
+        else
+        {
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0520, VK_FALSE, 2, baseAddresses);
+        }
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0505, VK_FALSE, (uint32_t)pLevel->stride);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0500, VK_FALSE, chipGfxPipeline->regDepthConfig);
 
