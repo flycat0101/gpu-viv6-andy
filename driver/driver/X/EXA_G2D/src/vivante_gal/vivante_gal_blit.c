@@ -1595,11 +1595,11 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
         {
             case 8:
             case 16:
-                retvsurf = VGetSurfAddrBy16(galInfo, maxsize, (int *) (&physicaladdr), (int *) (&linearaddr),(int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
+                retvsurf = VGetSurfAddrBy16(galInfo, maxsize, (int *) (&physicaladdr), &linearaddr,(int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
                 break;
             case 24:
             case 32:
-                retvsurf = VGetSurfAddrBy32(galInfo, maxsize, (int *) (&physicaladdr), (int *) (&linearaddr), (int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
+                retvsurf = VGetSurfAddrBy32(galInfo, maxsize, (int *) (&physicaladdr), &linearaddr, (int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
                 break;
             default:
                 return ;
