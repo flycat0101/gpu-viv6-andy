@@ -1368,11 +1368,6 @@ _CreateVivanteDrmBufferSurface(
                                 gcvSURF_FLAG_CONTENT_YINVERTED,
                                 gcvTRUE));
 
-    /* Corrent tile status state. */
-    surface->tileStatusDisabled[0] =
-            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
-            (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
-
     if (RenderMode >= 0)
     {
         gceTILING tiling = gcvINVALIDTILED;
@@ -1397,7 +1392,20 @@ _CreateVivanteDrmBufferSurface(
             return EGL_FALSE;
         }
 
+        /* Set default tile status state for Producer. */
+        tilingArgs.ts_mode = surface->tileStatusNode.pool == gcvPOOL_UNKNOWN ? DRM_VIV_GEM_TS_NONE
+                           : surface->tileStatusDisabled[0] ? DRM_VIV_GEM_TS_DISABLED
+                           : surface->compressed ? DRM_VIV_GEM_TS_COMPRESSED
+                           : DRM_VIV_GEM_TS_NORMAL;
+
         drm_vivante_bo_set_tiling(Bo->bo, &tilingArgs);
+    }
+    else
+    {
+        /* Corrent tile status state. */
+        surface->tileStatusDisabled[0] =
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
+                (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
     }
 
     *Surface = surface;
