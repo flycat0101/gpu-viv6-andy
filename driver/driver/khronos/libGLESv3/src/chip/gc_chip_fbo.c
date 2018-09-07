@@ -1198,6 +1198,19 @@ gcChipBlitFramebufferResolve(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
+    /* webgl 2.0 spec: For any source pixel lying outside the read framebuffer, the corresponding pixel remains untouched */
+    if (srcX0 < 0)
+    {
+        dstX0 = dstX0 - srcX0;
+        srcX0 = 0;
+    }
+
+    if (srcY0 < 0)
+    {
+        dstY0 = dstY0 - srcY0;
+        srcY0 = 0;
+    }
+
     rlvArgs.version = gcvHAL_ARG_VERSION_V2;
     rlvArgs.uArgs.v2.srcOrigin.x = __GL_MAX(0, srcX0);
     rlvArgs.uArgs.v2.srcOrigin.y = __GL_MAX(0, srcY0);
