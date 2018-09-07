@@ -33074,9 +33074,9 @@ gcInitGLSLCaps(
     Caps->maxWorkGroupSize[0] = 128;
     Caps->maxWorkGroupSize[1] = 128;
     Caps->maxWorkGroupSize[2] = 64;
-    /*modify the max WorkGroupInvocation from 128 to 2048
+    /*modify the max WorkGroupInvocation from 128 to 256
     when do barrier in cs, the max value should be 128*/
-    Caps->maxWorkGroupInvocation = 2048;
+    Caps->maxWorkGroupInvocation = 256;
     Caps->maxShareMemorySize = 32768;
 
     /* TS-only limits */
