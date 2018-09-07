@@ -4616,14 +4616,9 @@ GLvoid GL_APIENTRY __gles_GenerateMipmap(__GLcontext *gc, GLenum target)
     }
     else
     {
-        if (tex->fboList == gcvNULL)
-        {
-            tex->params.mipHint = __GL_TEX_MIP_HINT_FORCE_ON;
-        }
-        else
-        {
-            tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO_MIP;
-        }
+        /* remove the MIP_HINT_FORCE_ON which against spec required, the app will use mipmap only when
+        minFilter use mipmap related filter */
+        tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO_MIP;
     }
     tex->mipBaseLevel = baseLevel;
     tex->mipMaxLevel  = maxLevel;
