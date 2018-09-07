@@ -171,7 +171,7 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*resumeXFB)(__GLcontext *);
     GLvoid (*endXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*getXfbVarying)(__GLcontext*, __GLprogramObject*, GLuint, GLsizei, GLsizei*, GLsizei*, GLenum*, GLchar*);
-    GLboolean (*checkXFBBufSizes)(__GLcontext *, __GLxfbObject *, GLsizei);
+    GLboolean (*checkXFBBufSizes)(__GLcontext *, __GLxfbObject *, GLuint64);
 
     GLboolean (*drawArraysIndirect)(__GLcontext *);
     GLboolean (*drawElementsIndirect)(__GLcontext *);

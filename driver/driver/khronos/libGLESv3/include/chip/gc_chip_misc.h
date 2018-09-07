@@ -158,7 +158,7 @@ extern GLboolean
 __glChipCheckXFBBufSizes(
     __GLcontext *gc,
     __GLxfbObject *xfbObj,
-    GLsizei count
+    GLuint64 count
     );
 
 GLvoid

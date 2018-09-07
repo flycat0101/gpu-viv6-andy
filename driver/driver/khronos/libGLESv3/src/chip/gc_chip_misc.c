@@ -858,7 +858,7 @@ GLboolean
 __glChipCheckXFBBufSizes(
     __GLcontext *gc,
     __GLxfbObject *xfbObj,
-    GLsizei count
+    GLuint64 count
     )
 {
     __GLprogramObject *programObj = xfbObj->programObj;
@@ -867,8 +867,8 @@ __glChipCheckXFBBufSizes(
     GLboolean ret = GL_TRUE;
 
     /* The last bytes a XFB buffer will be written, plus 1. */
-    gctUINT32 endBytes = 0;
-    gctUINT32 bufSize = 0;
+    GLuint64 endBytes = 0;
+    GLuint64 bufSize = 0;
 
     gcmHEADER_ARG("gc=0x%x xfbObj=0x%x count=%d", gc, xfbObj, count);
 
@@ -878,11 +878,11 @@ __glChipCheckXFBBufSizes(
     {
         endBytes = program->xfbStride * (count + xfbObj->offset);
 
-        bufSize = (gctUINT)pXfbBindingPoints[0].bufSize;
+        bufSize = (GLuint64)pXfbBindingPoints[0].bufSize;
         /* (bufsize == 0) indicates the whole buffer */
         if (!bufSize)
         {
-            bufSize = (gctUINT)pXfbBindingPoints[0].boundBufObj->size;
+            bufSize = (GLuint64)pXfbBindingPoints[0].boundBufObj->size;
         }
 
         if (bufSize < endBytes)
@@ -899,11 +899,11 @@ __glChipCheckXFBBufSizes(
         {
             endBytes = program->xfbVaryings[index].stride * (count + xfbObj->offset);
 
-            bufSize = (gctUINT)pXfbBindingPoints[index].bufSize;
+            bufSize = (GLuint64)pXfbBindingPoints[index].bufSize;
             /* (bufsize == 0) indicates the whole buffer */
             if (!bufSize)
             {
-                bufSize = (gctUINT)pXfbBindingPoints[index].boundBufObj->size;
+                bufSize = (GLuint64)pXfbBindingPoints[index].boundBufObj->size;
             }
 
             if (bufSize < endBytes)

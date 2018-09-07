@@ -2605,7 +2605,7 @@ GLboolean
 __glChipProfile_CheckXFBBufSizes(
     __GLcontext *gc,
     __GLxfbObject *xfbObj,
-    GLsizei count
+    GLuint64 count
     )
 {
     GLboolean ret;

@@ -363,32 +363,23 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
 
             if (xfbObj->active && !xfbObj->paused)
             {
-                GLuint numPrims = 0;
-                GLuint numVerts = 0;
+                GLuint64 numPrims = 0;
+                GLuint64 numVerts = 0;
 
                 __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN];
-
-                if (vertexCount > 0)
-                {
-                   /* Check if the calculation will overflow */
-                   if ((((GLsizei)(((gctINT64)1 << (((sizeof(GLsizei)) << 3) - 1)) - 1)) / vertexCount) < instanceCount)
-                   {
-                      __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-                   }
-                }
 
                 switch (mode)
                 {
                 case GL_TRIANGLES:
-                    numPrims = (vertexCount / 3) * instanceCount;
+                    numPrims = (GLuint64)(vertexCount / 3) * instanceCount;
                     numVerts = numPrims * 3;
                     break;
                 case GL_LINES:
-                    numPrims = (vertexCount / 2) * instanceCount;
+                    numPrims = (GLuint64)(vertexCount / 2) * instanceCount;
                     numVerts = numPrims * 2;
                     break;
                 case GL_POINTS:
-                    numPrims = vertexCount * instanceCount;
+                    numPrims = (GLuint64)vertexCount * instanceCount;
                     numVerts = numPrims;
                     break;
                 }
@@ -398,7 +389,7 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
                     __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
                 }
 
-                xfbObj->vertices = numVerts;
+                xfbObj->vertices = (GLuint)numVerts;
 
                 /* Update query object for xfb. Handled by the CPU for now. */
                 if (queryObj && queryObj->active)
