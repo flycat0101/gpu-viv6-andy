@@ -1413,6 +1413,15 @@ __glChipGetDeviceConstants(
             minFragUniforms = 16;
         }
 
+        if ((gc->apiVersion == __GL_API_VERSION_ES30 && gcdPROC_IS_WEBGL(patchId)) &&
+            ((chipModel == gcv880 && chipRevision == 0x5106) ||
+            (chipModel == gcv2000 && chipRevision == 0x5108) ||
+            (chipModel == gcv2000 && chipRevision == 0xFFFF5450)))
+        {
+            minVertUniforms = 128;
+            minFragUniforms = 16;
+        }
+
         shaderCaps->maxBuildInVertAttributes = 2;
 
         gcmERR_BREAK(gcoHAL_QueryStreamCaps(gcvNULL,
