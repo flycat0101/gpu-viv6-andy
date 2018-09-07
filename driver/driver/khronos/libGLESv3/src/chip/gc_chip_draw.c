@@ -4302,7 +4302,7 @@ gcChipValidateRenderTargetState(
 
     gceSTATUS status = gcvSTATUS_OK;
 
-    GLuint i, j;
+    GLuint i, j, drawRTNumber;
 
     gcoSURF rtSurf, depthSurf;
 
@@ -4535,12 +4535,13 @@ gcChipValidateRenderTargetState(
     if(!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
     {
         /* Get fence for color attachment texture surafce. */
-        for (i = 0; i < chipCtx->drawRTnum; i++)
+        drawRTNumber = chipCtx->drawRTnum < __GL_MAX_DRAW_BUFFERS ? chipCtx->drawRTnum : __GL_MAX_DRAW_BUFFERS;
+        for (i = 0; i < drawRTNumber; i++)
         {
             rtSurf = chipCtx->drawRtViews[i].surf;
             if(rtSurf && (rtSurf->hints & gcvSURF_CREATE_AS_TEXTURE))
             {
-                gcmONERROR(gcoSURF_GetFence(chipCtx->drawRtViews[i].surf, gcvFENCE_TYPE_WRITE));
+                gcmONERROR(gcoSURF_GetFence(rtSurf, gcvFENCE_TYPE_WRITE));
             }
         }
 
