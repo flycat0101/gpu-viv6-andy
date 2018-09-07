@@ -659,7 +659,7 @@ gbm_viv_bo_create(
     struct gbm_viv_device *dev = gbm_viv_device(gbm);
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmASSERT(!count && modifiers);
+    gcmASSERT(!count || modifiers);
 
     /* It's acceptable to create an image with INVALID modifier in the list,
     * but it cannot be on the only modifier (since it will certainly fail
