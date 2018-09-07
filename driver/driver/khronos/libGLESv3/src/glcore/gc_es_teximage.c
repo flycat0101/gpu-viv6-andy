@@ -3443,7 +3443,9 @@ GLvoid GL_APIENTRY __gles_GenerateMipmap(__GLcontext *gc, GLenum target)
 
             gcoHAL_GetPatchID(gcvNULL, &patchId);
 
-            if (patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25)
+            if (patchId == gcvPATCH_GLBM21 ||
+                patchId == gcvPATCH_GLBM25 ||
+                patchId == gcvPATCH_ANTUTUGL3)
             {
                 tex->params.mipHint = __GL_TEX_MIP_HINT_FORCE_ON;
             }
