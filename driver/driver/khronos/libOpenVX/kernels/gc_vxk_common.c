@@ -941,7 +941,7 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
                         vx_size size = 0;
                         size = vxComputeImagePatchSize(image, &rect, plane);
                         /*Only copy different memory. For CTS GraphROI.Simple */
-                        if (size > 0 && (abs((vx_int32)((vx_uint32)(image->memory.logicals[plane]) - (vx_uint32)(image->memory.nodePtrs[plane]->logical))) > (vx_int32)size))
+                        if (size > 0 && (abs((vx_int32)(gcmALL_TO_UINT32(image->memory.logicals[plane]) - gcmALL_TO_UINT32(image->memory.nodePtrs[plane]->logical))) > (vx_int32)size))
                             gcoOS_MemCopy(image->memory.logicals[plane], image->memory.nodePtrs[plane]->logical, size);
                     }
                 }
