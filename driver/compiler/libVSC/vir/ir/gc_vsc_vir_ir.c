@@ -16308,7 +16308,6 @@ VIR_Shader_GetMaxFreeRegCount(
     if (pHwCfg->hwFeatureFlags.hasHalti5
         && pHwCfg->hwFeatureFlags.supportGS
         && pHwCfg->hwFeatureFlags.supportTS
-        && !VIR_Shader_IsCL(pShader)
         )
     {
         /*  128: total temp registers per workgroup (128 = 512/4: total temp register per core/4)
