@@ -268,12 +268,12 @@ static Bool DoneByVSurf(PixmapPtr pDst, int x, int y, int w,
 
         case 16:
             bytesperpixel = 2;
-            retvsurf = VGetSurfAddrBy16(&pViv->mGrCtx, maxsize, (int *) (&mmap.physical), (int *) (&(mmap.mUserAddr)), &aligned_width, &aligned_height, &aligned_pitch);
+            retvsurf = VGetSurfAddrBy16(&pViv->mGrCtx, maxsize, (int *) (&mmap.physical), &(mmap.mUserAddr), &aligned_width, &aligned_height, &aligned_pitch);
 
             break;
         case 32:
             bytesperpixel = 4;
-            retvsurf = VGetSurfAddrBy32(&pViv->mGrCtx, maxsize, (int *) (&mmap.physical), (int *) (&(mmap.mUserAddr)), &aligned_width, &aligned_height, &aligned_pitch);
+            retvsurf = VGetSurfAddrBy32(&pViv->mGrCtx, maxsize, (int *) (&mmap.physical), &(mmap.mUserAddr), &aligned_width, &aligned_height, &aligned_pitch);
             break;
         default:
             TRACE_EXIT(FALSE);

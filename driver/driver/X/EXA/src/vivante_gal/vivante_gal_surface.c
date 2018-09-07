@@ -1033,7 +1033,7 @@ void UnmapUserMem(GALINFOPTR galInfo, MemMapInfoPtr mmInfo) {
 
 typedef struct _IVSURF {
 gcoSURF surf;
-long        lineaddr;
+gctPOINTER lineaddr;
 }IVSURF,*PIVSURF;
 
 
@@ -1114,10 +1114,10 @@ static Bool VDestroySurf32() {
 
 }
 
-Bool  VGetSurfAddrBy16(GALINFOPTR galInfo,int maxsize,int *phyaddr,int *lgaddr,int *width,int *height,int *stride)
+Bool  VGetSurfAddrBy16(GALINFOPTR galInfo,int maxsize,int *phyaddr,void **lgaddr,int *width,int *height,int *stride)
 {
     static unsigned int gphyaddr[4];
-    static unsigned int glgaddr[4];
+    static gctPOINTER glgaddr[4];
     static unsigned int gwidth[4];
     static unsigned int gheight[4];
     static int gstride[4];
@@ -1149,7 +1149,7 @@ Bool  VGetSurfAddrBy16(GALINFOPTR galInfo,int maxsize,int *phyaddr,int *lgaddr,i
         if (status!=gcvSTATUS_OK)
             TRACE_EXIT(FALSE);
 
-        status=gcoSURF_Lock(_vsurf16->surf,  &gphyaddr[_surfIndex], (void *)&glgaddr[_surfIndex]);
+        status=gcoSURF_Lock(_vsurf16->surf,  &gphyaddr[_surfIndex], &glgaddr[_surfIndex]);
 
         _vsurf16->lineaddr=glgaddr[_surfIndex];
 
@@ -1166,10 +1166,10 @@ Bool  VGetSurfAddrBy16(GALINFOPTR galInfo,int maxsize,int *phyaddr,int *lgaddr,i
 }
 
 
-Bool  VGetSurfAddrBy32(GALINFOPTR galInfo,int maxsize, int *phyaddr,int *lgaddr,int *width,int *height,int *stride)
+Bool  VGetSurfAddrBy32(GALINFOPTR galInfo,int maxsize, int *phyaddr,void **lgaddr,int *width,int *height,int *stride)
 {
     static unsigned int gphyaddr[4];
-    static unsigned int glgaddr[4];
+    static gctPOINTER glgaddr[4];
     static unsigned int gwidth[4];
     static unsigned int gheight[4];
 
@@ -1202,7 +1202,7 @@ Bool  VGetSurfAddrBy32(GALINFOPTR galInfo,int maxsize, int *phyaddr,int *lgaddr,
     if (status!=gcvSTATUS_OK)
         TRACE_EXIT(FALSE);
 
-    status=gcoSURF_Lock(_vsurf32->surf,  &gphyaddr[_surfIndex], (void *)&glgaddr[_surfIndex]);
+    status=gcoSURF_Lock(_vsurf32->surf,  &gphyaddr[_surfIndex], &glgaddr[_surfIndex]);
 
     _vsurf32->lineaddr=glgaddr[_surfIndex];
 
