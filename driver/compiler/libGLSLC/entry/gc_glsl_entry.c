@@ -610,6 +610,8 @@ gcInitializeCompiler(
         gcmVERIFY_OK(gcInitGLSLCaps(glslCaps));
     }
 
+    gcmONERROR(gcInitializeRecompilation());
+
 OnError:
     gcmFOOTER_ARG("status=%d", status);
     return status;
@@ -650,7 +652,9 @@ gcFinalizeCompiler(void)
             }
         }
     }
+    gcmONERROR(gcFinalizeRecompilation());
 
+OnError:
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }

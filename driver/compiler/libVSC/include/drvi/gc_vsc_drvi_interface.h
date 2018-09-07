@@ -24,9 +24,10 @@
 #include "old_impl/gc_vsc_old_drvi_interface.h"
 
 /* 0.0.1.1 add chipModel and ChipRevision, Nov. 30, 2017 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 1)
+/* 0.0.1.2 change VIR_Operand size, April. 9, 2017 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 2)
 
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 1)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 2)
 
 #define gcdSUPPORT_COMPUTE_SHADER   1
 #define gcdSUPPORT_TESS_GS_SHADER   1

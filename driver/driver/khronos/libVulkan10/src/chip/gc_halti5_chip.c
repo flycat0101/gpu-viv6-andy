@@ -562,6 +562,8 @@ VkResult halti5_initializeChipModule(
         chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
     }
 
+    __VK_ONERROR(gcInitializeRecompilation());
+
     __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
     decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
     decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
@@ -619,6 +621,8 @@ VkResult halti5_finalizeChipModule(
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
 
     halti5_finalizeComputeBlit(devCtx);
+
+    gcFinalizeRecompilation();
 
     if (chipModule && (chipModule->patchLib))
     {

@@ -11,7 +11,6 @@
 // minimize the impact of pulling in essentially everything else in Clang.
 //
 //===----------------------------------------------------------------------===//
-#include <stdio.h>
 #include "gc_cl_compiler_int.h"
 #include "llvm/Config/config.h"
 #include "clang/FrontendTool/Utils.h"
@@ -107,6 +106,7 @@ KLC    **/
 }
 
 #define _USE_FILE_LOCK_FOR_RD_WR   0
+
 #define RESOURCE_DIRECTORY "/driver/openGL/libCL/frontend/llvm/bin/lib/clang/2.8"
 
 static char *_IncludePaths[] = {
@@ -125,14 +125,19 @@ GetTemporaryFilename(
 cloCOMPILER Compiler,
 gctUINT StringNo,
 const char *tmpdir,
-char *Suffix,
+char *Prefix,
 char *namebuffer,
 gctSIZE_T bufsize
 )
 {
+  gctHANDLE pid = gcoOS_GetCurrentProcessID();
+  char namePrefix[32];
+  gctUINT32 offset = 0;
   llvm::sys::Path P(tmpdir);
   std::string Error;
-  P.appendComponent("cl");
+
+  gcmVERIFY_OK(gcoOS_PrintStrSafe(namePrefix, 32, &offset, "%s_proc%x", Prefix, (int) (gctUINTPTR_T) pid));
+  P.appendComponent(namePrefix);
   if (P.makeUnique(false, &Error)) {
     gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                     0,
@@ -144,8 +149,6 @@ gctSIZE_T bufsize
 
   // FIXME: Grumble, makeUnique sometimes leaves the file around!?  PR3837.
   P.eraseFromDisk(false, 0);
-
-  P.appendSuffix(Suffix);
   gcmVERIFY_OK(gcoOS_StrCopySafe(namebuffer, bufsize, P.str().c_str()));
   return gcvSTATUS_OK;
 }
@@ -180,12 +183,22 @@ GetTemporaryDir(char *dirnamebuf, gctSIZE_T bufsize) {
   }
 #if defined(LINUX) && !defined(ANDROID)
   if (!TmpDir) {
-    FILE *fp = fopen("/tmp", "r");
-    if (fp != gcvNULL)
+    gceSTATUS status;
+    gctFILE filp;
+
+    status = gcoOS_Open(gcvNULL,
+                        "/tmp",
+                        gcvFILE_READ,
+                        &filp);
+    if(gcmIS_ERROR(status))
+    {
+       ;
+    }
+    else
     {
         /* /tmp is exist and readable, use it as temp directory */
       TmpDir = "/tmp";
-      fclose(fp);
+      gcoOS_Close(gcvNULL, filp);
     }
   }
 #endif
@@ -698,9 +711,9 @@ unsigned *pped_count)
     for(unsigned int i=0; i < count; i++) {
       if(!NoPreprocess) {
         char tmpfile_name[_cldFILENAME_MAX];
-        char name_suffix[16];
-        char tmpoutputfile_name[_cldFILENAME_MAX + 16];
-        status = GetTemporaryFilename(Compiler, count, tmpdir, (char *)"", tmpfile_name, _cldFILENAME_MAX);
+        char name_prefix[16];
+        char tmpoutputfile_name[_cldFILENAME_MAX + 32];
+        status = GetTemporaryFilename(Compiler, count, tmpdir, (char *)"cl", tmpfile_name, _cldFILENAME_MAX);
         if (gcmIS_ERROR(status)) {
            cloCOMPILER_Report(Compiler,
                               0,
@@ -747,8 +760,8 @@ unsigned *pped_count)
 
         Frontendopts.Inputs.clear();
         Frontendopts.Inputs.push_back(std::make_pair(IK_OpenCL, &tmpfile_name[0]));
-        gcmVERIFY_OK(gcoOS_PrintStrSafe(name_suffix, gcmSIZEOF(name_suffix), &offset, "_%d_PPED", i));
-        status = GetTemporaryFilename(Compiler, count, tmpdir, name_suffix, tmpoutputfile_name, _cldFILENAME_MAX + 16);
+        gcmVERIFY_OK(gcoOS_PrintStrSafe(name_prefix, gcmSIZEOF(name_prefix), &offset, "cl_%d_PPED", i));
+        status = GetTemporaryFilename(Compiler, count, tmpdir, name_prefix, tmpoutputfile_name, _cldFILENAME_MAX + 16);
         if (gcmIS_ERROR(status)) {
            cloCOMPILER_Report(Compiler,
                               0,
