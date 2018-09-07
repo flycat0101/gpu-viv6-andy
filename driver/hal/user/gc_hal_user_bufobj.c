@@ -561,7 +561,6 @@ static gceSTATUS _gpuUpload(
         &physicAddress,
         gcvNULL));
 
-
     srcLocked = gcvTRUE;
 
     srcAddress = physicAddress;
