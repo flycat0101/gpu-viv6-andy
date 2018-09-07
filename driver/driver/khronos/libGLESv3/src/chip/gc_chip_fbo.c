@@ -2027,7 +2027,8 @@ __glChipRenderbufferStorage(
 
      if (drvFormat == __GL_FMT_RGBA4 &&
         (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
-        ! gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI5))
+        ! gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI5) &&
+        rbo->width <= 0x80 && rbo->height <= 0x80)
     {
         drvFormat = __GL_FMT_RGBA8;
     }
