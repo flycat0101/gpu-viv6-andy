@@ -22954,7 +22954,7 @@ clGenDerefStructPointerCode(
                                           &LeftParameters->dataTypes[0].byteOffset,
                                           offset);
            if (gcmIS_ERROR(status)) return status;
-           clmGEN_CODE_ConvDirectElementDataType(UnaryExpr->u.fieldName->decl.dataType, dataType);
+           dataType = _ConvElementDataType(&UnaryExpr->u.fieldName->decl);
 
            clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, dataType);
            status = clGenGenericCode2(Compiler,
