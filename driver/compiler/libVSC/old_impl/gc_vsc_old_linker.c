@@ -6513,7 +6513,7 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
             {
                 if (vscBV_TestBit(&locationMask, j))
                 {
-                    if (gcSHADER_IsES11Compiler(Tree->shader))
+                    if (gcShader_IsES11Compiler(Tree->shader))
                     {
                         gcmATTRIBUTE_SetLocHasAlias(attribute, gcvTRUE);
                     }
