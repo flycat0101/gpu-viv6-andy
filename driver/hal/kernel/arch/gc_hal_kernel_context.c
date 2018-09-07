@@ -2746,6 +2746,11 @@ _DestroyContext(
             Context->buffer = next;
         }
 
+        gcmkVERIFY_OK(gckEVENT_Submit(Context->hardware->kernel->eventObj,
+            gcvTRUE,
+            gcvFALSE
+            ));
+
 #if gcdSECURE_USER
         /* Free the hint array. */
         if (Context->hint != gcvNULL)
