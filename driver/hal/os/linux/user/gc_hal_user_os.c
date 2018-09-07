@@ -1108,7 +1108,6 @@ _ModuleConstructor(
 
     /* Construct gl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
-
     /* Construct cl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.clFECompilerAccessLock));
 
