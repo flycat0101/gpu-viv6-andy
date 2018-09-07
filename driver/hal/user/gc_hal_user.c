@@ -268,6 +268,7 @@ _FillInOptions(
     gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvFALSE;
     gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
     gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvTRUE;
+    gcOptions[gcvOPTION_NO_Y_INVERT] = gcvFALSE;
 
 
     /* overwrite option with environment settings here. */
@@ -300,6 +301,14 @@ _FillInOptions(
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
         {
             gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvFALSE;
+        }
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_Y_INVERT", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
+        {
+            gcOptions[gcvOPTION_NO_Y_INVERT] = gcvTRUE;
         }
     }
 

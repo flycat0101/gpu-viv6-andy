@@ -3762,7 +3762,7 @@ gcChipRecompileEvaluateKeyStates(
             gctBOOL drawYInverted = program->masterPgInstance->programState.hints->yInvertAware &&
                                     chipCtx->drawYInverted;
 
-            if (drawYInverted != pgKeyState->staticKey->drawYInverted)
+            if ((drawYInverted != pgKeyState->staticKey->drawYInverted ) && (!gcoHAL_GetOption(gcvNULL, gcvOPTION_NO_Y_INVERT)))
             {
                 pgKeyState->staticKey->drawYInverted = drawYInverted;
                 pgKeyDirty = GL_TRUE;
