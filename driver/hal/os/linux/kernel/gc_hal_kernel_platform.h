@@ -284,7 +284,7 @@ gcsPLATFORM_OPERATIONS;
 enum
 {
     /* GPU can't issue more that 32bit physical address */
-    gcvPLATFORM_FLAG_LIMIT_4G_ADDRESS = 1 << 0;
+    gcvPLATFORM_FLAG_LIMIT_4G_ADDRESS = 1 << 0,
 };
 
 struct soc_platform

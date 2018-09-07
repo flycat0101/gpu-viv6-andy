@@ -3206,10 +3206,8 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
                     outTensor = vxReshapeTensor(reshuffleTensor, new_size, outputs_dims);
                 }
 
-                shaderExecutable = vxnneReshuffleShaderExecutable(node->base.context,
- VXNNE_KERNEL_TENSOR_RESHUFFLE, &node->kernelAttributes.borderMode, inputs,
- stride_x, stride_y, padMode, padConstValue, padXLeftValue, padXRightValue,
- padYTopValue, padYBottomValue, outTensor);
+                shaderExecutable = vxnneReshuffleShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_RESHUFFLE, &node->kernelAttributes.borderMode, inputs, stride_x, stride_y, padMode, padConstValue, padXLeftValue, padXRightValue, padYTopValue, padYBottomValue, outTensor);
+
 
                 if(outTensor)
                     vxReleaseTensor(&outTensor);

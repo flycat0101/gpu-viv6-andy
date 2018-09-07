@@ -186,7 +186,7 @@ struct _VIR_LinkLib_CONTEXT
 {
     VIR_Shader                          *shader;
     VIR_Shader                          *libShader;
-    VSC_HASH_TABLE                      *pTempHashTable;
+        VSC_HASH_TABLE                      *pTempHashTable;
     VIR_ShaderKind                      shaderKind;
     VSC_LIB_LINK_POINT                  *linkPoint;
     gctUINT                             libSpecializationConstantCount;

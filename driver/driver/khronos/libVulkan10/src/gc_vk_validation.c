@@ -303,9 +303,7 @@ vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice,
- VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
- VkImageUsageFlags flags, VkImageFormatProperties* pImageFormatProperties)
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageUsageFlags flags, VkImageFormatProperties* pImageFormatProperties)
 {
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
@@ -1327,9 +1325,7 @@ vk_Exit:
     devCtx->currentResult = result;
 }
 
-VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice,
- VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage,
- VkImageTiling tiling, uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
+VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage, VkImageTiling tiling, uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
 {
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
@@ -3762,10 +3758,7 @@ vk_Exit:
     cmb->obj.pDevContext->currentResult = result;
 }
 
-VKAPI_ATTR void VKAPI_CALL __valid_CmdBindDescriptorSets(VkCommandBuffer commandBuffer,
- VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet,
- uint32_t setCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount,
- const uint32_t* pDynamicOffsets)
+VKAPI_ATTR void VKAPI_CALL __valid_CmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount, const uint32_t* pDynamicOffsets)
 {
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     __vkPipelineLayout *ppl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, layout);
@@ -4547,20 +4540,16 @@ vk_Exit:
     cmb->obj.pDevContext->currentResult = result;
 }
 
-VKAPI_ATTR void VKAPI_CALL __valid_CmdWaitEvents(VkCommandBuffer commandBuffer,
- uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask,
- VkPipelineStageFlags destStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
- uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
- uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
+VKAPI_ATTR void VKAPI_CALL __valid_CmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
 {
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     __vkEvent *evt;
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkCmdWaitEvents(%p, %d, %p, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, eventCount, pEvents, srcStageMask,
- destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
- pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    __VK_LOG_API("(tid=%d): vkCmdWaitEvents(%p, %d, %p, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, eventCount, pEvents, srcStageMask, destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
+
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4602,18 +4591,14 @@ vk_Exit:
     cmb->obj.pDevContext->currentResult = result;
 }
 
-VKAPI_ATTR void VKAPI_CALL __valid_CmdPipelineBarrier(VkCommandBuffer commandBuffer,
- VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask,
- VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
- uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
- uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
+VKAPI_ATTR void VKAPI_CALL __valid_CmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
 {
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdPipelineBarrier(%p, %d, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcStageMask, destStageMask,
- dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
- pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    __VK_LOG_API("(tid=%d): vkCmdPipelineBarrier(%p, %d, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcStageMask, destStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
+
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))

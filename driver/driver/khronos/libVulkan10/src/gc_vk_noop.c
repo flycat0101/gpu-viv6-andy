@@ -37,9 +37,7 @@ VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceFormatProperties(VkPhysicalDev
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL __nop_GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice,
- VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
- VkImageUsageFlags flags, VkImageFormatProperties* pImageFormatProperties)
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageUsageFlags flags, VkImageFormatProperties* pImageFormatProperties)
 {
     __VK_NOP_MESSAGE();
     return VK_SUCCESS;
@@ -182,9 +180,7 @@ VKAPI_ATTR void VKAPI_CALL __nop_GetImageSparseMemoryRequirements(VkDevice devic
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice,
- VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage,
- VkImageTiling tiling, uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
+VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage, VkImageTiling tiling, uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
 {
     __VK_NOP_MESSAGE();
 }
@@ -571,10 +567,7 @@ VKAPI_ATTR void VKAPI_CALL __nop_CmdSetStencilCompareMask(VkCommandBuffer comman
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR void VKAPI_CALL __nop_CmdBindDescriptorSets(VkCommandBuffer commandBuffer,
- VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet,
- uint32_t setCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount,
- const uint32_t* pDynamicOffsets)
+VKAPI_ATTR void VKAPI_CALL __nop_CmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount, const uint32_t* pDynamicOffsets)
 {
     __VK_NOP_MESSAGE();
 }
@@ -684,20 +677,12 @@ VKAPI_ATTR void VKAPI_CALL __nop_CmdResetEvent(VkCommandBuffer commandBuffer, Vk
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR void VKAPI_CALL __nop_CmdWaitEvents(VkCommandBuffer commandBuffer,
- uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask,
- VkPipelineStageFlags destStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
- uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
- uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
+VKAPI_ATTR void VKAPI_CALL __nop_CmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
 {
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR void VKAPI_CALL __nop_CmdPipelineBarrier(VkCommandBuffer commandBuffer,
- VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask,
- VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
- uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
- uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
+VKAPI_ATTR void VKAPI_CALL __nop_CmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
 {
     __VK_NOP_MESSAGE();
 }

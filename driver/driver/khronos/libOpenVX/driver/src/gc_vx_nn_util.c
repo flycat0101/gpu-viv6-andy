@@ -1039,9 +1039,7 @@ void calculateFilterPerCore(vx_context context, vx_weights_biases_parameter wb, 
 
                         newWTBandWidth = _calcWriteBandWidth(x, y, outXSize, outYSize, outZSize, dataSize, imageCompressRatio, uscCacheSize, poolingStride);
 
-                        newCycleCount[0] = (vx_uint32)((vx_float32)_calcComputeCycleCount(x,
- y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize,
- madPerCore, dataSize, dpAmount, coefNonZeroRatio, interleaveMode, vip7FP16) * ceilf((vx_float32)outZSize / numCores) / outZSize);
+                        newCycleCount[0] = (vx_uint32)((vx_float32)_calcComputeCycleCount(x, y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, madPerCore, dataSize, dpAmount, coefNonZeroRatio, interleaveMode, vip7FP16) * ceilf((vx_float32)outZSize / numCores) / outZSize);
 
                         newCycleCount[0] = gcmMAX(newCycleCount[0], (vx_uint32)((vx_float32)newRDBandWidth[0] / sustainedBandwidth));
 
@@ -1065,9 +1063,7 @@ void calculateFilterPerCore(vx_context context, vx_weights_biases_parameter wb, 
                             newRDBandWidth[1] = _calcReadBandWidth(x, y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, outXSize, outYSize, numCores, brickMode, dataSize, 1.0f, imageCompressRatio, l2CacheSize);
                             newNCRDBandWidth[1] = _calcReadBandWidth(x, y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, outXSize, outYSize, numCores, brickMode, dataSize, 1.0f, imageCompressRatio, 0);
 
-                            newCycleCount[1] = (vx_uint32)((vx_float32)_calcComputeCycleCount(x,
- y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize,
- madPerCore, dataSize, dpAmount, 1.0f, interleaveMode, vip7FP16) * ceilf((vx_float32)outZSize / numCores) / outZSize);
+                            newCycleCount[1] = (vx_uint32)((vx_float32)_calcComputeCycleCount(x, y, k, outXSize, outYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, madPerCore, dataSize, dpAmount, 1.0f, interleaveMode, vip7FP16) * ceilf((vx_float32)outZSize / numCores) / outZSize);
 
                             newCycleCount[1] = gcmMAX(newCycleCount[1], (vx_uint32)((vx_float32)newRDBandWidth[1] / sustainedBandwidth));
 

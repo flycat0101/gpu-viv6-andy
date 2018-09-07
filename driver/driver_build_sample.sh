@@ -313,14 +313,6 @@ esac;
 #                                      enabling cacheable;
 #                               0      paged memory won't be cacheable;
 #
-#   NONPAGED_MEMORY_CACHEABLE   1      non paged memory will be cacheable;               0
-#                               0      paged memory won't be cacheable;
-#
-#   NONPAGED_MEMORY_BUFFERABLE  1      non paged memory will be bufferable;               1
-#                                      NONPAGED_MEMORY_CACHEABLE and USE_POWER_MANAGEMENT
-#                                      cann't be set to 1 at the same time;
-#                               0      non paged memory won't be bufferable;
-#
 
 BUILD_OPTION_DEBUG=0
 BUILD_OPTION_ABI=0

@@ -567,7 +567,7 @@ typedef enum _gceOPTION
     gcvOPTION_OCL_ASYNC_BLT = 57,
     gcvOPTION_OCL_IN_THREAD = 58,
     gcvOPTION_COMPRESSION_DEC400 = 59,
-
+    gcvOPTION_NO_Y_INVERT = 60,
     /* Insert option above this comment only */
     gcvOPTION_COUNT                     /* Not a OPTION*/
 }

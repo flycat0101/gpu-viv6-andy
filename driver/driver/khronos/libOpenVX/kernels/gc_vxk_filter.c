@@ -1256,36 +1256,26 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
 
                     vx_uint32 bin[12];
                     /*c4*/
-                    bin[0] = _gcfVX_PatternValue(func, m[0], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
- m[1], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[2],
- gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[3], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[0] = _gcfVX_PatternValue(func, m[0], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[1], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[2], gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[3], gceVX_MEDIAN_CROSS_NOCARE) << 24);
 
                     bin[1] = _gcfVX_PatternValue(func, m[4], gceVX_MEDIAN_CROSS_NOCARE);
 
-                    bin[2] = _gcfVX_PatternValue(func, m[5], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
- m[6], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[7],
- gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[8], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[2] = _gcfVX_PatternValue(func, m[5], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[6], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[7], gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[8], gceVX_MEDIAN_CROSS_NOCARE) << 24);
 
                     bin[3] = _gcfVX_PatternValue(func, m[9], gceVX_MEDIAN_CROSS_NOCARE);
 
                     /*c5*/
-                    bin[4] = _gcfVX_PatternValue(func, m[10], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
- m[11], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[12],
- gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[13],
- gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[4] = _gcfVX_PatternValue(func, m[10], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[11], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[12], gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[13], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+
                     bin[5] = _gcfVX_PatternValue(func, m[14], gceVX_MEDIAN_CROSS_NOCARE);
 
-                    bin[6] = _gcfVX_PatternValue(func, m[15], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
- m[16], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[17],
- gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[18],
- gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[6] = _gcfVX_PatternValue(func, m[15], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[16], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[17], gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[18], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+
                     bin[7] = _gcfVX_PatternValue(func, m[19], gceVX_MEDIAN_CROSS_NOCARE);
 
                     /*c6*/
-                    bin[8] = _gcfVX_PatternValue(func, m[20], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
- m[21], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[22],
- gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[23],
- gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[8] = _gcfVX_PatternValue(func, m[20], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[21], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[22], gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[23], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+
                     bin[9] = _gcfVX_PatternValue(func, m[24], gceVX_MEDIAN_CROSS_NOCARE);
 
                     bin[10] =

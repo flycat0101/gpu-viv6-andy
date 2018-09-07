@@ -858,7 +858,6 @@ __resize_callback(struct wl_egl_window *window, void *data)
 
         egl_surface->width  = window->width;
         egl_surface->height = window->height;
-        egl_surface->frame_callback = gcvNULL;
 
         /* handle recursive call to dequeue issue. */
         if (egl_surface->indequeue)
