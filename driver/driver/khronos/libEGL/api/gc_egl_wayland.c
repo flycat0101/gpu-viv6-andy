@@ -29,6 +29,7 @@
 #include <wayland-viv-client-protocol.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include "wayland-egl-backend.h"
 
 #include <gc_hal_user.h>
 
@@ -43,33 +44,33 @@
 #define WL_EGL_NUM_BACKBUFFERS          3
 #define WL_EGL_MAX_NUM_BACKBUFFERS      8
 
-#define WAYLAND_VERSION_CT ((WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13))
+typedef struct __WLEGLBufferRec *__WLEGLBuffer;
 
-struct wl_egl_display
+typedef struct __WLEGLDisplayRec
 {
     struct wl_display * wl_dpy;
     struct wl_viv * wl_viv;
     struct wl_registry * registry;
     struct wl_event_queue * wl_queue;
-#if (WAYLAND_VERSION_CT)
+
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     struct wl_display * wrap_dpy;
 #endif
-};
+} *__WLEGLDisplay;
 
-struct wl_egl_window
+typedef struct __WLEGLSurfaceRec
 {
     uint32_t signature;
 
-    struct wl_egl_display * display;
+    __WLEGLDisplay display;
+    struct wl_egl_window  * window;
 
-    struct wl_egl_buffer * buffers;
     int nr_buffers;
+    __WLEGLBuffer buffers;
     int next;
 
     int indequeue;
 
-    int32_t dx;
-    int32_t dy;
     int32_t width;
     int32_t height;
     int32_t swap_interval;
@@ -77,34 +78,31 @@ struct wl_egl_window
     gceSURF_FORMAT format;
     gceSURF_TYPE type;
 
-    int32_t attached_width;
-    int32_t attached_height;
-
     /* number of buffers can commit to compositor. */
     int32_t commit_signal;
     pthread_mutex_t commit_mutex;
 
-    VEGLThreadData winthread;
+    gctHANDLE tid;
     struct wl_event_queue * wl_queue;
     struct wl_event_queue * commit_queue;
 
-#if (WAYLAND_VERSION_CT)
-        struct wl_surface * wrap_surface;
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
+    struct wl_surface * wrap_surface;
 #endif
-    struct wl_surface * surface;
-    struct wl_list link;
-};
 
-enum wl_egl_buffer_state
+    struct wl_list link;
+} *__WLEGLSurface;
+
+enum
 {
     BUFFER_STATE_FREE = 0,
     BUFFER_STATE_DEQUEUED,
     BUFFER_STATE_QUEUED,
 };
 
-struct wl_egl_buffer
+struct __WLEGLBufferRec
 {
-    struct wl_egl_window *parent;
+    __WLEGLSurface parent;
     struct
     {
         gctINT32 width;
@@ -130,18 +128,18 @@ struct wl_egl_buffer
     struct wl_buffer * wl_buf;
 };
 
-static struct wl_list egl_window_list;
-static pthread_mutex_t egl_window_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct wl_list __wl_egl_surface_list;
+static pthread_mutex_t __wl_egl_surface_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+static pthread_once_t __once_control = PTHREAD_ONCE_INIT;
 
-static void once_init(void)
+static void __wl_egl_init(void)
 {
-    wl_list_init(&egl_window_list);
+    wl_list_init(&__wl_egl_surface_list);
 }
 
 static inline int
-poll_event(struct wl_display *wl_dpy, short int events, int timeout)
+__wl_egl_poll_event(struct wl_display *wl_dpy, short int events, int timeout)
 {
     int ret;
     struct pollfd pfd[1];
@@ -164,7 +162,7 @@ poll_event(struct wl_display *wl_dpy, short int events, int timeout)
  * Returns the number of dispatched events on success or -1 on failure.
  */
 static int
-dispatch_queue(struct wl_display *wl_dpy,
+__wl_egl_dispatch_queue(struct wl_display *wl_dpy,
                 struct wl_event_queue *wl_queue, int timeout)
 {
     int ret;
@@ -179,7 +177,7 @@ dispatch_queue(struct wl_display *wl_dpy,
         if (ret != -1 || errno != EAGAIN)
             break;
 
-        if (poll_event(wl_dpy, POLLOUT, -1) == -1)
+        if (__wl_egl_poll_event(wl_dpy, POLLOUT, -1) == -1)
         {
             wl_display_cancel_read(wl_dpy);
             return -1;
@@ -194,7 +192,7 @@ dispatch_queue(struct wl_display *wl_dpy,
         return -1;
     }
 
-    ret = poll_event(wl_dpy, POLLIN, timeout);
+    ret = __wl_egl_poll_event(wl_dpy, POLLIN, timeout);
 
     /* cancel read when on error or timeout. */
     if (ret == -1 || ret == 0)
@@ -210,7 +208,7 @@ dispatch_queue(struct wl_display *wl_dpy,
 }
 
 static void
-sync_callback(void *data, struct wl_callback *callback, uint32_t serial)
+__sync_callback(void *data, struct wl_callback *callback, uint32_t serial)
 {
     int *done = data;
 
@@ -218,8 +216,8 @@ sync_callback(void *data, struct wl_callback *callback, uint32_t serial)
     wl_callback_destroy(callback);
 }
 
-static const struct wl_callback_listener sync_listener = {
-    sync_callback
+static const struct wl_callback_listener __sync_listener = {
+    __sync_callback
 };
 
 /*
@@ -227,21 +225,21 @@ static const struct wl_callback_listener sync_listener = {
  * Return -1 on error, 0 on success.
  */
 static int
-roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
+__wl_egl_roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
 {
     struct wl_callback *callback;
     int done, ret = 0;
 
     done = 0;
 
-#if (WAYLAND_VERSION_CT)
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     {
         struct wl_display *wrapped_display;
         wrapped_display = (struct wl_display *)wl_proxy_create_wrapper((void *)wl_dpy);
         wl_proxy_set_queue((struct wl_proxy *) wrapped_display, wl_queue);
         callback = wl_display_sync(wrapped_display);
         wl_proxy_wrapper_destroy((void *)wrapped_display);
-        wl_callback_add_listener(callback, &sync_listener, &done);
+        wl_callback_add_listener(callback, &__sync_listener, &done);
     }
 #else
     /*
@@ -263,13 +261,13 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
     }
 
     wl_proxy_set_queue((struct wl_proxy *) callback, wl_queue);
-    wl_callback_add_listener(callback, &sync_listener, &done);
+    wl_callback_add_listener(callback, &__sync_listener, &done);
 
     wl_display_cancel_read(wl_dpy);
 #endif
 
     while (!done && ret >= 0)
-        ret = dispatch_queue(wl_dpy, wl_queue, 100);
+        ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
 
     if (ret == -1 && !done)
         wl_callback_destroy(callback);
@@ -278,10 +276,10 @@ roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_queue)
 }
 
 static void
-registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
+__registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
                        const char *interface, uint32_t version)
 {
-    struct wl_egl_display *display = data;
+    __WLEGLDisplay display = data;
 
     if (strcmp(interface, "wl_viv") == 0 && display)
     {
@@ -291,12 +289,12 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
 }
 
 static void
-registry_handle_global_remove(void *data, struct wl_registry *wl_registry,
+__registry_handle_global_remove(void *data, struct wl_registry *wl_registry,
                               uint32_t name)
 {
 }
 
-static const struct wl_registry_listener registry_listener = {
+static const struct wl_registry_listener __registry_listener = {
     /**
      * global - announce global object
      * @name: (none)
@@ -309,7 +307,7 @@ static const struct wl_registry_listener registry_listener = {
      * given name is now available, and it implements the given version
      * of the given interface.
      */
-    registry_handle_global,
+    __registry_handle_global,
 
     /*
      * global_remove - announce removal of global object
@@ -326,15 +324,13 @@ static const struct wl_registry_listener registry_listener = {
      * global going away and a client sending a request to it.
      * @param name numeric name of the global object
      */
-    registry_handle_global_remove
+    __registry_handle_global_remove
 };
 
-static struct wl_egl_display *
-wl_egl_display_create(struct wl_display *wl_dpy)
+static __WLEGLDisplay
+__wl_egl_display_create(struct wl_display *wl_dpy)
 {
-    struct wl_egl_display *display;
-
-    display = malloc(sizeof(*display));
+    __WLEGLDisplay display = malloc(sizeof(*display));
 
     if (!display)
     {
@@ -344,8 +340,8 @@ wl_egl_display_create(struct wl_display *wl_dpy)
 
     memset(display, 0, sizeof(*display));
 
-    display->wl_dpy   = wl_dpy;
-#if (WAYLAND_VERSION_CT)
+    display->wl_dpy = wl_dpy;
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     display->wrap_dpy = (struct wl_display * )wl_proxy_create_wrapper((void *)wl_dpy);
 #endif
     display->wl_queue = wl_display_create_queue(wl_dpy);
@@ -353,86 +349,84 @@ wl_egl_display_create(struct wl_display *wl_dpy)
     display->registry = wl_display_get_registry(wl_dpy);
 
     wl_proxy_set_queue((struct wl_proxy *)display->registry, display->wl_queue);
-    wl_registry_add_listener(display->registry, &registry_listener, display);
-    roundtrip_queue(display->wl_dpy, display->wl_queue);
-
+    wl_registry_add_listener(display->registry, &__registry_listener, display);
+    __wl_egl_roundtrip_queue(display->wl_dpy, display->wl_queue);
 
     return display;
 }
 
 static void
-wl_egl_display_destroy(struct wl_egl_display *display)
+__wl_egl_display_destroy(__WLEGLDisplay display)
 {
-    struct wl_egl_window *window;
+    __WLEGLSurface egl_surface;
 
-    pthread_once(&once_control, once_init);
+    pthread_once(&__once_control, __wl_egl_init);
 
     /*
      * Need destroy all 'display' relevant window resources, window destroying
      * may be after this, without display resource.
      */
-    pthread_mutex_lock(&egl_window_mutex);
+    pthread_mutex_lock(&__wl_egl_surface_mutex);
 
     /*
      * Display may be destroyed before window destroying.
      * Make sure window buffers are synced in this case.
      */
-    wl_list_for_each(window, &egl_window_list, link)
+    wl_list_for_each(egl_surface, &__wl_egl_surface_list, link)
     {
         int i;
 
-        if (window->display != display)
+        if (egl_surface->display != display)
             continue;
 
-
-        for (i = 0; i < window->nr_buffers; i++)
+        for (i = 0; i < egl_surface->nr_buffers; i++)
         {
-            struct wl_egl_buffer *buffer = &window->buffers[i];
+            __WLEGLBuffer buffer = &egl_surface->buffers[i];
 
-            if (buffer->frame_callback && window->commit_queue)
+            if (buffer->frame_callback && egl_surface->commit_queue)
             {
                 int ret = 0;
 
-                pthread_mutex_lock(&window->commit_mutex);
+                pthread_mutex_lock(&egl_surface->commit_mutex);
                 while (buffer->frame_callback && ret != -1)
                 {
-                    ret = dispatch_queue(display->wl_dpy, window->commit_queue, 100);
+                    ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
                 }
-                pthread_mutex_unlock(&window->commit_mutex);
+                pthread_mutex_unlock(&egl_surface->commit_mutex);
             }
         }
 
-        if (window->commit_queue)
-            roundtrip_queue(display->wl_dpy, window->commit_queue);
+        if (egl_surface->commit_queue)
+            __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
 
-        if (window->wl_queue)
-            roundtrip_queue(display->wl_dpy, window->wl_queue);
+        if (egl_surface->wl_queue)
+            __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->wl_queue);
 
-        if (window->commit_queue)
-            wl_event_queue_destroy(window->commit_queue);
+        if (egl_surface->commit_queue)
+            wl_event_queue_destroy(egl_surface->commit_queue);
 
-        if (window->wl_queue)
-            wl_event_queue_destroy(window->wl_queue);
+        if (egl_surface->wl_queue)
+            wl_event_queue_destroy(egl_surface->wl_queue);
 
 
-#if (WAYLAND_VERSION_CT)
-        if (window->wrap_surface)
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
+        if (egl_surface->wrap_surface)
         {
-            wl_proxy_wrapper_destroy((void *)window->wrap_surface);
-            window->wrap_surface = gcvNULL;
+            wl_proxy_wrapper_destroy((void *)egl_surface->wrap_surface);
+            egl_surface->wrap_surface = gcvNULL;
         }
 #endif
-        window->commit_queue = gcvNULL;
-        window->wl_queue = gcvNULL;
-        window->display = NULL;
+        egl_surface->commit_queue = gcvNULL;
+        egl_surface->wl_queue = gcvNULL;
+        egl_surface->display = NULL;
     }
 
-    pthread_mutex_unlock(&egl_window_mutex);
+    pthread_mutex_unlock(&__wl_egl_surface_mutex);
 
 
-    roundtrip_queue(display->wl_dpy, display->wl_queue);
+    __wl_egl_roundtrip_queue(display->wl_dpy, display->wl_queue);
 
-#if (WAYLAND_VERSION_CT)
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     wl_proxy_wrapper_destroy(display->wrap_dpy);
 #endif
 
@@ -442,79 +436,60 @@ wl_egl_display_destroy(struct wl_egl_display *display)
     free(display);
 }
 
-static inline int
-wl_egl_window_validate(struct wl_egl_window *window)
+static int
+__wl_egl_display_is_mthread(__WLEGLDisplay display)
 {
-    struct wl_egl_window *win;
+    int mthread = 0;
+    gctHANDLE tid = gcvNULL;
+    __WLEGLSurface egl_surface;
 
-    pthread_once(&once_control, once_init);
+    pthread_once(&__once_control, __wl_egl_init);
 
-    pthread_mutex_lock(&egl_window_mutex);
-
-    wl_list_for_each(win, &egl_window_list, link)
+    pthread_mutex_lock(&__wl_egl_surface_mutex);
+    wl_list_for_each(egl_surface, &__wl_egl_surface_list, link)
     {
-        if (win == window)
+        if (egl_surface->display != display)
         {
-            pthread_mutex_unlock(&egl_window_mutex);
-            return 0;
+            continue;
+        }
+
+        if (tid == gcvNULL)
+        {
+            tid = egl_surface->tid;
+        }
+        else if (tid != egl_surface->tid)
+        {
+            mthread = 1;
+            break;
         }
     }
+    pthread_mutex_unlock(&__wl_egl_surface_mutex);
 
-    pthread_mutex_unlock(&egl_window_mutex);
-
-    return -EINVAL;
-}
-
-static int
-wl_egl_window_check()
-{
-    struct wl_egl_window *win;
-    VEGLThreadData thread = gcvNULL;
-    int sync = 0;
-
-    pthread_once(&once_control, once_init);
-
-    pthread_mutex_lock(&egl_window_mutex);
-
-    wl_list_for_each(win, &egl_window_list, link)
-    {
-        if (thread == gcvNULL)
-            thread = win->winthread;
-        if (thread != win->winthread)
-            sync = 1;
-    }
-
-    pthread_mutex_unlock(&egl_window_mutex);
-    return sync;
-}
-
-
-static void
-wl_egl_window_register(struct wl_egl_window *window)
-{
-    pthread_once(&once_control, once_init);
-
-    pthread_mutex_lock(&egl_window_mutex);
-
-    wl_list_insert(&egl_window_list, &window->link);
-
-    pthread_mutex_unlock(&egl_window_mutex);
+    return mthread;
 }
 
 static void
-wl_egl_window_unregister(struct wl_egl_window *window)
+__wl_egl_surface_register(__WLEGLSurface egl_surface)
 {
-    pthread_mutex_lock(&egl_window_mutex);
+    pthread_once(&__once_control, __wl_egl_init);
 
-    wl_list_remove(&window->link);
-
-    pthread_mutex_unlock(&egl_window_mutex);
+    pthread_mutex_lock(&__wl_egl_surface_mutex);
+    wl_list_insert(&__wl_egl_surface_list, &egl_surface->link);
+    pthread_mutex_unlock(&__wl_egl_surface_mutex);
 }
 
 static void
-buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
+__wl_egl_surface_unregister(__WLEGLSurface egl_surface)
 {
-    struct wl_egl_buffer *buffer = (struct wl_egl_buffer *)data;
+    pthread_mutex_lock(&__wl_egl_surface_mutex);
+    wl_list_remove(&egl_surface->link);
+    pthread_mutex_unlock(&__wl_egl_surface_mutex);
+}
+
+static void
+__buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
+{
+    __WLEGLBuffer buffer = (__WLEGLBuffer)data;
     gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
     wl_callback_destroy(callback);
@@ -545,7 +520,7 @@ buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t t
     gcoHAL_SetHardwareType(gcvNULL, hwType);
 }
 
-static const struct wl_callback_listener buffer_callback_listener =
+static const struct wl_callback_listener __buffer_callback_listener =
 {
     /**
      * done - done event
@@ -553,12 +528,12 @@ static const struct wl_callback_listener buffer_callback_listener =
      *
      * Notify the client when the related request is done.
      */
-    buffer_callback_handle_done
+    __buffer_callback_handle_done
 };
 
-static void buffer_handle_release(void *data, struct wl_buffer *wl_buf)
+static void __buffer_handle_release(void *data, struct wl_buffer *wl_buf)
 {
-    struct wl_egl_buffer *buffer = data;
+    __WLEGLBuffer buffer = data;
 
     if  (buffer->state != BUFFER_STATE_QUEUED)
     {
@@ -569,7 +544,7 @@ static void buffer_handle_release(void *data, struct wl_buffer *wl_buf)
     buffer->state = BUFFER_STATE_FREE;
 }
 
-static struct wl_buffer_listener buffer_listener = {
+static struct wl_buffer_listener __buffer_listener = {
     /**
      * release - compositor releases buffer
      *
@@ -586,39 +561,37 @@ static struct wl_buffer_listener buffer_listener = {
      * wl_surface contents, e.g. as a GL texture. This is an important
      * optimization for GL(ES) compositors with wl_shm clients.
      */
-    buffer_handle_release
+    __buffer_handle_release
 };
 
 static void
-frame_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
+__frame_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
 {
-    struct wl_egl_buffer *buffer = data;
-    struct wl_egl_window *window = buffer->parent;
+    __WLEGLBuffer buffer = data;
+    __WLEGLSurface egl_surface = buffer->parent;
 
     buffer->frame_callback = NULL;
     wl_callback_destroy(callback);
 
-    window->commit_signal++;
+    egl_surface->commit_signal++;
 }
 
-static const struct wl_callback_listener frame_callback_listener = {
+static const struct wl_callback_listener __frame_callback_listener = {
     /**
      * done - done event
      * @callback_data: request-specific data for the wl_callback
      *
      * Notify the client when the related request is done.
      */
-    frame_callback_handle_done
+    __frame_callback_handle_done
 };
 
 static int
-wl_egl_buffer_create(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer,
-        int width, int height, int type, int format)
+__wl_egl_buffer_create(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
 {
     gceSTATUS status;
-    gcoSURF surface = gcvNULL;
     gctINT32 fd;
+    gcoSURF surface = gcvNULL;
 
     /*
      * Current hardware type should be correctly set already.
@@ -628,17 +601,17 @@ wl_egl_buffer_create(struct wl_egl_window *window,
 
     gcmONERROR(
         gcoSURF_Construct(gcvNULL,
-                          width,
-                          height,
+                          egl_surface->width,
+                          egl_surface->height,
                           1,
-                          type,
-                          format,
+                          egl_surface->type,
+                          egl_surface->format,
                           gcvPOOL_DEFAULT,
                           &surface));
 
     buffer->info.surface = surface;
 
-    if ((type & 0xFF) != gcvSURF_BITMAP)
+    if ((egl_surface->type & 0xFF) != gcvSURF_BITMAP)
     {
         gcoSURF_SetFlags(surface,
                          gcvSURF_FLAG_CONTENT_YINVERTED,
@@ -677,16 +650,16 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                                    &buffer->info.tsNode));
     }
 
-    buffer->info.width      = width;
-    buffer->info.height     = height;
-    buffer->info.format     = (gceSURF_FORMAT) format;
-    buffer->info.type       = (gceSURF_TYPE) type;
+    buffer->info.width      = egl_surface->width;
+    buffer->info.height     = egl_surface->height;
+    buffer->info.format     = (gceSURF_FORMAT)egl_surface->format;
+    buffer->info.type       = (gceSURF_TYPE)egl_surface->type;
 
-    buffer->parent          = window;
+    buffer->parent          = egl_surface;
     buffer->frame_callback  = NULL;
 
     buffer->wl_buf =
-        wl_viv_create_buffer(window->display->wl_viv,
+        wl_viv_create_buffer(egl_surface->display->wl_viv,
                 buffer->info.width,
                 buffer->info.height,
                 buffer->info.stride,
@@ -700,7 +673,7 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                 buffer->info.tsSize,
                 buffer->info.fd);
 
-    wl_buffer_add_listener(buffer->wl_buf, &buffer_listener, buffer);
+    wl_buffer_add_listener(buffer->wl_buf, &__buffer_listener, buffer);
 
     return 0;
 
@@ -714,10 +687,10 @@ OnError:
  * wl_egl_display_destroy.
  */
 static void
-wl_egl_buffer_destroy(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer)
+__wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
 {
-    struct wl_egl_display *display = window->display;
+    __WLEGLDisplay display = egl_surface->display;
+
     int done = 0;
 
     if (!buffer->info.surface)
@@ -727,24 +700,24 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
 
     if (display)
     {
-#if (WAYLAND_VERSION_CT)
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
         struct wl_callback *callback;
-        struct wl_egl_buffer * wrapper;
+        __WLEGLBuffer wrapper;
 
         /* Use a wrapper struct to allow modifications in original one. */
         wrapper = malloc(sizeof(*buffer));
         memcpy(wrapper, buffer, sizeof(*buffer));
 
         callback = wl_display_sync(display->wrap_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)callback, window->wl_queue);
-        wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
+        wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
+        wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
         buffer->info.surface = gcvNULL;
         done = 1;
 #else
         struct wl_callback *callback;
         struct wl_display *wl_dpy = display->wl_dpy;
-        struct wl_event_queue *wl_queue = window->wl_queue;
-        struct wl_egl_buffer * wrapper;
+        struct wl_event_queue *wl_queue = egl_surface->wl_queue;
+        __WLEGLBuffer wrapper;
         int ret = 0;
         /*
          * This is to block read & dispatch events in other threads, so that the
@@ -760,8 +733,8 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
             memcpy(wrapper, buffer, sizeof(*buffer));
 
             callback = wl_display_sync(display->wl_dpy);
-            wl_proxy_set_queue((struct wl_proxy *)callback, window->wl_queue);
-            wl_callback_add_listener(callback, &buffer_callback_listener, wrapper);
+            wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
+            wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
 
             wl_display_cancel_read(wl_dpy);
 
@@ -809,17 +782,220 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
     buffer->age = 0;
 }
 
+
+static void
+__wl_egl_surface_destroy(__WLEGLSurface egl_surface)
+{
+    int i;
+    __WLEGLDisplay display = egl_surface->display;
+
+    egl_surface->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
+    __wl_egl_surface_unregister(egl_surface);
+
+    for (i = 0; i < egl_surface->nr_buffers; i++)
+    {
+        __WLEGLBuffer buffer = &egl_surface->buffers[i];
+
+        if (display && buffer->frame_callback)
+        {
+            int ret = 0;
+
+            pthread_mutex_lock(&egl_surface->commit_mutex);
+            while (buffer->frame_callback && ret != -1)
+            {
+                ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
+            }
+            pthread_mutex_unlock(&egl_surface->commit_mutex);
+        }
+
+        __wl_egl_buffer_destroy(egl_surface, buffer);
+    }
+
+    if (display)
+    {
+        __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
+        __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->wl_queue);
+    }
+
+    if (egl_surface->wl_queue)
+    {
+        wl_event_queue_destroy(egl_surface->wl_queue);
+        egl_surface->wl_queue = gcvNULL;
+    }
+
+    if (egl_surface->commit_queue)
+    {
+        wl_event_queue_destroy(egl_surface->commit_queue);
+        egl_surface->commit_queue = gcvNULL;
+    }
+
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
+    if (egl_surface->wrap_surface)
+    {
+        wl_proxy_wrapper_destroy((void *)egl_surface->wrap_surface);
+        egl_surface->wrap_surface = gcvNULL;
+    }
+#endif
+
+    free(egl_surface->buffers);
+    egl_surface->buffers   = NULL;
+    egl_surface->signature = 0;
+
+    pthread_mutex_destroy(&egl_surface->commit_mutex);
+
+    free(egl_surface);
+}
+
+static void
+__resize_callback(struct wl_egl_window *window, void *data)
+{
+   __WLEGLSurface egl_surface = data;
+
+   if (window && egl_surface &&
+       (window->width != egl_surface->width || window->height != egl_surface->height)
+      )
+   {
+        int i;
+        VEGLDisplay dpy = NULL;
+        VEGLSurface sur = NULL;
+
+        if (egl_surface->display)
+        {
+            __wl_egl_roundtrip_queue(egl_surface->display->wl_dpy, egl_surface->wl_queue);
+        }
+
+        egl_surface->width  = window->width;
+        egl_surface->height = window->height;
+
+        /* handle recursive call to dequeue issue. */
+        if (egl_surface->indequeue)
+        {
+            return;
+        }
+
+        /* Reset age. */
+        for (i = 0; i < egl_surface->nr_buffers; i++)
+        {
+            __WLEGLBuffer buffer = &egl_surface->buffers[i];
+            buffer->age = 0;
+        }
+
+        /* Go through dpy list to find EGLSurface for window. */
+        gcoOS_LockPLS();
+        for (dpy = (VEGLDisplay)gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO); dpy != NULL; dpy = dpy->next)
+        {
+            for (sur = (VEGLSurface)dpy->surfaceStack; sur != NULL; sur = (VEGLSurface)sur->resObj.next)
+            {
+                if (sur->hwnd == window)
+                {
+                    break;
+                }
+            }
+
+            if (sur)
+            {
+                break;
+            }
+        }
+        gcoOS_UnLockPLS();
+
+        if (dpy && sur)
+        {
+            VEGLThreadData thread = veglGetThreadData();
+
+            if (thread && thread->context &&
+                thread->context->context &&
+                (thread->context->read == sur ||
+                 thread->context->draw == sur))
+            {
+                veglResizeSurface(dpy, sur, egl_surface->width, egl_surface->height);
+            }
+        }
+   }
+}
+
+static void
+__destroy_window_callback(void *data)
+{
+    __WLEGLSurface egl_surface = data;
+    if (egl_surface)
+    {
+        __wl_egl_surface_destroy(egl_surface);
+    }
+}
+
+__WLEGLSurface
+__wl_egl_surface_create(struct wl_egl_window *window)
+{
+    int i;
+    char *p;
+    __WLEGLSurface egl_surface = NULL;
+
+    egl_surface = (__WLEGLSurface)malloc(sizeof(*egl_surface));
+    if (!egl_surface)
+    {
+        return NULL;
+    }
+
+    memset(egl_surface, 0, sizeof(*egl_surface));
+    egl_surface->window = window;
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
+    egl_surface->wrap_surface = (struct wl_surface *)wl_proxy_create_wrapper((void*)window->surface);
+#endif
+
+    egl_surface->nr_buffers  = WL_EGL_NUM_BACKBUFFERS;
+
+    egl_surface->width  = window->width;
+    egl_surface->height = window->height;
+    egl_surface->format = gcvSURF_A8R8G8B8;
+    egl_surface->type   = gcvSURF_BITMAP;
+    egl_surface->swap_interval = 1;
+    egl_surface->commit_signal = 1;
+    pthread_mutex_init(&egl_surface->commit_mutex, NULL);
+
+    p = getenv("WL_EGL_SWAP_INTERVAL");
+    if (p)
+    {
+        int interval = atoi(p);
+        egl_surface->swap_interval = gcmCLAMP(interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
+    }
+    else
+    {
+        egl_surface->swap_interval = 1;
+    }
+
+    p = getenv("GPU_VIV_WL_MULTI_BUFFER");
+    if (p)
+    {
+        int nr_buffers = atoi(p);
+
+        if (nr_buffers > 0 && nr_buffers <= WL_EGL_MAX_NUM_BACKBUFFERS)
+        {
+            egl_surface->nr_buffers = nr_buffers;
+        }
+    }
+
+    egl_surface->buffers = calloc(egl_surface->nr_buffers, sizeof(struct __WLEGLBufferRec));
+    for (i = 0; i < egl_surface->nr_buffers; ++i)
+    {
+        egl_surface->buffers[i].info.fd = -1;
+        egl_surface->buffers[i].info.ts_fd = -1;
+    }
+
+    __wl_egl_surface_register(egl_surface);
+
+    window->driver_private = egl_surface;
+    window->destroy_window_callback = __destroy_window_callback;
+    window->resize_callback = __resize_callback;
+
+    return egl_surface;
+}
+
 /* returns errno. */
-static int wl_egl_window_set_format(struct wl_egl_window *window,
+static int
+__wl_egl_surface_set_format(__WLEGLSurface egl_surface,
             gceSURF_TYPE Type, gceSURF_FORMAT Format)
 {
-    /*
-     * Possiable types:
-     *   gcvSURF_BITMAP
-     *   gcvSURF_RENDER_TARGET
-     *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
-     *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
-     */
     switch (Type)
     {
     case gcvSURF_BITMAP:
@@ -832,58 +1008,80 @@ static int wl_egl_window_set_format(struct wl_egl_window *window,
         return -EINVAL;
     }
 
-    window->type   = Type | gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
-    window->format = Format;
+    egl_surface->type   = Type | gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
+    egl_surface->format = Format;
     return 0;
 }
 
-static struct wl_egl_buffer *
-wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
+static inline int
+__wl_egl_window_validate(struct wl_egl_window *window)
 {
-    struct wl_egl_buffer *buffer = NULL;
-    struct wl_display *wl_dpy = window->display->wl_dpy;
-    struct wl_event_queue *wl_queue = window->wl_queue;
+    int ret = -EINVAL;
+    __WLEGLSurface egl_surface;
+
+    pthread_once(&__once_control, __wl_egl_init);
+
+    pthread_mutex_lock(&__wl_egl_surface_mutex);
+    wl_list_for_each(egl_surface, &__wl_egl_surface_list, link)
+    {
+        if (egl_surface->window == window)
+        {
+            ret = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&__wl_egl_surface_mutex);
+
+    return ret;
+}
+
+static __WLEGLBuffer
+__wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
+{
+    __WLEGLBuffer buffer = NULL;
+    __WLEGLSurface egl_surface = window->driver_private;
+    struct wl_display *wl_dpy = egl_surface->display->wl_dpy;
+    struct wl_event_queue *wl_queue = egl_surface->wl_queue;
     int ret = 0;
 
-    if (window->indequeue)
+    if (egl_surface->indequeue)
     {
         fprintf(stderr, "ERROR: nested dequeue buffer\n");
         return NULL;
     }
 
-    window->indequeue = 1;
+    egl_surface->indequeue = 1;
 
 
     /* Try to read and dispatch some events. */
-    dispatch_queue(wl_dpy, wl_queue, 1);
+    __wl_egl_dispatch_queue(wl_dpy, wl_queue, 1);
 
-
-    if (window->nr_buffers > 1)
+    if (egl_surface->nr_buffers > 1)
     {
         int loop = 0;
         for (;;)
         {
-            int current = window->next;
+            int current = egl_surface->next;
 
-            buffer = &window->buffers[current];
+            buffer = &egl_surface->buffers[current];
 
             if (buffer->state == BUFFER_STATE_FREE)
             {
-                window->next = current + 1;
+                egl_surface->next = current + 1;
 
-                if (window->next >= window->nr_buffers)
-                    window->next -= window->nr_buffers;
+                if (egl_surface->next >= egl_surface->nr_buffers)
+                    egl_surface->next -= egl_surface->nr_buffers;
 
                 break;
             }
 
             if (loop > 2)
             {
-                ret = roundtrip_queue(wl_dpy, wl_queue);
+                ret = __wl_egl_roundtrip_queue(wl_dpy, wl_queue);
                 loop = 0;
             }
             else
-                ret = dispatch_queue(wl_dpy, wl_queue, 5);
+                ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 5);
 
             if (ret == -1)
             {
@@ -896,44 +1094,42 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     }
     else
     {
-        buffer = &window->buffers[0];
+        buffer = &egl_surface->buffers[0];
     }
 
     if (!buffer)
     {
-        window->indequeue = 0;
+        egl_surface->indequeue = 0;
         return NULL;
     }
 
     if (buffer->info.surface)
     {
         /* check resize. */
-        if (buffer->info.width  != window->width  ||
-            buffer->info.height != window->height ||
-            buffer->info.format != window->format)
+        if (buffer->info.width  != egl_surface->width  ||
+            buffer->info.height != egl_surface->height ||
+            buffer->info.format != egl_surface->format)
         {
             /* The buffer must not be in compositor (ie, QUEUED state). */
-            wl_egl_buffer_destroy(window, buffer);
+            __wl_egl_buffer_destroy(egl_surface, buffer);
         }
     }
 
     if (!buffer->info.surface)
     {
-        wl_egl_buffer_create(window, buffer,
-                window->width, window->height,
-                window->type,  window->format);
+        __wl_egl_buffer_create(egl_surface, buffer);
 
-        window->attached_width  = window->width;
-        window->attached_height = window->height;
+        window->attached_width  = egl_surface->width;
+        window->attached_height = egl_surface->height;
     }
 
-    window->indequeue = 0;
+    egl_surface->indequeue = 0;
     buffer->state = BUFFER_STATE_DEQUEUED;
     return buffer;
 }
 
 static void
-make_bounding_box(struct wl_egl_buffer *buffer, const struct eglRegion *region,
+__make_bounding_box(__WLEGLBuffer buffer, const struct eglRegion *region,
         int *x, int *y, int *width, int *height)
 {
     if (region)
@@ -972,26 +1168,27 @@ make_bounding_box(struct wl_egl_buffer *buffer, const struct eglRegion *region,
     }
 }
 
-#if (WAYLAND_VERSION_CT)
+#if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
 static int
-wl_egl_window_queue_buffer(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer,
+__wl_egl_window_queue_buffer(struct wl_egl_window *window,
+        __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
     gcoSURF surface = NULL;
-    struct wl_egl_display *display = window->display;
+    __WLEGLSurface egl_surface = window->driver_private;
+    __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
-    struct wl_event_queue *commit_queue = window->commit_queue;
+    struct wl_event_queue *commit_queue = egl_surface->commit_queue;
     int x, y, width, height;
     int ret = 0;
 
-    make_bounding_box(buffer, damage, &x, &y, &width, &height);
+    __make_bounding_box(buffer, damage, &x, &y, &width, &height);
 
-    pthread_mutex_lock(&window->commit_mutex);
+    pthread_mutex_lock(&egl_surface->commit_mutex);
 
     /* Make sure previous frame with this buffer is done. */
     while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -999,8 +1196,8 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         goto out;
     }
 
-    while (!window->commit_signal && ret != -1)
-        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+    while (!egl_surface->commit_signal && ret != -1)
+        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -1008,11 +1205,11 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         goto out;
     }
 
-    if (window->swap_interval > 0)
+    if (egl_surface->swap_interval > 0)
     {
-        buffer->frame_callback = wl_surface_frame(window->wrap_surface);
+        buffer->frame_callback = wl_surface_frame(egl_surface->wrap_surface);
         wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
     }
 
     /* buffer is queued to compositor. */
@@ -1027,11 +1224,11 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
-    wl_surface_attach(window->wrap_surface, buffer->wl_buf, window->dx, window->dy);
-    wl_surface_damage(window->wrap_surface, x, y, width, height);
-    wl_surface_commit(window->wrap_surface);
+    wl_surface_attach(egl_surface->wrap_surface, buffer->wl_buf, window->dx, window->dy);
+    wl_surface_damage(egl_surface->wrap_surface, x, y, width, height);
+    wl_surface_commit(egl_surface->wrap_surface);
 
-    window->commit_signal--;
+    egl_surface->commit_signal--;
 
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
@@ -1043,37 +1240,38 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     {
         buffer->frame_callback = wl_display_sync(display->wrap_dpy);
         wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
     }
 
     /* flush events. */
     wl_display_flush(wl_dpy);
 
 out:
-    pthread_mutex_unlock(&window->commit_mutex);
+    pthread_mutex_unlock(&egl_surface->commit_mutex);
 
     return ret;
 }
 #else
 static int
-wl_egl_window_queue_buffer(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer,
+__wl_egl_window_queue_buffer(struct wl_egl_window *window,
+        __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
     gcoSURF surface = NULL;
-    struct wl_egl_display *display = window->display;
+    __WLEGLSurface egl_surface = window->driver_private;
+    __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
-    struct wl_event_queue *commit_queue = window->commit_queue;
+    struct wl_event_queue *commit_queue = egl_surface->commit_queue;
     int x, y, width, height;
     int ret = 0;
 
-    make_bounding_box(buffer, damage, &x, &y, &width, &height);
+    __make_bounding_box(buffer, damage, &x, &y, &width, &height);
 
-    pthread_mutex_lock(&window->commit_mutex);
+    pthread_mutex_lock(&egl_surface->commit_mutex);
 
     /* Make sure previous frame with this buffer is done. */
     while (buffer->frame_callback && ret != -1)
-        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -1081,8 +1279,8 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         goto out;
     }
 
-    while (!window->commit_signal && ret != -1)
-        ret = dispatch_queue(wl_dpy, commit_queue, 100);
+    while (!egl_surface->commit_signal && ret != -1)
+        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
     {
@@ -1090,7 +1288,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
         goto out;
     }
 
-    if (window->swap_interval > 0)
+    if (egl_surface->swap_interval > 0)
     {
         /*
          * This is to block read & dispatch events in other threads, so that the
@@ -1107,7 +1305,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
         buffer->frame_callback = wl_surface_frame(window->surface);
         wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
     }
@@ -1128,7 +1326,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_surface_damage(window->surface, x, y, width, height);
     wl_surface_commit(window->surface);
 
-    window->commit_signal--;
+    egl_surface->commit_signal--;
 
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
@@ -1152,7 +1350,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
         buffer->frame_callback = wl_display_sync(wl_dpy);
         wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &frame_callback_listener, buffer);
+        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
     }
@@ -1161,26 +1359,26 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_display_flush(wl_dpy);
 
 out:
-    pthread_mutex_unlock(&window->commit_mutex);
+    pthread_mutex_unlock(&egl_surface->commit_mutex);
 
     return ret;
 }
 #endif
 
 static int
-wl_egl_window_cancel_buffer(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer)
+__wl_egl_window_cancel_buffer(struct wl_egl_window *window, __WLEGLBuffer buffer)
 {
-    struct wl_egl_display *display = window->display;
+    __WLEGLSurface egl_surface = window->driver_private;
 
     buffer->state = BUFFER_STATE_FREE;
 
     /* Roll back to make back buffers returned in order. */
-    window->next = (window->next == 0) ? window->nr_buffers - 1
-                 : window->next - 1;
+    egl_surface->next = (egl_surface->next == 0)
+                      ? egl_surface->nr_buffers - 1
+                      : egl_surface->next - 1;
 
     /* flush events. */
-    wl_display_flush(display->wl_dpy);
+    wl_display_flush(egl_surface->display->wl_dpy);
 
     return 0;
 }
@@ -1226,9 +1424,7 @@ _InitLocalDisplayInfo(
     )
 {
     struct wl_display *wl_dpy = Display->hdc;
-    struct wl_egl_display *display;
-
-    display = wl_egl_display_create(wl_dpy);
+    __WLEGLDisplay display = __wl_egl_display_create(wl_dpy);
 
     if (!display)
     {
@@ -1245,14 +1441,14 @@ _DeinitLocalDisplayInfo(
     IN VEGLDisplay Display
     )
 {
-    struct wl_egl_display *display = Display->localInfo;
+    __WLEGLDisplay display = Display->localInfo;
 
     if (!display)
     {
         return EGL_FALSE;
     }
 
-    wl_egl_display_destroy(display);
+    __wl_egl_display_destroy(display);
     Display->localInfo = gcvNULL;
 
     return EGL_TRUE;
@@ -1295,6 +1491,7 @@ _SetSwapInterval(
     IN EGLint Interval
     )
 {
+    __WLEGLSurface egl_surface;
     struct wl_egl_window *window = Surface->hwnd;
 
     if (!window)
@@ -1303,7 +1500,8 @@ _SetSwapInterval(
     }
 
     /* clamp to min and max */
-    window->swap_interval = gcmCLAMP(Interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
+    egl_surface = window->driver_private;
+    egl_surface->swap_interval = gcmCLAMP(Interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
 
     return EGL_TRUE;
 }
@@ -1318,31 +1516,31 @@ _ConnectWindow(
     IN void * Window
     )
 {
+    __WLEGLSurface egl_surface;
     struct wl_egl_window *window = Window;
-
-    if (wl_egl_window_validate(window))
-    {
-        fprintf(stderr, "%s: invalid window=%p\n", __func__, Window);
-        return EGL_FALSE;
-    }
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(window != gcvNULL);
 
+    egl_surface = window->driver_private;
+    if (egl_surface == gcvNULL)
+    {
+        egl_surface = __wl_egl_surface_create(window);
+    }
     /* Set display to window. */
-    window->display = Display->localInfo;
+    egl_surface->display = Display->localInfo;
 
     gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
-    wl_egl_window_set_format(window, gcvSURF_BITMAP, Surface->renderTargetFormat);
+    __wl_egl_surface_set_format(egl_surface, gcvSURF_BITMAP, Surface->renderTargetFormat);
 
-    if (window->wl_queue == gcvNULL)
+    if (egl_surface->wl_queue == gcvNULL)
     {
-        window->wl_queue = wl_display_create_queue(window->display->wl_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)window->display->wl_viv, window->wl_queue);
+        egl_surface->wl_queue = wl_display_create_queue(egl_surface->display->wl_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)egl_surface->display->wl_viv, egl_surface->wl_queue);
     }
 
-    if (window->commit_queue == gcvNULL)
-        window->commit_queue = wl_display_create_queue(window->display->wl_dpy);
+    if (egl_surface->commit_queue == gcvNULL)
+        egl_surface->commit_queue = wl_display_create_queue(egl_surface->display->wl_dpy);
 
     /* Save window info structure. */
     Surface->winInfo = (void *) 1;
@@ -1358,7 +1556,7 @@ _DisconnectWindow(
     /* Get shortcut. */
     struct wl_egl_window *window = Surface->hwnd;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
@@ -1393,27 +1591,23 @@ _BindWindow(
     )
 {
     gceSTATUS status;
-
-    /* Get shortcut. */
+    __WLEGLSurface egl_surface;
     struct wl_egl_window *window = Surface->hwnd;
+
     /* Indirect rendering by default. */
     EGLint renderMode = VEGL_INDIRECT_RENDERING;
-    gceSURF_FORMAT format;
-    gceSURF_TYPE type;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
 
-    format = window->format;
-    type   = window->type;
-
-    (void)status;
-    (void)type;
+    egl_surface = window->driver_private;
 
     if (Surface->openVG)
     {
+        gceSURF_FORMAT format = egl_surface->format;
+
         /* Check direct rendering support for 2D VG. */
         do
         {
@@ -1483,11 +1677,14 @@ _BindWindow(
         while (gcvFALSE);
 
         /* Request linear buffer for hardware OpenVG. */
-        wl_egl_window_set_format(window, gcvSURF_BITMAP, format);
+        __wl_egl_surface_set_format(egl_surface, gcvSURF_BITMAP, format);
     }
     else
     {
 #if gcdENABLE_3D
+        gceSURF_TYPE type;
+        gceSURF_FORMAT format = egl_surface->format;
+
 #if gcdENABLE_RENDER_INTO_WINDOW
         /* 3D pipe. */
         do
@@ -1624,6 +1821,7 @@ _BindWindow(
         while (gcvFALSE);
 #  endif
 
+        type = egl_surface->type;
         switch (renderMode)
         {
         case VEGL_INDIRECT_RENDERING:
@@ -1646,11 +1844,11 @@ _BindWindow(
         }
 
         /* Set required type and format. */
-        wl_egl_window_set_format(window, type, format);
+        __wl_egl_surface_set_format(egl_surface, type, format);
 #endif
     }
 
-    window->winthread = veglGetThreadData();
+    egl_surface->tid = gcoOS_GetCurrentThreadID();
 
     *RenderMode = renderMode;
     return EGL_TRUE;
@@ -1662,16 +1860,18 @@ _UnbindWindow(
     IN VEGLSurface Surface
     )
 {
+    __WLEGLSurface egl_surface;
     struct wl_egl_window *window = Surface->hwnd;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
 
     /* Do not throttle the swap thread. */
-    window->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
-    window->winthread = gcvNULL;
+    egl_surface = window->driver_private;
+    egl_surface->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
+    egl_surface->tid = gcvNULL;
 
     return EGL_TRUE;
 }
@@ -1686,7 +1886,7 @@ _GetWindowSize(
 {
     struct wl_egl_window *window = Surface->hwnd;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
@@ -1706,15 +1906,15 @@ _GetWindowBackBuffer(
     IN struct eglBackBuffer * BackBuffer
     )
 {
+    __WLEGLBuffer buffer;
     struct wl_egl_window *window = Surface->hwnd;
-    struct wl_egl_buffer *buffer;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
 
-    buffer = wl_egl_window_dequeue_buffer(window);
+    buffer = __wl_egl_window_dequeue_buffer(window);
 
     if (!buffer)
     {
@@ -1742,14 +1942,14 @@ _PostWindowBackBuffer(
     int err;
     struct wl_egl_window *window = Surface->hwnd;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
-    err = wl_egl_window_queue_buffer(window, BackBuffer->context, DamageHint);
+    err = __wl_egl_window_queue_buffer(window, BackBuffer->context, DamageHint);
 
     if (err < 0)
     {
@@ -1770,14 +1970,14 @@ _CancelWindowBackBuffer(
     int err;
     struct wl_egl_window *window = Surface->hwnd;
 
-    if (wl_egl_window_validate(window))
+    if (__wl_egl_window_validate(window))
     {
         return EGL_FALSE;
     }
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
-    err = wl_egl_window_cancel_buffer(window, BackBuffer->context);
+    err = __wl_egl_window_cancel_buffer(window, BackBuffer->context);
 
     if (err)
     {
@@ -1794,8 +1994,9 @@ _SynchronousPost(
     )
 {
     struct wl_egl_window *window = Surface->hwnd;
+    __WLEGLSurface egl_surface = window->driver_private;
 
-    if (window->nr_buffers == 1)
+    if (egl_surface->nr_buffers == 1)
     {
         return EGL_TRUE;
     }
@@ -1806,10 +2007,12 @@ _SynchronousPost(
      * but the requests for <interval = 0> should be handled faster than requests for <interval = 1>, the processing rate is decided by the slow ones,
      * this means <interval = 0> will not work.
      */
-    if (wl_egl_window_check())
+    if (__wl_egl_display_is_mthread(egl_surface->display))
     {
-        if (window->swap_interval == 0)
+        if (egl_surface->swap_interval == 0)
+        {
             return EGL_TRUE;
+        }
     }
 
     return EGL_FALSE;
@@ -1824,11 +2027,12 @@ _UpdateBufferAge(
 {
     int i;
     struct wl_egl_window *window = Surface->hwnd;
-    struct wl_egl_buffer *buffer = BackBuffer->context;
+    __WLEGLSurface egl_surface = window->driver_private;
+    __WLEGLBuffer buffer = BackBuffer->context;
 
-    for (i = 0; i < window->nr_buffers; i++)
+    for (i = 0; i < egl_surface->nr_buffers; i++)
     {
-        struct wl_egl_buffer *b = &window->buffers[i];
+        __WLEGLBuffer b = &egl_surface->buffers[i];
 
         if (b->age)
         {
@@ -1851,7 +2055,7 @@ _QueryBufferAge(
 {
     if (BackBuffer && BackBuffer->context)
     {
-        struct wl_egl_buffer *buffer = BackBuffer->context;
+        __WLEGLBuffer buffer = BackBuffer->context;
         *BufferAge = buffer->age;
         return EGL_TRUE;
     }
@@ -1864,13 +2068,14 @@ _QueryBufferAge(
          */
         int i;
         struct wl_egl_window *window = Surface->hwnd;
-        struct wl_egl_buffer *buffer = &window->buffers[window->next];
+        __WLEGLSurface egl_surface = window->driver_private;
+        __WLEGLBuffer buffer = &egl_surface->buffers[egl_surface->next];
 
         *BufferAge = buffer->age;
 
-        for (i = 0; i < window->nr_buffers; i++)
+        for (i = 0; i < egl_surface->nr_buffers; i++)
         {
-            buffer = &window->buffers[i];
+            buffer = &egl_surface->buffers[i];
 
             if (buffer->age == 0)
             {
@@ -2186,231 +2391,6 @@ veglGetWaylandPlatform(
 
 /******************************************************************************/
 
-struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
-                            int width, int height)
-{
-    struct wl_egl_window *window = NULL;
-    char *p;
-    int i;
-
-    window = (struct wl_egl_window *) malloc(sizeof (struct wl_egl_window));
-
-    if (!window)
-    {
-        return NULL;
-    }
-
-    memset(window, 0, sizeof (struct wl_egl_window));
-    window->surface = surface;
-
-#if (WAYLAND_VERSION_CT)
-    window->wrap_surface = (struct wl_surface *)wl_proxy_create_wrapper((void *)surface);
-#endif
-
-    window->nr_buffers  = WL_EGL_NUM_BACKBUFFERS;
-
-    window->width  = width;
-    window->height = height;
-    window->attached_width  = width;
-    window->attached_height = height;
-    window->format = gcvSURF_A8R8G8B8;
-    window->type   = gcvSURF_BITMAP;
-    window->swap_interval = 1;
-    window->commit_signal = 1;
-
-    p = getenv("WL_EGL_SWAP_INTERVAL");
-    if (p != NULL)
-    {
-        int interval = atoi(p);
-        window->swap_interval = gcmCLAMP(interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
-    }
-    else
-    {
-        window->swap_interval = 1;
-    }
-
-
-    pthread_mutex_init(&window->commit_mutex, NULL);
-
-    p = getenv("GPU_VIV_WL_MULTI_BUFFER");
-
-    if (p != NULL)
-    {
-        int nr_buffers = atoi(p);
-
-        if (nr_buffers > 0 && nr_buffers <= WL_EGL_MAX_NUM_BACKBUFFERS)
-        {
-            window->nr_buffers = nr_buffers;
-        }
-    }
-
-    window->buffers = calloc(window->nr_buffers, sizeof(struct wl_egl_buffer));
-    for (i = 0; i < window->nr_buffers; ++i)
-    {
-        window->buffers[i].info.fd = -1;
-        window->buffers[i].info.ts_fd = -1;
-    }
-
-    wl_egl_window_register(window);
-
-    return window;
-}
-
-void wl_egl_window_destroy(struct wl_egl_window *window)
-{
-    int i;
-    struct wl_egl_display *display = window->display;
-
-    if (display)
-    {
-        /*
-         * Better to make buffers FREE. But we meet crash in weston, seems
-         * in weston desktop-shell, surface is gone in before destroy egl
-         * window structure.
-         */
-        /*
-        wl_surface_attach(window->surface, NULL, 0, 0);
-        wl_surface_damage(window->surface, 0, 0, window->width, window->height);
-        wl_surface_commit(window->surface);
-         */
-    }
-
-    window->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
-
-    wl_egl_window_unregister(window);
-
-    for (i = 0; i < window->nr_buffers; i++)
-    {
-        struct wl_egl_buffer *buffer = &window->buffers[i];
-
-        if (display && buffer->frame_callback)
-        {
-            int ret = 0;
-
-            pthread_mutex_lock(&window->commit_mutex);
-            while (buffer->frame_callback && ret != -1)
-            {
-                ret = dispatch_queue(display->wl_dpy, window->commit_queue, 100);
-            }
-            pthread_mutex_unlock(&window->commit_mutex);
-        }
-
-        wl_egl_buffer_destroy(window, buffer);
-    }
-
-    if (display)
-    {
-        roundtrip_queue(display->wl_dpy, window->commit_queue);
-        roundtrip_queue(display->wl_dpy, window->wl_queue);
-    }
-
-    if (window->wl_queue)
-    {
-        wl_event_queue_destroy(window->wl_queue);
-        window->wl_queue = gcvNULL;
-    }
-
-    if (window->commit_queue)
-    {
-        wl_event_queue_destroy(window->commit_queue);
-        window->commit_queue = gcvNULL;
-    }
-
-#if (WAYLAND_VERSION_CT)
-    if (window->wrap_surface)
-    {
-        wl_proxy_wrapper_destroy((void *)window->wrap_surface);
-        window->wrap_surface = gcvNULL;
-    }
-#endif
-
-    free(window->buffers);
-    window->buffers   = NULL;
-    window->signature = 0;
-
-    pthread_mutex_destroy(&window->commit_mutex);
-
-    free(window);
-}
-
-void wl_egl_window_resize(struct wl_egl_window *window,
-        int width, int height, int dx, int dy)
-{
-    if (window->width != width || window->height != height)
-    {
-        struct wl_egl_display *display = window->display;
-        VEGLDisplay dpy = NULL;
-        VEGLSurface sur = NULL;
-        int i;
-
-        if (display)
-        {
-            roundtrip_queue(display->wl_dpy, window->wl_queue);
-        }
-
-        window->width  = width;
-        window->height = height;
-
-        /* handle recursive call to dequeue issue. */
-        if (window->indequeue)
-        {
-            return;
-        }
-
-        /* Reset age. */
-        for (i = 0; i < window->nr_buffers; i++)
-        {
-            struct wl_egl_buffer *buffer = &window->buffers[i];
-            buffer->age = 0;
-        }
-
-        /* Go through dpy list to find EGLSurface for window. */
-        gcoOS_LockPLS();
-        dpy = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
-
-        for (; dpy != NULL; dpy = dpy->next)
-        {
-            sur = (VEGLSurface) dpy->surfaceStack;
-
-            for (; sur != NULL; sur = (VEGLSurface) sur->resObj.next)
-            {
-                if (sur->hwnd == window)
-                    break;
-            }
-
-            if (sur != NULL)
-                break;
-        }
-        gcoOS_UnLockPLS();
-
-        if (dpy != NULL && sur != NULL)
-        {
-            VEGLThreadData thread = veglGetThreadData();
-            if (thread && thread->context &&
-                thread->context->context &&
-                (thread->context->read == sur ||
-                 thread->context->draw == sur))
-            {
-                veglResizeSurface(dpy, sur, width, height);
-            }
-        }
-    }
-}
-
-void wl_egl_window_get_attached_size(struct wl_egl_window *window,
-        int *width, int *height)
-{
-    if (width)
-    {
-        *width = window->attached_width;
-    }
-
-    if (height)
-    {
-        *height = window->attached_height;
-    }
-}
-
 static int create_pixmap_content(struct wl_egl_pixmap *pixmap)
 {
     gceSTATUS status;
@@ -2617,17 +2597,17 @@ veglCreateWaylandBufferFromImage(
 {
     gceSTATUS status;
     struct wl_buffer *wl_buf = NULL;
-    struct wl_egl_display *display;
-    struct wl_egl_buffer *buffer;
+    __WLEGLDisplay display;
+    __WLEGLBuffer buffer;
     gctINT32 fd = -1;
     gcoSURF surface = NULL;
 
     VEGL_LOCK_DISPLAY_RESOURCE(Dpy);
 
-    display = (struct wl_egl_display *) Dpy->localInfo;
+    display = (__WLEGLDisplay)Dpy->localInfo;
 
-    buffer = malloc(sizeof (struct wl_egl_buffer));
-    memset(buffer, 0, sizeof (struct wl_egl_buffer));
+    buffer = malloc(sizeof(*buffer));
+    memset(buffer, 0, sizeof(*buffer));
 
     /* wlbuffer's width and height and fd got from veglQueryWaylandBuffer */
     buffer->info.width  = Image->image.u.wlbuffer.width;
