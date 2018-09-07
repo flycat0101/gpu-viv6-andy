@@ -1762,7 +1762,7 @@ _UpdateBufferCache(
 #ifdef DRM_GRALLOC
     data = gralloc_vivante_bo_from_handle(Buffer->handle);
 #else
-    data = gc_native_handle_get(Buffer->handle)->surface;
+    data = (void *)(intptr_t)gc_native_handle_get(Buffer->handle)->surface;
 #endif
 
     for (i = 0; i < info->bufferCacheCount; i++)
