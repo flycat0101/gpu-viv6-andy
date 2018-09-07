@@ -3436,6 +3436,18 @@ GLvoid GL_APIENTRY __gles_GenerateMipmap(__GLcontext *gc, GLenum target)
         /* remove the MIP_HINT_FORCE_ON which against spec required, the app will use mipmap only when
         minFilter use mipmap related filter */
         tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO_MIP;
+
+        if (tex->fboList == gcvNULL)
+        {
+            gcePATCH_ID patchId = gcvPATCH_INVALID;
+
+            gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+            if (patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25)
+            {
+                tex->params.mipHint = __GL_TEX_MIP_HINT_FORCE_ON;
+            }
+        }
     }
     tex->mipBaseLevel = baseLevel;
     tex->mipMaxLevel  = maxLevel;
