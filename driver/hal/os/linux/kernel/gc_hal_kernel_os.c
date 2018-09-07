@@ -73,7 +73,7 @@
 #include <linux/anon_inodes.h>
 #endif
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #  include <linux/file.h>
 #  include "gc_hal_kernel_sync.h"
 #endif
@@ -5549,7 +5549,7 @@ gckOS_CreateSignal(
 
     atomic_set(&signal->ref, 1);
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
     signal->timeline = gcvNULL;
 #  else
@@ -5672,7 +5672,7 @@ gckOS_Signal(
 {
     gceSTATUS status;
     gcsSIGNAL_PTR signal;
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
     struct sync_timeline * timeline = gcvNULL;
 #  else
@@ -5719,7 +5719,7 @@ gckOS_Signal(
 
         wake_up(&signal->wait);
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
         timeline = signal->timeline;
 #  else
@@ -5735,7 +5735,7 @@ gckOS_Signal(
 
     spin_unlock(&signal->lock);
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
     /* Signal timeline. */
     if (timeline)
@@ -6647,7 +6647,7 @@ gckOS_DetectProcessByName(
                               : gcvSTATUS_FALSE;
 }
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
 gceSTATUS
 gckOS_CreateSyncTimeline(

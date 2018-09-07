@@ -7256,8 +7256,39 @@ OnError:
 }
 #endif
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(ANDROID)
 #include <sync/sync.h>
+#else
+int sync_wait(int fd, int timeout)
+{
+    struct pollfd fds;
+    int ret;
+
+    if (fd < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    fds.fd = fd;
+    fds.events = POLLIN;
+
+    do {
+        ret = poll(&fds, 1, timeout);
+        if (ret > 0) {
+            if (fds.revents & (POLLERR | POLLNVAL)) {
+                errno = EINVAL;
+                return -1;
+            }
+            return 0;
+        } else if (ret == 0) {
+            errno = ETIME;
+            return -1;
+        }
+    } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+
+    return ret;
+}
+#endif
 
 gceSTATUS
 gcoOS_CreateNativeFence(
@@ -7377,7 +7408,6 @@ OnError:
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }
-#endif
 
 gceSTATUS
 gcoOS_CPUPhysicalToGPUPhysical(

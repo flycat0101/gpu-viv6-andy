@@ -1127,7 +1127,7 @@ static VkResult __CommitPresentCommand(
         ));
 
     /* Create fence sync. */
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdANDROID_NATIVE_FENCE_SYNC >= 2
     do
     {
         gceSTATUS status;
@@ -1496,7 +1496,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSignalReleaseImageANDROID(
         __vk_InsertSemaphoreWaits(queue, pWaitSemaphores, waitSemaphoreCount);
     }
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdANDROID_NATIVE_FENCE_SYNC >= 2
     do
     {
         gceSTATUS status;

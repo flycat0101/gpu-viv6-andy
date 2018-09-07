@@ -44,7 +44,7 @@ veglCreateSync(
     gceSTATUS status;
     gctPOINTER pointer = gcvNULL;
     gcsHAL_INTERFACE iface;
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     EGLint fenceFD = EGL_NO_NATIVE_FENCE_FD_ANDROID;
 #endif
 
@@ -83,7 +83,7 @@ veglCreateSync(
 
     /* Test type is a supported type of sync object. */
     if (type != EGL_SYNC_REUSABLE_KHR
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
         && type != EGL_SYNC_NATIVE_FENCE_ANDROID
 #endif
         && type != EGL_SYNC_FENCE)
@@ -110,7 +110,7 @@ veglCreateSync(
         }
         break;
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     case EGL_SYNC_NATIVE_FENCE_ANDROID:
         if (attrib_list != gcvNULL)
         {
@@ -157,7 +157,7 @@ veglCreateSync(
     sync->type              = type;
     sync->condition         = EGL_SYNC_PRIOR_COMMANDS_COMPLETE;
     sync->signal            = gcvNULL;
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     sync->fenceFD           = EGL_NO_NATIVE_FENCE_FD_ANDROID;
 #endif
 
@@ -176,7 +176,7 @@ veglCreateSync(
         }
         break;
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     case EGL_SYNC_NATIVE_FENCE_ANDROID:
         sync->fenceFD = fenceFD;
 
@@ -362,7 +362,7 @@ veglDestroySync(
         }
     }
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
     {
         /* Close file descriptor. */
@@ -457,7 +457,7 @@ veglClientWaitSync(
          * Check if the sync is already signaled. If it is, there's no
          * need to flush again.
          */
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
         if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
         {
             /* ANDROID_native_fence_sync or KHR_fence_sync */
@@ -495,7 +495,7 @@ veglClientWaitSync(
              ? gcvINFINITE
              : (gctUINT32) gcoMATH_DivideUInt64(timeout, 1000000ull);
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
         if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
         {
             /* Wait external fence fd. */
@@ -605,7 +605,7 @@ veglGetSyncAttrib(
         break;
 
     case EGL_SYNC_STATUS:
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
         if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
         {
             status = gcoOS_ClientWaitNativeFence(gcvNULL, sync->fenceFD, 0);
@@ -1104,7 +1104,7 @@ OnError:
     return EGL_FALSE;
 }
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
 /* EGL_ANDROID_native_fence_sync. */
 EGLAPI EGLint EGLAPIENTRY
 eglDupNativeFenceFDANDROID(

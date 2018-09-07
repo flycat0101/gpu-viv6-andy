@@ -251,7 +251,7 @@ typedef struct _gcsSIGNAL
     /* ID. */
     gctUINT32 id;
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
     /* Parent timeline. */
     struct sync_timeline * timeline;

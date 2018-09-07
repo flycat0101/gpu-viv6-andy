@@ -620,7 +620,7 @@ struct _gckKERNEL
     gckDVFS                     dvfs;
 #endif
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if gcdLINUX_SYNC_FILE
     gctHANDLE                   timeline;
 #endif
 

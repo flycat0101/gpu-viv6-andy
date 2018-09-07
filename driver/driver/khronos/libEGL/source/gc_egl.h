@@ -630,7 +630,7 @@ struct eglSync
     /* Signal */
     gctSIGNAL                   signal;
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
+#if defined(__linux__)
     /* Native sync fence fd. */
     EGLint                      fenceFD;
 #endif

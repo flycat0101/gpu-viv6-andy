@@ -984,6 +984,10 @@ This define enables the use of VM for gckCommand and fence buffers.
 #   define gcdANDROID_NATIVE_FENCE_SYNC         0
 #endif
 
+#ifndef gcdLINUX_SYNC_FILE
+#   define gcdLINUX_SYNC_FILE                   0
+#endif
+
 /*
     gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
 

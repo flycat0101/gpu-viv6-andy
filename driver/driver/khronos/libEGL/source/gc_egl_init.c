@@ -94,6 +94,7 @@ _GenExtension(
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
     extensions[VEGL_EXTID_EXT_image_dma_buf_import_modifiers].enabled = EGL_TRUE;
+    extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
         Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV ||
@@ -113,9 +114,6 @@ _GenExtension(
         extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
-#if gcdANDROID_NATIVE_FENCE_SYNC
-        extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled   = EGL_TRUE;
-#  endif
     }
 #endif
 
