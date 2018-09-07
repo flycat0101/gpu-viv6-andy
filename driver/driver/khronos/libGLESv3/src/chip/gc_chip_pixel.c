@@ -50,6 +50,7 @@ gcChipProcessPBO(
     }
 
     gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, gcvNULL, &logical));
+    gcmONERROR(gcoBUFOBJ_WaitFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE));
     *pBuf = (GLbyte *)logical + (gctSIZE_T)buf;
 
 OnError:

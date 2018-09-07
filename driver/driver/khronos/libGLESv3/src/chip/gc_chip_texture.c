@@ -2137,6 +2137,9 @@ gcChipTexSubImage(
             skipOffset += __GL_PTR2SIZE(buf);
             GL_ASSERT(unpackBufInfo);
             gcmONERROR(gcoBUFOBJ_Lock(unpackBufInfo->bufObj, &physicalAddress, (gctPOINTER*)&buf));
+            /* wait fence here becuase of the bufobj may comes from packbuffer obj which write in glReadPixel*/
+            gcmONERROR(gcoBUFOBJ_WaitFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+            /* get fence here becuase of the bufobj may will be used in glMapBufferRange for read */
             gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
 
             physicalAddress += (gctUINT32)skipOffset;

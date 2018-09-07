@@ -12813,7 +12813,7 @@ gcoSURF_BlitCPU(
                 continue;
             }
 
-            jSrc = (gctINT)((jDst - blitArgs.dstY) * yScale);
+            jSrc = (gctINT)(((jDst - blitArgs.dstY) * yScale) + 0.49);
 
             if (jSrc > blitArgs.srcHeight - 1)
             {
@@ -12853,7 +12853,7 @@ gcoSURF_BlitCPU(
                     continue;
                 }
 
-                iSrc = (gctINT)((iDst - blitArgs.dstX) * xScale);
+                iSrc = (gctINT)(((iDst - blitArgs.dstX) * xScale) + 0.49);
 
                 if (iSrc > blitArgs.srcWidth - 1)
                 {

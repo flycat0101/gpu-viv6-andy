@@ -1747,11 +1747,18 @@ _FillInFeatureTable(
         Features[gcvFEATURE_PSOUTPUT_MAPPING] = gcvTRUE;
         Features[gcvFEATURE_8K_RT_FIX] = gcvTRUE;
         Features[gcvFEATURE_TX_TILE_STATUS_MAPPING] = gcvTRUE;
-        Features[gcvFEATURE_SRGB_RT_SUPPORT] = gcvTRUE;
         Features[gcvFEATURE_TEXTURE_16K] = gcvTRUE;
         Features[gcvFEATURE_PE_DITHER_COLORMASK_FIX] = gcvTRUE;
         Features[gcvFEATURE_TX_LOD_GUARDBAND] = gcvTRUE;
         Features[gcvFEATURE_IMG_INSTRUCTION] = gcvTRUE;
+
+#if gcdENABLE_3D
+        /* HW has precision issue for linear to gamma conversion, and disable this feature for webgl 2.0 cts. */
+        if (!(gcdPROC_IS_WEBGL(Hardware->patchID)))
+#endif
+        {
+            Features[gcvFEATURE_SRGB_RT_SUPPORT] = gcvTRUE;
+        }
     }
     Features[gcvFEATURE_SH_INSTRUCTION_PREFETCH] = database->SH_ICACHE_PREFETCH;
 
