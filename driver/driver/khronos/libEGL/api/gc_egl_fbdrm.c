@@ -3041,9 +3041,9 @@ _CreateWindowBuffers(
                 buffer->origin.y = alignedHeight * i;
 
                 gcmTRACE(gcvLEVEL_INFO,
-                         "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
+                         "%s(%d): buffer[%d]: yoffset=%-4d",
                          __FUNCTION__, __LINE__,
-                         i, alignedHeight * i, physical);
+                         i, alignedHeight * i);
             }
 
             gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
