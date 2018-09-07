@@ -363,8 +363,8 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
 
             if (xfbObj->active && !xfbObj->paused)
             {
-                GLuint numPrims = vertexCount;
-                GLuint numVerts = vertexCount;
+                GLuint numPrims = vertexCount * instanceCount;
+                GLuint numVerts = vertexCount * instanceCount;
 
                 __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN];
 
