@@ -1088,6 +1088,14 @@ gcoHAL_GetGraphicBufferFd(
     OUT gctINT32 * Fd
     );
 
+gceSTATUS
+gcoHAL_AlignToTile(
+    IN OUT gctUINT32 * Width,
+    IN OUT gctUINT32 * Height,
+    IN  gceSURF_TYPE Type,
+    IN  gceSURF_FORMAT Format
+    );
+
 /******************************************************************************\
 ********************************** gcoOS Object *********************************
 \******************************************************************************/

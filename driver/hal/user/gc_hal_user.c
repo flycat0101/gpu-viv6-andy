@@ -3435,3 +3435,29 @@ gcoHAL_GetGraphicBufferFd(
 OnError:
     return status;
 }
+
+gceSTATUS
+gcoHAL_AlignToTile(
+    IN OUT gctUINT32 * Width,
+    IN OUT gctUINT32 * Height,
+    IN  gceSURF_TYPE Type,
+    IN  gceSURF_FORMAT Format
+    )
+{
+    gceSTATUS status;
+
+    status = gcoHARDWARE_AlignToTileCompatible(
+        gcvNULL,
+        Type & 0xFF,
+        Type & ~0xFF,
+        Format,
+        Width,
+        Height,
+        1,
+        gcvNULL,
+        gcvNULL,
+        gcvNULL
+        );
+
+    return status;
+}
