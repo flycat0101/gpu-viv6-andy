@@ -533,9 +533,6 @@ _FillIn(
             || ((Color->formatFlags & VEGL_565)   == VEGL_565)
             || ((Color->formatFlags & VEGL_8888)  == VEGL_8888)
             || ((Color->formatFlags & VEGL_888)   == VEGL_888)
-#if gcdENABLE_VG
-            ||  ((Color->formatFlags & VEGL_ALPHA)   == VEGL_ALPHA)
-#endif
             )
         )
         {
@@ -551,6 +548,14 @@ _FillIn(
                                         |  EGL_VG_COLORSPACE_LINEAR_BIT;
             }
         }
+
+#if gcdENABLE_VG
+        if (Color->formatFlags == VEGL_ALPHA)
+        {
+            config->renderableType  |= EGL_OPENVG_BIT;
+            config->surfaceType     |= EGL_VG_COLORSPACE_LINEAR_BIT;
+        }
+#endif
     }
 #ifndef ANDROID
     /* No, 2D/3D implementation only. */

@@ -1157,6 +1157,12 @@ _InitializeSurface(
             &surface->depthFormat
             );
 
+#if gcdENABLE_VG
+        if (((Config->surfaceType & EGL_VG_COLORSPACE_LINEAR_BIT) == EGL_VG_COLORSPACE_LINEAR_BIT) && (surface->renderTargetFormat == gcvSURF_A8))
+        {
+              surface->colorType |= gcvSURF_COLOR_LINEAR;
+        }
+#endif
 #if gcdENABLE_3D
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_FORCE_16BIT_RENDER_TARGET
         if (surface->renderTargetFormat == gcvSURF_R5G6B5 && patchId == gcvPATCH_DEBUG)
