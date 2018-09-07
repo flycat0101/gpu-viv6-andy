@@ -1185,6 +1185,7 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
             break;
         case VX_PATTERN_CROSS:
         case VX_PATTERN_DISK:
+        case VX_PATTERN_OTHER:
             {
                 status |= vxCopyMatrix(mask, m, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
 
@@ -1299,7 +1300,7 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
 
                 kernelContext->params.xstep        = 1;
                 kernelContext->params.ystep        = 1;
-                kernelContext->params.volume       = (pattern == VX_PATTERN_CROSS) ? gcvVX_PARTTERN_MODE_CROSS: gcvVX_PARTTERN_MODE_DISK;
+                kernelContext->params.volume       = (pattern == VX_PATTERN_CROSS) ? gcvVX_PARTTERN_MODE_CROSS: (pattern == VX_PATTERN_DISK) ? gcvVX_PARTTERN_MODE_DISK : gcvVX_PARTTERN_MODE_OTHER;
             }
             break;
         }
