@@ -20102,20 +20102,20 @@ _gcLoadProgramHeader(
 
     /* Word 2: program binary file version # */
     version = (gctUINT32 *) (signature + 1);
-    if(*version > gcdSL_PROGRAM_BINARY_FILE_VERSION) {
-#if gcmIS_DEBUG(gcdDEBUG_FATAL)
+    /* Need to make sure the program binary file's version is matched with current compiler version */
+    if(*version != gcdSL_SHADER_BINARY_FILE_VERSION) {
         gctUINT8 *inputVerPtr, *curVerPtr;
-        gctUINT32 curVer[1] = {gcdSL_PROGRAM_BINARY_FILE_VERSION};
+        gctUINT32 curVer[1] = {gcdSL_SHADER_BINARY_FILE_VERSION};
 
         inputVerPtr = (gctUINT8 *) version;
         curVerPtr = (gctUINT8 *) curVer;
-        gcmFATAL("_gcLoadProgramHeader: program binary file's version of %u.%u.%u:%u "
-                 "is newer than current version %u.%u.%u:%u",
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's version of %u.%u.%u:%u "
+                 "is not compatible with current version %u.%u.%u:%u\n"
+                 "Please recompile source.",
                  inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
                  curVerPtr[0], curVerPtr[1], curVerPtr[2], curVerPtr[3]);
-#endif
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-        return gcvSTATUS_INVALID_DATA;
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
+        return gcvSTATUS_VERSION_MISMATCH;
     }
 
     /* Word 3: language type */
