@@ -2423,6 +2423,8 @@ veglCreateWaylandBufferFromImage(
         gcoSURF_GetFormat(surface,
                           &buffer->info.type,
                           &buffer->info.format));
+    /* Need original type ever pass when creating surface */
+    buffer->info.type |= surface->hints;
 
     gcmONERROR(
         gcoSURF_QueryVidMemNode(surface,
