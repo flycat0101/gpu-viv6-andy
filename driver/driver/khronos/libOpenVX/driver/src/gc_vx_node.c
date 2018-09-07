@@ -644,45 +644,6 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
-    if ((*nodePtr)->cmdBuffer)
-    {
-#if VX_C_MEMORY_MANAGE
-        vxoMemory_CFree((*nodePtr)->base.context, (void**)&(*nodePtr)->cmdBuffer);
-#else
-        free((*nodePtr)->cmdBuffer);
-#endif
-    }
-
-#if gcdVX_OPTIMIZER
-    if ((*nodePtr)->kernelContext)
-    {
-        vxFree((*nodePtr)->kernelContext);
-    }
-#else
-    if ((*nodePtr)->kernelContext)
-    {
-        vx_int32 i = 0;
-        gcoVX_Kernel_Context * kernelContext = (gcoVX_Kernel_Context *)((*nodePtr)->kernelContext);
-
-        for (i = 0; i < GC_VX_MAX_HARDWARE_CONTEXT; i++)
-        {
-            if (kernelContext->hwContext[i])
-            {
-                if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
-                {
-                    gcoVX_DestroyInstruction(kernelContext->hwContext[i]->node);
-                    kernelContext->hwContext[i]->node = gcvNULL;
-                }
-                vxFree(kernelContext->hwContext[i]);
-                kernelContext->hwContext[i] = gcvNULL;
-            }
-        }
-
-        vxFree((*nodePtr)->kernelContext);
-        (*nodePtr)->kernelContext = gcvNULL;
-    }
-#endif
-
     return vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
 }
 
@@ -988,14 +949,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseNode(vx_node *node)
 {
-    if((*node)->base.type == VX_TYPE_NODE)
-    {
-        return vxoNode_Release(node);
-    }
-    else
-    {
-        return vxoReference_Release((vx_reference *)node, VX_TYPE_ERROR, VX_REF_INTERNAL);
-    }
+    return vxoNode_Release(node);
 }
 
 VX_API_ENTRY vx_status  VX_API_CALL vxRemoveNode(vx_node *node)
