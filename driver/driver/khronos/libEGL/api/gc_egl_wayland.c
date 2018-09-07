@@ -1161,7 +1161,6 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
         __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
-    gcoSURF surface = NULL;
     __WLEGLSurface egl_surface = window->driver_private;
     __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
@@ -1195,17 +1194,20 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dx = 0;
     window->dy = 0;
 
-    surface = buffer->info.surface;
+    if (buffer->info.surface)
+    {
+        gcoSURF surface = buffer->info.surface;
 
 #if gcdENABLE_3D
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-        !surface->tileStatusDisabled[0], surface->compressed,
-        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+            !surface->tileStatusDisabled[0], surface->compressed,
+            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
 #else
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
 
-    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
+        gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
+    }
 
     wl_surface_attach(egl_surface->wrap_surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(egl_surface->wrap_surface, x, y, width, height);
@@ -1239,7 +1241,6 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
         __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
-    gcoSURF surface = NULL;
     __WLEGLSurface egl_surface = window->driver_private;
     __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
@@ -1288,16 +1289,20 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dx = 0;
     window->dy = 0;
 
-    surface = buffer->info.surface;
+    if (buffer->info.surface)
+    {
+        gcoSURF surface = buffer->info.surface;
+
 #if gcdENABLE_3D
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-        !surface->tileStatusDisabled[0], surface->compressed,
-        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+            !surface->tileStatusDisabled[0], surface->compressed,
+            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
 #else
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
 
-    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
+        gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
+    }
 
     wl_surface_attach(window->surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(window->surface, x, y, width, height);
