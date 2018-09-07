@@ -834,6 +834,9 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
         wl_egl_buffer_create(window, buffer,
                 window->width, window->height,
                 window->type,  window->format);
+
+        window->attached_width  = window->width;
+        window->attached_height = window->height;
     }
 
     window->indequeue = 0;
@@ -941,8 +944,6 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     /* buffer is queued to compositor. */
     buffer->state = BUFFER_STATE_QUEUED;
 
-    window->attached_width  = window->width;
-    window->attached_height = window->height;
     window->dx = 0;
     window->dy = 0;
 
@@ -2011,6 +2012,8 @@ struct wl_egl_window *wl_egl_window_create(struct wl_surface *surface,
 
     window->width  = width;
     window->height = height;
+    window->attached_width  = width;
+    window->attached_height = height;
     window->format = gcvSURF_A8R8G8B8;
     window->type   = gcvSURF_BITMAP;
     window->swap_interval = 1;
