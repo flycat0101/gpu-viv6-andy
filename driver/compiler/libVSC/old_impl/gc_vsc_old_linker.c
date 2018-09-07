@@ -6482,7 +6482,6 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
     gctUINT              i, j;
     VSC_BIT_VECTOR       locationMask;
     VSC_PRIMARY_MEM_POOL pmp;
-    gctBOOL              attributeAliased = gcvFALSE;
 
     /* Initialize 512KB PMP for shader use. */
     vscPMP_Intialize(&pmp, gcvNULL, 8, sizeof(void *), gcvTRUE);
@@ -6517,7 +6516,6 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
                     if (gcSHADER_IsES11Compiler(Tree->shader))
                     {
                         gcmATTRIBUTE_SetLocHasAlias(attribute, gcvTRUE);
-                        attributeAliased = gcvTRUE;
                     }
                     else
                     {
