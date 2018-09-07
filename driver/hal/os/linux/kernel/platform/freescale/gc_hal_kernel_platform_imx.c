@@ -308,7 +308,7 @@ static struct notifier_block thermal_hot_pm_notifier =
 
 static ssize_t show_gpu3DMinClock(struct device_driver *dev, char *buf)
 {
-    gctUINT currentf,minf,maxf;
+    gctUINT currentf = 0, minf = 0, maxf = 0;
     gckGALDEVICE galDevice;
 
     galDevice = platform_get_drvdata(pdevice);
