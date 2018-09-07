@@ -3849,6 +3849,9 @@ gckOS_FreeMemory(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
+**      gctSIZE_T Offset
+**          Offset to this memory block.
+**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -3860,7 +3863,7 @@ gckOS_CacheClean(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )
@@ -3888,6 +3891,9 @@ gckOS_CacheClean(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
+**      gctSIZE_T Offset
+**          Offset to this memory block.
+**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -3899,7 +3905,7 @@ gckOS_CacheInvalidate(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )
@@ -3927,6 +3933,9 @@ gckOS_CacheInvalidate(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
+**      gctSIZE_T Offset
+**          Offset to this memory block.
+**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -3938,7 +3947,7 @@ gckOS_CacheFlush(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )

@@ -2797,9 +2797,17 @@ _AllocateContextBuffer(
     }
     else
     {
-        gcmkONERROR(gckOS_AllocateContiguous(
+        gctUINT32 allocFlag;
+
+#if gcdENABLE_CACHEABLE_COMMAND_BUFFER
+        allocFlag = gcvALLOC_FLAG_CACHEABLE | gcvALLOC_FLAG_CONTIGUOUS;
+#else
+        allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
+#endif
+        gcmkONERROR(gckOS_AllocateNonPagedMemory(
             Context->os,
             gcvFALSE,
+            allocFlag,
             &totalSize,
             &Buffer->physical,
             &pointer

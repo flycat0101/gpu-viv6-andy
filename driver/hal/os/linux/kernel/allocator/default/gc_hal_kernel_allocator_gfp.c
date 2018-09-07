@@ -667,7 +667,12 @@ _GFPMmap(
 
     if (Cacheable == gcvFALSE)
     {
+        /* Make this mapping non-cached. */
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
         vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+#else
+        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
     }
 
     if (platform && platform->ops->adjustProt)
@@ -870,24 +875,9 @@ _GFPMapKernel(
     gctINT numPages = Mdl->numPages;
     struct gfp_mdl_priv *mdlPriv = Mdl->priv;
 
-#if gcdNONPAGED_MEMORY_CACHEABLE
-    if (Mdl->contiguous)
-    {
-        addr = page_address(mdlPriv->contiguousPages);
-    }
-    else
-    {
-        addr = vmap(mdlPriv->nonContiguousPages,
-                    numPages,
-                    0,
-                    PAGE_KERNEL);
-
-        /* Trigger a page fault. */
-        memset(addr, 0, numPages * PAGE_SIZE);
-    }
-#else
     struct page ** pages;
     gctBOOL free = gcvFALSE;
+    pgprot_t pgprot;
     gctINT i;
 
     if (Mdl->contiguous)
@@ -911,13 +901,26 @@ _GFPMapKernel(
         pages = mdlPriv->nonContiguousPages;
     }
 
-    addr = vmap(pages, numPages, 0, pgprot_writecombine(PAGE_KERNEL));
+    /* ioremap() can't work on system memory since 2.6.38. */
+    if (Mdl->cacheable)
+    {
+        pgprot = PAGE_KERNEL;
+    }
+    else
+    {
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
+        pgprot = pgprot_writecombine(PAGE_KERNEL);
+#else
+        pgprot = pgprot_noncached(PAGE_KERNEL);
+#endif
+    }
+
+    addr = vmap(pages, numPages, 0, pgprot);
 
     if (free)
     {
         kfree(pages);
     }
-#endif
 
     if (addr)
     {
@@ -937,10 +940,7 @@ _GFPUnmapKernel(
     IN gctPOINTER Logical
     )
 {
-
-#if !gcdNONPAGED_MEMORY_CACHEABLE
     vunmap(Logical);
-#endif
 
     return gcvSTATUS_OK;
 }
@@ -949,8 +949,8 @@ static gceSTATUS
 _GFPCache(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
-    IN gctUINT32 Physical,
     IN gctUINT32 Bytes,
     IN gceCACHEOPERATION Operation
     )

@@ -1316,7 +1316,7 @@ gckOS_CacheClean(
     gckOS Os,
     gctUINT32 ProcessID,
     gctPHYS_ADDR Handle,
-    gctPHYS_ADDR_T Physical,
+    gctSIZE_T Offset,
     gctPOINTER Logical,
     gctSIZE_T Bytes
     );
@@ -1326,7 +1326,7 @@ gckOS_CacheFlush(
     gckOS Os,
     gctUINT32 ProcessID,
     gctPHYS_ADDR Handle,
-    gctPHYS_ADDR_T Physical,
+    gctSIZE_T Offset,
     gctPOINTER Logical,
     gctSIZE_T Bytes
     );
@@ -1336,7 +1336,7 @@ gckOS_CacheInvalidate(
     gckOS Os,
     gctUINT32 ProcessID,
     gctPHYS_ADDR Handle,
-    gctPHYS_ADDR_T Physical,
+    gctSIZE_T Offset,
     gctPOINTER Logical,
     gctSIZE_T Bytes
     );

@@ -1333,6 +1333,8 @@ gckOS_AllocateNonPagedMemory(
     /* Check status. */
     gcmkONERROR(status);
 
+    mdl->cacheable = Flag & gcvALLOC_FLAG_CACHEABLE;
+
     mdl->numPages = numPages;
 
     mdl->contiguous = gcvTRUE;
@@ -2140,6 +2142,7 @@ gckOS_MapPhysical(
             struct page * page;
             gctUINT numPages;
             gctINT i;
+            pgprot_t pgprot;
 
             numPages = GetPageCount(PAGE_ALIGN(offset + Bytes), 0);
 
@@ -2158,7 +2161,13 @@ gckOS_MapPhysical(
                 pages[i] = nth_page(page, i);
             }
 
-            logical = vmap(pages, numPages, 0, gcmkNONPAGED_MEMROY_PROT(PAGE_KERNEL));
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
+            pgprot = pgprot_writecombine(PAGE_KERNEL);
+#else
+            pgprot = pgprot_noncached(PAGE_KERNEL);
+#endif
+
+            logical = vmap(pages, numPages, 0, pgprot);
 
             kfree(pages);
 
@@ -3084,6 +3093,7 @@ gckOS_AllocatePagedMemoryEx(
     mdl->addr       = 0;
     mdl->numPages   = numPages;
     mdl->contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
+    mdl->cacheable  = Flag & gcvALLOC_FLAG_CACHEABLE;
 
     if (Gid != gcvNULL)
     {
@@ -3318,17 +3328,14 @@ gckOS_MapPagesEx(
     PLINUX_MDL  mdl;
     gctUINT32*  table;
     gctUINT32   offset = 0;
-#if gcdNONPAGED_MEMORY_CACHEABLE
-    gckMMU      mmu;
-    PLINUX_MDL  mmuMdl;
-    gctUINT32   bytes;
-    gctPHYS_ADDR pageTablePhysical;
-#endif
 
 #if gcdPROCESS_ADDRESS_SPACE
     gckKERNEL kernel = Os->device->kernels[Core];
     gckMMU      mmu;
 #endif
+
+    gctUINT32 bytes = PageCount * 4;
+
     gckALLOCATOR allocator;
 
     gctUINT32 policyID = 0;
@@ -3365,11 +3372,6 @@ gckOS_MapPagesEx(
 #endif
 
     table = (gctUINT32 *)PageTable;
-#if gcdNONPAGED_MEMORY_CACHEABLE
-    mmu = Os->device->kernels[Core]->mmu;
-    bytes = PageCount * sizeof(*table);
-    mmuMdl = (PLINUX_MDL)mmu->pageTablePhysical;
-#endif
 
     if (platform && platform->ops->getPolicyID)
     {
@@ -3465,21 +3467,56 @@ gckOS_MapPagesEx(
         offset += PAGE_SIZE;
     }
 
-#if gcdNONPAGED_MEMORY_CACHEABLE
-    /* Get physical address of pageTable */
-    pageTablePhysical = (gctPHYS_ADDR)(mmuMdl->dmaHandle +
-                        ((gctUINT32 *)PageTable - mmu->pageTableLogical));
+#if gcdENABLE_VG
+    if (Core == gcvCORE_VG)
+    {
+        gckVGMMU mmu = Os->device->kernels[gcvCORE_VG]->vg->mmu;
+        gctPHYS_ADDR mmuMdl = mmu->pageTablePhysical;
 
-    /* Flush the mmu page table cache. */
-    gcmkONERROR(gckOS_CacheClean(
-        Os,
-        _GetProcessID(),
-        gcvNULL,
-        pageTablePhysical,
-        PageTable,
-        bytes
-        ));
-#endif
+        offset = (gctUINT8_PTR)PageTable - (gctUINT8_PTR)mmu->pageTableLogical;
+
+        gcmkVERIFY_OK(gckOS_CacheClean(
+            Os,
+            _GetProcessID(),
+            mmuMdl,
+            offset,
+            PageTable,
+            bytes
+            ));
+    }
+    else
+#  endif
+    {
+        gckMMU mmu = Os->device->kernels[Core]->mmu;
+        gcsADDRESS_AREA * area = &mmu->area[0];
+
+        offset = (gctUINT8_PTR)PageTable - (gctUINT8_PTR)area->pageTableLogical;
+
+        /* must be in dynamic area. */
+        gcmkASSERT(offset < area->pageTableSize);
+
+        gcmkVERIFY_OK(gckOS_CacheClean(
+            Os,
+            0,
+            area->pageTablePhysical,
+            offset,
+            PageTable,
+            bytes
+            ));
+
+        if (mmu->mtlbPhysical)
+        {
+            /* Flush MTLB table. */
+            gcmkVERIFY_OK(gckOS_CacheClean(
+                Os,
+                0,
+                mmu->mtlbPhysical,
+                0,
+                mmu->mtlbLogical,
+                mmu->mtlbSize
+                ));
+        }
+    }
 
 OnError:
 
@@ -4364,7 +4401,7 @@ _CacheOperation(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes,
     IN gceCACHEOPERATION Operation
@@ -4390,15 +4427,16 @@ _CacheOperation(
 
         mutex_unlock(&mdl->mapsMutex);
 
-        if (mdlMap == gcvNULL)
+        if (ProcessID && mdlMap == gcvNULL)
         {
             return gcvSTATUS_INVALID_ARGUMENT;
         }
 
-        if (mdlMap->cacheable)
+        if ((!ProcessID && mdl->cacheable) ||
+            (mdlMap && mdlMap->cacheable))
         {
             allocator->ops->Cache(allocator,
-                mdl, Logical, Physical, Bytes, Operation);
+                mdl, Offset, Logical, Bytes, Operation);
 
             return gcvSTATUS_OK;
         }
@@ -4427,8 +4465,8 @@ _CacheOperation(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
-**      gctPOINTER Physical
-**          Physical address to flush.
+**      gctSIZE_T Offset
+**          Offset to this memory block.
 **
 **      gctPOINTER Logical
 **          Logical address to flush.
@@ -4462,7 +4500,7 @@ gckOS_CacheClean(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )
@@ -4478,7 +4516,7 @@ gckOS_CacheClean(
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
     gcmkONERROR(_CacheOperation(Os, ProcessID,
-                                Handle, Physical, Logical, Bytes,
+                                Handle, Offset, Logical, Bytes,
                                 gcvCACHE_CLEAN));
 
 OnError:
@@ -4505,6 +4543,9 @@ OnError:
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
+**      gctSIZE_T Offset
+**          Offset to this memory block.
+**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -4516,15 +4557,15 @@ gckOS_CacheInvalidate(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )
 {
     gceSTATUS status;
 
-    gcmkHEADER_ARG("Os=0x%X ProcessID=%d Handle=0x%X Logical=%p Bytes=%lu",
-                   Os, ProcessID, Handle, Logical, Bytes);
+    gcmkHEADER_ARG("Os=%p ProcessID=%d Handle=%p Offset=0x%llx Logical=%p Bytes=0x%zx",
+                   Os, ProcessID, Handle, Offset, Logical, Bytes);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
@@ -4532,7 +4573,7 @@ gckOS_CacheInvalidate(
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
     gcmkONERROR(_CacheOperation(Os, ProcessID,
-                                Handle, Physical, Logical, Bytes,
+                                Handle, Offset, Logical, Bytes,
                                 gcvCACHE_INVALIDATE));
 
 OnError:
@@ -4558,6 +4599,9 @@ OnError:
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
+**      gctSIZE_T Offset
+**          Offset to this memory block.
+**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -4569,15 +4613,15 @@ gckOS_CacheFlush(
     IN gckOS Os,
     IN gctUINT32 ProcessID,
     IN gctPHYS_ADDR Handle,
-    IN gctPHYS_ADDR_T Physical,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctSIZE_T Bytes
     )
 {
     gceSTATUS status;
 
-    gcmkHEADER_ARG("Os=0x%X ProcessID=%d Handle=0x%X Logical=%p Bytes=%lu",
-                   Os, ProcessID, Handle, Logical, Bytes);
+    gcmkHEADER_ARG("Os=%p ProcessID=%d Handle=%p Offset=0x%llx Logical=%p Bytes=0x%zx",
+                   Os, ProcessID, Handle, Offset, Logical, Bytes);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
@@ -4585,7 +4629,7 @@ gckOS_CacheFlush(
     gcmkVERIFY_ARGUMENT(Bytes > 0);
 
     gcmkONERROR(_CacheOperation(Os, ProcessID,
-                                Handle, Physical, Logical, Bytes,
+                                Handle, Offset, Logical, Bytes,
                                 gcvCACHE_FLUSH));
 
 OnError:

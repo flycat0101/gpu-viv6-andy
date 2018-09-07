@@ -688,6 +688,7 @@ typedef struct _gcsFENCE
 
     /* Fence location. */
     gctPHYS_ADDR                physical;
+    gctPHYS_ADDR                physHandle;
     gctPOINTER                  logical;
     gctUINT32                   address;
 
@@ -758,6 +759,7 @@ struct _gckCOMMAND
     queues[gcdCOMMAND_QUEUES];
 
     gctPHYS_ADDR                virtualMemory;
+    gctPHYS_ADDR                physHandle;
     gctUINT32                   physical;
     gctPOINTER                  logical;
     gctUINT32                   address;
@@ -779,6 +781,7 @@ struct _gckCOMMAND
     gctPOINTER                  waitLogical;
     gctUINT32                   waitAddress;
     gctUINT32                   waitSize;
+    gctUINT32                   waitOffset;
 
     /* Command buffer alignment. */
     gctUINT32                   alignment;
@@ -939,7 +942,8 @@ gceSTATUS
 gckEVENT_Stop(
     IN gckEVENT Event,
     IN gctUINT32 ProcessID,
-    IN gctUINT32 Handle,
+    IN gctPHYS_ADDR Handle,
+    IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
     IN gctUINT32 Address,
     IN gctSIGNAL Signal,

@@ -12295,6 +12295,10 @@ gckHARDWARE_PrepareFunctions(
 #endif
 #endif
 
+#if gcdENABLE_CACHEABLE_COMMAND_BUFFER
+        flags |= gcvALLOC_FLAG_CACHEABLE;
+#endif
+
         /* Allocate mmu command buffer within 32bit space */
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
@@ -12348,11 +12352,21 @@ gckHARDWARE_PrepareFunctions(
             ));
 
         function->bytes = mmuBytes + endBytes;
+
+        gcmkONERROR(gckOS_CacheClean(
+            Hardware->os,
+            0,
+            Hardware->mmuFuncPhysical,
+            0,
+            Hardware->mmuFuncLogical,
+            function->bytes
+            ));
     }
 
 #if USE_KERNEL_VIRTUAL_BUFFERS
     if (Hardware->kernel->virtualCommandBuffer)
     {
+        gckVIRTUAL_COMMAND_BUFFER_PTR commandBuffer = gcvNULL;
         gcmkONERROR(gckKERNEL_AllocateVirtualCommandBuffer(
             Hardware->kernel,
             gcvFALSE,
@@ -12368,17 +12382,26 @@ gckHARDWARE_PrepareFunctions(
             Hardware->auxFuncPhysical,
             &Hardware->auxFuncAddress
             ));
+
+        commandBuffer = (gckVIRTUAL_COMMAND_BUFFER_PTR) Hardware->auxFuncPhysical;
+
+        Hardware->auxPhysHandle = commandBuffer->virtualBuffer.physical;
     }
     else
 #endif
     {
         gctPHYS_ADDR_T physical = 0;
+        gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
+
+#if gcdENABLE_CACHEABLE_COMMAND_BUFFER
+        allocFlag |= gcvALLOC_FLAG_CACHEABLE;
+#endif
 
         /* Allocate a command buffer. */
         gcmkONERROR(gckOS_AllocateNonPagedMemory(
             os,
             gcvFALSE,
-            gcvALLOC_FLAG_CONTIGUOUS,
+            allocFlag,
             &Hardware->auxFuncBytes,
             &Hardware->auxFuncPhysical,
             &Hardware->auxFuncLogical
@@ -12403,6 +12426,8 @@ gckHARDWARE_PrepareFunctions(
             Hardware->auxFuncAddress,
             Hardware->auxFuncBytes
             ));
+
+        Hardware->auxPhysHandle = Hardware->auxFuncPhysical;
     }
 
     /*
@@ -12478,6 +12503,7 @@ gckHARDWARE_PrepareFunctions(
         function->bytes = eventBytes * 29;
     }
 
+
     /************************************************************************************
     * Dummy draw.
     */
@@ -12519,6 +12545,15 @@ gckHARDWARE_PrepareFunctions(
         function->bytes = dummyDrawBytes + endBytes;
     }
     gcmkASSERT(offset < Hardware->auxFuncBytes)
+
+    gcmkONERROR(gckOS_CacheClean(
+        Hardware->os,
+        0,
+        Hardware->auxPhysHandle,
+        0,
+        Hardware->auxFuncLogical,
+        Hardware->auxFuncBytes
+        ));
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;

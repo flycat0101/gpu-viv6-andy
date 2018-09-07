@@ -118,14 +118,6 @@
 /* Protection bit when mapping memroy to user sapce */
 #define gcmkPAGED_MEMROY_PROT(x)    pgprot_writecombine(x)
 
-#if gcdNONPAGED_MEMORY_BUFFERABLE
-#define gcmkIOREMAP                 ioremap_wc
-#define gcmkNONPAGED_MEMROY_PROT(x) pgprot_writecombine(x)
-#elif !gcdNONPAGED_MEMORY_CACHEABLE
-#define gcmkIOREMAP                 ioremap_nocache
-#define gcmkNONPAGED_MEMROY_PROT(x) pgprot_noncached(x)
-#endif
-
 #define gcdSUPPRESS_OOM_MESSAGE 1
 
 #if gcdSUPPRESS_OOM_MESSAGE

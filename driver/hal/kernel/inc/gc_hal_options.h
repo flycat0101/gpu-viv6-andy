@@ -741,23 +741,21 @@ This define enables the use of VM for gckCommand and fence buffers.
 #endif
 
 /*
-   gcdNONPAGED_MEMORY_CACHEABLE
+   gcdENABLE_CACHEABLE_COMMAND_BUFFER
 
-        When non-zero, non paged memory will be cacheable.
+        When non-zero, command buffer will be cacheable.
 */
-#ifndef gcdNONPAGED_MEMORY_CACHEABLE
-#   define gcdNONPAGED_MEMORY_CACHEABLE         0
+#ifndef gcdENABLE_CACHEABLE_COMMAND_BUFFER
+#   define gcdENABLE_CACHEABLE_COMMAND_BUFFER          0
 #endif
 
 /*
-   gcdNONPAGED_MEMORY_BUFFERABLE
+   gcdENABLE_BUFFERABLE_VIDEO_MEMORY
 
-        When non-zero, non paged memory will be bufferable.
-        gcdNONPAGED_MEMORY_BUFFERABLE and gcdNONPAGED_MEMORY_CACHEABLE
-        can't be set 1 at same time
+        When non-zero, all video memory will be bufferable by default.
 */
-#ifndef gcdNONPAGED_MEMORY_BUFFERABLE
-#   define gcdNONPAGED_MEMORY_BUFFERABLE        1
+#ifndef gcdENABLE_BUFFERABLE_VIDEO_MEMORY
+#   define gcdENABLE_BUFFERABLE_VIDEO_MEMORY           1
 #endif
 
 /*
