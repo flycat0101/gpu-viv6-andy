@@ -3349,18 +3349,6 @@ gcoHARDWARE_Initialize3D(
  29:29) + 1))))))) << (0 ? 29:29))))));
     }
 
-#if gcdENABLE_TRUST_APPLICATION
-    if (Hardware->features[gcvFEATURE_SECURITY])
-    {
-        gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
-            0x03900,
-            Hardware->context));
-
-        gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
-            0x03904,
-            0));
-    }
-#endif
 
     /* Initialized GPU reset timestamp */
     gcmONERROR(gcoHAL_QueryResetTimeStamp(&Hardware->resetTimeStamp, gcvNULL));
