@@ -239,7 +239,7 @@ struct blitter_layer
 
     /* Alpha blending states >>> */
     uint32_t blendFormula;  /* Layer blend formula. */
-    uint32_t globalAlpha;   /* Layer plane alpha. */
+    float globalAlpha;      /* Layer plane alpha. */
     int opaque;             /* Force no blend for tough-blend-hole opt. */
     /* <<< End alpha blending states. */
 

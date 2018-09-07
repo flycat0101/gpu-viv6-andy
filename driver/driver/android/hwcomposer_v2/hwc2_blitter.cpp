@@ -594,8 +594,10 @@ struct blend_formula blend_formula[] =
      * Cs' = Cs * Ags
      * As' = As * Ags
      *
-     * C  = Cs' + Cd * (1 - As') = Cs * Ags + Cd * (1 - As * Ags)
-     * A  = As' + Ad * (1 - As') = As * Ags + Ad * (1 - As * Ags)
+     * Global color multiply color: Cgs = Ags
+     *
+     * C  = Cs' + Cd * (1 - As') = Cs * Ags + Cd * (1 - As * Ags) = Cs * Cgs + Cd * (1 - As * Ags)
+     * A  = As' + Ad * (1 - As') = As * Ags + Ad * (1 - As * Ags) = As * Ags + Ad * (1 - As * Ags)
      */
     [FORMULA_PREMULT] = {
         gcvSURF_PIXEL_ALPHA_STRAIGHT,
@@ -634,8 +636,10 @@ struct blend_formula blend_formula[] =
      * Cs' = Cs * Ags
      * As' = 1  * Ags
      *
-     * C  = Cs' + Cd * (1 - As') = Cs * Ags + Cd * (1 - Ags)
-     * A  = As' + Ad * (1 - As') = 1  * Ags + Ad * (1 - Ags)
+     * Global color multiply color: Cgs = Ags
+     *
+     * C  = Cs' + Cd * (1 - As') = Cs * Ags + Cd * (1 - Ags) = Cs * Cgs + Cd * (1 - Ags)
+     * A  = As' + Ad * (1 - As') = 1  * Ags + Ad * (1 - Ags) = 1  * Ags + Ad * (1 - Ags)
      */
     [FORMULA_PREMULT_PLANE] = {
         gcvSURF_PIXEL_ALPHA_STRAIGHT,
@@ -658,6 +662,84 @@ struct blend_formula blend_formula[] =
         gcvSURF_GLOBAL_ALPHA_OFF,
         gcvSURF_BLEND_ONE,
         gcvSURF_BLEND_INVERSED,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR,
+        gcv2D_COLOR_MULTIPLY_DISABLE
+    },
+};
+
+struct blend_formula opaque_blend_formula[] =
+{
+    [FORMULA_DISABLED] = {
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_GLOBAL_ALPHA_OFF,
+        gcvSURF_GLOBAL_ALPHA_OFF,
+        gcvSURF_BLEND_ZERO,
+        gcvSURF_BLEND_ZERO,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE
+    },
+
+    /*
+     * Cs' = Cs * Ags = Cs * Cgs + Cd * 0
+     * As' = As * Ags = As * Ags + Ad * 0
+     */
+    [FORMULA_PREMULT] = {
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_GLOBAL_ALPHA_SCALE,
+        gcvSURF_GLOBAL_ALPHA_ON,
+        gcvSURF_BLEND_ONE,
+        gcvSURF_BLEND_ZERO,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR,
+        gcv2D_COLOR_MULTIPLY_DISABLE
+    },
+
+    /* OFF. */
+    [FORMULA_PREMULT_PERPIXEL] = {
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_GLOBAL_ALPHA_OFF,
+        gcvSURF_GLOBAL_ALPHA_OFF,
+        gcvSURF_BLEND_ZERO,
+        gcvSURF_BLEND_ZERO,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE
+    },
+
+    /*
+     * Cs' = Cs * Ags = Cs * Cgs + Cd * 0
+     * As' = As * Ags = As * Ags + Ad * 0
+     */
+    [FORMULA_PREMULT_PLANE] = {
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_GLOBAL_ALPHA_ON,
+        gcvSURF_GLOBAL_ALPHA_ON,
+        gcvSURF_BLEND_ONE,
+        gcvSURF_BLEND_ZERO,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR,
+        gcv2D_COLOR_MULTIPLY_DISABLE
+    },
+
+    /* TODO: This is not fully correct. */
+    [FORMULA_COVERAGE] = {
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_PIXEL_ALPHA_STRAIGHT,
+        gcvSURF_GLOBAL_ALPHA_ON,
+        gcvSURF_GLOBAL_ALPHA_OFF,
+        gcvSURF_BLEND_ONE,
+        gcvSURF_BLEND_ZERO,
         gcv2D_COLOR_MULTIPLY_DISABLE,
         gcv2D_COLOR_MULTIPLY_DISABLE,
         gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR,
@@ -702,15 +784,10 @@ static inline void refresh_layer_blend(__hwc2_display_t *dpy,
     /* update blend formula. */
     layer->blt.blendFormula = formula;
     layer->blt.opaque       = 0;
+    layer->blt.globalAlpha  = layer->planeAlpha;
 
-    /* Covert [0.0, 1.0] to [0, 255]. */
-    if (layer->planeAlpha >= 1.0)
-        layer->blt.globalAlpha = 255;
-    else
-        layer->blt.globalAlpha = (uint32_t)(layer->planeAlpha * 256);
-
-    __hwc2_trace(2, "layer=%p(%u) formula=%d planeAlpha=%.4f(%u)",
-        layer, layer->id, formula, layer->planeAlpha, layer->blt.globalAlpha);
+    __hwc2_trace(2, "layer=%p(%u) formula=%d planeAlpha=%.4f",
+        layer, layer->id, formula, layer->planeAlpha);
 }
 
 static inline void refresh_blend(__hwc2_device_t *dev,
@@ -1614,7 +1691,6 @@ static inline void refresh_geometry(__hwc2_device_t *dev,
 
 
 
-/* TODO: unnecessary code. */
 static inline void update_ref_buffer(__hwc2_display_t *dpy,
                         buffer_handle_t buffer)
 {
@@ -2598,46 +2674,76 @@ OnError:
  * 3. blend-hole optimization, per area (parameter opaque)
  */
 static void program_layer_blend(__hwc2_device_t *device,
-                    __hwc2_layer_t *layer, int opaque, uint32_t dim)
+                    __hwc2_layer_t *layer, int opaque, float dim)
 {
     blitter_device_t *blt = &device->blt;
     struct blend_formula *formula;
+    float colorf;
+    int enableBlend = 1;
     gctUINT32 srcGlobal;
     gceSTATUS status;
 
-    __hwc2_trace(2, "layer=%p(%u) formula=%d globalAlpha=%u opaque=%d",
-            layer, layer->id, layer->blt.blendFormula,
-            layer->blt.globalAlpha, (layer->blt.opaque | opaque));
-
-    formula = &blend_formula[layer->blt.blendFormula];
+    __hwc2_trace(2, "layer=%p(%u) globalAlpha=%.4f opaque=%d dim=%.4f",
+            layer, layer->id, layer->blt.globalAlpha,
+            (layer->blt.opaque | opaque), dim);
 
     if (layer->blt.blendFormula == FORMULA_DISABLED ||
             layer->blt.opaque || opaque) {
-        gcmONERROR(gco2D_DisableAlphaBlend(blt->engine));
+
+        formula = &opaque_blend_formula[layer->blt.blendFormula];
+
+        /* Need alpha blending is there's plane alpha. Disable if not. */
+        if (layer->blt.blendFormula == FORMULA_DISABLED ||
+                layer->blt.blendFormula == FORMULA_PREMULT_PERPIXEL) {
+            enableBlend = 0;
+        }
+
+        __hwc2_trace(2, "formula=opaque[%d] blend=%d",
+                layer->blt.blendFormula, enableBlend);
     } else {
+        formula = &blend_formula[layer->blt.blendFormula];
+        __hwc2_trace(2, "formula=normal[%d]", layer->blt.blendFormula);
+    }
+
+    if (enableBlend) {
         gcmONERROR(gco2D_EnableAlphaBlendAdvanced(blt->engine,
                 formula->srcAlphaMode, formula->dstAlphaMode,
                 formula->srcGlobalAlphaMode, formula->dstGlobalAlphaMode,
                 formula->srcFactorMode, formula->dstFactorMode));
+    } else {
+        gcmONERROR(gco2D_DisableAlphaBlend(blt->engine));
     }
 
-
-    if (dim < 0xFF) {
-        srcGlobal = (layer->blt.globalAlpha * dim) / 0xFF;
+    if (dim < 1.0f) {
+        colorf = layer->blt.globalAlpha * dim;
 
         gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
                 formula->srcPremultSrcAlpha, formula->dstPremultDstAlpha,
                 gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR, formula->dstDemultDstAlpha));
     } else {
-        srcGlobal = layer->blt.globalAlpha;
+        colorf = layer->blt.globalAlpha;
 
         gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
                 formula->srcPremultSrcAlpha, formula->dstPremultDstAlpha,
                 formula->srcPremultGlobalMode, formula->dstDemultDstAlpha));
     }
 
-    srcGlobal = srcGlobal | (srcGlobal << 8) | (srcGlobal << 16)
-            | (layer->blt.globalAlpha << 24);
+    if (colorf > 511.0f / 512.0f)
+        srcGlobal = 255;
+    else
+        srcGlobal = (uint32_t)(colorf * 256);
+
+
+    /* generate source global color. */
+    srcGlobal = srcGlobal | (srcGlobal << 8) | (srcGlobal << 16);
+
+    /* generate source global alpha. */
+    if (layer->blt.globalAlpha > 511.0f / 512.0f)
+        srcGlobal |= 0xFF000000;
+    else
+        srcGlobal |= ((uint32_t)(layer->blt.globalAlpha * 256)) << 24;
+
+    __hwc2_trace(2, "srcGlobal=0x%08X", srcGlobal);
 
     gcmONERROR(gco2D_SetSourceGlobalColorAdvanced(blt->engine, srcGlobal));
     gcmONERROR(gco2D_SetTargetGlobalColorAdvanced(blt->engine, 0xFFFFFFFF));
@@ -2970,7 +3076,7 @@ static void blit_layer(__hwc2_device_t *device,
     __hwc2_trace(0, "layer=%p(%u) composition=%s(%d)", layer, layer->id,
             composition_name(layer->composition), layer->composition);
 
-    program_layer_blend(device, layer, 0, 0xFF);
+    program_layer_blend(device, layer, 0, 1.0f);
 
     __hwc2_list_for_each(pos, &layer->blt.visibleDamaged) {
         struct area *area = __hwc2_list_entry(pos, struct area, link);
@@ -3683,7 +3789,7 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
         if (dimMask & mask)
             continue;
 
-        uint32_t dim = 0xFF;
+        float dim = 1.0f;
 
         if (mask < dimMask) {
             uint64_t m;
@@ -3692,14 +3798,14 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
             for (j = i + 1, m = (mask << 1); m <= dimMask; j++, m <<= 1) {
                 if (m & dimMask) {
                     __hwc2_layer_t *layer = dpy->blt.bltLayers[j];
-                    uint32_t d = 0xFF - (layer->blt.color32 >> 24);
-                    dim = dim * d / 0xFF;
+                    float d = float(layer->blt.color32 >> 24) / 256.0 + 1.0 / 512;
+                    dim *= (1 - layer->blt.globalAlpha * d);
                 }
             }
         }
 
         __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
-        __hwc2_trace(0, "layer=%p(%u) dim=0x%x(%u)", layer, layer->id, dim, dim);
+        __hwc2_trace(0, "layer=%p(%u) dim=%.4f", layer, layer->id, dim);
 
         /* Setup source index. */
         gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
@@ -3863,13 +3969,13 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
     }
 
     for (i = 0, mask = 1; mask <= batchMask; i++, mask <<= 1) {
-        if (!(batchMask &mask))
+        if (!(batchMask & mask))
             continue;
 
         if (dimMask & mask)
             continue;
 
-        uint32_t dim = 0xFF;
+        float dim = 1.0f;
 
         if (mask < dimMask) {
             uint64_t m;
@@ -3878,14 +3984,14 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
             for (j = i + 1, m = (mask << 1); m <= dimMask; j++, m <<= 1) {
                 if (m & dimMask) {
                     __hwc2_layer_t *layer = dpy->blt.bltLayers[j];
-                    uint32_t d = 0xFF - (layer->blt.color32 >> 24);
-                    dim = dim * d / 0xFF;
+                    float d = float(layer->blt.color32 >> 24) / 256.0 + 1.0 / 512;
+                    dim *= (1 - layer->blt.globalAlpha * d);
                 }
             }
         }
 
         __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
-        __hwc2_trace(0, "layer=%p(%u) dim=0x%x(%u)", layer, layer->id, dim, dim);
+        __hwc2_trace(0, "layer=%p(%u) dim=%.4f", layer, layer->id, dim);
 
         /* Setup source index. */
         gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
@@ -4031,7 +4137,7 @@ static void blit_area_multi(__hwc2_device_t *device,
                 program_multi_blit(device, dpy, &area->rect, batch, &param);
             else {
                 /* Do single blit. */
-                program_layer_blend(device, layer, opaque, 0xFF);
+                program_layer_blend(device, layer, opaque, 1.0f);
                 blit_layer_rects(device, dpy, layer, &area->rect, 1);
             }
 
@@ -4043,7 +4149,7 @@ static void blit_area_multi(__hwc2_device_t *device,
         }
 
         /* Do single blit. */
-        program_layer_blend(device, layer, opaque, 0xFF);
+        program_layer_blend(device, layer, opaque, 1.0f);
         blit_layer_rects(device, dpy, layer, &area->rect, 1);
 
         /* Advance to next layer. */
@@ -4075,7 +4181,7 @@ static void blit_area_single(__hwc2_device_t *device,
         int opaque = ((mask - 1) & area->layerMask) == 0;
 
         /* Do single blit. */
-        program_layer_blend(device, layer, opaque, 0xFF);
+        program_layer_blend(device, layer, opaque, 1.0f);
         blit_layer_rects(device, dpy, layer, &area->rect, 1);
     }
 }
