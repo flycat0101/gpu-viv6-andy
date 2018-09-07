@@ -1547,6 +1547,8 @@ typedef struct _vx_image
     vx_enum                                 importType;
 
     vx_image                                subimages[VX_MAX_REF_COUNT];
+
+    vx_bool                                 useInternalMem;
 }
 vx_image_s;
 

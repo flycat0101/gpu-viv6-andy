@@ -13,12 +13,6 @@
 
 #include <gc_vx_common.h>
 
-#ifdef WIN32
-#define SYNC_OUTPUT_MEMORY 1
-#else
-#define SYNC_OUTPUT_MEMORY 0
-#endif
-
 VX_INTERNAL_API vx_bool vxImageFormat_IsSupported(vx_df_image imageFormat)
 {
     switch (imageFormat)
@@ -310,6 +304,8 @@ VX_INTERNAL_API void vxoImage_Initialize(
 
     image->memory.planeCount    = image->planeCount;
 
+    image->useInternalMem       = vx_true_e;
+
     vxoImage_Dump(image);
 }
 
@@ -346,15 +342,15 @@ VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
         vx_uint32 planeIndex;
         vx_context context = vxGetContext((vx_reference)image);
 
-#if !SYNC_OUTPUT_MEMORY
-
-        vxmASSERT(image->importType == VX_MEMORY_TYPE_HOST || image->importType == VX_MEMORY_TYPE_HOST_UNCACHED || image->importType == VX_MEMORY_TYPE_INTERNAL);
-
-        if (image->importType != VX_MEMORY_TYPE_INTERNAL)
+        if(image->useInternalMem == vx_false_e)
         {
-            vxoImage_FreeWrappedMemory(image);
+            vxmASSERT(image->importType == VX_MEMORY_TYPE_HOST || image->importType == VX_MEMORY_TYPE_HOST_UNCACHED || image->importType == VX_MEMORY_TYPE_INTERNAL);
+
+            if (image->importType != VX_MEMORY_TYPE_INTERNAL)
+            {
+                vxoImage_FreeWrappedMemory(image);
+            }
         }
-#endif
 
         for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
         {
@@ -427,22 +423,33 @@ VX_INTERNAL_API void vxoImage_FreeMemory(vx_image image)
 
 VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
 {
-#if defined(WIN32)
     vx_uint32 planeIndex;
+    vx_bool status = vx_false_e;
 
-    vxmASSERT(image);
+    status = vxoMemory_WrapUserMemory(image->base.context, &image->memory);
 
-    /* For CTS, vxCreateImageFromHandle */
-    image->memory.allocated = vx_true_e;
-
-    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+    if(status == vx_false_e)
     {
-        if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
+        vxmASSERT(image);
+        /* For CTS, vxCreateImageFromHandle */
+        image->memory.allocated = vx_true_e;
+
+        for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
         {
-            goto OnError;
+            if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
+            {
+                goto OnError;
+            }
         }
+        return vx_true_e;
     }
+    else
+    {
+        image->useInternalMem = vx_false_e;
+    }
+
     return vx_true_e;
+
 OnError:
     for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
     {
@@ -453,10 +460,6 @@ OnError:
         }
     }
     return vx_false_e;
-#else
-    vxmASSERT(image);
-    return vxoMemory_WrapUserMemory(image->base.context, &image->memory);
-#endif
 }
 
 VX_INTERNAL_API void vxoImage_FreeWrappedMemory(vx_image image)
@@ -551,6 +554,8 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
         /* keep offset to allow vxSwapImageHandle update ROI pointers*/
         subImage->memory.offset[planeIndex]            = offset;
     }
+
+    subImage->useInternalMem = image->useInternalMem;
 
     vxoImage_Dump(subImage);
 
@@ -993,6 +998,8 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
             {
                 vxError("Child image failed to allocate!\n");
             }
+
+            subimage->useInternalMem = image->useInternalMem;
         }
         else
         {
@@ -2380,12 +2387,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                 /* return previous image handlers */
                 for (p = 0; p < image->planeCount; p++)
                 {
-#if !SYNC_OUTPUT_MEMORY && !defined(WIN32)
-                    if (image->memory.logicals[p] && image->memory.wrappedSize[p])
+                    if (image->useInternalMem == vx_false_e && image->memory.logicals[p] && image->memory.wrappedSize[p])
                     {
                         gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     }
-#endif
                     prev_ptrs[p] = image->memory.logicals[p];
                 }
             }
@@ -2430,31 +2435,34 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                 {
                     vx_context context = vxGetContext((vx_reference)image);
 
-#if defined(WIN32)
-                    for (p = 0; p < image->planeCount; p++)
+                    if(vx_true_e == image->useInternalMem)
                     {
-                        if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                        for (p = 0; p < image->planeCount; p++)
                         {
-                            gcoVX_FreeMemory((gcsSURF_NODE_PTR)image->memory.nodePtrs[p]);
-                            image->memory.nodePtrs[p] = VX_NULL;
+                            if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                            {
+                                gcoVX_FreeMemory((gcsSURF_NODE_PTR)image->memory.nodePtrs[p]);
+                                image->memory.nodePtrs[p] = VX_NULL;
 
-                            context->memoryCount--;
+                                context->memoryCount--;
 
+                            }
+                            /* offset is non zero if this is a subimage of some image */
+                            ptr = (vx_uint8*)new_ptrs[p];
+                            image->memory.logicals[p] = ptr;
                         }
-                        /* offset is non zero if this is a subimage of some image */
-                        ptr = (vx_uint8*)new_ptrs[p];
-                        image->memory.logicals[p] = ptr;
                     }
-#else
-                    vxoMemory_FreeWrappedMemory(context, &image->memory);
-                    for (p = 0; p < image->planeCount; p++)
+                    else
                     {
-                        /* offset is non zero if this is a subimage of some image */
-                        ptr = (vx_uint8*)new_ptrs[p];
-                        image->memory.logicals[p] = ptr;
+                        vxoMemory_FreeWrappedMemory(context, &image->memory);
+                        for (p = 0; p < image->planeCount; p++)
+                        {
+                            /* offset is non zero if this is a subimage of some image */
+                            ptr = (vx_uint8*)new_ptrs[p];
+                            image->memory.logicals[p] = ptr;
+                        }
+                        vxoMemory_WrapUserMemory(context, &image->memory);
                     }
-                    vxoMemory_WrapUserMemory(context, &image->memory);
-#endif
                 }
                 else
                 {

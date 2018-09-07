@@ -181,6 +181,9 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         desc.physical = gcvINVALID_ADDRESS;
         desc.size     = (gctUINT32)size;
 
+        /*63 is the cache line size for CPU*/
+        if(desc.logical & 63 || size & 63) goto ErrorExit;
+
         memory->wrappedSize[planeIndex] = (gctUINT32)size;
 
         /* Map the host ptr to a vidmem node. */
@@ -225,7 +228,6 @@ ErrorExit:
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
                             memory->wrappedNode[planeIndex]));
 
-            memory->logicals[planeIndex]     = VX_NULL;
             memory->wrappedNode[planeIndex]  = 0;
         }
 
