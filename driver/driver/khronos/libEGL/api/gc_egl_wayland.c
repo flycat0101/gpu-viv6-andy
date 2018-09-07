@@ -78,8 +78,7 @@ typedef struct __WLEGLSurfaceRec
     gceSURF_FORMAT format;
     gceSURF_TYPE type;
 
-    /* number of buffers can commit to compositor. */
-    int32_t commit_signal;
+
     pthread_mutex_t commit_mutex;
 
     gctHANDLE tid;
@@ -90,6 +89,7 @@ typedef struct __WLEGLSurfaceRec
     struct wl_surface * wrap_surface;
 #endif
 
+    struct wl_callback * frame_callback;
     struct wl_list link;
 } *__WLEGLSurface;
 
@@ -124,7 +124,6 @@ struct __WLEGLBufferRec
 
     EGLint age;
     volatile int state;
-    struct wl_callback * frame_callback;
     struct wl_buffer * wl_buf;
 };
 
@@ -374,21 +373,17 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
      */
     wl_list_for_each(egl_surface, &__wl_egl_surface_list, link)
     {
-        int i;
-
         if (egl_surface->display != display)
             continue;
 
-        for (i = 0; i < egl_surface->nr_buffers; i++)
-        {
-            __WLEGLBuffer buffer = &egl_surface->buffers[i];
 
-            if (buffer->frame_callback && egl_surface->commit_queue)
+        {
+            if (egl_surface->frame_callback && egl_surface->commit_queue)
             {
                 int ret = 0;
 
                 pthread_mutex_lock(&egl_surface->commit_mutex);
-                while (buffer->frame_callback && ret != -1)
+                while (egl_surface->frame_callback && ret != -1)
                 {
                     ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
                 }
@@ -570,10 +565,8 @@ __frame_callback_handle_done(void *data, struct wl_callback *callback, uint32_t 
     __WLEGLBuffer buffer = data;
     __WLEGLSurface egl_surface = buffer->parent;
 
-    buffer->frame_callback = NULL;
+    egl_surface->frame_callback = NULL;
     wl_callback_destroy(callback);
-
-    egl_surface->commit_signal++;
 }
 
 static const struct wl_callback_listener __frame_callback_listener = {
@@ -656,7 +649,6 @@ __wl_egl_buffer_create(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
     buffer->info.type       = (gceSURF_TYPE)egl_surface->type;
 
     buffer->parent          = egl_surface;
-    buffer->frame_callback  = NULL;
 
     buffer->wl_buf =
         wl_viv_create_buffer(egl_surface->display->wl_viv,
@@ -789,19 +781,18 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     int i;
     __WLEGLDisplay display = egl_surface->display;
 
-    egl_surface->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
     __wl_egl_surface_unregister(egl_surface);
 
     for (i = 0; i < egl_surface->nr_buffers; i++)
     {
         __WLEGLBuffer buffer = &egl_surface->buffers[i];
 
-        if (display && buffer->frame_callback)
+        if (display && egl_surface->frame_callback)
         {
             int ret = 0;
 
             pthread_mutex_lock(&egl_surface->commit_mutex);
-            while (buffer->frame_callback && ret != -1)
+            while (egl_surface->frame_callback && ret != -1)
             {
                 ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
             }
@@ -840,6 +831,7 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     free(egl_surface->buffers);
     egl_surface->buffers   = NULL;
     egl_surface->signature = 0;
+    egl_surface->frame_callback = gcvNULL;
 
     pthread_mutex_destroy(&egl_surface->commit_mutex);
 
@@ -866,6 +858,7 @@ __resize_callback(struct wl_egl_window *window, void *data)
 
         egl_surface->width  = window->width;
         egl_surface->height = window->height;
+        egl_surface->frame_callback = gcvNULL;
 
         /* handle recursive call to dequeue issue. */
         if (egl_surface->indequeue)
@@ -950,7 +943,8 @@ __wl_egl_surface_create(struct wl_egl_window *window)
     egl_surface->format = gcvSURF_A8R8G8B8;
     egl_surface->type   = gcvSURF_BITMAP;
     egl_surface->swap_interval = 1;
-    egl_surface->commit_signal = 1;
+    egl_surface->frame_callback = gcvNULL;
+
     pthread_mutex_init(&egl_surface->commit_mutex, NULL);
 
     p = getenv("WL_EGL_SWAP_INTERVAL");
@@ -1058,7 +1052,7 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     if (egl_surface->nr_buffers > 1)
     {
-        int loop = 0;
+
         for (;;)
         {
             int current = egl_surface->next;
@@ -1075,20 +1069,13 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
                 break;
             }
 
-            if (loop > 2)
-            {
-                ret = __wl_egl_roundtrip_queue(wl_dpy, wl_queue);
-                loop = 0;
-            }
-            else
-                ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 5);
+            ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 5);
 
             if (ret == -1)
             {
                 buffer = NULL;
                 break;
             }
-            loop++;
         }
 
     }
@@ -1187,16 +1174,7 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     pthread_mutex_lock(&egl_surface->commit_mutex);
 
     /* Make sure previous frame with this buffer is done. */
-    while (buffer->frame_callback && ret != -1)
-        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
-
-    if (ret == -1)
-    {
-        /* fatal error, can not recover. */
-        goto out;
-    }
-
-    while (!egl_surface->commit_signal && ret != -1)
+    while (egl_surface->frame_callback && ret != -1)
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
@@ -1207,9 +1185,9 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     if (egl_surface->swap_interval > 0)
     {
-        buffer->frame_callback = wl_surface_frame(egl_surface->wrap_surface);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
+        egl_surface->frame_callback = wl_surface_frame(egl_surface->wrap_surface);
+        wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
+        wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
     }
 
     /* buffer is queued to compositor. */
@@ -1218,9 +1196,14 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dy = 0;
 
     surface = buffer->info.surface;
+
+#if gcdENABLE_3D
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
         !surface->tileStatusDisabled[0], surface->compressed,
         surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+#else
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+#endif
 
     gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
@@ -1228,7 +1211,6 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_surface_damage(egl_surface->wrap_surface, x, y, width, height);
     wl_surface_commit(egl_surface->wrap_surface);
 
-    egl_surface->commit_signal--;
 
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
@@ -1236,11 +1218,11 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
      * handle the commit and send a release event before checking for a free
      * buffer
      */
-    if (buffer->frame_callback == NULL)
+    if (egl_surface->frame_callback == NULL)
     {
-        buffer->frame_callback = wl_display_sync(display->wrap_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
+        egl_surface->frame_callback = wl_display_sync(display->wrap_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
+        wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
     }
 
     /* flush events. */
@@ -1270,16 +1252,7 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     pthread_mutex_lock(&egl_surface->commit_mutex);
 
     /* Make sure previous frame with this buffer is done. */
-    while (buffer->frame_callback && ret != -1)
-        ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
-
-    if (ret == -1)
-    {
-        /* fatal error, can not recover. */
-        goto out;
-    }
-
-    while (!egl_surface->commit_signal && ret != -1)
+    while (egl_surface->frame_callback && ret != -1)
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
 
     if (ret == -1)
@@ -1303,9 +1276,9 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
             goto out;
         }
 
-        buffer->frame_callback = wl_surface_frame(window->surface);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
+        egl_surface->frame_callback = wl_surface_frame(window->surface);
+        wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
+        wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
     }
@@ -1316,9 +1289,13 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dy = 0;
 
     surface = buffer->info.surface;
+#if gcdENABLE_3D
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
         !surface->tileStatusDisabled[0], surface->compressed,
         surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+#else
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+#endif
 
     gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
@@ -1326,15 +1303,13 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_surface_damage(window->surface, x, y, width, height);
     wl_surface_commit(window->surface);
 
-    egl_surface->commit_signal--;
-
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
      * to a sync callback so that we always give a chance for the compositor to
      * handle the commit and send a release event before checking for a free
      * buffer
      */
-    if (buffer->frame_callback == NULL)
+    if (egl_surface->frame_callback == NULL)
     {
         /*
          * This is to block read & dispatch events in other threads, so that the
@@ -1348,9 +1323,9 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
             goto out;
         }
 
-        buffer->frame_callback = wl_display_sync(wl_dpy);
-        wl_proxy_set_queue((struct wl_proxy *)buffer->frame_callback, commit_queue);
-        wl_callback_add_listener(buffer->frame_callback, &__frame_callback_listener, buffer);
+        egl_surface->frame_callback = wl_display_sync(wl_dpy);
+        wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
+        wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
 
         wl_display_cancel_read(wl_dpy);
     }
@@ -1870,7 +1845,6 @@ _UnbindWindow(
 
     /* Do not throttle the swap thread. */
     egl_surface = window->driver_private;
-    egl_surface->commit_signal = WL_EGL_MAX_NUM_BACKBUFFERS;
     egl_surface->tid = gcvNULL;
 
     return EGL_TRUE;
@@ -2657,9 +2631,13 @@ veglCreateWaylandBufferFromImage(
                 buffer->info.node, buffer->info.pool, buffer->info.size,
                 buffer->info.tsNode, buffer->info.tsPool, buffer->info.tsSize, buffer->info.fd);
 
+#if gcdENABLE_3D
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
         !surface->tileStatusDisabled[0], surface->compressed,
         surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+#else
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+#endif
 
     wl_proxy_set_queue((struct wl_proxy *)buffer->wl_buf, NULL);
 
