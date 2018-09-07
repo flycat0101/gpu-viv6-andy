@@ -417,7 +417,10 @@ wl_egl_display_destroy(struct wl_egl_display *display)
 
 #if (WAYLAND_VERSION_CT)
         if (window->wrap_surface)
+        {
             wl_proxy_wrapper_destroy((void *)window->wrap_surface);
+            window->wrap_surface = gcvNULL;
+        }
 #endif
         window->commit_queue = gcvNULL;
         window->wl_queue = gcvNULL;
@@ -2301,13 +2304,13 @@ void wl_egl_window_destroy(struct wl_egl_window *window)
         roundtrip_queue(display->wl_dpy, window->wl_queue);
     }
 
-    if (window->wl_queue == gcvNULL)
+    if (window->wl_queue)
     {
         wl_event_queue_destroy(window->wl_queue);
         window->wl_queue = gcvNULL;
     }
 
-    if (window->commit_queue == gcvNULL)
+    if (window->commit_queue)
     {
         wl_event_queue_destroy(window->commit_queue);
         window->commit_queue = gcvNULL;
