@@ -490,7 +490,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
     switch (internalFormat)
     {
         case GL_RED:
-        case GL_R8:
         case GL_R8_SNORM:
         case GL_R8I:
         case GL_R8UI:
@@ -502,7 +501,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_R32F:
 
         case GL_RG:
-        case GL_RG8:
         case GL_RG8_SNORM:
         case GL_RG8I:
         case GL_RG8UI:
@@ -567,6 +565,19 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_DEPTH32F_STENCIL8:
 
             break;
+
+        /* According to GL_EXT_texture_rg spec:
+        ** only RED_EXT & RG_EXT Accepted by the <internalformat> parameter of TexImage2D and CopyTexImage2D.
+        ** GL_R8 & GL_RG8 are invalid internaformat under es2 context
+        */
+        case GL_R8:
+        case GL_RG8:
+            if((gc->apiVersion == __GL_API_VERSION_ES20) && (gc->constants.majorVersion == 2))
+            {
+                invalid = GL_TRUE;
+            }
+            break;
+
         case GL_STENCIL_INDEX8:
             if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
             {
