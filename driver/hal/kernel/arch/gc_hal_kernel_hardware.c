@@ -1319,7 +1319,7 @@ _QueryFeatureDatabase(
         break;
 
     case gcvFEATURE_GPIPE_CLOCK_GATE_FIX:
-        available = gcvFALSE;
+        available = gcvTRUE;
         break;
 
     case gcvFEATURE_NEW_GPIPE:
