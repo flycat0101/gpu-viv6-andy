@@ -13,12 +13,6 @@
 
 #include <gc_vxk_common.h>
 
-#ifdef WIN32
-#define SYNC_OUTPUT_MEMORY 1
-#else
-#define SYNC_OUTPUT_MEMORY 0
-#endif
-
 #if defined(__linux__)
 VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref)
 {
@@ -511,42 +505,45 @@ gcfVX_GetImageInfo(
 
         if (Image->importType == VX_MEMORY_TYPE_HOST)
         {
-#if !SYNC_OUTPUT_MEMORY && !defined(WIN32)
-            if (Image->memory.logicals[plane] && Image->memory.wrappedSize[plane])
+            if(Image->useInternalMem == vx_false_e)
             {
-                gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
+                if (Image->memory.logicals[plane] && Image->memory.wrappedSize[plane])
+                {
+                    gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
+                }
+                Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
             }
-            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
-#else
-            node = gcvNULL;
-            vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
-
-            if (node == NULL)
+            else
             {
-                vx_context context = vxGetContext((vx_reference)Image);
+                node = gcvNULL;
+                vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
 
-                vx_rectangle_t rect;
-                vx_size size = 0;
-                gctUINT32_PTR logical = 0;
+                if (node == NULL)
+                {
+                    vx_context context = vxGetContext((vx_reference)Image);
 
-                vxGetValidRegionImage(Image, &rect);
-                size = vxComputeImagePatchSize(Image, &rect, plane);
+                    vx_rectangle_t rect;
+                    vx_size size = 0;
+                    gctUINT32_PTR logical = 0;
 
-                gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
-                                            &Image->memory.physicals[plane],
-                                            &Image->memory.nodePtrs[plane]);
+                    vxGetValidRegionImage(Image, &rect);
+                    size = vxComputeImagePatchSize(Image, &rect, plane);
 
-                context->memoryCount ++;
+                    gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
+                                                &Image->memory.physicals[plane],
+                                                &Image->memory.nodePtrs[plane]);
 
-                node = Image->memory.nodePtrs[plane];
+                    context->memoryCount ++;
 
-                if (size > 0)
-                    gcoOS_MemCopy(node->logical, Image->memory.logicals[plane], size);
+                    node = Image->memory.nodePtrs[plane];
+
+                    if (size > 0)
+                        gcoOS_MemCopy(node->logical, Image->memory.logicals[plane], size);
+                }
+
+                Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+                Info->logicals[plane] = (gctPOINTER)node->logical;
             }
-
-            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
-            Info->logicals[plane] = (gctPOINTER)node->logical;
-#endif
         }
         else if (Image->importType == VX_MEMORY_TYPE_DMABUF ||
                  Image->importType == VX_MEMORY_TYPE_INTERNAL ||
@@ -910,7 +907,6 @@ gceSTATUS gcfVX_Commit(
     return status;
 }
 
-#if SYNC_OUTPUT_MEMORY
 gceSTATUS gcfVX_SyncMemoryForOutPut(
     IN gcoVX_Kernel_Context *Context
     )
@@ -930,6 +926,11 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
             {
                 vx_rectangle_t rect;
                 vx_image image = (vx_image)object->obj;
+
+                if(image->importType != VX_MEMORY_TYPE_HOST || image->useInternalMem == vx_false_e)
+                    continue;
+
+                gcoVX_Flush(gcvTRUE);
 
                 vxGetValidRegionImage(image, &rect);
 
@@ -952,7 +953,6 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif
 
 gceSTATUS
 gcfVX_RunKernel(
@@ -998,11 +998,7 @@ gcfVX_RunKernel(
         gcmONERROR(gcoVX_InvokeKernel(&Context->params));
     }
 
-#if SYNC_OUTPUT_MEMORY
-    /* add flush here to make sure the graph has completed before reading out the result for WIN32 */
-    gcoVX_Flush(gcvTRUE);
     gcmONERROR(gcfVX_SyncMemoryForOutPut(Context));
-#endif
 
 #if VX_NN_SH_PARALLEL
     if (Context->node->cnnWaitEventID1 != 0xffffffff)
