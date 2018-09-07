@@ -4710,6 +4710,7 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
     {
         /* we check per-vertex attribute for TCS, since VS shader output is always checked */
         if (VIR_Shader_GetKind(pShader) == VIR_SHADER_TESSELLATION_CONTROL ||
+            VIR_Shader_GetKind(pShader) == VIR_SHADER_TESSELLATION_EVALUATION ||
             VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
         {
             _InitUsageFlag(pShader, VIR_Shader_GetAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvTRUE);

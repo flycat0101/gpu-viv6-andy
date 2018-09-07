@@ -96,6 +96,54 @@ VIR_Lower_SetIntZero(
 }
 
 gctBOOL
+VIR_Lower_SetIntOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm1;
+    imm1.iValue = 1;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm1);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetIntTwo(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm2;
+    imm2.iValue = 2;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm2);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetIntThree(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm3;
+    imm3.iValue = 3;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm3);
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Lower_SetIntHighBitOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -141,23 +189,6 @@ VIR_Lower_SetMinusOne(
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_FLOAT32,
-        imm0);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetIntOne(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ScalarConstVal imm0;
-
-    imm0.iValue = 1;
-
-    VIR_Operand_SetImmediate(Opnd,
-        VIR_TYPE_INT32,
         imm0);
     return gcvTRUE;
 }
@@ -788,6 +819,54 @@ VIR_Lower_label_set_jmp_neg3_6(
     }
 
     return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg3_6_9(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if (!VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -3))
+    {
+        return gcvFALSE;
+    }
+    if (!VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6))
+    {
+        return gcvFALSE;
+    }
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -9);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -4);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg6(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg8(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -8);
 }
 
 gctBOOL

@@ -17791,6 +17791,211 @@ static VIR_Pattern _evisFilterPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static gctBOOL
+_isDestTessLevelOuterAndSrc1Variable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst)
+{
+    VIR_Operand *dest = Inst->dest;
+    VIR_Operand *src1 = VIR_Inst_GetSource(Inst, 1);
+    VIR_Symbol *sym = VIR_Operand_GetUnderlyingSymbol(dest);
+    if ((VIR_Operand_GetOpKind(src1) != VIR_OPND_IMMEDIATE) &&
+        sym && (VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_OUTER))
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+/* gl_TessLevelInner and gl_TessLevelOuter are stored in packed mode,
+ * if dynamic index is used in such variables, replace it with immediate
+ */
+static gctBOOL
+_isSrc0TessLevelOuterAndSrc2Variable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst)
+{
+    VIR_Operand *src0 = VIR_Inst_GetSource(Inst, 0);
+    VIR_Operand *src2 = VIR_Inst_GetSource(Inst, 2);
+    VIR_Symbol *sym = VIR_Operand_GetUnderlyingSymbol(src0);
+    if ((VIR_Operand_GetOpKind(src2) != VIR_OPND_IMMEDIATE) &&
+        sym && (VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_OUTER))
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL
+_setOperandNotConstIndexing(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_Operand_SetIsConstIndexing(Opnd, 0);
+    return gcvTRUE;
+}
+
+/* find destination symbol according to the original dest and reset
+    gl_TessLevelInner and gl_TessLevelOuter are fix size array, which corresponding symbol Ids of each element are continous
+    Added SYM_VARIABLE 10: float[2]  patch out  gl_TessLevelInner ==> temp(0 - 1) common_flags:< >
+    Added SYM_VIRREG 11: float temp(3) common_flags:< >
+    Added SYM_VIRREG 12: float temp(4) common_flags:< >   <-- if dynamic indexing is 1, use sym_virreg(12)
+    Added SYM_VARIABLE 13: float[4]  patch out  gl_TessLevelOuter ==> temp(0 - 3) common_flags:< >
+    Added SYM_VIRREG 14: float temp(5) common_flags:< >
+    Added SYM_VIRREG 15: float temp(6) common_flags:< >   <-- if dynamic indexing is 1 (original should be 14), use sym_virreg(15)
+    Added SYM_VIRREG 16: float temp(7) common_flags:< >
+    Added SYM_VIRREG 17: float temp(8) common_flags:< >
+*/
+static gctBOOL
+_setDestSymIdPlusOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_Symbol *sym = VIR_Operand_GetSymbol(Opnd);
+    VIR_Symbol *newSym = gcvNULL;
+    newSym = VIR_Shader_GetSymFromId(Context->shader, VIR_Symbol_GetIndex(sym)+1);
+    gcmASSERT(newSym);
+    VIR_Operand_SetSym(Opnd, newSym);
+    VIR_Operand_SetIsConstIndexing(Opnd, 0);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setDestSymIdPlusTwo(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_Symbol *sym = VIR_Operand_GetSymbol(Opnd);
+    VIR_Symbol *newSym = gcvNULL;
+    newSym = VIR_Shader_GetSymFromId(Context->shader, VIR_Symbol_GetIndex(sym)+2);
+    gcmASSERT(newSym);
+    VIR_Operand_SetSym(Opnd, newSym);
+    VIR_Operand_SetIsConstIndexing(Opnd, 0);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setDestSymIdPlusThree(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    VIR_Symbol *sym = VIR_Operand_GetSymbol(Opnd);
+    VIR_Symbol *newSym = gcvNULL;
+    newSym = VIR_Shader_GetSymFromId(Context->shader, VIR_Symbol_GetIndex(sym)+3);
+    gcmASSERT(newSym);
+    VIR_Operand_SetSym(Opnd, newSym);
+    VIR_Operand_SetIsConstIndexing(Opnd, 0);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setSrc0NotConstIndexing(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+}
+
+/* attr_st gl_TessLevelOuter accessed by dynamic indexing
+ATTR_ST            hp temp(5).hp.x, int 0, int mp  temp(9).mp.x, hp  temp(277).hp.x
+=>
+    jmpc label1, temp(9) == 0
+    jmpc label2, temp(9) == 1
+    jmpc label3, temp(9) == 2
+    jmpc lable4, temp(9) == 3
+label1:
+    ATTR_ST            hp temp(5).hp.x, int 0, int   0, hp  temp(277).hp.x
+    jmp label5
+label2:
+    ATTR_ST            hp temp(6).hp.x, int 0, int   0, hp  temp(277).hp.x
+    jmp label5
+label3:
+    ATTR_ST            hp temp(7).hp.x, int 0, int   0, hp  temp(277).hp.x
+    jmp label5
+label4:
+    ATTR_ST            hp temp(8).hp.x, int 0, int   0, hp  temp(277).hp.x
+label5:
+*/
+static VIR_PatternMatchInst _attrstPatInst0[] = {
+    { VIR_OP_ATTR_ST, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, {_isDestTessLevelOuterAndSrc1Variable}, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _attrstRepInst0[] = {
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 3, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntZero, 0 }},
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 3, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 }},
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 3, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 }},
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 3, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntThree, 0 }},
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg4 } }, /*label1*/
+    { VIR_OP_ATTR_ST, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { _setOperandNotConstIndexing, 0, VIR_Lower_SetIntZero, 0, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg6 } }, /*label2*/
+    { VIR_OP_ATTR_ST, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { _setDestSymIdPlusOne, 0, VIR_Lower_SetIntZero, 0, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg8 } }, /*label3*/
+    { VIR_OP_ATTR_ST, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { _setDestSymIdPlusTwo, 0, VIR_Lower_SetIntZero, 0, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg10 } }, /*label4*/
+    { VIR_OP_ATTR_ST, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { _setDestSymIdPlusThree, 0, VIR_Lower_SetIntZero, 0, 0} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6_9 } }, /*label5*/
+};
+
+static VIR_Pattern _attrstPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_attrst, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* attr_ld gl_TessLevelOuter accessed by dynamic indexing
+    ATTR_LD            dest, hp temp(5).hp.x, 0, hp  temp(277).hp.x
+=>
+    jmpc label1, temp(277) == 0
+    jmpc label2, temp(277) == 1
+    jmpc label3, temp(277) == 2
+    jmpc lable4, temp(277) == 3
+label1:
+    ATTR_LD            dest, hp temp(5).hp.x, 0, 0
+    jmp label5
+label2:
+    ATTR_LD            dest, hp temp(5).hp.x, 0, 1
+    jmp label5
+label3:
+    ATTR_LD            dest, hp temp(5).hp.x, 0, 2
+    jmp label5
+label4:
+    ATTR_LD            dest, hp temp(5).hp.x, 0, 3
+label5:
+*/
+static VIR_PatternMatchInst _attrldPatInst0[] = {
+    { VIR_OP_ATTR_LD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, {_isSrc0TessLevelOuterAndSrc2Variable}, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _attrldRepInst0[] = {
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 4, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntZero, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 4, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 4, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, 4, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntThree, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg4 } }, /*label1*/
+    { VIR_OP_ATTR_LD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { 0, _setOperandNotConstIndexing, 0, VIR_Lower_SetIntZero, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg6 } }, /*label2*/
+    { VIR_OP_ATTR_LD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { 0, _setOperandNotConstIndexing, 0, VIR_Lower_SetIntOne, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg8 } }, /*label3*/
+    { VIR_OP_ATTR_LD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, { 0, _setOperandNotConstIndexing, 0, VIR_Lower_SetIntTwo, 0} },
+    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg10 } }, /*label4*/
+    { VIR_OP_ATTR_LD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 0 }, {0, _setOperandNotConstIndexing, 0, VIR_Lower_SetIntThree, 0} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6_9 } }, /*label5*/
+};
+
+static VIR_Pattern _attrldPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_attrld, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 gctBOOL
 _SplitPackedGT16ByteInst(
     IN VIR_PatternContext *Context,
@@ -17997,6 +18202,10 @@ _GetLowerPatternPhaseExpand(
             return _longhiPattern;
         case VIR_OP_MOV_LONG:
             return _movlongPattern;
+        case VIR_OP_ATTR_ST:
+            return _attrstPattern;
+        case VIR_OP_ATTR_LD:
+            return _attrldPattern;
         default:
             break;
         }

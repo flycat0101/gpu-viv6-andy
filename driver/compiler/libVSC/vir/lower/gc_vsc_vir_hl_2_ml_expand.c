@@ -92,26 +92,6 @@ label_set_jmp_neg2(
 }
 
 static gctBOOL
-label_set_jmp_neg3(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return label_set_jmp_n(Context, Inst, Opnd, -3);
-}
-
-static gctBOOL
-label_set_jmp_neg4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return label_set_jmp_n(Context, Inst, Opnd, -4);
-}
-
-static gctBOOL
 label_set_jmp_neg5(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -129,24 +109,6 @@ label_set_jmp_neg7(
     )
 {
     return label_set_jmp_n(Context, Inst, Opnd, -7);
-}
-
-static gctBOOL
-label_set_jmp_neg3_6_9(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    if (!label_set_jmp_n(Context, Inst, Opnd, -3))
-    {
-        return gcvFALSE;
-    }
-    if (!label_set_jmp_n(Context, Inst, Opnd, -6))
-    {
-        return gcvFALSE;
-    }
-    return label_set_jmp_n(Context, Inst, Opnd, -9);
 }
 
 /* set current operand as constant 0.5. */
@@ -225,48 +187,6 @@ _constf_three(
     imm.fValue = (gctFLOAT) 3.0;
 
     VIR_Operand_SetImmediate(Opnd, VIR_TYPE_FLOAT32, imm);
-
-    return gcvTRUE;
-}
-
-static gctBOOL
-_consti_one(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    VIR_ScalarConstVal     imm;
-    imm.iValue = 1;
-
-    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
-
-    return gcvTRUE;
-}
-
-static gctBOOL
-_consti_two(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    VIR_ScalarConstVal     imm;
-    imm.iValue = 2;
-
-    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
-
-    return gcvTRUE;
-}
-
-static gctBOOL
-_consti_three(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    VIR_ScalarConstVal     imm;
-    imm.iValue = 3;
-
-    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_INT32, imm);
 
     return gcvTRUE;
 }
@@ -1859,10 +1779,10 @@ static VIR_PatternMatchInst _intrinVecGetPatInst0[] = {
 static VIR_PatternReplaceInst _intrinVecGetRepInst0[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_two, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_three, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntThree, 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label1*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg5 } }, /*label2*/
@@ -1870,7 +1790,7 @@ static VIR_PatternReplaceInst _intrinVecGetRepInst0[] = {
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg7 } }, /*label3*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleW } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3_6_9 } }, /*label4*/
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6_9 } }, /*label4*/
 };
 
 /* vecget instrinsic function param0 is vec3
@@ -1894,14 +1814,14 @@ static VIR_PatternMatchInst _intrinVecGetPatInst1[] = {
 static VIR_PatternReplaceInst _intrinVecGetRepInst1[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_two, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 } },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg2 } }, /*label1*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg4 } }, /*label2*/
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg4 } }, /*label2*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleZ } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label3*/
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label3*/
 };
 
 /* vecget instrinsic function param0 is vec2
@@ -1921,12 +1841,12 @@ static VIR_PatternMatchInst _intrinVecGetPatInst2[] = {
 
 static VIR_PatternReplaceInst _intrinVecGetRepInst2[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, _consti_one, 0 } },
+    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
     { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label1*/
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label1*/
     { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg3 } }, /*label2*/
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label2*/
 };
 
 static VIR_Pattern _intrinVecGetPattern[] = {
