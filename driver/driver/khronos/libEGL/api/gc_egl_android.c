@@ -298,6 +298,9 @@ struct eglWindowInfo
     struct
     {
         void *          handle;
+        int             fd;
+        void *          data;
+
         gcoSURF         surface;
         EGLint          age;
     } bufferCache[32];
@@ -1747,17 +1750,36 @@ _UpdateBufferCache(
 {
     EGLint i;
     VEGLWindowInfo info = EglSurface->winInfo;
-    void * handle = (void *) Buffer->handle;
+    native_handle_t *handle = (native_handle_t *)Buffer->handle;
     void * bo = NULL;
     gcoSURF surface;
+    int fd;
+    void * data;
+    EGLBoolean invalidate = EGL_FALSE;
+
+    fd = (int)handle->data[0];
+
+#ifdef DRM_GRALLOC
+    data = gralloc_vivante_bo_from_handle(Buffer->handle);
+#else
+    data = gc_native_handle_get(Buffer->handle)->surface;
+#endif
 
     for (i = 0; i < info->bufferCacheCount; i++)
     {
         if (info->bufferCache[i].handle == handle)
         {
-            /* The buffer handle is already cached. */
-            *Surface = info->bufferCache[i].surface;
-            return EGL_TRUE;
+            if (info->bufferCache[i].fd == fd &&
+                info->bufferCache[i].data == data)
+            {
+                /* The buffer handle is already cached. */
+                *Surface = info->bufferCache[i].surface;
+                return EGL_TRUE;
+            }
+
+            LOGV("%s: buffer out of data: buffer=%p", __func__, handle);
+            invalidate = EGL_TRUE;
+            break;
         }
     }
 
@@ -1766,6 +1788,11 @@ _UpdateBufferCache(
     {
         /* Seems buffers are out of date. */
         LOGV("%s: buffers out of data: buffer=%p", __func__, handle);
+        invalidate = EGL_TRUE;
+    }
+
+    if (invalidate)
+    {
         _InvalidateBufferCache(EglSurface);
         i = 0;
     }
@@ -1780,6 +1807,8 @@ _UpdateBufferCache(
 
     /* Not cached yet, cache it. */
     info->bufferCache[i].handle  = handle;
+    info->bufferCache[i].fd      = fd;
+    info->bufferCache[i].data    = data;
     info->bufferCache[i].surface = surface;
     info->bufferCache[i].age     = 0;
 
