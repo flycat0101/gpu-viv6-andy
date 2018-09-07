@@ -566,7 +566,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             }
             else
             {
-                tex->params.sampler.sWrapMode = (GLenum)param;
+                tex->params.sampler.tWrapMode = (GLenum)param;
                 dirty = __GL_TEXPARAM_WRAP_T_BIT;
                 break;
             }
@@ -579,7 +579,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             }
             else
             {
-                tex->params.sampler.sWrapMode = (GLenum)param;
+                tex->params.sampler.tWrapMode = (GLenum)param;
                 dirty = __GL_TEXPARAM_WRAP_T_BIT;
                 break;
             }
@@ -620,7 +620,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             }
             else
             {
-                tex->params.sampler.sWrapMode = (GLenum)param;
+                tex->params.sampler.rWrapMode = (GLenum)param;
                 dirty = __GL_TEXPARAM_WRAP_R_BIT;
                 break;
             }
@@ -633,7 +633,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             }
             else
             {
-                tex->params.sampler.sWrapMode = (GLenum)param;
+                tex->params.sampler.rWrapMode = (GLenum)param;
                 dirty = __GL_TEXPARAM_WRAP_R_BIT;
                 break;
             }
