@@ -12562,7 +12562,7 @@ gckHARDWARE_PrepareFunctions(
 
         function->bytes = dummyDrawBytes + endBytes;
     }
-    gcmkASSERT(offset < Hardware->auxFuncBytes)
+    gcmkASSERT(offset < Hardware->auxFuncBytes);
 
     gcmkONERROR(gckOS_CacheClean(
         Hardware->os,
