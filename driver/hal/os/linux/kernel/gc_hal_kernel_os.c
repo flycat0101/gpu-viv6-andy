@@ -5695,7 +5695,7 @@ gckOS_Signal(
 #ifndef CONFIG_SYNC_FILE
     struct sync_timeline * timeline = gcvNULL;
 #  else
-    struct fence * fence = gcvNULL;
+    struct dma_fence * fence = gcvNULL;
 #  endif
 #endif
 
@@ -5764,8 +5764,8 @@ gckOS_Signal(
 #  else
     if (fence)
     {
-        fence_signal(fence);
-        fence_put(fence);
+        dma_fence_signal(fence);
+        dma_fence_put(fence);
     }
 #  endif
 #endif
@@ -6990,7 +6990,7 @@ gckOS_CreateNativeFence(
     OUT gctINT * FenceFD
     )
 {
-    struct fence *fence = NULL;
+    struct dma_fence *fence = NULL;
     struct sync_file *sync = NULL;
     int fd;
     struct viv_sync_timeline *timeline;
@@ -7041,7 +7041,7 @@ OnError:
 
     if (fence)
     {
-        fence_put(fence);
+        dma_fence_put(fence);
     }
 
     if (fd > 0)
@@ -7153,8 +7153,8 @@ gckOS_WaitNativeFence(
     unsigned int i;
     unsigned long timeout;
     unsigned int numFences;
-    struct fence *fence;
-    struct fence **fences;
+    struct dma_fence *fence;
+    struct dma_fence **fences;
 
     timeline = (struct viv_sync_timeline *) Timeline;
 
@@ -7165,9 +7165,9 @@ gckOS_WaitNativeFence(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-    if (fence_is_array(fence))
+    if (dma_fence_is_array(fence))
     {
-        struct fence_array *array = to_fence_array(fence);
+        struct dma_fence_array *array = to_dma_fence_array(fence);
         fences = array->fences;
         numFences = array->num_fences;
     }
@@ -7181,13 +7181,13 @@ gckOS_WaitNativeFence(
 
     for (i = 0; i < numFences; i++)
     {
-        struct fence *f = fences[i];
+        struct dma_fence *f = fences[i];
 
         if (f->context != timeline->context &&
-            !fence_is_signaled(f))
+            !dma_fence_is_signaled(f))
         {
             signed long ret;
-            ret = fence_wait_timeout(f, 1, timeout);
+            ret = dma_fence_wait_timeout(f, 1, timeout);
 
             if (ret == -ERESTARTSYS)
             {
@@ -7207,7 +7207,7 @@ gckOS_WaitNativeFence(
         }
     }
 
-    fence_put(fence);
+    dma_fence_put(fence);
 
     return gcvSTATUS_OK;
 
