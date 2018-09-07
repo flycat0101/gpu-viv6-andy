@@ -2598,7 +2598,7 @@ OnError:
  * 3. blend-hole optimization, per area (parameter opaque)
  */
 static void program_layer_blend(__hwc2_device_t *device,
-                    __hwc2_layer_t *layer, int opaque)
+                    __hwc2_layer_t *layer, int opaque, uint32_t dim)
 {
     blitter_device_t *blt = &device->blt;
     struct blend_formula *formula;
@@ -2621,14 +2621,23 @@ static void program_layer_blend(__hwc2_device_t *device,
                 formula->srcFactorMode, formula->dstFactorMode));
     }
 
-    gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
-            formula->srcPremultSrcAlpha, formula->dstPremultDstAlpha,
-            formula->srcPremultGlobalMode, formula->dstDemultDstAlpha));
 
-    srcGlobal = layer->blt.globalAlpha;
+    if (dim < 0xFF) {
+        srcGlobal = (layer->blt.globalAlpha * dim) / 0xFF;
 
-    srcGlobal |= srcGlobal << 8;
-    srcGlobal |= srcGlobal << 16;
+        gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
+                formula->srcPremultSrcAlpha, formula->dstPremultDstAlpha,
+                gcv2D_GLOBAL_COLOR_MULTIPLY_COLOR, formula->dstDemultDstAlpha));
+    } else {
+        srcGlobal = layer->blt.globalAlpha;
+
+        gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(blt->engine,
+                formula->srcPremultSrcAlpha, formula->dstPremultDstAlpha,
+                formula->srcPremultGlobalMode, formula->dstDemultDstAlpha));
+    }
+
+    srcGlobal = srcGlobal | (srcGlobal << 8) | (srcGlobal << 16)
+            | (layer->blt.globalAlpha << 24);
 
     gcmONERROR(gco2D_SetSourceGlobalColorAdvanced(blt->engine, srcGlobal));
     gcmONERROR(gco2D_SetTargetGlobalColorAdvanced(blt->engine, 0xFFFFFFFF));
@@ -2961,7 +2970,7 @@ static void blit_layer(__hwc2_device_t *device,
     __hwc2_trace(0, "layer=%p(%u) composition=%s(%d)", layer, layer->id,
             composition_name(layer->composition), layer->composition);
 
-    program_layer_blend(device, layer, 0);
+    program_layer_blend(device, layer, 0, 0xFF);
 
     __hwc2_list_for_each(pos, &layer->blt.visibleDamaged) {
         struct area *area = __hwc2_list_entry(pos, struct area, link);
@@ -3047,9 +3056,13 @@ static int32_t append_multi_blit_layer(__hwc2_device_t *device,
         return 1;
     }
 
-    /* Can always handle solid color. */
-    if (!layer->blt.surface)
-        goto success;
+    if (!layer->blt.surface) {
+        /* handle only dim for solid color layer. */
+        if (!(layer->blt.color32 & 0x00FFFFFF) && param->numBuffer)
+            goto success;
+        else
+            return 1;
+    }
 
     if (layer->blt.yuvClass) {
         if (param->numYuvSource == device->blt.multiBltMaxYuvSource) {
@@ -3515,7 +3528,7 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
     uint64_t mask;
     uint32_t sourceMask = 0;
     uint32_t sourceNum  = 0;
-    uint32_t solidColorMask = 0; /* Mask of solid color layers. */
+    uint64_t dimMask = 0; /* Mask of dim layers. */
 
     /* Fake a rectangle, which is the same rectangle on source and dest.
      * This rectangle is actually clipRect against a new 'initial point' */
@@ -3657,17 +3670,42 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
     program_fake_target(device, target, dx, dy, dstRotation, fakeWidth, fakeHeight);
 
     for (i = 0, mask = 1; mask <= batchMask; i++, mask <<= 1) {
-        if (!(batchMask &mask))
+        __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
+
+        if ((batchMask & mask) && !layer->blt.surface)
+            dimMask |= mask;
+    }
+
+    for (i = 0, mask = 1; mask <= batchMask; i++, mask <<= 1) {
+        if (!(batchMask & mask))
             continue;
 
+        if (dimMask & mask)
+            continue;
+
+        uint32_t dim = 0xFF;
+
+        if (mask < dimMask) {
+            uint64_t m;
+            uint32_t j;
+
+            for (j = i + 1, m = (mask << 1); m <= dimMask; j++, m <<= 1) {
+                if (m & dimMask) {
+                    __hwc2_layer_t *layer = dpy->blt.bltLayers[j];
+                    uint32_t d = 0xFF - (layer->blt.color32 >> 24);
+                    dim = dim * d / 0xFF;
+                }
+            }
+        }
+
         __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
-        __hwc2_trace(0, "layer=%p(%u)", layer, layer->id);
+        __hwc2_trace(0, "layer=%p(%u) dim=0x%x(%u)", layer, layer->id, dim, dim);
 
         /* Setup source index. */
         gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
 
         /* Setup source. */
-        if (layer->blt.surface != gcvNULL) {
+        {
             struct surface *sur;
 
             int width  = fakeWidth;
@@ -3750,41 +3788,10 @@ static void program_multi_blit_v1(__hwc2_device_t *device, __hwc2_display_t *dpy
             gcmONERROR(gco2D_SetSource(blt->engine, &fakeRect));
             gcmONERROR(gco2D_SetROP(blt->engine, 0xCC, 0xCC));
 
-            /* Try to set source address of previous no-source layers to
-               current layer. */
-            for (uint32_t j = 0; solidColorMask != 0; j++) {
-                if ((solidColorMask & (1 << j)) == 0)
-                    continue;
-
-                gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, j));
-
-                program_fake_source(device, sur, dx, dy, rotation, width, height);
-                gcmONERROR(gco2D_SetSource(blt->engine, &fakeRect));
-
-                gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
-
-                solidColorMask &= ~(1 << j);
-            }
-        } else {
-            __hwc2_trace_string("color32=0x%08x", layer->blt.color32);
-
-            /* Color source is still needed if uses patthen only. We set dummy
-             * color source to framebuffer target. */
-            program_fake_source(device, target, 0, 0, gcvSURF_0_DEGREE,
-                    fakeWidth, fakeHeight);
-
-            gcmONERROR(gco2D_SetSource(blt->engine, &fakeRect));
-            gcmONERROR(gco2D_SetROP(blt->engine, 0xF0, 0xCC));
-
-            gcmONERROR(gco2D_LoadSolidBrush(blt->engine,
-                    gcvSURF_UNKNOWN, gcvTRUE, layer->blt.color32, ~0ULL));
-
-            /* Record solid color layer. */
-            solidColorMask |= (1 << sourceNum);
         }
 
         int opaque = (sourceNum == 0) ? param->opaque : 0;
-        program_layer_blend(device, layer, opaque);
+        program_layer_blend(device, layer, opaque, dim);
 
         if (blt->multiBlt2) {
             /* Set target rectangle for each source. */
@@ -3836,7 +3843,7 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
 
     uint32_t i;
     uint64_t mask;
-    uint32_t solidColorMask  = 0;
+    uint64_t dimMask = 0; /* Mask of dim layers. */
     uint32_t sourceMask = 0;
     uint32_t sourceNum  = 0;
 
@@ -3849,16 +3856,41 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
     __hwc2_trace(0, "batchMask=0x%" PRIx64, batchMask);
 
     for (i = 0, mask = 1; mask <= batchMask; i++, mask <<= 1) {
+        __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
+
+        if ((batchMask & mask) && !layer->blt.surface)
+            dimMask |= mask;
+    }
+
+    for (i = 0, mask = 1; mask <= batchMask; i++, mask <<= 1) {
         if (!(batchMask &mask))
             continue;
 
+        if (dimMask & mask)
+            continue;
+
+        uint32_t dim = 0xFF;
+
+        if (mask < dimMask) {
+            uint64_t m;
+            uint32_t j;
+
+            for (j = i + 1, m = (mask << 1); m <= dimMask; j++, m <<= 1) {
+                if (m & dimMask) {
+                    __hwc2_layer_t *layer = dpy->blt.bltLayers[j];
+                    uint32_t d = 0xFF - (layer->blt.color32 >> 24);
+                    dim = dim * d / 0xFF;
+                }
+            }
+        }
+
         __hwc2_layer_t *layer = dpy->blt.bltLayers[i];
-        __hwc2_trace(0, "layer=%p(%u)", layer, layer->id);
+        __hwc2_trace(0, "layer=%p(%u) dim=0x%x(%u)", layer, layer->id, dim, dim);
 
         /* Setup source index. */
         gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
 
-        if (layer->blt.surface) {
+        {
             if (blt->multiBlt2) {
                 srcRect = (gcsRECT) {
                     (gctINT)ceilf (layer->blt.sourceCropD.left),
@@ -3900,39 +3932,10 @@ static void program_multi_blit_v2(__hwc2_device_t *device, __hwc2_display_t *dpy
                     layer->blt.rotation));
 
             gcmONERROR(gco2D_SetROP(blt->engine, 0xCC, 0xCC));
-
-            for (uint32_t j = 0; solidColorMask != 0U; j++) {
-                if ((solidColorMask & (1 << j)) == 0)
-                    continue;
-
-                gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, j));
-                gcmONERROR(gcoSURF_Set2DSource(
-                        layer->blt.surface, layer->blt.rotation));
-                gcmONERROR(gco2D_SetSource(blt->engine, &srcRect));
-
-                gcmONERROR(gco2D_SetCurrentSourceIndex(blt->engine, sourceNum));
-
-                solidColorMask &= ~(1 << j);
-            }
-        } else {
-            gcmONERROR(gcoSURF_Set2DSource(dpy->blt.surface, gcvSURF_0_DEGREE));
-
-            gcmONERROR(gco2D_SetSource(blt->engine, &dstRect));
-            gcmONERROR(gco2D_SetTargetRect(blt->engine, &dstRect));
-            gcmONERROR(gco2D_SetClipping(blt->engine, &dstRect));
-
-            gcmONERROR(gco2D_LoadSolidBrush(blt->engine,
-                    gcvSURF_UNKNOWN, gcvTRUE, layer->blt.color32, ~0ULL));
-
-            gcmONERROR(gco2D_SetROP(blt->engine, 0xF0, 0xCC));
-
-            solidColorMask |= (1 << sourceNum);
-
-            __hwc2_trace_string("color32=0x%08X", layer->blt.color32);
         }
 
         int opaque = (sourceNum == 0) ? param->opaque : 0;
-        program_layer_blend(device, layer, opaque);
+        program_layer_blend(device, layer, opaque, dim);
 
         /* Append mask to sourceMask. */
         sourceMask = ((sourceMask << 1U) | 1U);
@@ -4028,7 +4031,7 @@ static void blit_area_multi(__hwc2_device_t *device,
                 program_multi_blit(device, dpy, &area->rect, batch, &param);
             else {
                 /* Do single blit. */
-                program_layer_blend(device, layer, opaque);
+                program_layer_blend(device, layer, opaque, 0xFF);
                 blit_layer_rects(device, dpy, layer, &area->rect, 1);
             }
 
@@ -4040,7 +4043,7 @@ static void blit_area_multi(__hwc2_device_t *device,
         }
 
         /* Do single blit. */
-        program_layer_blend(device, layer, opaque);
+        program_layer_blend(device, layer, opaque, 0xFF);
         blit_layer_rects(device, dpy, layer, &area->rect, 1);
 
         /* Advance to next layer. */
@@ -4072,7 +4075,7 @@ static void blit_area_single(__hwc2_device_t *device,
         int opaque = ((mask - 1) & area->layerMask) == 0;
 
         /* Do single blit. */
-        program_layer_blend(device, layer, opaque);
+        program_layer_blend(device, layer, opaque, 0xFF);
         blit_layer_rects(device, dpy, layer, &area->rect, 1);
     }
 }
