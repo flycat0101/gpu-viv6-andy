@@ -1533,10 +1533,8 @@ __glChipGetDeviceConstants(
         /* Unified uniforms, maxUniformVectors will be calculated by number of unified uniforms. */
         if (unifiedUniforms > 0)
         {
-            /* For enough unified uniforms, allocate vs/fs uniforms in proportion. */
             if (unifiedUniforms > minVertUniforms + minFragUniforms)
             {
-                shaderCaps->maxVertUniformVectors = unifiedUniforms * minVertUniforms / (minVertUniforms + minFragUniforms);
                 shaderCaps->maxFragUniformVectors = unifiedUniforms - shaderCaps->maxVertUniformVectors;
             }
             else
