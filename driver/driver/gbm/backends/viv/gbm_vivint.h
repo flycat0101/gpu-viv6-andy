@@ -40,31 +40,31 @@ struct gbm_viv_bo
     void *map;
     uint32_t type;
     uint64_t modifier;
+    gcoSURF surface;
+
     int32_t fd;
     int32_t ts_fd;
 };
 
 struct gbm_viv_buffer
 {
-    struct gbm_bo         *bo;
+    struct gbm_bo *bo;
+
     enum {
         LOCKED_BY_CLIENT, /* taken by gbm_surface_lock_front_buffer */
         USED_BY_EGL,      /* currently in use for EGL rendering */
         FRONT_BUFFER,     /* last buffer with completed rendering */
         FREE              /* free */
     } status;
-    uint32_t               bpp;
-    gcoSURF                render_surface;
-    struct gbm_viv_surface *surf;
 };
 
 struct gbm_viv_surface
 {
     struct gbm_surface base;
 
-    struct gbm_viv_buffer buffers[GBM_MAX_BUFFER];
     gctINT buffer_count;
-    uint32_t bpp;
+    struct gbm_viv_buffer buffers[GBM_MAX_BUFFER];
+
     gctBOOL extResolve;
 };
 

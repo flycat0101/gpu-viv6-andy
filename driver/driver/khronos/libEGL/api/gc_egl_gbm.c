@@ -487,7 +487,9 @@ gbm_CancelDisplayBackbuffer(
 
     for (i = 0; i < surf->buffer_count; i++)
     {
-        if (surf->buffers[i].render_surface == Surface)
+        struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+
+        if (viv_bo->surface == Surface)
         {
             surf->buffers[i].status = FREE;
             break;
@@ -783,7 +785,9 @@ gbm_GetDisplayBackbufferEx(
     {
         if (surf->buffers[i].status == FREE)
         {
-            *surface = surf->buffers[i].render_surface;
+            struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+
+            *surface = viv_bo->surface;
             surf->buffers[i].status = USED_BY_EGL;
             *Offset  = 0;
             *X       = 0;
