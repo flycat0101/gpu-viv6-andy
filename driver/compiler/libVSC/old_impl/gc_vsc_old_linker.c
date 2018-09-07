@@ -6462,6 +6462,19 @@ _fixUniformPrecision(
     return precision;
 }
 
+/*  ES 3.2 spec [11.1.1 Vertex Attributes]:
+**  Binding more than one attribute name to the same location is referred to as
+**  aliasing, and is not permitted in OpenGL ES Shading Language 3.00 or later vertex
+**  shaders. LinkProgram will fail when this condition exists. However, aliasing
+**  is possible in OpenGL ES Shading Language 1.00 vertex shaders. This will only
+**  work if only one of the aliased attributes is active in the executable program, or if
+**  no path through the shader consumes more than one attribute of a set of attributes
+**  aliased to the same location. A link error can occur if the linker determines that
+**  every path through the shader consumes multiple aliased attributes, but implementations
+**  are not required to generate an error in this case. The compiler and linker
+**  are allowed to assume that no aliasing is done, and may employ optimizations that
+**  work only in the absence of aliasing.
+*/
 static gceSTATUS
 _CheckIoAliasedLocation(gcLINKTREE  Tree)
 {
@@ -6500,8 +6513,15 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
             {
                 if (vscBV_TestBit(&locationMask, j))
                 {
-                    status = gcvSTATUS_LOCATION_ALIASED;
-                    goto OnError;
+                    if (gcShader_IsES11Compiler(Tree->shader))
+                    {
+                        gcmATTRIBUTE_SetLocHasAlias(attribute, gcvTRUE);
+                    }
+                    else
+                    {
+                        status = gcvSTATUS_LOCATION_ALIASED;
+                        goto OnError;
+                    }
                 }
 
                 vscBV_SetBit(&locationMask, j);

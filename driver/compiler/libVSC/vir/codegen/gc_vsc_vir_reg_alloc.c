@@ -5317,7 +5317,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
                  VIR_Symbol_GetName(attribute) == VIR_NAME_INSTANCE_ID) &&
                 VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.vtxInstanceIdAsAttr == gcvFALSE)
             {
-                gcmASSERT(VIR_Symbol_GetPrecision(attribute) != VIR_PRECISION_HIGH);
+                /* gcmASSERT(VIR_Symbol_GetPrecision(attribute) != VIR_PRECISION_HIGH); */
 
                 /* if vtxInstanceIdAsAttr is not enabled, assign a special regNo
                     to the web, otherwise, assign as the last attribute  */
