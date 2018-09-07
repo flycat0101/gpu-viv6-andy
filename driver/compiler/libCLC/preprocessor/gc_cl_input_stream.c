@@ -536,6 +536,7 @@ gceSTATUS ppoInfomationForBISRollBack_RollBackBISList(ppoPREPROCESSOR PP, ppoInf
             );
 
         here->curpos = 0;
+        here = (ppoBYTE_INPUT_STREAM)here->inputStream.base.node.prev;
     }
 
     PP->currentSourceFileStringNumber = Info->from_here_to_the_end->inputStringNumber;
