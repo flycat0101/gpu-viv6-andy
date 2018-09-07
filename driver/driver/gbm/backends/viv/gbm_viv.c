@@ -973,7 +973,7 @@ OnError:
 
         if (surf->buffers[i].bo)
         {
-            gbm_bo_destroy(surf->buffers[i].bo);
+            gbm_viv_bo_destroy(surf->buffers[i].bo);
         }
 
         surf->buffers[i].render_surface = NULL;
@@ -1113,7 +1113,13 @@ gbm_viv_surface_destroy(
     {
         if (surf->buffers[i].bo != NULL)
         {
-            gbm_bo_destroy(surf->buffers[i].bo);
+            struct gbm_bo *_bo = surf->buffers[i].bo;
+
+            if (_bo->destroy_user_data)
+            {
+                _bo->destroy_user_data(_bo, _bo->user_data);
+            }
+            gbm_viv_bo_destroy(_bo);
             surf->buffers[i].bo = NULL;
         }
     }
