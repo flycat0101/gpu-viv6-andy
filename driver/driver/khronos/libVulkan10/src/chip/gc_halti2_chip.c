@@ -468,6 +468,9 @@ VkResult halti2_clearImageWithRS(
     uint32_t ditherTable[2] = { ~0U, ~0U };
     uint32_t hwSrcStride, hwControl;
     uint32_t hwWindowSize, hwOffset;
+    uint32_t dstTileMode = 0;
+    __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkDevContext *devCtx = cmd->devCtx;
 
     __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
 
@@ -489,6 +492,18 @@ VkResult halti2_clearImageWithRS(
         dstRes.u.img.subRes.arrayLayer = subResource->arrayLayer;
 
         return (halti5_computeClear(commandBuffer, clearValue, &dstRes));
+    }
+
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        if (img->halTiling == gcvSUPERTILED)
+        {
+            dstTileMode = 0x1;
+        }
+        else if (img->halTiling == gcvYMAJOR_SUPERTILED)
+        {
+            dstTileMode = 0x2;
+        }
     }
 
     switch (img->formatInfo.bitsPerBlock / img->formatInfo.partCount)
@@ -576,7 +591,8 @@ VkResult halti2_clearImageWithRS(
  30:30) + 1))))))) << (0 ? 30:30)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
- 28:27) + 1))))))) << (0 ? 28:27))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 28:27) + 1))))))) << (0 ? 
+ 28:27))) | (((gctUINT32) ((gctUINT32) (dstTileMode) & ((gctUINT32) ((((1 ?
  28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
  28:27) + 1))))))) << (0 ? 28:27)));
 
@@ -679,6 +695,9 @@ VkResult halti2_copyImageWithRS(
     VkResult result = VK_SUCCESS;
     uint32_t hwConfig, hwSrcStride, hwDstStride, hwOffset, hwWindowSize;
     uint32_t ditherTable[2] = { ~0U, ~0U };
+    uint32_t srcTileMode = 0, dstTileMode = 0;
+    __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkDevContext *devCtx = cmd->devCtx;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -705,6 +724,18 @@ VkResult halti2_copyImageWithRS(
                                  srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
         srcMsaa = (srcImg->sampleInfo.product > 1);
         rsConfigTiling(srcImg, &srcTiling, &srcSuperTile);
+
+        if (devCtx->database->CACHE128B256BPERLINE)
+        {
+            if(srcImg->halTiling == gcvSUPERTILED)
+            {
+                srcTileMode = 0x1;
+            }
+            else if (srcImg->halTiling == gcvYMAJOR_SUPERTILED)
+            {
+                srcTileMode = 0x2;
+            }
+        }
     }
     else
     {
@@ -748,6 +779,18 @@ VkResult halti2_copyImageWithRS(
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
         dstMsaa = (dstImg->sampleInfo.product > 1);
         rsConfigTiling(dstImg, &dstTiling, &dstSuperTile);
+
+        if (devCtx->database->CACHE128B256BPERLINE)
+        {
+            if (dstImg->halTiling == gcvSUPERTILED)
+            {
+                dstTileMode = 0x1;
+            }
+            else if (dstImg->halTiling == gcvYMAJOR_SUPERTILED)
+            {
+                dstTileMode = 0x2;
+            }
+        }
     }
     else
     {
@@ -936,8 +979,18 @@ VkResult halti2_copyImageWithRS(
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
  29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) ((gctUINT32) (srcMsaa) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29)));
+ 29:29) - (0 ? 29:29) + 1) == 32) ? 
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) (srcTileMode) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)));
 
     hwDstStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
@@ -952,8 +1005,18 @@ VkResult halti2_copyImageWithRS(
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
  30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)));
+ 30:30) - (0 ? 30:30) + 1) == 32) ? 
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) (dstTileMode) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)));
 
     hwOffset = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
