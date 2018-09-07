@@ -1565,7 +1565,9 @@ _BindWindow(
     OUT EGLint * RenderMode
     )
 {
+#if gcdENABLE_3D
     gceSTATUS status;
+#endif
     __WLEGLSurface egl_surface;
     struct wl_egl_window *window = Surface->hwnd;
 
