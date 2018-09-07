@@ -38,6 +38,7 @@
 #include "gc_hal_kernel_device.h"
 #include "gc_hal_kernel_os.h"
 #include "gc_hal_kernel_buffer.h"
+#include "gc_hal_kernel_resource_manager.h"
 #include "../inc/gc_hal_common_qnx.h"
 
 #define _WIDE(string)               L##string
