@@ -55,6 +55,27 @@ VIR_Lower_SetIntZero(
     );
 
 gctBOOL
+VIR_Lower_SetIntOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetIntTwo(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetIntThree(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -70,13 +91,6 @@ VIR_Lower_SetIntHighBitOne(
 
 gctBOOL
 VIR_Lower_SetMinusOne(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_SetIntOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -347,6 +361,34 @@ VIR_Lower_label_set_jmp_neg3(
 
 gctBOOL
 VIR_Lower_label_set_jmp_neg3_6(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg3_6_9(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg6(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg8(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd

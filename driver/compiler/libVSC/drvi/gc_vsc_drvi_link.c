@@ -5711,7 +5711,8 @@ static VSC_ErrCode _FindAndLinkAnOuputForAnInput(SHADER_HW_INFO* pUpperHwShader,
         pThisOutputRegLinkage = &pOutputLinkageInfo->ioRegLinkage[outputIdx];
         pThisOutputRegLinkage->linkNo = (*pLinkNo) ++;
 
-        if (pInputMapping->ioMode == SHADER_IO_MODE_ACTIVE)
+        /* pThisInputRegMapping->regIoMode may be different with pInputMapping->ioMode, using rInputreg here */
+        if (pThisInputRegMapping->regIoMode == SHADER_IO_MODE_ACTIVE)
         {
             gcmASSERT(pThisOutputRegLinkage->linkNo ==
                 pThisInputRegMapping->ioChannelMapping[pThisInputRegMapping->firstValidIoChannel].
