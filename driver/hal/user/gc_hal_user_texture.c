@@ -1349,18 +1349,6 @@ gcoTEXTURE_UploadSub(
 
     if (gcmIS_ERROR(status))
     {
-        /* Update texture surface data if this texture is bound to fbo before.
-        ** VIV: [todo] some special scene may need to be considered:
-        ** eg. if there is two continuous gcoTEXTURE_UploadSub calling, the second upload does not need to flush.
-        */
-        if((map->surface->type == gcvSURF_RENDER_TARGET) || (map->surface->type == gcvSURF_DEPTH))
-        {
-            /* Flush the pipe. */
-            gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
-            /* Commit and stall the pipe. */
-            gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
-            gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
-        }
 
         gcmONERROR(gcoSURF_WaitFence(map->surface));
 

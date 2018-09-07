@@ -2876,6 +2876,12 @@ gcChipTexMipSliceSyncFromShadow(
 
                 /* Commit commands. */
                 gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
+
+                /* Get fence for master surface if needed. */
+                if(!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
+                {
+                    gcmONERROR(gcoSURF_GetFence(texView.surf, gcvFENCE_TYPE_WRITE));
+                }
             }
             else
             {
