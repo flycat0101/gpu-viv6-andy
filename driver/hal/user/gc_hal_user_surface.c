@@ -8043,9 +8043,10 @@ gcoSURF_Clear2D(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
             destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8148,9 +8149,10 @@ gcoSURF_Line(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
             destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8421,11 +8423,10 @@ gcoSURF_Blit(
                     stretchBlt = gcvTRUE;
                 }
 
-                gcmERR_BREAK(gco2D_SetColorSourceEx(
+                gcmERR_BREAK(gco2D_SetColorSource64(
                     engine,
-                    useSoftEngine ?
-                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
-                        : srcAddress[0],
+                    srcAddress[0],
+                    srcMemory[0],
                     SrcSurface->stride,
                     SrcSurface->format,
                     SrcSurface->rotation,
@@ -8450,11 +8451,10 @@ gcoSURF_Blit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
-            useSoftEngine ?
-                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
-                : destAddress[0],
+            destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8471,6 +8471,7 @@ gcoSURF_Blit(
             gctUINT32 tileHeightMask;
             gctUINT32 maxHeight;
             gctUINT32 srcBaseAddress;
+            gctUINT8_PTR srcBaseMemory;
             gcsRECT srcSubRect;
             gcsRECT destSubRect;
             gcsRECT maskRect;
@@ -8558,11 +8559,15 @@ gcoSURF_Blit(
 
             /* Determine the initial source address. */
             srcBaseAddress
-                = (useSoftEngine ?
-                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
-                        : srcAddress[0])
-                +   srcAlignedTop  * SrcSurface->stride
+                = srcAddress[0]
+                + srcAlignedTop  * SrcSurface->stride
                 + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
+
+            srcBaseMemory
+                = (gctUINT8_PTR)srcMemory[0]
+                + srcAlignedTop  * SrcSurface->stride
+                + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
+
 
             /* Set initial mask coordinates. */
             maskRect.left   = srcAlignedLeft;
@@ -8597,13 +8602,17 @@ gcoSURF_Blit(
                     ));
 
                 /* Configure masked source. */
-                gcmERR_BREAK(gco2D_SetMaskedSource(
+                gcmERR_BREAK(gco2D_SetMaskedSource64(
                     engine,
                     srcBaseAddress,
+                    (gctPOINTER)srcBaseMemory,
                     SrcSurface->stride,
                     SrcSurface->format,
                     relativeSource,
-                    streamPack
+                    streamPack,
+                    gcvSURF_0_DEGREE,
+                    0,
+                    0
                     ));
 
                 /* Do the blit. */
@@ -8622,6 +8631,7 @@ gcoSURF_Blit(
 
                 /* Update the source address. */
                 srcBaseAddress += srcSubRect.bottom * SrcSurface->stride;
+                srcBaseMemory  += srcSubRect.bottom * SrcSurface->stride;
 
                 /* Update the line counter. */
                 lines2render -= srcSubRect.bottom;
@@ -8875,11 +8885,10 @@ gcoSURF_MonoBlit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
-            useSotfEngine ?
-                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
-                : destAddress[0],
+            destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -9486,9 +9495,10 @@ gcoSURF_FilterBlit(
                     engine,
                     &destSubRect));
 
-                gcmERR_BREAK(gco2D_SetColorSourceEx(
+                gcmERR_BREAK(gco2D_SetColorSource64(
                     engine,
                     srcAddress[0],
+                    srcMemory[0],
                     srcSurf->stride,
                     srcSurf->format,
                     srcSurf->rotation,
@@ -9504,9 +9514,10 @@ gcoSURF_FilterBlit(
                     &tempRect
                     ));
 
-                gcmERR_BREAK(gco2D_SetTargetEx(
+                gcmERR_BREAK(gco2D_SetTarget64(
                     engine,
                     destAddress[0],
+                    destMemory[0],
                     DstSurface->stride,
                     DstSurface->rotation,
                     DstSurface->alignedW,
