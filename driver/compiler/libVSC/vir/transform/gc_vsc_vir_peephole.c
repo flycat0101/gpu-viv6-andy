@@ -1611,7 +1611,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
 
     gctUINT constMatrix[VIR_MAX_SRC_NUM][VIR_CHANNEL_COUNT];
     gctUINT constLength[VIR_MAX_SRC_NUM] = {0};
-    gctUINT constBaseTypeId[VIR_MAX_SRC_NUM];
+    gctUINT constBaseTypeId[VIR_MAX_SRC_NUM] = {0};
     VIR_Swizzle constSwizzle[VIR_MAX_SRC_NUM] = {VIR_SWIZZLE_XXXX};
 
     for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)

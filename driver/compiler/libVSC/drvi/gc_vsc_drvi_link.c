@@ -2598,7 +2598,8 @@ static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER*
 {
     gctINT                      i, j, k, l, m;
     gctUINT                     accumChannelCount;
-    VSC_BIT_VECTOR              globalChannelsPairMask[3], localChannelsPairMask[3];
+    VSC_BIT_VECTOR              globalChannelsPairMask[3] = {{0}};
+    VSC_BIT_VECTOR              localChannelsPairMask[3] = {{0}};
     gctBOOL                     bCanVectorized;
     gctBOOL                     bEarlyOut;
 
