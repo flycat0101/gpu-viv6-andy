@@ -568,7 +568,7 @@ GLvoid __indirect_glDrawArrays(GLenum mode, GLint first, GLsizei count)
     __GLXcontext *gc = __glXGetCurrentContext();
     __GLXvertArrayState *va = &gc->state.vertArray;
     const GLubyte *vaPtr = NULL, *naPtr = NULL, *caPtr = NULL,
-                  *iaPtr = NULL, *tcaPtr[__GLX_MAX_TEXTURE_UNITS] = {gcvNULL};
+                  *iaPtr = NULL, *tcaPtr[__GLX_MAX_TEXTURE_UNITS] = {NULL};
     const GLboolean *efaPtr = NULL;
     GLint i, j;
 
