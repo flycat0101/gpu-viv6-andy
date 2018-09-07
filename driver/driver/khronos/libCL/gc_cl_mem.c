@@ -3077,9 +3077,9 @@ clCreateBuffer(
         gctUINT32 physical;
 
         if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV))
-            gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node);
+            clmONERROR(gcoCL_WrapUserMemory(HostPtr, Size, gcvTRUE, &physical, &buffer->u.buffer.node), CL_MAP_FAILURE);
         else
-            gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node);
+            clmONERROR(gcoCL_WrapUserMemory(HostPtr, Size, gcvFALSE, &physical, &buffer->u.buffer.node), CL_MAP_FAILURE);
 
         buffer->u.buffer.allocatedSize  = Size;
         buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
