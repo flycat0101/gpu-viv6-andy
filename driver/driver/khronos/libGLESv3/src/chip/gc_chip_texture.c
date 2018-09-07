@@ -2137,7 +2137,7 @@ gcChipTexSubImage(
             skipOffset += __GL_PTR2SIZE(buf);
             GL_ASSERT(unpackBufInfo);
             gcmONERROR(gcoBUFOBJ_Lock(unpackBufInfo->bufObj, &physicalAddress, (gctPOINTER*)&buf));
-            gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
+            gcmONERROR(gcoBUFOBJ_WaitFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
 
             physicalAddress += (gctUINT32)skipOffset;
         }
@@ -3848,7 +3848,7 @@ __glChipGetTexImage(
         packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
         GL_ASSERT(packBufInfo);
         gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
-        gcmONERROR(gcoBUFOBJ_GetFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+        gcmONERROR(gcoBUFOBJ_WaitFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
 
         skipOffset += __GL_PTR2SIZE(buf);
         physicalAddress += (gctUINT32)skipOffset;
