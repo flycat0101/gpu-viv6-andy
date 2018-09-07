@@ -3058,6 +3058,7 @@ clCreateBuffer(
 
     if ((Flags & CL_MEM_USE_HOST_PTR)
          && !(gcmPTR2INT(HostPtr) & 0x3F)
+         && !(Size & 0x3F)
          && !disableByChip)
     {
         gctUINT32 physical;
@@ -3653,7 +3654,7 @@ clCreateImage(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if (!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
@@ -3902,7 +3903,7 @@ clCreateImage2D(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if (!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
@@ -4164,7 +4165,7 @@ clCreateImage3D(
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR_UNCACHED;
         }
-        else
+        else if (!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
