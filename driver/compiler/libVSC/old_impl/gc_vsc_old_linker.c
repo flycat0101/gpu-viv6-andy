@@ -8399,6 +8399,11 @@ gcLINKTREE_Optimize(
                 continue;
             }
 
+            /* Cannot optimize a MOV if the source has modifier */
+            if (gcmSL_SOURCE_GET(code->source0, Neg) || gcmSL_SOURCE_GET(code->source0, Abs))
+            {
+                continue;
+            }
             /* there is implicit type conversion inside the code, thus bail out
                 when the type is not the same */
             diffType = gcvFALSE;
