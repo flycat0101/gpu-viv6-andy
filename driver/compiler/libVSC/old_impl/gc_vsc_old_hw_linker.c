@@ -3973,13 +3973,9 @@ _MapAttributes(
                     continue;
                 }
 
-                /* Assign input register. */
-                attribute->inputIndex = reg;
-
                 /* Determine rows and components. */
                 gcTYPE_GetTypeInfo(attribute->type, &components, &rows, 0);
                 rows *= attribute->arraySize;
-
                 if (CodeGen->shaderType == gcSHADER_TYPE_VERTEX)
                 {
                     /* Reserve all components for vertex shaders. */
@@ -4009,7 +4005,43 @@ _MapAttributes(
                     default:
                         break;
                     }
+                }
+                if (gcmATTRIBUTE_hasAlias(attribute))
+                {
+                    gctUINT k;
+                    gcATTRIBUTE aliseAttribute = gcvNULL;
 
+                    /* find the aliased to attribute and use the assigned register and enable */
+                    for (k = 0; k < i; k++)
+                    {
+                        if (attribute->location == shader->attributes[k]->location &&
+                            gcmATTRIBUTE_isRegAllocated(shader->attributes[k]))
+                        {
+                            aliseAttribute = shader->attributes[k];
+                        }
+                    }
+                    if (aliseAttribute)
+                    {
+                        attribute->inputIndex = aliseAttribute->inputIndex;
+                        /* Set register usage. */
+                        _SetRegisterUsage(Usage + attribute->inputIndex,
+                                  rows,
+                                  enable,
+                                  Tree->attributeArray[i].lastUse);
+
+                        if (gcSHADER_DumpCodeGenVerbose(Tree->shader))
+                            dumpAttributeRegisterAllocation(attribute, rows,
+                                                            Tree->attributeArray[i].lastUse);
+                        continue;
+                    }
+                }
+
+                /* Assign input register. */
+                attribute->inputIndex = reg;
+                gcmATTRIBUTE_SetRegAllocated(attribute, gcvTRUE);
+
+                if (CodeGen->shaderType != gcSHADER_TYPE_VERTEX)
+                {
                     if (attribute->nameLength == gcSL_POINT_COORD)
                     {
                         gctINT j;
@@ -4031,9 +4063,9 @@ _MapAttributes(
 
                 /* Set register usage. */
                 _SetRegisterUsage(Usage + reg,
-                          rows,
-                          enable,
-                          Tree->attributeArray[i].lastUse);
+                            rows,
+                            enable,
+                            Tree->attributeArray[i].lastUse);
 
                 if (gcSHADER_DumpCodeGenVerbose(Tree->shader))
                     dumpAttributeRegisterAllocation(attribute, rows,
@@ -4041,6 +4073,7 @@ _MapAttributes(
 
                 /* Move to next register. */
                 reg += rows;
+
             }
         }
 
@@ -15479,8 +15512,11 @@ _GenerateStates(
                     gcTYPE_GetTypeInfo(Tree->shader->attributes[i]->type,
                                        &components, &rows, 0);
                     rows *= Tree->shader->attributes[i]->arraySize;
-
-                    attributeCount += rows;
+                    if (gcmATTRIBUTE_isRegAllocated(Tree->shader->attributes[i]))
+                    {
+                        /* only count the attribute if it is allocated register */
+                        attributeCount += rows;
+                    }
                 }
 
               /*Do medium precision checking */

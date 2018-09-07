@@ -1628,6 +1628,9 @@ typedef enum _gceATTRIBUTE_Flag
 
     /* The location is set by driver. */
     gcATTRIBUTE_LOC_SET_BY_DRIVER   = 0x200000,
+    gcATTRIBUTE_LOC_HAS_ALIAS       = 0x400000, /* aliased with another attribute (same location) */
+
+    gcATTRIBUTE_REG_ALLOCATED       = 0x800000, /* register allocated for this attribute */
 } gceATTRIBUTE_Flag;
 
 #define gcmATTRIBUTE_isTexture(att)             (((att)->flags_ & gcATTRIBUTE_ISTEXTURE) != 0)
@@ -1652,6 +1655,8 @@ typedef enum _gceATTRIBUTE_Flag
 #define gcmATTRIBUTE_isCompilerGen(att)         (((att)->flags_ & gcATTRIBUTE_COMPILERGEN) != 0)
 #define gcmATTRIBUTE_isUseAsInterpolate(att)    (((att)->flags_ & gcATTRIBUTE_ISUSEASINTERPOLATE) != 0)
 #define gcmATTRIBUTE_isLocSetByDriver(att)      (((att)->flags_ & gcATTRIBUTE_LOC_SET_BY_DRIVER) != 0)
+#define gcmATTRIBUTE_hasAlias(att)              (((att)->flags_ & gcATTRIBUTE_LOC_HAS_ALIAS) != 0)
+#define gcmATTRIBUTE_isRegAllocated(att)        (((att)->flags_ & gcATTRIBUTE_REG_ALLOCATED) != 0)
 
 #define gcmATTRIBUTE_SetIsTexture(att, v)   \
         ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_ISTEXTURE) | \
@@ -1739,6 +1744,14 @@ typedef enum _gceATTRIBUTE_Flag
 #define gcmATTRIBUTE_SetLocSetByDriver(att, v)  \
         ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_LOC_SET_BY_DRIVER) | \
                           ((v) == gcvFALSE ? 0 : gcATTRIBUTE_LOC_SET_BY_DRIVER))
+
+#define gcmATTRIBUTE_SetLocHasAlias(att, v)  \
+        ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_LOC_HAS_ALIAS) | \
+                          ((v) == gcvFALSE ? 0 : gcATTRIBUTE_LOC_HAS_ALIAS))
+
+#define gcmATTRIBUTE_SetRegAllocated(att, v)  \
+        ((att)->flags_ = ((att)->flags_ & ~gcATTRIBUTE_REG_ALLOCATED) | \
+                          ((v) == gcvFALSE ? 0 : gcATTRIBUTE_REG_ALLOCATED))
 
 /* Forwarded declaration */
 typedef struct _gcSHADER *              gcSHADER;
