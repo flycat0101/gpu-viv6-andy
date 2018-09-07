@@ -1800,10 +1800,9 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE:
-            /* We can't tell what the component type is. But there is no clarification in SPEC,
-            ** just follow conformance test
-            */
-            if ((formatInfo->drvFormat == __GL_FMT_Z32FS8) || (formatInfo->drvFormat == __GL_FMT_Z24S8))
+            /* 3.x spec: This query can not be performed for a combined depth+stencil (GL_DEPTH_STENCIL_ATTACHMENT) attachment,
+            since it does not have a single format */
+            if (GL_DEPTH_STENCIL_ATTACHMENT == attachment)
             {
                 __GL_ERROR_EXIT(GL_INVALID_OPERATION);
             }
