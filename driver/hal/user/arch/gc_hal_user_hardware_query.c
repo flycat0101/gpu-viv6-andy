@@ -5648,7 +5648,7 @@ gcoHARDWARE_AlignToTileCompatible(
     prevType = tls->currentType;
     tls->currentType = gcvHARDWARE_3D;
 
-    status = gcoHARDWARE_AlignToTile(Hardware, Type, Hint, Format, Width, Height,
+    status = gcoHARDWARE_AlignToTile(gcvNULL, Type, Hint, Format, Width, Height,
                                      Depth, Tiling, SuperTiled, hAlignment);
 
     /* Set back to previous type. */
