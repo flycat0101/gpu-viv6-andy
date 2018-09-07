@@ -1498,7 +1498,16 @@ _SetHardwareOptions(
                 gcmkASSERT(!gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_GEOMETRY_SHADER));
                 attribBufSizeInKB = 8;
             }
-            L1cacheSize = database->USC_MAX_PAGES - attribBufSizeInKB;
+
+            if (attribBufSizeInKB < database->USC_MAX_PAGES)
+            {
+                L1cacheSize = database->USC_MAX_PAGES - attribBufSizeInKB;
+            }
+            else
+            {
+                attribBufSizeInKB -= 4;
+                L1cacheSize = 4;
+            }
         }
         gcmkASSERT(L1cacheSize);
         if (L1cacheSize >= database->L1CacheSize)
