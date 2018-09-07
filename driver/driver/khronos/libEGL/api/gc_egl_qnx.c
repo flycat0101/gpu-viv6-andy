@@ -143,7 +143,10 @@ _ConvertWindowFormat(
             bpp = 32;
             fmt = gcvSURF_X8R8G8B8;
             break;
-
+        case SCREEN_FORMAT_NV12:
+            bpp = 16;
+            fmt = gcvSURF_NV12;
+            break;
         default:
             goto OnError;
     }
@@ -262,11 +265,11 @@ qnx_GetDisplayInfoEx(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    screen_buffer_t buf[gcdDISPLAY_BACK_BUFFERS];
+    screen_buffer_t *render_bufs = NULL, buf;
     gctPOINTER pointer;
     gctINT contiguous = 0;
     gctINT64 paddr;
-    gctINT rc, stride;
+    gctINT rc, stride, nbufs = 0;
     gctINT size[2];
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x DisplayInfoSize=%u", Display, Window, DisplayInfoSize);
@@ -274,19 +277,46 @@ qnx_GetDisplayInfoEx(
     /* Valid Window? and structure size? */
     if ((Window == gcvNULL) || (DisplayInfoSize != sizeof(qnxDISPLAY_INFO)))
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
 
-    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)buf);
-    if (rc)
+    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &nbufs);
+    if (rc || nbufs < 1)
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
+    }
+
+    render_bufs = malloc(nbufs * sizeof(screen_buffer_t));
+    if (render_bufs == NULL)
+    {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        goto OnError;
+    }
+    else
+    {
+        rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)render_bufs);
+        if (rc)
+        {
+            free(render_bufs);
+            render_bufs = NULL;
+            status = gcvSTATUS_INTERFACE_ERROR;
+            goto OnError;
+        }
+        else
+        {
+            buf = render_bufs[0];
+            free(render_bufs);
+            render_bufs = NULL;
+        }
     }
 
     /* For QNX, the Width and Height are size of the framebuffer. */
-    rc = screen_get_buffer_property_iv(buf[0], SCREEN_PROPERTY_BUFFER_SIZE, size);
+    rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_BUFFER_SIZE, size);
     if (rc)
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
 
@@ -294,36 +324,40 @@ qnx_GetDisplayInfoEx(
     DisplayInfo->height = size[1];
 
     /* The stride of the window. */
-    rc = screen_get_buffer_property_iv(buf[0], SCREEN_PROPERTY_STRIDE, &stride);
+    rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_STRIDE, &stride);
     if (rc)
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
 
     DisplayInfo->stride = stride;
 
     /* The logical address of the window. */
-    rc = screen_get_buffer_property_pv(buf[0], SCREEN_PROPERTY_POINTER, &pointer);
+    rc = screen_get_buffer_property_pv(buf, SCREEN_PROPERTY_POINTER, &pointer);
     if (rc)
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
 
     DisplayInfo->logical = pointer;
 
     /* Whether or not it is physically contiguous. */
-    rc = screen_get_buffer_property_iv(buf[0], SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS, &contiguous);
+    rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS, &contiguous);
     if (rc)
     {
+        status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
 
     if (contiguous)
     {
         /* The physical address of the window. */
-        rc = screen_get_buffer_property_llv(buf[0], SCREEN_PROPERTY_PHYSICAL_ADDRESS, &paddr);
+        rc = screen_get_buffer_property_llv(buf, SCREEN_PROPERTY_PHYSICAL_ADDRESS, &paddr);
         if (rc)
         {
+            status = gcvSTATUS_INVALID_ARGUMENT;
             goto OnError;
         }
     }
@@ -345,7 +379,6 @@ qnx_GetDisplayInfoEx(
     return status;
 
 OnError:
-    status = gcvSTATUS_INVALID_ARGUMENT;
     gcmFOOTER();
     return status;
 }
@@ -376,66 +409,6 @@ qnx_GetDisplayBackbuffer(
     *Y = 0;
 
     return gcvSTATUS_OK;
-}
-
-gceSTATUS
-qnx_SetDisplayVirtual(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctUINT Offset,
-    IN gctINT X,
-    IN gctINT Y
-    )
-{
-    screen_buffer_t buf[gcdDISPLAY_BACK_BUFFERS];
-    int rc;
-    int rects[4];
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
-
-    rects[0] = 0;
-    rects[1] = 0;
-
-    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)buf);
-    if (rc)
-    {
-        goto OnError;
-    }
-
-    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_BUFFER_SIZE, &rects[2]);
-    if (rc)
-    {
-        goto OnError;
-    }
-
-    rc = screen_post_window((screen_window_t)Window, buf[0], 1, rects, 0);
-    if (rc)
-    {
-        goto OnError;
-    }
-
-    gcmFOOTER_NO();
-    return status;
-
-OnError:
-    status = gcvSTATUS_INVALID_ARGUMENT;
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-qnx_SetDisplayVirtualEx(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctPOINTER Context,
-    IN gcoSURF Surface,
-    IN gctUINT Offset,
-    IN gctINT X,
-    IN gctINT Y
-    )
-{
-    return qnx_SetDisplayVirtual(Display, Window, Offset, X, Y);
 }
 
 gceSTATUS
@@ -2398,6 +2371,7 @@ _ConnectPixmap(
         case gcvSURF_A4B4G4R4:
         case gcvSURF_X4R4G4B4:
         case gcvSURF_X4B4G4R4:
+        case gcvSURF_NV12:
             break;
 
         default:

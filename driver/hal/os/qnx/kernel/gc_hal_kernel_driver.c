@@ -15,7 +15,10 @@
 #include "gc_hal_driver.h"
 
 #include <screen/gpu.h>
+
+#ifndef IMX
 #include <platform_config.h>
+#endif
 
 /* for ARM_PTE_... */
 #include <arm/mmu.h>
@@ -24,18 +27,54 @@
 #include <KHR/khronos_utils.h>
 
 /* for slogf */
-#include <sys/slog.h>
 #include <sys/slogcodes.h>
+
+/* for timing */
+#include <time.h>
 
 #define MAX_EEXIST_RETRIES 5
 
 static gckGALDEVICE galDevice;
+
+#if defined(AARCH64)
+static int posix_mem_fd = -1;
+#endif
 
 /*----------------------------------------------------------------------------
  * Device configuration -
  *      defines set in build_qnx/platform_config/<platform>/platform_config.h
  *----------------------------------------------------------------------------
  */
+#if defined(IMX)
+
+  int hasPL310 = 0;
+
+int             irqLine             = -1;
+long            registerMemBase     = -1;
+unsigned long   registerMemSize     = 0;
+
+#ifdef gcdDUAL_CORE
+  int             irqLine3D1          = -1;
+  long            registerMemBase3D1  = -1;
+  unsigned long   registerMemSize3D1  = 0;
+#endif
+
+unsigned long   baseAddress         = 0;
+
+int             irqLine2D           = -1;
+long            registerMemBase2D   = -1;
+unsigned long   registerMemSize2D   = 0;
+
+int             irqLineVG           = -1;
+long            registerMemBaseVG   = -1;
+unsigned long   registerMemSizeVG   = 0;
+
+static int      powerManagement     = -1;
+static int      gpuProfiler         = -1;
+static unsigned long   physBase     = 0;
+static unsigned int    physSize     = 0;
+
+#else
 int             irqLine             = gcd3D_IRQ;
 long            registerMemBase     = gcd3D_REG_BASE;
 unsigned long   registerMemSize     = gcd3D_REG_SIZE;
@@ -61,6 +100,7 @@ static int      gpuProfiler         = gcdGPUPROFILER;
 
 static unsigned int    physBase     = gcdMMU_PhysicalMemoryBase;
 static unsigned int    physSize     = gcdMMU_PhysicalMemorySize;
+#endif
 
 /* Configurable Memory sizes. */
 unsigned long contiguousSize        = (248 << 20);      /* Video memory pool. */
@@ -69,6 +109,9 @@ unsigned int internalPoolSize       = (  6 << 20);      /* Kernel local memory p
 unsigned int sharedPoolSize         = (  2 << 20);      /* Shared per-client memory pool initial size. */
 unsigned int sharedPoolPageSize     = (  1 << 12);      /* Shared per-client memory pool page size. */
 unsigned int internalPoolPageSize   = (  1 << 12);      /* Kernel local memory pool page size. */
+
+unsigned int slogUsageInterval = 0;                     /* slog video memory pool usage every N seconds, 0 disables. */
+unsigned int contiguousAbort = 0;                       /* abort() if contiguous pool exhausted. */
 
 /* ContiguousBase should be 0,
  * for video memory to be allocated from the memory pool. */
@@ -82,6 +125,22 @@ static unsigned int recovery        = 1;    /* Recover GPU from stuck (1: Enable
 static unsigned int stuckDump       = 1;    /* Level of stuck dump content (1: Minimal, 2: Middle, 3: Maximal) */
 
 static int mmu                      = 1;    /* Enable mmu or not (only for new mmu). */
+
+/*----------------------------------------------------------------------------*/
+
+/*----------------------------- Timing helper --------------------------------*/
+#define DEFINE_CLOCK(clock) struct timespec clock
+
+#define START_CLOCK(clock) clock_gettime(CLOCK_REALTIME, &clock)
+
+#define STOP_CLOCK(clock, message, ...) \
+    do { \
+          double start_s = (clock).tv_sec + ((clock).tv_nsec / 1000000000.0); \
+          clock_gettime(CLOCK_REALTIME, &(clock)); \
+          double stop_s = (clock).tv_sec + ((clock).tv_nsec / 1000000000.0); \
+          slogf(_SLOGC_GRAPHICS_GL, _SLOG_INFO, "CLOCK: %gs " message, stop_s - start_s, ##__VA_ARGS__); \
+    } while (0)
+
 
 /*----------------------------------------------------------------------------*/
 
@@ -251,8 +310,8 @@ typedef struct _gcsMEM_POOL
     gctUINT32 pageSize;
     gctUINT32 poolSize;
     pthread_mutex_t mutex;
-    gctUINT32 addr;
-    gctUINT32 paddr;
+    gctPOINTER addr;
+    gctPHYS_ADDR_T paddr;
     gckPAGE_USAGE pageUsage;
     gctINT fd;
 } gcsMEM_POOL;
@@ -284,6 +343,15 @@ gckOS_DumpParam(
     printk("  registerMemBase   = 0x%08lX", registerMemBase);
     printk("  registerMemSize   = 0x%08lX", registerMemSize);
 
+#ifdef gcdDUAL_CORE
+    if (irqLine3D1 != -1)
+    {
+      printk("  irqLine3D1           = %d",      irqLine3D1);
+      printk("  registerMemBase3D1   = 0x%08lX", registerMemBase3D1);
+      printk("  registerMemSize3D1   = 0x%08lX", registerMemSize3D1);
+    }
+#endif
+
     if (irqLine2D != -1)
     {
         printk("  irqLine2D         = %d",      irqLine2D);
@@ -300,6 +368,7 @@ gckOS_DumpParam(
 
     printk("  contiguousBase    = 0x%08lX", contiguousBase);
     printk("  contiguousSize    = %lu MB",  contiguousSize >> 20);
+    printk("  slogUsageInterval = %d sec",  slogUsageInterval);
     printk("  internalPoolMB    = %u MB",   internalPoolSize >> 20);
     printk("  sharedPoolMB      = %u MB",   sharedPoolSize   >> 20);
     printk("  bankSize          = 0x%08lX", bankSize);
@@ -308,7 +377,7 @@ gckOS_DumpParam(
     printk("  powerManagement   = %d",      powerManagement);
     printk("  gpuProfiler       = %d",      gpuProfiler);
     printk("  baseAddress       = 0x%08lX", baseAddress);
-    printk("  physBase          = 0x%08X",  physBase);
+    printk("  physBase          = 0x%08lX", (unsigned long)physBase);
     printk("  physSize          = 0x%08X",  physSize);
     printk("  recovery          = %d",      recovery);
     printk("  stuckDump         = %d",      stuckDump);
@@ -322,6 +391,22 @@ drv_mempool_init()
     void* addr;
     size_t pcontig;
     int rc, err;
+#if defined(AARCH64)
+    size_t pt_contig_len = 0;
+    int pt_fildes = NOFD;
+    off64_t pt_offset;
+#endif
+
+    DEFINE_CLOCK(clock);
+    DEFINE_CLOCK(total);
+
+#if defined(AARCH64)
+    posix_mem_fd = posix_typed_mem_open("/memory/below4G/ram/sysram", O_RDWR, POSIX_TYPED_MEM_ALLOCATE_CONTIG);
+    if (posix_mem_fd < 0) {
+        fprintf(stderr, "galcore:%s[%d]: posix_typed_mem_open failed\n", __FUNCTION__, __LINE__);
+        return gcvSTATUS_GENERIC_IO;
+    }
+#endif
 
     memPool.pageSize = internalPoolPageSize;
 
@@ -333,57 +418,138 @@ drv_mempool_init()
     memPool.poolSize = memPool.pageCount * memPool.pageSize;
     /*fprintf(stderr, "memPoolSize: %d\n", memPool.poolSize);*/
 
+    START_CLOCK(total);
     /* Allocate a single chunk of physical memory.
      * Zero memory with MAP_ANON so we don't leak any sensitive information by chance. */
+    START_CLOCK(clock);
     memPool.fd = drv_create_shm_object();
+    STOP_CLOCK(clock, "drv_create_shm_object");
     if (memPool.fd == -1) {
         fprintf(stderr, "galcore:%s[%d]: shm_open failed\n", __FUNCTION__, __LINE__);
         return gcvSTATUS_GENERIC_IO;
     }
 
-    if (shm_ctl_special(memPool.fd, SHMCTL_ANON | SHMCTL_PHYS, 0, memPool.poolSize, ARM_PTE_RW) == -1) {
-        fprintf(stderr, "galcore:%s[%d]: shm_ctl_special failed: %s\n", __FUNCTION__, __LINE__, strerror(errno));
-        close(memPool.fd);
-        memPool.fd = -1;
-        return gcvSTATUS_GENERIC_IO;
-    }
+#if defined(AARCH64)
+    /* Map this memory inside user and galcore. */
+    unsigned prot_flags = PROT_READ | PROT_WRITE | PROT_NOCACHE;
+    unsigned map_flags = 0;
 
-    addr = mmap64(0, memPool.poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, memPool.fd, 0);
-
+    START_CLOCK(clock);
+    addr = mmap64(0, memPool.poolSize, prot_flags, MAP_SHARED, posix_mem_fd, 0);
+    err = errno;
+    STOP_CLOCK(clock, "mmap64 prot_flags = 0x%x", prot_flags);
     if (addr == MAP_FAILED) {
-        fprintf(stderr, "galcore:%s[%d]: mmap64 failed, errno=%d.\n", __FUNCTION__, __LINE__, errno);
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: mmap64 failed: %s", __FUNCTION__, __LINE__, strerror(err));
         close(memPool.fd);
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
     }
-    memPool.addr = gcmPTR2INT32(addr) ;
+
+    START_CLOCK(clock);
+    rc = posix_mem_offset64(addr, memPool.poolSize, &pt_offset, &pt_contig_len, &pt_fildes);
+    err = errno;
+    STOP_CLOCK(clock, "posix_mem_offset64");
+    if (rc != 0) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: posix_mem_offset64 failed: %s", __FUNCTION__, __LINE__, strerror(err));
+        munmap(addr, memPool.poolSize);
+        close(memPool.fd);
+        memPool.fd = -1;
+        return gcvSTATUS_GENERIC_IO;
+    }
+    /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
+    /* cacheable, write back == lazy write */
+    START_CLOCK(clock);
+    rc = shm_ctl_special(memPool.fd, SHMCTL_PHYS, pt_offset, memPool.poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
+    err = errno;
+    STOP_CLOCK(clock, "shm_ctl_special poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
+    if (rc == -1) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl_special failed: %s", __FUNCTION__, __LINE__, strerror(err));
+        munmap(addr, memPool.poolSize);
+        close(memPool.fd);
+        memPool.fd = -1;
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+#else
+#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
+     START_CLOCK(clock);
+
+    /*
+     * use SHMCTL_LAZYWRITE to get write-combine memory access
+      */
+    rc = shm_ctl(memPool.fd, SHMCTL_ANON|SHMCTL_PHYS|SHMCTL_LAZYWRITE, 0, memPool.poolSize);
+    err = errno;
+    STOP_CLOCK(clock, "shm_ctl poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
+    if (rc == -1) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl failed: %s", __FUNCTION__, __LINE__, strerror(err));
+        close(memPool.fd);
+        memPool.fd = -1;
+        return gcvSTATUS_GENERIC_IO;
+    }
+    unsigned prot_flags = PROT_READ | PROT_WRITE;
+#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
+    START_CLOCK(clock);
+       rc = shm_ctl(memPool.fd, SHMCTL_ANON|SHMCTL_PHYS, 0, memPool.poolSize);
+    err = errno;
+    STOP_CLOCK(clock, "shm_ctl_special poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
+    if (rc == -1) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl_special failed: %s", __FUNCTION__, __LINE__, strerror(err));
+        close(memPool.fd);
+        memPool.fd = -1;
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    unsigned prot_flags = PROT_READ | PROT_WRITE | PROT_NOCACHE;
+#endif
+
+    unsigned map_flags = MAP_NOINIT;
+    while (1) {
+      START_CLOCK(clock);
+      addr = mmap64(0, memPool.poolSize, prot_flags, map_flags | MAP_SHARED, memPool.fd, 0);
+      err = errno;
+      STOP_CLOCK(clock, "mmap64 prot_flags = 0x%x map_flags = 0x%x", prot_flags, map_flags);
+      if (addr == MAP_FAILED) {
+        fprintf(stderr, "galcore:%s[%d]: mmap64 failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, err, strerror(err));
+        if (err != EINTR && err != EAGAIN) {
+          close(memPool.fd);
+          memPool.fd = -1;
+          return gcvSTATUS_GENERIC_IO;
+        }
+      } else {
+          break;
+      }
+    }
+#endif
+    memPool.addr = addr;
 
     while (1) {
-        if (mem_offset64(addr, NOFD, memPool.poolSize, &paddr, &pcontig) == -1) {
-            fprintf(stderr, "galcore:%s[%d]: mem_offset64 failed\n", __FUNCTION__, __LINE__);
-            if ((errno != EINTR) && (errno != EAGAIN)) {
-                munmap(addr, memPool.poolSize);
-                close(memPool.fd);
-                memPool.fd = -1;
-                memPool.addr = 0;
-                return gcvSTATUS_GENERIC_IO;
-            }
-        } else {
-            break;
+      START_CLOCK(clock);
+      if (mem_offset64(addr, NOFD, memPool.poolSize, &paddr, &pcontig) == -1) {
+        fprintf(stderr, "galcore:%s[%d]: mem_offset64 failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, errno, strerror(errno));
+        if (errno != EINTR && errno != EAGAIN) {
+          munmap(addr, memPool.poolSize);
+          close(memPool.fd);
+          memPool.fd = -1;
+          memPool.addr = NULL;
+          return gcvSTATUS_GENERIC_IO;
         }
+      } else {
+        STOP_CLOCK(clock, "mem_offset64");
+        break;
+      }
     }
 
-    rc = mprotect(addr, memPool.poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE);
-    err = errno;
-    if (rc)
-    {
-        fprintf(stderr, "galcore:%s[%d]: mprotect failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, err, strerror(err));
-    }
+#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
+    STOP_CLOCK(total, "total poolSize = %uMB%s%s", memPool.poolSize / 1048576, prot_flags & PROT_NOCACHE ? " PROT_NOCACHE" : "", map_flags & MAP_NOINIT ? " MAP_NOINIT" : "");
+#else
+    STOP_CLOCK(total, "total poolSize = %uMB%s%s", memPool.poolSize / 1048576, prot_flags & PROT_NOCACHE ? " PROT_NOCACHE" : "",
+       map_flags & MAP_NOINIT ? " MAP_NOINIT" : "");
+#endif
 
-    memPool.paddr = (gctUINT32)paddr;
+    memPool.paddr = (gctPHYS_ADDR_T)paddr;
 
-    fprintf(stderr, "Mempool Map addr range[%x-%x]\n", memPool.addr, memPool.addr +  memPool.poolSize);
-    fprintf(stderr, "Mempool Map paddr range[%x-%x]\n", memPool.paddr, memPool.paddr +  memPool.poolSize );
+    fprintf(stderr, "Mempool Map addr range[%p-%p]\n", memPool.addr, memPool.addr +  memPool.poolSize);
+    fprintf(stderr, "Mempool Map paddr range[%lx-%lx]\n", (long)memPool.paddr, (long)memPool.paddr +  memPool.poolSize );
 
     /* Allocate the page usage array and Initialize all pages to free. */
     memPool.pageUsage = (gckPAGE_USAGE)calloc(
@@ -396,7 +562,7 @@ drv_mempool_init()
         munmap(addr, memPool.poolSize);
         close(memPool.fd);
         memPool.fd = -1;
-        memPool.addr = 0;
+        memPool.addr = NULL;
         memPool.paddr = 0;
         return gcvSTATUS_GENERIC_IO;
     }
@@ -411,7 +577,7 @@ drv_mempool_init()
         munmap(addr, memPool.poolSize);
         close(memPool.fd);
         memPool.fd = -1;
-        memPool.addr = 0;
+        memPool.addr = NULL;
         memPool.paddr = 0;
         return gcvSTATUS_GENERIC_IO;
     }
@@ -425,11 +591,16 @@ drv_mempool_destroy()
     pthread_mutex_destroy(&memPool.mutex);
     free(memPool.pageUsage);
     memPool.pageUsage = gcvNULL;
-    munmap(gcmINT2PTR(memPool.addr), memPool.poolSize);
+    munmap((void*)memPool.addr, memPool.poolSize);
     close(memPool.fd);
     memPool.fd = -1;
-    memPool.addr = 0;
+    memPool.addr = NULL;
     memPool.paddr = 0;
+#if defined(AARCH64)
+    if (posix_mem_fd != -1) {
+        close(posix_mem_fd);
+    }
+#endif
 }
 
 gctINT
@@ -438,13 +609,13 @@ drv_mempool_get_fileDescriptor()
     return memPool.fd;
 }
 
-gctUINT32
+gctPHYS_ADDR_T
 drv_mempool_get_basePAddress()
 {
     return memPool.paddr;
 }
 
-gctUINT32
+gctPOINTER
 drv_mempool_get_baseAddress()
 {
     return memPool.addr;
@@ -459,29 +630,27 @@ drv_mempool_get_page_size()
 gceSTATUS
 drv_mempool_mem_offset(
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address)
+    OUT gctPHYS_ADDR_T * Address)
 {
-    gctUINT32 logical = gcmPTR2INT32(Logical);
-
     if (Address == gcvNULL)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    if ((logical < memPool.addr) ||
-        (logical >= (memPool.addr + memPool.poolSize)))
+    if ((Logical < memPool.addr) ||
+        (Logical >= (memPool.addr + memPool.poolSize)))
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    *Address = (logical - memPool.addr) + memPool.paddr;
+    *Address = (gctPHYS_ADDR_T)(Logical - memPool.addr) + memPool.paddr;
 
     return gcvSTATUS_OK;
 }
 
 gceSTATUS
 drv_mempool_get_kernel_logical(
-    IN gctUINT32 Address,
+    IN gctPHYS_ADDR_T Address,
     OUT gctPOINTER *Logical)
 {
     if (Logical == gcvNULL)
@@ -495,7 +664,7 @@ drv_mempool_get_kernel_logical(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    *Logical = gcmINT2PTR((Address - memPool.paddr) + memPool.addr);
+    *Logical = (Address - memPool.paddr) + memPool.addr;
 
     return gcvSTATUS_OK;
 }
@@ -506,7 +675,7 @@ drv_mempool_get_kernel_logical(
 void
 drv_mempool_alloc_contiguous(
     IN gctUINT32 Bytes,
-    OUT gctUINT32 * Physical,
+    OUT gctPHYS_ADDR_T * Physical,
     OUT gctPOINTER * Logical
     )
 {
@@ -617,7 +786,7 @@ int drv_mempool_free(gctPOINTER Logical)
 
     pthread_mutex_lock(&memPool.mutex);
 
-    pageIndex = (gcmPTR2INT32(Logical) - gcmPTR2INT32(memPool.addr)) / memPool.pageSize;
+    pageIndex = (gcmPTR2INT32(Logical - memPool.addr)) / memPool.pageSize;
 
     /* Verify the memory is valid and unlocked. */
     if ( (pageIndex < 0) || (pageIndex >= memPool.pageCount) )
@@ -779,8 +948,8 @@ drv_shm_acquire_pool_by_user_logical(
         while (shmPoolPid != gcvNULL)
         {
             /* Check if this address is in range of this shmPool. */
-            if ((shmPoolPid->UserLogical <= gcmPTR2INT32(Logical)) &&
-                ((shmPoolPid->UserLogical + shmPoolPid->poolSize) > gcmPTR2INT32(Logical))
+            if ((shmPoolPid->UserLogical <= Logical) &&
+                ((shmPoolPid->UserLogical + shmPoolPid->poolSize) > Logical)
                )
             {
                 return shmPoolPid;
@@ -830,8 +999,8 @@ drv_shm_acquire_pool_by_kernel_logical(
         while (shmPoolPid != gcvNULL)
         {
             /* Check if this address is in range of this shmPool. */
-            if ((shmPoolPid->KernelLogical <= gcmPTR2INT32(Logical)) &&
-                ((shmPoolPid->KernelLogical + shmPoolPid->poolSize) > gcmPTR2INT32(Logical))
+            if ((shmPoolPid->KernelLogical <= Logical) &&
+                ((shmPoolPid->KernelLogical + shmPoolPid->poolSize) > Logical)
                )
             {
                 return shmPoolPid;
@@ -895,9 +1064,8 @@ gceSTATUS
 drv_shmpool_mem_offset(
     IN gctUINT32 Pid,
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address)
+    OUT gctPHYS_ADDR_T * Address)
 {
-    gctUINT32 logical = gcmPTR2INT32(Logical);
     gckSHM_POOL shmPool;
 
     if (Address == gcvNULL)
@@ -911,7 +1079,7 @@ drv_shmpool_mem_offset(
 
     if (shmPool != gcvNULL)
     {
-        *Address = (logical - shmPool->KernelLogical) + shmPool->Physical;
+        *Address = (gctPHYS_ADDR_T)(Logical - shmPool->KernelLogical) + shmPool->Physical;
 
         pthread_mutex_unlock(&shmPoolListMutex);
 
@@ -927,9 +1095,8 @@ gceSTATUS
 drv_shmpool_mem_offset_by_user_logical(
     IN gctUINT32 Pid,
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address)
+    OUT gctPHYS_ADDR_T * Address)
 {
-    gctUINT32 logical = gcmPTR2INT32(Logical);
     gckSHM_POOL shmPool;
 
     if (Address == gcvNULL)
@@ -943,7 +1110,7 @@ drv_shmpool_mem_offset_by_user_logical(
 
     if (shmPool != gcvNULL)
     {
-        *Address = (logical - shmPool->UserLogical) + shmPool->Physical;
+        *Address = (gctPHYS_ADDR_T)(Logical - shmPool->UserLogical) + shmPool->Physical;
 
         pthread_mutex_unlock(&shmPoolListMutex);
 
@@ -963,9 +1130,14 @@ gckSHM_POOL drv_shmpool_create(
         IN gctUINT32 CacheFlag)
 {
     int rc;
-    void *caddr, *saddr;
+    void *caddr=gcvNULL, *saddr=gcvNULL;
     off64_t paddr;
     gctUINT32 fd;
+#if defined(AARCH64)
+    size_t pt_contig_len = 0;
+    int pt_fildes = NOFD;
+    off64_t pt_offset;
+#endif
 
     gckSHM_POOL shm = (gckSHM_POOL) calloc(1, sizeof(struct _gckSHM_POOL));
     if (shm == gcvNULL)
@@ -996,7 +1168,6 @@ gckSHM_POOL drv_shmpool_create(
         free(shm);
         return gcvNULL;
     }
-
     fd = drv_create_shm_object();
     if (fd == -1) {
         fprintf(stderr, "%s: couldn't create shmem: %s\n", __FUNCTION__, strerror( errno ) );
@@ -1005,38 +1176,114 @@ gckSHM_POOL drv_shmpool_create(
         return gcvNULL;
     }
 
-    rc = shm_ctl_special(fd,
-            SHMCTL_ANON | SHMCTL_PHYS,
-            0,
-            shm->poolSize,
-            ARM_PTE_RW | (CacheFlag == 0x1 ? ARM_PTE_C : 0));
-    if (rc == -1) {
-        fprintf(stderr, "%s: shm_ctl_special failed: %s\n", __FUNCTION__, strerror( errno ) );
+#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
+    /*
+     * use SHMCTL_LAZYWRITE to get write-combine memory access
+     */
+#if defined(AARCH64)
+    /* Map this memory inside user and galcore. */
+    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, posix_mem_fd, 0);
+    if (saddr == MAP_FAILED) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't mmap memory of size: %u, Pid: %u [errno: %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ));
+        close(fd);
+        pthread_mutex_destroy(&shm->mutex);
+        if (shm->poolSize > 512*1024*1024) {
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_CRITICAL, "shm->poolSize (%u) is suspiciously large -- forcing core dump!", shm->poolSize);
+            *((int*)1) = 0;
+        }
+        free(shm);
+        return gcvNULL;
+    }
+
+    if (posix_mem_offset64(saddr, shm->poolSize, &pt_offset, &pt_contig_len, &pt_fildes) == -1) {
+        fprintf(stderr, "%s: posix_mem_offset64 failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
         return gcvNULL;
     }
 
+    /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
+    if (CacheFlag == 0x1) {
+        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
+    } else {
+        /* Cachable, write back == lazy write */
+        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WB | ARM_SHMCTL_SH);
+    }
+    if (rc) {
+        fprintf(stderr, "%s: shm_ctl_special failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
+        close(fd);
+        pthread_mutex_destroy(&shm->mutex);
+        free(shm);
+        return gcvNULL;
+    }
+    if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
+        caddr = saddr;
+    } else {
+        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, fd, 0);
+    }
+#else
+    if (CacheFlag == 0x1) {
+        rc = shm_ctl(fd, SHMCTL_ANON|SHMCTL_PHYS, 0, shm->poolSize);
+    } else {
+        rc = shm_ctl(fd, SHMCTL_ANON|SHMCTL_PHYS|SHMCTL_LAZYWRITE, 0, shm->poolSize);
+    }
+
+    if (rc) {
+        fprintf(stderr, "%s: shm_ctl failed: %s\n", __FUNCTION__, strerror( errno ) );
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
+        close(fd);
+        pthread_mutex_destroy(&shm->mutex);
+        free(shm);
+
+        return gcvNULL;
+    }
+
     /* Map this memory inside user and galcore. */
     saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (CacheFlag == 0x1) {
-        rc = 0;
+
+
+    if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
+        caddr = saddr;
     } else {
-        rc = mprotect(saddr, shm->poolSize, PROT_READ | PROT_WRITE | PROT_NOCACHE);
-        if (rc) {
-            fprintf(stderr, "%s: couldn't mprotect memory of size %d, Pid: %d [errno %s]",
-                __FUNCTION__, shm->poolSize, Pid, strerror( errno ) );
+        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    }
+#endif
+
+#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
+
+    /* Allocation performance is not an issue for omap5 -- the amount of memory is small */
+    /* TODO: we do not need/use the fd in this code! */
+    rc = 0;
+
+    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE | (CacheFlag?0:PROT_NOCACHE),
+        MAP_SHARED | MAP_ANON | MAP_NOINIT | MAP_PHYS, NOFD, 0);
+
+    if( saddr == MAP_FAILED ) {
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "drv_shmpool_create: mmap64() failed, size %d, Pid: %d [errno %s]",
+            shm->poolSize, Pid, strerror( errno ) );
+        rc = 1;
+
+    } else if( Pid == getpid() ) {
+        /* Same process mapping -- do not mmap_peer() into itself */
+        caddr = saddr;
+
+    } else {
+        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE | (CacheFlag?0:PROT_NOCACHE), MAP_SHARED, NOFD, 0);
+        if( caddr == MAP_FAILED ) {
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "drv_shmpool_create: mmap64_peer() failed, size %d, Pid: %d [errno %s]",
+                shm->poolSize, Pid, strerror( errno ) );
+            rc = 1;
         }
     }
 
-    if (!rc && (saddr != MAP_FAILED) && (Pid == getpid())) {
-        caddr = saddr;
-    } else {
-        caddr = mmap64_peer(Pid, 0, shm->poolSize,
-                    PROT_READ | PROT_WRITE | (CacheFlag == 0x1 ? 0 : PROT_NOCACHE),
-                    MAP_SHARED, fd, 0);
-    }
+#endif
 
     if (rc || (caddr == MAP_FAILED) || (saddr == MAP_FAILED))
     {
@@ -1069,31 +1316,31 @@ gckSHM_POOL drv_shmpool_create(
         return gcvNULL;
     }
 
-    shm->UserLogical   = gcmPTR2INT32(caddr);
-    shm->KernelLogical = gcmPTR2INT32(saddr);
+    shm->UserLogical   = caddr;
+    shm->KernelLogical = saddr;
 
     /* fd should be NOFD here, to get physical address. */
     rc = mem_offset64(saddr, NOFD, 1, (off64_t *)&paddr, NULL);
     if (rc == -1) {
-        fprintf(stderr, "%s: mem_offset failed (saddr:%x): %s\n", __FUNCTION__, gcmPTR2INT32(saddr), strerror( errno ) );
+        fprintf(stderr, "%s: mem_offset failed (saddr:%p): %s\n", __FUNCTION__, saddr, strerror( errno ) );
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
         return gcvNULL;
     }
 
-    shm->Physical = gcmPTR2INT32(paddr);
+    shm->Physical = (gctPHYS_ADDR_T)paddr;
 
-    mlock(gcmINT2PTR(shm->KernelLogical), shm->poolSize);
+    mlock(shm->KernelLogical, shm->poolSize);
 
     /* Allocate the page usage array and Initialize all pages to free. */
     shm->pageUsage = (gckPAGE_USAGE)calloc(shm->pageCount, sizeof(struct _gckPAGE_USAGE));
     if (shm->pageUsage == gcvNULL)
     {
         fprintf( stderr, "%s: malloc failed: %s\n", __FUNCTION__, strerror(errno) );
-        munmap(gcmINT2PTR(shm->KernelLogical), shm->poolSize);
+        munmap(shm->KernelLogical, shm->poolSize);
         if (getpid() != Pid)
         {
-            munmap_peer(Pid, gcmINT2PTR(shm->UserLogical), shm->poolSize);
+            munmap_peer(Pid, shm->UserLogical, shm->poolSize);
         }
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
@@ -1126,10 +1373,10 @@ drv_shmpool_destroy(
 
         if (ShmPool->UserLogical)
         {
-            munmap(gcmINT2PTR(ShmPool->KernelLogical), ShmPool->poolSize);
+            munmap(ShmPool->KernelLogical, ShmPool->poolSize);
             if (getpid() != ShmPool->pid)
             {
-                munmap_peer(ShmPool->pid, gcmINT2PTR(ShmPool->UserLogical), ShmPool->poolSize);
+                munmap_peer(ShmPool->pid, ShmPool->UserLogical, ShmPool->poolSize);
             }
         }
 
@@ -1290,7 +1537,6 @@ drv_shmpool_get_kernel_logical(
     )
 {
     gckSHM_POOL shmPool;
-    gctUINT32 logical = gcmPTR2INT32(Logical);
     gctPOINTER svaddr = gcvNULL;
 
     pthread_mutex_lock(&shmPoolListMutex);
@@ -1299,7 +1545,7 @@ drv_shmpool_get_kernel_logical(
 
     if (shmPool != gcvNULL)
     {
-        svaddr = gcmINT2PTR(logical - shmPool->UserLogical + shmPool->KernelLogical);
+        svaddr = (Logical - shmPool->UserLogical) + shmPool->KernelLogical;
     }
 
     pthread_mutex_unlock(&shmPoolListMutex);
@@ -1336,7 +1582,7 @@ drv_shmpool_free(
         return 0;
     }
 
-    pageIndex = (gcmPTR2INT32(Logical) - shmPool->UserLogical) / shmPool->pageSize;
+    pageIndex = (gcmPTR2INT32(Logical - shmPool->UserLogical)) / shmPool->pageSize;
 
     gcmkTRACE(gcvLEVEL_INFO, "Freeing pages @ %d\n", pageIndex);
 
@@ -1917,6 +2163,9 @@ OnError:
 
 /*----------------------------------------------------------------------------*/
 /*-------------------------- DRIVER INITIALIZATIONS --------------------------*/
+#if defined(IMX6X) || defined(IMX)
+uintptr_t m_pl310Base = MAP_DEVICE_FAILED;
+#endif
 
 static int drv_init(void)
 {
@@ -1941,11 +2190,13 @@ static int drv_init(void)
     args.registerSizes[gcvCORE_MAJOR] = registerMemSize;
     args.chipIDs[gcvCORE_MAJOR] = gcvCORE_MAJOR;
 
-#ifdef gcdDUAL_CORE
-    args.irqs[gcvCORE_3D1] = irqLine3D1;
-    args.registerBases[gcvCORE_3D1] = registerMemBase3D1;
-    args.registerSizes[gcvCORE_3D1] = registerMemSize3D1;
-    args.chipIDs[gcvCORE_3D1] = gcvCORE_3D1;
+#if defined(gcdDUAL_CORE)
+    if (irqLine3D1 != -1) {
+      args.irqs[gcvCORE_3D1] = irqLine3D1;
+      args.registerBases[gcvCORE_3D1] = registerMemBase3D1;
+      args.registerSizes[gcvCORE_3D1] = registerMemSize3D1;
+      args.chipIDs[gcvCORE_3D1] = gcvCORE_3D1;
+    }
 #endif
 
     args.irqs[gcvCORE_2D] = irqLine2D;
@@ -1960,6 +2211,27 @@ static int drv_init(void)
 
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_DRIVER,
                   "[galcore] Entering drv_init\n");
+
+#if defined(IMX6X) || defined(IMX)
+    /*
+     * This is for L2-cache-sync
+     * since we use write-combine memory access
+     */
+#if defined(IMX)
+    if (hasPL310 == 1)
+#endif
+    {
+      if (m_pl310Base == MAP_DEVICE_FAILED) {
+          m_pl310Base = mmap_device_io(0x1000, 0x00A02000);
+          if (m_pl310Base == MAP_DEVICE_FAILED) {
+              gcmkTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_DRIVER,
+                            "[galcore] [%s] Can't mmap device io for PL310 L2 Cache controller (errno: %s).\n", __FUNCTION__, strerror(errno));
+
+              return -1;
+          }
+      }
+    }
+#endif
 
     gcmkPRINT("Galcore version %d.%d.%d.%d\n",
         gcvVERSION_MAJOR, gcvVERSION_MINOR, gcvVERSION_PATCH, gcvVERSION_BUILD);
@@ -2221,7 +2493,7 @@ drv_close_connection(resmgr_context_t *ctp, void *reserved, RESMGR_OCB_T *ocb)
     return iofunc_close_ocb_default(ctp, reserved, ocb);
 }
 
-static void drv_load_values_from_config_file()
+static int drv_load_values_from_config_file()
 {
     int rc;
     char val[128];
@@ -2248,7 +2520,7 @@ static void drv_load_values_from_config_file()
     rc = __khrGetDeviceConfigValue(1, "gpu-physBase", val, sizeof(val));
     if (rc == EOK)
     {
-        physBase = atoi(val);
+        physBase = atol(val);
     }
 
     rc = __khrGetDeviceConfigValue(1, "gpu-physSize", val, sizeof(val));
@@ -2292,6 +2564,110 @@ static void drv_load_values_from_config_file()
     {
         powerManagement = 0;
     }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-slogUsageInterval", val, sizeof(val));
+    if (rc == EOK) {
+        slogUsageInterval = atoi(val);
+    }
+
+#if defined(IMX)
+    rc = __khrGetDeviceConfigValue(1, "device-base-address", val, sizeof(val));
+    if (rc == EOK)
+    {
+      baseAddress = atol(val);
+    } else {
+      fprintf(stderr, "Unable to read mandatory parameter device-base-address from graphics.conf!\n");
+      return -1;
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "hasPL310", val, sizeof(val));
+    if (rc == EOK)
+    {
+      hasPL310 = atoi(val);
+    }
+
+    //GPU 3D 0
+    rc = __khrGetDeviceConfigValue(1, "gpu-irq-3D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        irqLine = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-base-3D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemBase = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-size-3D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemSize = atoi(val);
+    }
+
+#ifdef gcdDUAL_CORE
+    //GPU 3D 1
+    rc = __khrGetDeviceConfigValue(1, "gpu-irq-3D1", val, sizeof(val));
+    if (rc == EOK)
+    {
+        irqLine3D1 = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-base-3D1", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemBase3D1 = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-size-3D1", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemSize3D1 = atoi(val);
+    }
+#endif
+
+    //2D core
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-irq-2D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        irqLine2D = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-base-2D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemBase2D = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-size-2D", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemSize2D = atoi(val);
+    }
+
+    //VG core
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-irq-VG", val, sizeof(val));
+    if (rc == EOK)
+    {
+        irqLineVG = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-base-VG", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemBaseVG = atoi(val);
+    }
+
+    rc = __khrGetDeviceConfigValue(1, "gpu-reg-size-VG", val, sizeof(val));
+    if (rc == EOK)
+    {
+        registerMemSizeVG = atoi(val);
+    }
+#endif
+
+    return 0;
 }
 
 int gpu_init()
@@ -2301,7 +2677,9 @@ int gpu_init()
     sigset_t  sigset;
     int rc;
 
-    drv_load_values_from_config_file();
+    if (drv_load_values_from_config_file() != 0) {
+        goto fail_001;
+    }
 
     gckOS_DumpParam();
 

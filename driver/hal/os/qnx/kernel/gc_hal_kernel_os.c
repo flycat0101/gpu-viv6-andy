@@ -18,13 +18,18 @@
 #include <sys/procfs.h>
 #include <sys/time.h>
 #include <sys/slog.h>
+#include <sys/slogcodes.h>
 #include <libgen.h>
 #include <semaphore.h>
 #include <screen/gpu.h>
 #include <errno.h>
 
 /* for ARM_PTE_... */
+#if (defined(IMX) && defined(AARCH64))
+#include <aarch64/mmu.h>
+#else
 #include <arm/mmu.h>
+#endif
 
 #define GC_HAL_QNX_PULSEVAL_SIGNAL  (_PULSE_CODE_MINAVAIL+1)
 
@@ -74,7 +79,7 @@ struct _gckOS
     gctPOINTER                  memoryLock;
     gctPOINTER                  memoryMapLock;
     gctPOINTER                  mempoolBaseAddress;
-    gctPOINTER                  mempoolBasePAddress;
+    gctPHYS_ADDR_T              mempoolBasePAddress;
     gctUINT32                   mempoolPageSize;
 
     gctUINT32                   baseAddress;
@@ -478,9 +483,9 @@ gckOS_Construct(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-    if (shm_ctl_special(
+    if (shm_ctl(
             os->extraPageFd, SHMCTL_ANON | SHMCTL_PHYS,
-            0, os->extraPageSize, ARM_PTE_RW) == -1)
+            0, os->extraPageSize) == -1)
     {
         close(os->extraPageFd);
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
@@ -509,8 +514,8 @@ gckOS_Construct(
                   "Physical base address set to 0x%08X.\n",
                   os->baseAddress);
 
-    os->mempoolBaseAddress = gcmINT2PTR( drv_mempool_get_baseAddress());
-    os->mempoolBasePAddress = gcmINT2PTR( drv_mempool_get_basePAddress());
+    os->mempoolBaseAddress = drv_mempool_get_baseAddress();
+    os->mempoolBasePAddress = drv_mempool_get_basePAddress();
     os->mempoolPageSize = drv_mempool_get_page_size();
 
     /* Return pointer to the gckOS object. */
@@ -1082,7 +1087,7 @@ gckOS_AllocateNonPagedMemory(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 physical;
+    gctPHYS_ADDR_T physical;
     gcsPHYSICAL_PTR node;
     gctBOOL nodeAllocated = gcvFALSE;
 
@@ -1408,7 +1413,7 @@ gckOS_GetPhysicalAddress(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 res;
-    gctUINT32 address;
+    gctPHYS_ADDR_T address;
     off64_t offset;
     gctUINT32 pid;
 
@@ -1507,7 +1512,7 @@ gceSTATUS gckOS_UserLogicalToPhysical(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 pid;
-    gctUINT32 address;
+    gctPHYS_ADDR_T address;
     off64_t offset;
     size_t length;
     int rc;
@@ -1596,6 +1601,7 @@ gckOS_MapPhysical(
     OUT gctPOINTER * Logical
     )
 {
+
     gcmkHEADER_ARG("Os=0x%X Physical=0x%X Bytes=%lu", Os, Physical, Bytes);
 
     /* Verify the arguments. */
@@ -1678,7 +1684,8 @@ gckOS_UnmapPhysical(
     IN gctSIZE_T Bytes
     )
 {
-    gctUINT32 address, res;
+    gctUINT32 res;
+    gctPHYS_ADDR_T address;
 
     gcmkHEADER_ARG("Os=0x%X Logical=0x%X Bytes=%lu", Os, Logical, Bytes);
 
@@ -2826,6 +2833,9 @@ gckOS_StopTimer(
 **
 **      Nothing.
 */
+#if defined(IMX6X) || defined(IMX)
+extern uintptr_t m_pl310Base;
+#endif
 gceSTATUS
 gckOS_MemoryBarrier(
     IN gckOS Os,
@@ -2836,8 +2846,41 @@ gckOS_MemoryBarrier(
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
+#ifdef IMX6X
+    /*
+     * for write-combine memory access
+     */
+    __asm__ __volatile__ ("dsb" : : : "memory");
 
-    __asm__ __volatile__ ("dsb");
+    /*
+     * Linux also calles: outer_sync()
+     *
+     */
+    if (m_pl310Base == MAP_DEVICE_FAILED) {
+        /* This should unlikely happen */
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, " [%s] device io map for PL310 L2 Cache controller is Failed or not-done (abort ... )", __FUNCTION__);
+        abort();
+    } else {
+        out32((uintptr_t)m_pl310Base + 0x730, 1);
+    }
+#elif defined(IMX8X)
+    __asm__ __volatile__ ("dsb" : : : "memory");
+#elif defined(IMX) && !defined(AARCH64)
+    __asm__ __volatile__ ("dsb" : : : "memory");
+    if (m_pl310Base != MAP_DEVICE_FAILED) { /* non iMX6 platform keep m_pl310Base invalid */
+        out32((uintptr_t)m_pl310Base + 0x730, 1);
+    }
+#elif defined(IMX) && defined(AARCH64)
+    __asm__ __volatile__ ("dsb sy" : : : "memory");
+#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
+    __asm__ __volatile__ ("dsb" : : : "memory");
+    /*
+     * As recommended by TI, in order to push the stale data out
+     * we need to have strongly ordered access between dsb and isb
+     */
+    *(volatile unsigned *)Address = *(volatile unsigned *)Address;
+    __asm__ __volatile__ ("isb" : : : "memory");
+#endif
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -2909,7 +2952,11 @@ gckOS_AllocatePagedMemoryEx(
     OUT gctPHYS_ADDR * Physical
     )
 {
-    int rc, fd, shm_ctl_flags = SHMCTL_ANON;
+#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
+    int rc, fd, shm_ctl_flags = SHMCTL_ANON | SHMCTL_LAZYWRITE;   /* use SHMCTL_LAZYWRITE to get write-combine memory access */
+#else
+    int rc, fd, shm_ctl_flags = SHMCTL_ANON /* | SHMCTL_LAZYWRITE - don't do it.  Bad. */;
+#endif
     gceSTATUS status;
     gctBOOL acquired = gcvFALSE;
     gcsPHYSICAL_PTR node;
@@ -2944,22 +2991,18 @@ gckOS_AllocatePagedMemoryEx(
     if (fd == -1) {
         gcmkPRINT("[VIV]: %s:%d, shm_open failed. error %s\n",
             __FUNCTION__, __LINE__, strerror(errno));
-
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_open failed. error %s", strerror( errno ) );
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-    /* Special flags for this shm, to make it write buffered. */
     /* Virtual memory doesn't need to be physically contiguous. */
     /* Allocations would be page aligned. */
-    rc = shm_ctl_special(fd,
-                         shm_ctl_flags,
-                         0,
-                         Bytes,
-                         ARM_PTE_RW);
+    rc = shm_ctl(fd,
+                 shm_ctl_flags,
+                  0,
+                 Bytes);
     if (rc == -1) {
-        gcmkPRINT("[VIV]: %s:%d: shm_ctl_special failed. error %s\n",
-            __FUNCTION__, __LINE__, strerror(errno));
-
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl failed. error %s", strerror( errno ) );
         close(fd);
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
@@ -3495,7 +3538,7 @@ gckOS_AllocateContiguous(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 physical;
+    gctPHYS_ADDR_T physical;
     gcsPHYSICAL_PTR node;
     gctBOOL nodeAllocated = gcvFALSE;
 
@@ -4357,7 +4400,12 @@ gckOS_CacheClean(
     IN gctSIZE_T Bytes
     )
 {
+#if defined(IMX) && defined(AARCH64)
+    __asm__ __volatile__ ("dsb sy");
+#else
     __asm__ __volatile__ ("dsb");
+#endif
+
     return gcvSTATUS_OK;
 }
 
@@ -4397,8 +4445,13 @@ gckOS_CacheFlush(
     IN gctSIZE_T Bytes
     )
 {
-    __asm__ __volatile__ ("dsb");
-    return gcvSTATUS_OK;
+#if defined(IMX) && defined(AARCH64)
+  __asm__ __volatile__ ("dsb sy");
+#else
+  __asm__ __volatile__ ("dsb");
+#endif
+
+  return gcvSTATUS_OK;
 }
 
 /*******************************************************************************
@@ -4438,7 +4491,11 @@ gckOS_CacheInvalidate(
     IN gctSIZE_T Bytes
     )
 {
-     __asm__ __volatile__ ("dsb");
+#if defined(IMX) && defined(AARCH64)
+  __asm__ __volatile__ ("dsb sy");
+#else
+  __asm__ __volatile__ ("dsb");
+#endif
      return gcvSTATUS_OK;
 }
 
