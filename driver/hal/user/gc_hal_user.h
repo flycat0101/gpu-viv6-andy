@@ -2804,6 +2804,7 @@ typedef enum _gceVX_PatternMode
     gcvVX_PARTTERN_MODE_BOX,
     gcvVX_PARTTERN_MODE_CROSS,
     gcvVX_PARTTERN_MODE_DISK,
+    gcvVX_PARTTERN_MODE_OTHER,
 }
 gceVX_PatternMode;
 

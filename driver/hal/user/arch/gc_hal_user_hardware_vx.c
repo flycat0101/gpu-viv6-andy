@@ -3642,7 +3642,8 @@ static gceSTATUS _nonlinearfilter(
         {
             for (i = 0; i < 5; i ++)
             {
-                if (Context->volume == gcvVX_PARTTERN_MODE_CROSS || Context->volume == gcvVX_PARTTERN_MODE_DISK)
+                if (Context->volume == gcvVX_PARTTERN_MODE_CROSS || Context->volume == gcvVX_PARTTERN_MODE_DISK
+                    || Context->volume == gcvVX_PARTTERN_MODE_OTHER)
                 {
                     /*          x        y       z        w
                      * x max:
@@ -3826,7 +3827,7 @@ static gceSTATUS _nonlinearfilter(
 
         for (i = 0; i < 3; i ++)
         {
-            if (Context->volume == gcvVX_PARTTERN_MODE_CROSS)
+            if (Context->volume == gcvVX_PARTTERN_MODE_CROSS || Context->volume == gcvVX_PARTTERN_MODE_OTHER)
             {
                 if ((Kernel == gcvVX_KERNEL_NONLINEAR_FILTER_MAX)
                     || ((Kernel == gcvVX_KERNEL_NONLINEAR_FILTER_MEDIAN) && (i < 2)))
