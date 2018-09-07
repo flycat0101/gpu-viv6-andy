@@ -4302,6 +4302,12 @@ gcChipValidateRenderTargetState(
 
     gceSTATUS status = gcvSTATUS_OK;
 
+    GLuint i, j;
+
+    gcoSURF rtSurf, depthSurf;
+
+    gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
+
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     if (chipDirty->uBuffer.bufferDirty)
@@ -4314,8 +4320,6 @@ gcChipValidateRenderTargetState(
         __GLchipSLProgramInstance* pgInstance = fsProgram ? fsProgram->curPgInstance : gcvNULL;
         __GLchipHalRtSlotInfo rtHalMapping[__GL_MAX_DRAW_BUFFERS];
         GLuint halRTIndex = 0;
-        GLuint i, j;
-        gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
 
         __GL_MEMZERO(rtHalMapping, sizeof(rtHalMapping));
 
@@ -4524,6 +4528,27 @@ gcChipValidateRenderTargetState(
             gcmONERROR(gco3D_SetRenderLayered(chipCtx->engine,
                                               chipCtx->drawLayered ? gcvTRUE : gcvFALSE,
                                               chipCtx->drawMaxLayers));
+        }
+    }
+
+    /* Get fence if need. */
+    if(!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
+    {
+        /* Get fence for color attachment texture surafce. */
+        for (i = 0; i < chipCtx->drawRTnum; i++)
+        {
+            rtSurf = chipCtx->drawRtViews[i].surf;
+            if(rtSurf && (rtSurf->hints & gcvSURF_CREATE_AS_TEXTURE))
+            {
+                gcmONERROR(gcoSURF_GetFence(chipCtx->drawRtViews[i].surf, gcvFENCE_TYPE_WRITE));
+            }
+        }
+
+        /* Get fence for depth attachment texture surafce. */
+        depthSurf = dsView->surf;
+        if(depthSurf && (depthSurf->hints & gcvSURF_CREATE_AS_TEXTURE))
+        {
+            gcmONERROR(gcoSURF_GetFence(dsView->surf, gcvFENCE_TYPE_WRITE));
         }
     }
 
