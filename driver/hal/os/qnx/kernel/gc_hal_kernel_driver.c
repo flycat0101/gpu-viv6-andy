@@ -2693,6 +2693,21 @@ static int drv_load_values_from_config_file()
     }
 #endif
 
+    if(compression == -1)
+    {
+        compression = gcvCOMPRESSION_OPTION_DEFAULT;
+        /* Depth compression generates 16bit bursts to reduce data traffic.
+           Due to a LPDDR4 limitation, 16bit bursts causes high latency in LPDDR4. This latency outweighs benefit of the compression.
+           This option can disable the depth compression for boards with LPDDR4. */
+        rc = __khrGetDeviceConfigValue(1, "gpu-depth-compression", val, sizeof(val));
+        if (rc == EOK)
+        {
+            if (atoi(val) == 0) {
+                compression &= ~gcvCOMPRESSION_OPTION_DEPTH;
+            }
+        }
+    }
+
     return 0;
 }
 

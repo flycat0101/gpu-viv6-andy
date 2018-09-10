@@ -48,6 +48,13 @@ begin khronos
   gpu-reg-size-3D1    = 262144
   hasPL310            = 0
 
+# Depth compression generates 16bit bursts to reduce data traffic.
+# Due to a LPDDR4 limitation, 16bit bursts causes high latency in LPDDR4.
+# This latency outweighs benefit of the compression.
+# This option can disable the depth compression for boards with LPDDR4.
+  gpu-depth-compression = 0
+
+
 # Enable monitoring GPU h/w status and set report interval.
 # The following information is reported at given interval (in seconds)
 # irq count
