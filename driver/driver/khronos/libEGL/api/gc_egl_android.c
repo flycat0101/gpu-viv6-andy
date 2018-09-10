@@ -2277,10 +2277,13 @@ _QueryRenderMode(
         {
             gceCHIPMODEL chipModel;
             gctUINT32 chipRevision;
+            gctSTRING socType = gcvNULL;
 
             gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
-            if (chipModel == gcv600 && chipRevision == 0x4653)
+            if (chipModel == gcv600 && chipRevision == 0x4653 &&
+                (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.boot.soc_type", &socType)) &&
+                socType && gcmIS_SUCCESS(gcoOS_StrCmp(socType, "imx8mm"))))
             {
                 renderMode = VEGL_DIRECT_RENDERING_NOFC;
             }
