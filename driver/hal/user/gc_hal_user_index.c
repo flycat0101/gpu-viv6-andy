@@ -1842,9 +1842,6 @@ gcoINDEX_UploadDynamicEx(
     gctUINT32 offset = 0;
     gctUINT indexSize = 0;
 
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-    gctSIZE_T dynamicSize = (128 << 10);
-
     gcmHEADER_ARG("Index=0x%x IndexType=%d Data=0x%x Bytes=%lu",
                   Index, IndexType, Data, Bytes);
 
@@ -1853,17 +1850,10 @@ gcoINDEX_UploadDynamicEx(
     gcmDEBUG_VERIFY_ARGUMENT(Data != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(Bytes > 0);
 
-    /* Get patch id. */
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (patchId == gcvPATCH_ANDROID_CTS_OPENGLPERF)
-    {
-        dynamicSize = (128 << 15);
-    }
-
     /* If the index wasn't initialized as dynamic, do it now */
     if (Index->dynamic == gcvNULL)
     {
-        gcmONERROR(gcoINDEX_SetDynamic(Index, dynamicSize, 32));
+        gcmONERROR(gcoINDEX_SetDynamic(Index, 128 << 10, 32));
     }
 
     if (Index->dynamicAllocate)
