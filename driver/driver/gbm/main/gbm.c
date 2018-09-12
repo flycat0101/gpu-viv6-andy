@@ -607,6 +607,18 @@ gbm_surface_release_buffer(struct gbm_surface *surf, struct gbm_bo *bo)
 }
 
 /**
+ * return the fence fd from gbm surface
+ * This fd was used for set the IN_FENCE_FD propery in the display.
+ *
+ * \param surf The surface
+ */
+GBM_EXPORT int
+gbm_surface_get_in_fence_fd(struct gbm_surface *surf)
+{
+   return surf->gbm->surface_get_in_fence_fd(surf);
+}
+
+/**
  * Return whether or not a surface has free (non-locked) buffers
  *
  * Before starting a new frame, the surface must have a buffer

@@ -906,6 +906,7 @@ gbm_viv_surface_create(
     surf->base.height = height;
     surf->base.format = format;
     surf->base.flags = flags;
+    surf->base.fence_fd = -1;
 
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
         format, usage, modifiers, count));
@@ -989,6 +990,14 @@ gbm_viv_surface_has_free_buffers(
     return 0;
 }
 
+static int
+gbm_viv_surface_get_in_fence_fd(
+    struct gbm_surface *surface
+    )
+{
+    return surface->fence_fd;
+}
+
 static void
 gbm_viv_surface_destroy(
     struct gbm_surface *surface
@@ -1014,6 +1023,11 @@ gbm_viv_surface_destroy(
         }
     }
 
+    if(surface->fence_fd > 0)
+    {
+        close(surface->fence_fd);
+        surface->fence_fd = -1;
+    }
     /* Flush hardware to scheduled surface free to takeplace */
     gcoHAL_Commit(gcvNULL, gcvTRUE);
 
@@ -1061,6 +1075,7 @@ viv_device_create(int fd)
     dev->base.surface_lock_front_buffer = gbm_viv_surface_lock_front_buffer;
     dev->base.surface_release_buffer = gbm_viv_surface_release_buffer;
     dev->base.surface_has_free_buffers = gbm_viv_surface_has_free_buffers;
+    dev->base.surface_get_in_fence_fd = gbm_viv_surface_get_in_fence_fd;
     dev->base.surface_destroy = gbm_viv_surface_destroy;
     dev->base.name = gbm_viv_backend.backend_name;
 

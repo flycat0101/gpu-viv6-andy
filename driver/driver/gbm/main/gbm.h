@@ -384,6 +384,9 @@ gbm_surface_release_buffer(struct gbm_surface *surface, struct gbm_bo *bo);
 int
 gbm_surface_has_free_buffers(struct gbm_surface *surface);
 
+int
+gbm_surface_get_in_fence_fd(struct gbm_surface *surface);
+
 void
 gbm_surface_destroy(struct gbm_surface *surface);
 

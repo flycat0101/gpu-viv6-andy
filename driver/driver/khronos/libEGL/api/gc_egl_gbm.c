@@ -2557,6 +2557,93 @@ _PostWindowBackBuffer(
 }
 
 static EGLBoolean
+_PostWindowBackBufferFence(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer,
+    IN struct eglRegion * DamageHint
+    )
+{
+    void * win = Surface->hwnd;
+    VEGLWindowInfo info = Surface->winInfo;
+    struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) win);
+    gcoSURF surface;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSIGNAL signal;
+    int fenceFd = -1;
+
+    gcmASSERT(Surface->type & EGL_WINDOW_BIT);
+    gcmASSERT(info);
+
+    (void) surface;
+
+    if (info->fbDirect)
+    {
+        surface = info->wrapFB ? gcvNULL : BackBuffer->surface;
+
+        status = gbm_SetDisplayVirtual((PlatformDisplayType) Display->hdc,
+                                       (PlatformWindowType) win,
+                                       0,
+                                       BackBuffer->origin.x,
+                                       BackBuffer->origin.y);
+        do
+        {
+            /* Create sync point. */
+            status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &signal);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+                break;
+            }
+
+            /* Create native fence. */
+            status = gcoOS_CreateNativeFence(gcvNULL, signal, &fenceFd);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+                break;
+            }
+
+            {
+                gcsHAL_INTERFACE iface;
+
+                /* Submit the sync point. */
+                iface.command            = gcvHAL_SIGNAL;
+                iface.engine             = gcvENGINE_RENDER;
+                iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
+                iface.u.Signal.auxSignal = 0;
+                iface.u.Signal.process   = gcmPTR_TO_UINT64(Display->process);
+                iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
+                /* Send event. */
+                gcoHAL_ScheduleEvent(gcvNULL, &iface);
+            }
+
+            /* Commit commands. */
+            gcoHAL_Commit(gcvNULL, gcvFALSE);
+
+            /* Now destroy the sync point. */
+            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, signal));
+        }
+        while (gcvFALSE);
+
+        if (gcmIS_ERROR(status))
+        {
+            return EGL_FALSE;
+        }
+
+        if(surf->base.fence_fd > 0)
+        {
+            close(surf->base.fence_fd);
+        }
+        surf->base.fence_fd = fenceFd;
+    }
+    return EGL_TRUE;
+}
+
+static EGLBoolean
 _CancelWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
@@ -2595,7 +2682,7 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
-    return EGL_TRUE;
+    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -3185,7 +3272,7 @@ static struct eglPlatform gbmPlatform =
     _GetWindowSize,
     _GetWindowBackBuffer,
     _PostWindowBackBuffer,
-    gcvNULL,
+    _PostWindowBackBufferFence,
     _CancelWindowBackBuffer,
     _SynchronousPost,
     gcvNULL,
