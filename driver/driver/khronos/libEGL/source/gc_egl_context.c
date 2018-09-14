@@ -2857,6 +2857,15 @@ _SyncImage(
         /* Lock the image mutex. */
         gcoOS_AcquireMutex(gcvNULL, khrImage->mutex, gcvINFINITE);
 
+        /* Flush the tile status and decompress the buffers,
+           since pixmap buffer could be get by QNX system calls.*/
+        if ((khrImage->surface != gcvNULL) &&
+            (khrImage->type == KHR_IMAGE_PIXMAP))
+        {
+            gcsSURF_VIEW surfView = {khrImage->surface, 0, 1};
+            gcmVERIFY_OK(gcoSURF_DisableTileStatus(&surfView, gcvTRUE));
+        }
+
         if ((khrImage->surface != gcvNULL) &&
             (khrImage->srcSurface != gcvNULL) &&
             (khrImage->surface != khrImage->srcSurface))
