@@ -26,6 +26,7 @@ struct _gckPAGE_USAGE
     gctUINT16 pageCount;
 };
 
+struct ctm;
 struct _gckSHM_POOL
 {
     gctUINT32 pid;                      /* Pid of the owner of this pool. */
@@ -42,6 +43,7 @@ struct _gckSHM_POOL
     struct _gckPAGE_USAGE* pageUsage;   /* List of pageUsage arrays. */
     struct _gckSHM_POOL* nextPool;      /* Pointer to next pool. */
     struct _gckSHM_POOL* nextPoolPid;   /* Pointer to next pool for the same Pid. */
+    struct ctm * ctm;                   /* Contiguous memory pool. */
 };
 
 typedef struct _gckSHM_POOL* gckSHM_POOL;

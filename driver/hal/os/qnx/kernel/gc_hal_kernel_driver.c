@@ -13,15 +13,21 @@
 
 #include "gc_hal_kernel_qnx.h"
 #include "gc_hal_driver.h"
+#include "ptm_ctm.h"
 
 #include <screen/gpu.h>
+#include <assert.h>
 
 #ifndef IMX
 #include <platform_config.h>
 #endif
 
 /* for ARM_PTE_... */
-#include <arm/mmu.h>
+#if __aarch64__
+# include <aarch64/mmu.h>
+#elif __arm__
+# include <arm/mmu.h>
+#endif
 
 /* for __khrGetDeviceConfigValue */
 #include <KHR/khronos_utils.h>
@@ -35,10 +41,6 @@
 #define MAX_EEXIST_RETRIES 5
 
 static gckGALDEVICE galDevice;
-
-#if defined(AARCH64)
-static int posix_mem_fd = -1;
-#endif
 
 /*----------------------------------------------------------------------------
  * Device configuration -
@@ -314,6 +316,7 @@ typedef struct _gcsMEM_POOL
     gctPHYS_ADDR_T paddr;
     gckPAGE_USAGE pageUsage;
     gctINT fd;
+    struct ctm * ctm;
 } gcsMEM_POOL;
 
 gcsMEM_POOL memPool;
@@ -387,27 +390,11 @@ gckOS_DumpParam(
 gceSTATUS
 drv_mempool_init()
 {
-    off64_t paddr;
     void* addr;
-    int rc, err;
-#if defined(AARCH64)
-    size_t pt_contig_len = 0;
-    int pt_fildes = NOFD;
-    off64_t pt_offset;
-#else
-    size_t pcontig;
-#endif
+    off64_t paddr;
 
     DEFINE_CLOCK(clock);
     DEFINE_CLOCK(total);
-
-#if defined(AARCH64)
-    posix_mem_fd = posix_typed_mem_open("/memory/below4G/ram/sysram", O_RDWR, POSIX_TYPED_MEM_ALLOCATE_CONTIG);
-    if (posix_mem_fd < 0) {
-        fprintf(stderr, "galcore:%s[%d]: posix_typed_mem_open failed\n", __FUNCTION__, __LINE__);
-        return gcvSTATUS_GENERIC_IO;
-    }
-#endif
 
     memPool.pageSize = internalPoolPageSize;
 
@@ -417,7 +404,6 @@ drv_mempool_init()
 
     /* Align memPoolSize to page size. */
     memPool.poolSize = memPool.pageCount * memPool.pageSize;
-    /*fprintf(stderr, "memPoolSize: %d\n", memPool.poolSize);*/
 
     START_CLOCK(total);
     /* Allocate a single chunk of physical memory.
@@ -426,153 +412,49 @@ drv_mempool_init()
     memPool.fd = drv_create_shm_object();
     STOP_CLOCK(clock, "drv_create_shm_object");
     if (memPool.fd == -1) {
-        fprintf(stderr, "galcore:%s[%d]: shm_open failed\n", __FUNCTION__, __LINE__);
+        fprintf(stderr, "galcore:%s[%d]: shm_open failed\n",
+                __FUNCTION__, __LINE__);
         return gcvSTATUS_GENERIC_IO;
     }
 
+    int special = 0;
 #if defined(AARCH64)
-    /* Map this memory inside user and galcore. */
-    unsigned prot_flags = PROT_READ|PROT_WRITE;
-    unsigned map_flags = 0;
-
-    START_CLOCK(clock);
-    addr = mmap64(0, memPool.poolSize, prot_flags, MAP_SHARED|MAP_NOINIT, posix_mem_fd, 0);
-    err = errno;
-    STOP_CLOCK(clock, "mmap64 prot_flags = 0x%x", prot_flags);
-    if (addr == MAP_FAILED) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: mmap64 failed: %s", __FUNCTION__, __LINE__, strerror(err));
-        close(memPool.fd);
-        memPool.fd = -1;
-        return gcvSTATUS_GENERIC_IO;
-    }
-
-    START_CLOCK(clock);
-    rc = posix_mem_offset64(addr, memPool.poolSize, &pt_offset, &pt_contig_len, &pt_fildes);
-    err = errno;
-    STOP_CLOCK(clock, "posix_mem_offset64");
-    if (rc != 0) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: posix_mem_offset64 failed: %s", __FUNCTION__, __LINE__, strerror(err));
-        munmap(addr, memPool.poolSize);
-        close(memPool.fd);
-        memPool.fd = -1;
-        return gcvSTATUS_GENERIC_IO;
-    }
-    paddr = pt_offset;
-    /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
-    /* cacheable, write back == lazy write */
-    START_CLOCK(clock);
-    rc = shm_ctl_special(memPool.fd, SHMCTL_PHYS, pt_offset, memPool.poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
-    err = errno;
-    STOP_CLOCK(clock, "shm_ctl_special poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
-    if (rc == -1) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl_special failed: %s", __FUNCTION__, __LINE__, strerror(err));
-        munmap(addr, memPool.poolSize);
-        close(memPool.fd);
-        memPool.fd = -1;
-        return gcvSTATUS_GENERIC_IO;
-    }
-
-    {
-        void *taddr = mmap64( 0, memPool.poolSize, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_NOINIT, memPool.fd, 0);
-        if( taddr == MAP_FAILED ) {
-            munmap(addr,memPool.poolSize);
-            close(memPool.fd);
-            memPool.fd = -1;
-            return gcvSTATUS_GENERIC_IO;
-        }
-
-        rc = mprotect( addr, memPool.poolSize, PROT_NONE );
-        if (rc == -1) {
-            munmap(taddr, memPool.poolSize);
-            munmap(addr, memPool.poolSize);
-            close(memPool.fd);
-            memPool.fd = -1;
-            return gcvSTATUS_GENERIC_IO;
-        }
-        addr = taddr;
-
-    }
-
+    special = ARM_SHMCTL_WT | ARM_SHMCTL_SH;
 #else
-#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
-     START_CLOCK(clock);
+    assert(0 && "only AARCH64 is supported ");
+    fprintf(stderr, "galcore:%s[%d]: only AARCH64 is supported\n",
+                __FUNCTION__, __LINE__);
+#endif
 
-    /*
-     * use SHMCTL_LAZYWRITE to get write-combine memory access
-      */
-    rc = shm_ctl(memPool.fd, SHMCTL_ANON|SHMCTL_PHYS|SHMCTL_LAZYWRITE, 0, memPool.poolSize);
-    err = errno;
-    STOP_CLOCK(clock, "shm_ctl poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
-    if (rc == -1) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl failed: %s", __FUNCTION__, __LINE__, strerror(err));
+    if (ptm_init()) {
+        fprintf(stderr, "galcore:%s[%d]: ptm_init failed\n",
+                __FUNCTION__, __LINE__);
         close(memPool.fd);
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
     }
-    unsigned prot_flags = PROT_READ | PROT_WRITE;
-#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
-    START_CLOCK(clock);
-       rc = shm_ctl(memPool.fd, SHMCTL_ANON|SHMCTL_PHYS, 0, memPool.poolSize);
-    err = errno;
-    STOP_CLOCK(clock, "shm_ctl_special poolSize = %u (%uMB)", memPool.poolSize, memPool.poolSize / 1048576);
-    if (rc == -1) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "galcore:%s[%d]: shm_ctl_special failed: %s", __FUNCTION__, __LINE__, strerror(err));
+    memPool.ctm = ptm_alloc_ctm(memPool.poolSize,
+            memPool.fd, special);
+    if (!memPool.ctm) {
+        fprintf(stderr, "galcore:%s[%d]: ptm_alloc_ctm failed\n",
+                __FUNCTION__, __LINE__);
+        close(memPool.fd);
+        memPool.fd = -1;
+        return gcvSTATUS_GENERIC_IO;
+    }
+    if (ctm_map(memPool.ctm, PROT_READ|PROT_WRITE, MAP_SHARED)) {
+        fprintf(stderr, "galcore:%s[%d]: ctm_map failed\n",
+                __FUNCTION__, __LINE__);
+        ctm_free(memPool.ctm);
         close(memPool.fd);
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
     }
 
-    unsigned prot_flags = PROT_READ | PROT_WRITE | PROT_NOCACHE;
-#endif
-
-    unsigned map_flags = MAP_NOINIT;
-    while (1) {
-      START_CLOCK(clock);
-      addr = mmap64(0, memPool.poolSize, prot_flags, map_flags | MAP_SHARED, memPool.fd, 0);
-      err = errno;
-      STOP_CLOCK(clock, "mmap64 prot_flags = 0x%x map_flags = 0x%x", prot_flags, map_flags);
-      if (addr == MAP_FAILED) {
-        fprintf(stderr, "galcore:%s[%d]: mmap64 failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, err, strerror(err));
-        if (err != EINTR && err != EAGAIN) {
-          close(memPool.fd);
-          memPool.fd = -1;
-          return gcvSTATUS_GENERIC_IO;
-        }
-      } else {
-          break;
-      }
-    }
-#endif
+    addr = memPool.ctm->vaddr;
+    assert( addr != MAP_FAILED );
+    paddr = memPool.ctm->paddr;
     memPool.addr = addr;
-
-#if defined(AARCH64)
-    paddr = pt_offset;
-#else
-    while (1) {
-      START_CLOCK(clock);
-      if (mem_offset64(addr, NOFD, memPool.poolSize, &paddr, &pcontig) == -1) {
-        fprintf(stderr, "galcore:%s[%d]: mem_offset64 failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, errno, strerror(errno));
-        if (errno != EINTR && errno != EAGAIN) {
-          munmap(addr, memPool.poolSize);
-          close(memPool.fd);
-          memPool.fd = -1;
-          memPool.addr = NULL;
-          return gcvSTATUS_GENERIC_IO;
-        }
-      } else {
-        STOP_CLOCK(clock, "mem_offset64");
-        break;
-      }
-    }
-#endif
-
-#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
-    STOP_CLOCK(total, "total poolSize = %uMB%s%s", memPool.poolSize / 1048576, prot_flags & PROT_NOCACHE ? " PROT_NOCACHE" : "", map_flags & MAP_NOINIT ? " MAP_NOINIT" : "");
-#else
-    STOP_CLOCK(total, "total poolSize = %uMB%s%s", memPool.poolSize / 1048576, prot_flags & PROT_NOCACHE ? " PROT_NOCACHE" : "",
-       map_flags & MAP_NOINIT ? " MAP_NOINIT" : "");
-#endif
-
     memPool.paddr = (gctPHYS_ADDR_T)paddr;
 
     fprintf(stderr, "Mempool Map addr range[%p-%p]\n", memPool.addr, memPool.addr +  memPool.poolSize);
@@ -586,7 +468,7 @@ drv_mempool_init()
     if (memPool.pageUsage == gcvNULL)
     {
         fprintf( stderr, "malloc failed: %s\n", strerror( errno ) );
-        munmap(addr, memPool.poolSize);
+        ctm_free(memPool.ctm);
         close(memPool.fd);
         memPool.fd = -1;
         memPool.addr = NULL;
@@ -601,7 +483,7 @@ drv_mempool_init()
     if (pthread_mutex_init(&memPool.mutex, gcvNULL) != EOK)
     {
         free(memPool.pageUsage);
-        munmap(addr, memPool.poolSize);
+        ctm_free(memPool.ctm);
         close(memPool.fd);
         memPool.fd = -1;
         memPool.addr = NULL;
@@ -618,16 +500,11 @@ drv_mempool_destroy()
     pthread_mutex_destroy(&memPool.mutex);
     free(memPool.pageUsage);
     memPool.pageUsage = gcvNULL;
-    munmap((void*)memPool.addr, memPool.poolSize);
+    ctm_free(memPool.ctm);
     close(memPool.fd);
     memPool.fd = -1;
     memPool.addr = NULL;
     memPool.paddr = 0;
-#if defined(AARCH64)
-    if (posix_mem_fd != -1) {
-        close(posix_mem_fd);
-    }
-#endif
 }
 
 gctINT
@@ -882,6 +759,8 @@ drv_shm_destroy()
         shmPool = nextPool;
     }
     pthread_mutex_destroy(&shmPoolListMutex);
+
+    ptm_fini();
 
     return gcvSTATUS_OK;
 }
@@ -1158,13 +1037,7 @@ gckSHM_POOL drv_shmpool_create(
 {
     int rc;
     void *caddr=gcvNULL, *saddr=gcvNULL;
-    off64_t paddr;
     gctUINT32 fd;
-#if defined(AARCH64)
-    size_t pt_contig_len = 0;
-    int pt_fildes = NOFD;
-    off64_t pt_offset;
-#endif
 
     gckSHM_POOL shm = (gckSHM_POOL) calloc(1, sizeof(struct _gckSHM_POOL));
     if (shm == gcvNULL)
@@ -1203,133 +1076,51 @@ gckSHM_POOL drv_shmpool_create(
         return gcvNULL;
     }
 
-#if defined(IMX6X) || defined(IMX8X) || defined(IMX)
-    /*
-     * use SHMCTL_LAZYWRITE to get write-combine memory access
-     */
+    int special = 0;
 #if defined(AARCH64)
-    /* Map this memory inside user and galcore. */
-    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, posix_mem_fd, 0);
-    if (saddr == MAP_FAILED) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't mmap memory of size: %u, Pid: %u [errno: %s]",
-                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ));
-        close(fd);
-        pthread_mutex_destroy(&shm->mutex);
-        if (shm->poolSize > 512*1024*1024) {
-            slogf(_SLOGC_GRAPHICS_GL, _SLOG_CRITICAL, "shm->poolSize (%u) is suspiciously large -- forcing core dump!", shm->poolSize);
-            *((int*)1) = 0;
-        }
-        free(shm);
-        return gcvNULL;
-    }
-
-    if (posix_mem_offset64(saddr, shm->poolSize, &pt_offset, &pt_contig_len, &pt_fildes) == -1) {
-        fprintf(stderr, "%s: posix_mem_offset64 failed: %s\n", __FUNCTION__, strerror( errno ) );
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
-        close(fd);
-        pthread_mutex_destroy(&shm->mutex);
-        free(shm);
-        return gcvNULL;
-	}
-
-    /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
     if (CacheFlag == 0x1) {
-        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WB | ARM_SHMCTL_SH);
+        special = ARM_SHMCTL_WB | ARM_SHMCTL_SH;
     } else {
-        rc = shm_ctl_special(fd, SHMCTL_PHYS, pt_offset, shm->poolSize, ARM_SHMCTL_WT | ARM_SHMCTL_SH);
+        special = ARM_SHMCTL_WT | ARM_SHMCTL_SH;
     }
-    if (rc) {
-        fprintf(stderr, "%s: shm_ctl_special failed: %s\n", __FUNCTION__, strerror( errno ) );
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
+#else
+    assert(0 && "only AARCH64 is supported ");
+    fprintf(stderr, "galcore:%s[%d]: only AARCH64 is supported\n",
+            __FUNCTION__, __LINE__);
+#endif
+    /* Map this memory inside user and galcore. */
+    struct ctm * ctm;
+    ctm = ptm_alloc_ctm(shm->poolSize, fd, special);
+    if (!ctm) {
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
         return gcvNULL;
     }
-    if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
+    if (ctm_map(ctm, PROT_READ|PROT_WRITE, MAP_SHARED)) {
+        close(fd);
+        pthread_mutex_destroy(&shm->mutex);
+        free(shm);
+        ctm_free(ctm);
+        return gcvNULL;
+    }
+    shm->ctm = ctm;
+    /* Overlay the shared memory object over the posix memory. Set as shareable and write through. */
+    saddr = ctm->vaddr;
+    assert(saddr != MAP_FAILED);
+    if(Pid == getpid()) {
         caddr = saddr;
     } else {
         caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE,  MAP_SHARED, fd, 0);
-    }
-#else
-    if (CacheFlag == 0x1) {
-        rc = shm_ctl(fd, SHMCTL_ANON|SHMCTL_PHYS, 0, shm->poolSize);
-    } else {
-        rc = shm_ctl(fd, SHMCTL_ANON|SHMCTL_PHYS|SHMCTL_LAZYWRITE, 0, shm->poolSize);
-    }
-
-    if (rc) {
-        fprintf(stderr, "%s: shm_ctl failed: %s\n", __FUNCTION__, strerror( errno ) );
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
-        close(fd);
-        pthread_mutex_destroy(&shm->mutex);
-        free(shm);
-
-        return gcvNULL;
-    }
-
-    /* Map this memory inside user and galcore. */
-    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
-
-    if( !rc && saddr != MAP_FAILED && Pid == getpid()  ) {
-        caddr = saddr;
-    } else {
-        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    }
-#endif
-
-#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
-
-    /* Allocation performance is not an issue for omap5 -- the amount of memory is small */
-    /* TODO: we do not need/use the fd in this code! */
-    rc = 0;
-
-    saddr = mmap64(0, shm->poolSize, PROT_READ | PROT_WRITE | (CacheFlag?0:PROT_NOCACHE),
-        MAP_SHARED | MAP_ANON | MAP_NOINIT | MAP_PHYS, NOFD, 0);
-
-    if( saddr == MAP_FAILED ) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "drv_shmpool_create: mmap64() failed, size %d, Pid: %d [errno %s]",
-            shm->poolSize, Pid, strerror( errno ) );
-        rc = 1;
-
-    } else if( Pid == getpid() ) {
-        /* Same process mapping -- do not mmap_peer() into itself */
-        caddr = saddr;
-
-    } else {
-        caddr = mmap64_peer(Pid, 0, shm->poolSize, PROT_READ | PROT_WRITE | (CacheFlag?0:PROT_NOCACHE), MAP_SHARED, NOFD, 0);
-        if( caddr == MAP_FAILED ) {
-            slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "drv_shmpool_create: mmap64_peer() failed, size %d, Pid: %d [errno %s]",
-                shm->poolSize, Pid, strerror( errno ) );
-            rc = 1;
+        if (caddr == MAP_FAILED) {
+            fprintf(stderr, "%s: couldn't map memory of size %d, Pid: %d [errno %s]",
+                    __FUNCTION__, shm->poolSize, Pid, strerror( errno ) );
+            ctm_free(ctm);
+            close(fd);
+            pthread_mutex_destroy(&shm->mutex);
+            free(shm);
+            return gcvNULL;
         }
-    }
-
-#endif
-
-    if (rc || (caddr == MAP_FAILED) || (saddr == MAP_FAILED))
-    {
-        if ((caddr != MAP_FAILED) && (caddr != saddr))
-        {
-            munmap_peer(Pid, caddr, shm->poolSize);
-        }
-
-        if (saddr != MAP_FAILED)
-        {
-            munmap(saddr, shm->poolSize);
-        }
-
-        fprintf(stderr, "%s: couldn't map memory of size %d, Pid: %d [errno %s]",
-            __FUNCTION__, shm->poolSize, Pid, strerror( errno ) );
-
-        close(fd);
-        pthread_mutex_destroy(&shm->mutex);
-        free(shm);
-        return gcvNULL;
     }
 
     shm->cacheFlag = CacheFlag;
@@ -1337,33 +1128,21 @@ gckSHM_POOL drv_shmpool_create(
     rc = close(fd);
     if (rc == -1) {
         fprintf(stderr, "%s: close failed: %s\n", __FUNCTION__, strerror( errno ) );
+        ctm_free(ctm);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
         return gcvNULL;
     }
-
     shm->UserLogical   = caddr;
     shm->KernelLogical = saddr;
-
-    /* fd should be NOFD here, to get physical address. */
-    rc = mem_offset64(saddr, NOFD, 1, (off64_t *)&paddr, NULL);
-    if (rc == -1) {
-        fprintf(stderr, "%s: mem_offset failed (saddr:%p): %s\n", __FUNCTION__, saddr, strerror( errno ) );
-        pthread_mutex_destroy(&shm->mutex);
-        free(shm);
-        return gcvNULL;
-    }
-
-    shm->Physical = (gctPHYS_ADDR_T)paddr;
-
-    mlock(shm->KernelLogical, shm->poolSize);
+    shm->Physical = (gctPHYS_ADDR_T)ctm->paddr;
 
     /* Allocate the page usage array and Initialize all pages to free. */
     shm->pageUsage = (gckPAGE_USAGE)calloc(shm->pageCount, sizeof(struct _gckPAGE_USAGE));
     if (shm->pageUsage == gcvNULL)
     {
         fprintf( stderr, "%s: malloc failed: %s\n", __FUNCTION__, strerror(errno) );
-        munmap(shm->KernelLogical, shm->poolSize);
+        ctm_free(ctm);
         if (getpid() != Pid)
         {
             munmap_peer(Pid, shm->UserLogical, shm->poolSize);
@@ -1399,13 +1178,16 @@ drv_shmpool_destroy(
 
         if (ShmPool->UserLogical)
         {
-            munmap(ShmPool->KernelLogical, ShmPool->poolSize);
+            if (ShmPool->ctm) {
+                struct ctm * ctm = ShmPool->ctm;
+                ctm_free(ctm);
+            }
+
             if (getpid() != ShmPool->pid)
             {
                 munmap_peer(ShmPool->pid, ShmPool->UserLogical, ShmPool->poolSize);
             }
         }
-
         free(ShmPool);
     }
     else
