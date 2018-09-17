@@ -2351,6 +2351,21 @@ _QueryRenderMode(
                 renderMode = 0;
             }
         }
+
+        /* If use DPU 2D HWC on 8qm or 8qxp, set renderMode to DIRECT_RENDERING_NOFC */
+        {
+            gctSTRING socType = gcvNULL;
+            gctSTRING useHWC = gcvNULL;
+
+            if((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.boot.soc_type", &socType)) &&
+                socType && (gcmIS_SUCCESS(gcoOS_StrCmp(socType, "imx8qm")) ||
+                (gcmIS_SUCCESS(gcoOS_StrCmp(socType, "imx8qxp"))))) &&
+                !(gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "sys.hwc.disable", &useHWC)) &&
+                useHWC && !gcmIS_SUCCESS(gcoOS_StrCmp(useHWC, "0"))))
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+            }
+        }
     }
     while (0);
 
