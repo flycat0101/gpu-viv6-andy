@@ -2396,14 +2396,14 @@ _ConnectPixmap(
                               pixmapWidth,
                               pixmapHeight,
                               1,
-                              gcvSURF_BITMAP,
+                              gcvSURF_BITMAP | gcvSURF_NO_COMPRESSION,
                               pixmapFormat,
                               gcvPOOL_USER,
                               &wrapper));
 
         /* Set pixels. */
         status = gcoSURF_SetBuffer(wrapper,
-                                   gcvSURF_BITMAP,
+                                   gcvSURF_BITMAP | gcvSURF_NO_COMPRESSION,
                                    pixmapFormat,
                                    pixmapStride,
                                    pixmapBits,
