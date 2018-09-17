@@ -907,6 +907,7 @@ gbm_viv_surface_create(
     surf->base.format = format;
     surf->base.flags = flags;
     surf->base.fence_fd = -1;
+    surf->sync_post = 1;
 
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
         format, usage, modifiers, count));
@@ -995,6 +996,10 @@ gbm_viv_surface_get_in_fence_fd(
     struct gbm_surface *surface
     )
 {
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
+    if(surf->sync_post)
+        surf->sync_post = 0;
+
     return surface->fence_fd;
 }
 

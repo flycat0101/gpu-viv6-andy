@@ -2682,7 +2682,10 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
-    return EGL_FALSE;
+    void * win = Surface->hwnd;
+    struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) win);
+
+    return surf->sync_post;
 }
 
 static EGLBoolean

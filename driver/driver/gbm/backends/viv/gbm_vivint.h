@@ -68,6 +68,7 @@ struct gbm_viv_surface
     gctINT buffer_count;
     uint32_t bpp;
     gctBOOL extResolve;
+    gctBOOL sync_post;
 };
 
 struct
