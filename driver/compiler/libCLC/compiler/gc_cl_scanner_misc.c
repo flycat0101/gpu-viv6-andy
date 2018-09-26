@@ -1835,6 +1835,90 @@ OUT gctBOOL *IsUnsigned
      }
 #endif
   }
+
+  *Type = type;
+  *IsUnsigned = isUnsigned;
+  return endPtr;
+}
+
+static gctSTRING
+_ScanHexIntConstantType(
+IN gctUINT64 Data,
+IN gctSTRING ConstStr,
+OUT gctINT *Type,
+OUT gctBOOL *IsUnsigned
+)
+{
+  gctINT type = T_INT;
+  gctBOOL isUnsigned = gcvFALSE;
+  gctSTRING endPtr;
+
+  endPtr = _ScanStrpbrk(ConstStr, cldIntegerSuffix);
+  if(endPtr) {
+     gctSTRING cPtr = endPtr;
+     char ch;
+     gctBOOL isLong = gcvFALSE;
+     gctBOOL isLongLong = gcvFALSE;
+
+     while((ch = *cPtr++) != '\0') {
+       switch(ch) {
+       case 'u':
+       case 'U':
+          isUnsigned = gcvTRUE;
+          break;
+
+       case 'l':
+       case 'L':
+          if(isLong) isLongLong = gcvTRUE;
+      else isLong = gcvTRUE;
+          break;
+       }
+     }
+#if cldScanSupportLong
+     if(isUnsigned) {
+       if(isLong || isLongLong) {
+         type = T_ULONG;
+       }
+       else type = T_UINT;
+     }
+     else if(isLong) {
+       type = T_LONG;
+     }
+#else
+     if(isUnsigned) {
+       type = T_UINT;
+     }
+     else {
+       type = T_INT;
+     }
+#endif
+  }
+  else
+  {
+    typedef struct _TYPELIST
+    {
+        gctINT type;
+        gctBOOL isUnsigned;
+        gctUINT64 maxValue;
+    }typeList;
+    typeList types[4] =
+    {{T_INT,    gcvTRUE,    0x7FFFFFFF},
+     {T_UINT,   gcvFALSE,   0x0000000100000000LL},
+     {T_LONG,   gcvTRUE,    0x7FFFFFFFFFFFFFFFLL},
+     {T_ULONG,  gcvFALSE,   0}};
+    gctUINT i;
+
+    for (i = 0; i < 4; i++)
+    {
+        if (types[i].maxValue == 0 ||
+            Data < types[i].maxValue)
+        {
+            type = types[i].type;
+            isUnsigned = types[i].isUnsigned;
+            break;
+        }
+    }
+  }
   *Type = type;
   *IsUnsigned = isUnsigned;
   return endPtr;
@@ -1980,13 +2064,16 @@ OUT clsLexToken * Token
     gctSTRING endPtr;
     gctBOOL isUnsigned;
     gctINT type;
-    char saveChr = '\0';;
+    char saveChr = '\0';
+    gctUINT64 data = 0;
+
+    _ConvStringToUintConstant(Text + index, 16, &data);
 
     gcmASSERT(Token);
     (void)gcoOS_ZeroMemory((gctPOINTER)&Token->u.constant, sizeof(cluCONSTANT_VALUE));
     Token->lineNo    = LineNo;
     Token->stringNo    = StringNo;
-    endPtr = _ScanIntConstantType(Text, &Token->type, &isUnsigned);
+    endPtr = _ScanHexIntConstantType(data, Text, &Token->type, &isUnsigned);
     if(endPtr) {
       saveChr = *endPtr;
       *endPtr = '\0';
