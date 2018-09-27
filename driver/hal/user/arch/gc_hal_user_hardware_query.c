@@ -6669,11 +6669,6 @@ gcoHARDWARE_QueryTileStatus(
                               (Hardware->resolveAlignmentX * Hardware->resolveAlignmentY)) * 4;
         gceCACHE_MODE cacheMode = Surface->cacheMode;
 
-        if (cacheMode == gcvCACHE_NONE)
-        {
-            cacheMode = (Surface->hints & gcvSURF_CACHE_MODE_128) ? gcvCACHE_128 : DEFAULT_CACHE_MODE;
-        }
-
         /* Every cache (128B or 256B) -> 4bit */
         *Size = (cacheMode == gcvCACHE_256) ? (Bytes >> 9) : (Bytes >> 8);
 

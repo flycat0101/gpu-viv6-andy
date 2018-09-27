@@ -257,16 +257,6 @@ static gctINT _GetTextureFormat(
         }
     }
 
-    if (Hardware->features[gcvFEATURE_128BTILE] &&
-        cacheMode == gcvCACHE_128)
-    {
-        *SampleMode2 |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23)));
-    }
-
     /*
     ** There are 2 steps of texture swizzle:
     ** 1. implicit: filter texture value to texture base color Cb. Since HW cannot support it natively, it need
@@ -2066,16 +2056,6 @@ gcoHARDWARE_BindTexture(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    if (Hardware->features[gcvFEATURE_128BTILE] &&
-        SamplerInfo->cacheMode == gcvCACHE_128)
-    {
-        sampleMode2 |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23)));
-    }
-
     /* Swap U,V for YVYU and VYUY. */
     swapUV = SamplerInfo->format == gcvSURF_YVYU
           || SamplerInfo->format == gcvSURF_VYUY;
@@ -2274,15 +2254,6 @@ gcoHARDWARE_BindTexture(
  25:25) + 1))))))) << (0 ? 25:25))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  25:25) - (0 ? 25:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:25) - (0 ?
  25:25) + 1))))))) << (0 ? 25:25)));
-    }
-
-    if (Hardware->features[gcvFEATURE_128BTILE])
-    {
-        sampleModeEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) ((gctUINT32) (SamplerInfo->cacheMode == gcvCACHE_256 ?
- 0x1 : 0x0) & ((gctUINT32) ((((1 ? 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)));
     }
 
     /* Set the gcregTXSize register value. */
@@ -5562,11 +5533,6 @@ gcoHARDWARE_UpdateTextureDesc(
  31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
  31:31))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 31:31) - (0 ? 31:31) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:23) - (0 ?
- 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ?
- 23:23))) | (((gctUINT32) ((gctUINT32) (baseSurf->cacheMode == gcvCACHE_256) & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23)))
         ;
 
 
