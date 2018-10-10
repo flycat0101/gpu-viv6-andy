@@ -574,6 +574,12 @@ vivante_fill(win_blit_ctx_t ctx, win_handle_t dst,
     int		         gc_rc;
 
     struct win_blit_ctx *blt_ctx   = (struct win_blit_ctx *)ctx;
+
+    /* Swap red and blue channel.
+       The clrColor is in G2D_RGBA8888 format, which has
+       red offset 0 and blue offset 16. */
+    uint32_t clrColor = ((color >> 16) & 0xFF) | ((color & 0xFF) << 16) | (color & 0xFF00FF00);
+
     pthread_mutex_lock(&blt_ctx->mutex);
 #if defined(MULTIBLIT)
     if( ctx->n_blits ) {
@@ -586,7 +592,7 @@ vivante_fill(win_blit_ctx_t ctx, win_handle_t dst,
     d->G2DSurface.top = rect->y1;
     d->G2DSurface.right = rect->x2;
     d->G2DSurface.bottom = rect->y2;
-    d->G2DSurface.clrcolor = color;
+    d->G2DSurface.clrcolor = clrColor;
     d->G2DSurface.rot = G2D_ROTATION_0;
 
 
