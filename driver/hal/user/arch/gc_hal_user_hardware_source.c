@@ -1540,6 +1540,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
     gceSTATUS status;
     gctUINT32 format, swizzle, isYUV, strideWidth[3];
     gctUINT32 data[4], configEx = 0;
+    /*gcregPEControl reset value*/
+    gctUINT32 peControl[8] = {0};
     gctUINT32 rotated = 0;
     gctBOOL cacheMode = gcvFALSE;
     gctUINT32 rgbaSwizzle, uvSwizzle;
@@ -2249,6 +2251,37 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
  3:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+
+    /*set gcregPEControl*/
+    if(Filter)
+    {
+        uvSwizzle = ((((gctUINT32) (uvSwizzle)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
+        uvSwizzle = ((((gctUINT32) (uvSwizzle)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ?
+ 11:11))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)));
+        peControl[0] = uvSwizzle;
+        gcmONERROR(gcoHARDWARE_Load2DState(
+        Hardware,
+        0x12C80, 8,
+        peControl
+        ));
+    }
 
     gcmONERROR(gcoHARDWARE_Load2DState32(
         Hardware,
