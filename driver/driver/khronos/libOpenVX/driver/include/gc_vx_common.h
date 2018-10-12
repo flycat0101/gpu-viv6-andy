@@ -2095,6 +2095,8 @@ typedef struct _vx_object_data
         arrayInfo;
     }
     u;
+
+    vx_bool isVirtual;
 }
 vx_object_data_s;
 
