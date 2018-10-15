@@ -8451,7 +8451,8 @@ __glChipShaderBinary(
             found = fragmentShader;
         }
 
-        gcmONERROR(gcSHADER_Destroy(shader));
+        gcmVERIFY_OK(gcSHADER_Destroy(shader));
+        shader = gcvNULL;
 
         if (!found)
         {
