@@ -6499,6 +6499,39 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+ _QueryHardwareFrequency(
+    gcoHARDWARE Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER();
+
+    if (Hardware->shClk)
+    {
+        gcmONERROR(gcvSTATUS_OK);
+    }
+
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_QUERY_CHIP_FREQUENCY;
+
+    gcmONERROR(gcoOS_DeviceControl(
+        gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface)
+        ));
+
+    Hardware->mcClk = iface.u.QueryChipFrequency.mcClk;
+    Hardware->shClk = iface.u.QueryChipFrequency.shClk;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gcoHARDWARE_QueryShaderCapsEx
@@ -6578,6 +6611,8 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (ClockFrequency != gcvNULL)
     {
+	_QueryHardwareFrequency(Hardware);
+
         /* Return the shader core clock in Mhz. */
         *ClockFrequency = (Hardware->shClk + 500000) / 1000000;
     }

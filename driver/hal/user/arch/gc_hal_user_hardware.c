@@ -2614,34 +2614,6 @@ OnError:
     return status;
 }
 
-static gceSTATUS
- _QueryHardwareFrequency(
-    gcoHARDWARE Hardware
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER();
-
-    iface.ignoreTLS = gcvFALSE;
-    iface.command = gcvHAL_QUERY_CHIP_FREQUENCY;
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    Hardware->mcClk = iface.u.QueryChipFrequency.mcClk;
-    Hardware->shClk = iface.u.QueryChipFrequency.shClk;
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
 #endif /* #if gcdENABLE_2D || gcdENABLE_3D */
 
 #if gcdENABLE_3D
@@ -5161,7 +5133,6 @@ gcoHARDWARE_Construct(
     gcoOS_ZeroMemory(pointer,gcmSIZEOF(gcsHARDWARE_CONFIG));
     hardware->config = pointer;
     gcmONERROR(_QueryHardwareIdAndOptions(hardware));
-    gcmONERROR(_QueryHardwareFrequency(hardware));
 #if gcdENABLE_3D
     gcmONERROR(_SetSpecialHint(hardware));
 #endif
