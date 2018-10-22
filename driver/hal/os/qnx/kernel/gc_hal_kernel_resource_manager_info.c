@@ -627,8 +627,6 @@ int gc_clk_show(void *data)
 	gckGALDEVICE device = m->thread->device;
 	gctUINT i;
 
-	gckGALDEVICE_QueryFrequency(device);
-
 	for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
 	{
 		if (device->kernels[i])
@@ -641,6 +639,7 @@ int gc_clk_show(void *data)
 				continue;
 			}
 #endif
+			gckHARDWARE_QueryFrequency(hardware);
 
 			if (hardware->mcClk)
 			{
