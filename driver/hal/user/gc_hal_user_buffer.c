@@ -2758,6 +2758,7 @@ gcoBUFFER_Commit_Worker(
     iface.ignoreTLS     = gcvTRUE;
     iface.hardwareType  = Worker->hardwareType;
     iface.coreIndex     = Worker->currentCoreIndex;
+    iface.commitMutex = gcvFALSE;
 
     /* Send for execution. */
     if (Worker->emptyBuffer)
