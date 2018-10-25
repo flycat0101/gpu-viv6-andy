@@ -1240,11 +1240,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkRenderPass *rdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkRenderPass *, pRenderPassBegin->renderPass);
     __vkFramebuffer *fb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFramebuffer *, pRenderPassBegin->framebuffer);
+    VkRect2D rect = pRenderPassBegin->renderArea;
+    VkResult result = VK_SUCCESS;
     uint32_t i;
 
     __VK_ASSERT(rdp->attachmentCount == fb->attachmentCount);
-
-    cmd->state = __VK_CMDBUF_STATE_BEGIN_RENDERPASS;        // Needed in __vk_CmdClearAttachments() only
 
     cmd->bindInfo.renderPass.rdp = (__vkRenderPass *)rdp;
     cmd->bindInfo.renderPass.subPass = &rdp->subPassInfo[0];
@@ -1289,39 +1289,46 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
         if ((rdp->attachments[i].usedInRenderPass) &&
             (rdp->attachments[i].loadClear || rdp->attachments[i].stencil_loadClear))
         {
-            VkClearAttachment clearAttachment;
-            VkClearRect clearRect;
+            VkImageSubresource subResource;
+            uint32_t il;
+            uint32_t baseArrayLayer;
+            __vkImageView* imageView = fb->imageViews[i];
+            VkClearValue clearValue = pRenderPassBegin->pClearValues[i];
 
-            clearAttachment.aspectMask = fb->imageViews[i]->createInfo.subresourceRange.aspectMask;
-            /* Determine correct aspect mask for depth / stencil clear */
-            if (rdp->attachments[i].stencil_loadClear)
+            const VkMemoryBarrier memBarrier =
             {
-                clearAttachment.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                0,
+                VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            };
 
-                if (rdp->attachments[i].loadClear)
-                    clearAttachment.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-            }
-            else
+            subResource.aspectMask = imageView->createInfo.subresourceRange.aspectMask;
+            subResource.mipLevel = imageView->createInfo.subresourceRange.baseMipLevel;
+            baseArrayLayer = imageView->createInfo.subresourceRange.baseArrayLayer;
+
+            for (il = baseArrayLayer; il < (baseArrayLayer + fb->layers); il++)
             {
-                clearAttachment.aspectMask &= ~VK_IMAGE_ASPECT_STENCIL_BIT;
+                subResource.arrayLayer = il;
+                __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                    commandBuffer,
+                    imageView->createInfo.image,
+                    &subResource,
+                    &clearValue,
+                    &rect
+                    ));
             }
 
-            clearAttachment.clearValue = pRenderPassBegin->pClearValues[i];
-            if (clearAttachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
-                clearAttachment.colorAttachment = i;
-            else
-                clearAttachment.colorAttachment = 0;
-
-            clearRect.baseArrayLayer = 0;
-            clearRect.layerCount = fb->layers;
-            clearRect.rect = pRenderPassBegin->renderArea;
-
-            __vk_CmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
-
+            __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
         }
     }
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
+    return;
 }
 
 void __vki_CmdResolveSubPass(
@@ -1481,10 +1488,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
         uint32_t imgViewIndex = ia;
 
         if (pAttachments[ia].aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
-            if (cmd->state == __VK_CMDBUF_STATE_BEGIN_RENDERPASS)
-                imgViewIndex = pAttachments[ia].colorAttachment;
-            else
-                imgViewIndex = cmd->bindInfo.renderPass.subPass->color_attachment_index[pAttachments[ia].colorAttachment];
+            imgViewIndex = cmd->bindInfo.renderPass.subPass->color_attachment_index[pAttachments[ia].colorAttachment];
         else
             imgViewIndex = cmd->bindInfo.renderPass.subPass->dsAttachIndex;
 
