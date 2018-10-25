@@ -762,6 +762,12 @@ gcOpt_OptimizeMOVInstructions(
         {
             if (gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_MOV)
             {
+                /* If the src0 of the dep code is indexed, just skip. */
+                if (gcmSL_SOURCE_GET(depCode->instruction.source0, Indexed) != gcSL_NOT_INDEXED)
+                {
+                    continue;
+                }
+
                 if (_ConvertEnable2Swizzle(gcmSL_TARGET_GET(code->instruction.temp, Enable)) !=
                     gcmSL_SOURCE_GET(depCode->instruction.source0, Swizzle))
                 {
