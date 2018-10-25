@@ -1731,12 +1731,16 @@ _IntrisicTexldFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
+    VIR_TypeId       typeId,
     gctSTRING       *pLibName
     )
 {
     VIR_ParmPassing *parmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
     VIR_Operand     *pOpnd;
     VIR_Operand  *texldOperand;
+
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+        VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, typeId)));
 
     if (parmOpnd->argNum < 3)
     {
@@ -1770,10 +1774,14 @@ _IntrisicImageAddrFuncName(
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
     VIR_Symbol      *pImageSym,
+    VIR_TypeId       typeId,
     gctSTRING       *pLibName
     )
 {
     VIR_TypeId       imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pImageSym));
+
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+        VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, typeId)));
 
     if (VIR_TypeId_isImage3D(imageTypeId) ||
         VIR_TypeId_isImageCube(imageTypeId) ||
@@ -1802,18 +1810,60 @@ _IntrisicImageAddrFuncName(
     }
 }
 
-
 static void
 _IntrisicImageFetchFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
+    VIR_TypeId      imageTypeId,
     gctSTRING       *pLibName
     )
 {
     VIR_ParmPassing *parmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
     VIR_Operand     *pOpnd;
-    VIR_Operand  *texldOperand;
+    VIR_TypeId      typeId = imageTypeId;
+
+    /* We treat sampler1D as a sampler2D. */
+    if (VIR_TypeId_isSampler1D(typeId))
+    {
+        switch (typeId)
+        {
+        case VIR_TYPE_SAMPLER_1D:
+            typeId = VIR_TYPE_SAMPLER_2D;
+            break;
+        case VIR_TYPE_SAMPLER_1D_ARRAY:
+            typeId = VIR_TYPE_SAMPLER_2D_ARRAY;
+            break;
+        case VIR_TYPE_SAMPLER_1D_SHADOW:
+            typeId = VIR_TYPE_SAMPLER_2D_SHADOW;
+            break;
+        case VIR_TYPE_SAMPLER_1D_ARRAY_SHADOW:
+            typeId = VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW;
+            break;
+        case VIR_TYPE_ISAMPLER_1D:
+            typeId = VIR_TYPE_ISAMPLER_2D;
+            break;
+        case VIR_TYPE_ISAMPLER_1D_ARRAY:
+            typeId = VIR_TYPE_ISAMPLER_2D_ARRAY;
+            break;
+        case VIR_TYPE_USAMPLER_1D:
+            typeId = VIR_TYPE_USAMPLER_2D;
+            break;
+        case VIR_TYPE_USAMPLER_1D_ARRAY:
+            typeId = VIR_TYPE_USAMPLER_2D_ARRAY;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            typeId = VIR_TYPE_SAMPLER_2D;
+            break;
+        }
+
+        gcmASSERT(VIR_TypeId_isSampler2D(typeId));
+    }
+
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+        VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, typeId)));
 
     if (parmOpnd->argNum < 3)
     {
@@ -1827,10 +1877,8 @@ _IntrisicImageFetchFuncName(
         return;
     }
 
-    texldOperand = (VIR_Operand*)pOpnd;
-
     /* Check offset. */
-    if (VIR_Operand_GetTexldOffset(texldOperand) != gcvNULL)
+    if (VIR_Operand_GetTexldOffset(pOpnd) != gcvNULL)
     {
         gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_offset");
     }
@@ -1974,23 +2022,25 @@ _IntrisicOrExtFuncName(
     }
     else
     {
-        gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
-            VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, opndTypeId)));
-
         /* Check for texld related. */
         if (VIR_Intrinsics_isTexLdRelated(intrinsicKind))
         {
-            _IntrisicTexldFuncName(pShader, pHwCfg, pInst, pLibName);
+            _IntrisicTexldFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
         }
         /* Check for image addr. */
         else if (VIR_Intrinsics_isImageAddr(intrinsicKind))
         {
-            _IntrisicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, pLibName);
+            _IntrisicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
         }
         /* Check for image fetch. */
         else if (VIR_Intrinsics_isImageFetch(intrinsicKind))
         {
-            _IntrisicImageFetchFuncName(pShader, pHwCfg, pInst, pLibName);
+            _IntrisicImageFetchFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
+        }
+        else
+        {
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+                VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, opndTypeId)));
         }
     }
 }
@@ -3329,6 +3379,224 @@ _UpdateOperandParameterForIntrinsicCall(
         }
 
         gcmASSERT(argIdx == newArgNum);
+    }
+    else if (VIR_Intrinsics_isImageFetch(IntrinsicsKind))
+    {
+        VIR_TypeId      opndTypeId = VIR_Operand_GetTypeId(opndParm->args[0]);
+        VIR_Operand*    pTexldOperand = gcvNULL;
+
+        /* No texldParm for samplerBuffer. */
+        if (VIR_TypeId_isSamplerBuffer(opndTypeId))
+        {
+            return errCode;
+        }
+
+        /* If there is no texldParm operand, create one first.*/
+        if (argNum == 2)
+        {
+            VIR_Operand*        pNewOpnd = gcvNULL;
+
+            /* Create the texld parameter operand. */
+            errCode = VIR_Function_NewOperand(func, &pNewOpnd);
+            ON_ERROR(errCode, "new operand");
+            VIR_Operand_SetOpKind(pNewOpnd, VIR_OPND_TEXLDPARM);
+
+            /* Update the parameter operand. */
+            VIR_Function_NewParameters(func, 3, &newOpndParam);
+            newOpndParam->args[0] = opndParm->args[0];
+            newOpndParam->args[1] = opndParm->args[1];
+            newOpndParam->args[2] = pNewOpnd;
+            newOpndParam->argNum = 3;
+
+            VIR_Operand_SetParameters(paramOperand, newOpndParam);
+            opndParm = newOpndParam;
+            argNum = 3;
+        }
+
+        pTexldOperand = opndParm->args[2];
+
+        /* If there is no LOD parameter, add one whose value is zero. */
+        if (!VIR_Operand_GetTexldLod(pTexldOperand))
+        {
+            VIR_Operand*        pNewOpnd = gcvNULL;
+
+            /* Update the offset parameter. */
+            errCode = VIR_Function_NewOperand(func, &pNewOpnd);
+            ON_ERROR(errCode, "new operand");
+            VIR_Operand_SetImmediateInt(pNewOpnd, 0);
+            VIR_Operand_SetTexldLod(pTexldOperand, pNewOpnd);
+        }
+
+        /* We treat a sampler1D as a sampler2D, so we need to convert the coordinate, and the offset if needed,*/
+        if (VIR_TypeId_isSampler1D(opndTypeId))
+        {
+            VIR_Operand*        pCoordOpnd = opndParm->args[1];
+            VIR_Operand*        pTexldOperand = opndParm->args[2];
+            VIR_Operand*        pOffsetOpnd = VIR_Operand_GetTexldOffset(pTexldOperand);
+            VIR_TypeId          coordTypeId = VIR_Operand_GetTypeId(pCoordOpnd);
+            VIR_TypeId          coordCompTypeId = VIR_GetTypeComponentType(coordTypeId);
+            gctUINT             coordCount = VIR_GetTypeComponents(coordTypeId);
+            VIR_TypeId          newCoordTypeId = VIR_INVALID_ID;
+            VIR_SymId           newCoordSymId = VIR_INVALID_ID;
+            VIR_VirRegId        newVirRegId = VIR_INVALID_ID;
+            VIR_Instruction*    pNewInst = gcvNULL;
+            VIR_Operand*        pNewOpnd = gcvNULL;
+
+            /* Construct a new reg to hold the new coordiante, the Y channel is always zero. */
+            gcmASSERT(coordCount <= 2);
+            newCoordTypeId = VIR_TypeId_ComposeNonOpaqueType(coordCompTypeId, coordCount + 1, 1);
+
+            newVirRegId = VIR_Shader_NewVirRegId(pShader, 1);
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                           VIR_SYM_VIRREG,
+                                           newVirRegId,
+                                           VIR_Shader_GetTypeFromId(pShader, newCoordTypeId),
+                                           VIR_STORAGE_UNKNOWN,
+                                           &newCoordSymId);
+            ON_ERROR(errCode, "add new symbol");
+
+            /* Construct the X coordinate. */
+            errCode = VIR_Function_AddInstructionBefore(func,
+                                                        VIR_OP_MOV,
+                                                        coordCompTypeId,
+                                                        pCallInst,
+                                                        gcvTRUE,
+                                                        &pNewInst);
+            ON_ERROR(errCode, "add new instruction");
+
+            /* Set dest. */
+            pNewOpnd = VIR_Inst_GetDest(pNewInst);
+            VIR_Operand_SetTempRegister(pNewOpnd,
+                                        func,
+                                        newCoordSymId,
+                                        coordCompTypeId);
+            VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+            /* Set SRC0. */
+            pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+            VIR_Operand_Copy(pNewOpnd, pCoordOpnd);
+            VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Construct the Y coordinate. */
+            errCode = VIR_Function_AddInstructionBefore(func,
+                                                        VIR_OP_MOV,
+                                                        coordCompTypeId,
+                                                        pCallInst,
+                                                        gcvTRUE,
+                                                        &pNewInst);
+            ON_ERROR(errCode, "add new instruction");
+
+            /* Set dest. */
+            pNewOpnd = VIR_Inst_GetDest(pNewInst);
+            VIR_Operand_SetTempRegister(pNewOpnd,
+                                        func,
+                                        newCoordSymId,
+                                        coordCompTypeId);
+            VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_Y);
+
+            /* Set SRC0. */
+            pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+            VIR_Operand_SetImmediateInt(pNewOpnd, 0);
+
+            /* Construct the array coordinate if needed. */
+            if (coordCount > 1)
+            {
+                errCode = VIR_Function_AddInstructionBefore(func,
+                                                            VIR_OP_MOV,
+                                                            coordCompTypeId,
+                                                            pCallInst,
+                                                            gcvTRUE,
+                                                            &pNewInst);
+                ON_ERROR(errCode, "add new instruction");
+
+                /* Set dest. */
+                pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                VIR_Operand_SetTempRegister(pNewOpnd,
+                                            func,
+                                            newCoordSymId,
+                                            coordCompTypeId);
+                VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_Z);
+
+                /* Set SRC0. */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                VIR_Operand_Copy(pNewOpnd, pCoordOpnd);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_YYYY);
+            }
+
+            /* Update the parameter. */
+            errCode = VIR_Function_NewOperand(func, &pNewOpnd);
+            ON_ERROR(errCode, "new operand");
+            VIR_Operand_SetSymbol(pNewOpnd, func, newCoordSymId);
+            VIR_Operand_SetTypeId(pNewOpnd, newCoordTypeId);
+            VIR_Operand_SetSwizzle(pNewOpnd, VIR_TypeId_Conv2Swizzle(newCoordTypeId));
+            opndParm->args[1] = pNewOpnd;
+
+            /* convert the offset. */
+            if (pOffsetOpnd != gcvNULL)
+            {
+                VIR_SymId       newOffsetSymId = VIR_INVALID_ID;
+
+                newVirRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_VIRREG,
+                                               newVirRegId,
+                                               VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INTEGER_X2),
+                                               VIR_STORAGE_UNKNOWN,
+                                               &newOffsetSymId);
+                ON_ERROR(errCode, "add new symbol");
+
+                /* Construct the X channel. */
+                errCode = VIR_Function_AddInstructionBefore(func,
+                                                            VIR_OP_MOV,
+                                                            VIR_TYPE_INT32,
+                                                            pCallInst,
+                                                            gcvTRUE,
+                                                            &pNewInst);
+                ON_ERROR(errCode, "add new instruction");
+
+                /* Set dest. */
+                pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                VIR_Operand_SetTempRegister(pNewOpnd,
+                                            func,
+                                            newOffsetSymId,
+                                            VIR_TYPE_INT32);
+                VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+                /* Set SRC0. */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                VIR_Operand_Copy(pNewOpnd, pOffsetOpnd);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+                /* Construct the Y coordinate. */
+                errCode = VIR_Function_AddInstructionBefore(func,
+                                                            VIR_OP_MOV,
+                                                            VIR_TYPE_INT32,
+                                                            pCallInst,
+                                                            gcvTRUE,
+                                                            &pNewInst);
+                ON_ERROR(errCode, "add new instruction");
+
+                /* Set dest. */
+                pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                VIR_Operand_SetTempRegister(pNewOpnd,
+                                            func,
+                                            newOffsetSymId,
+                                            VIR_TYPE_INT32);
+                VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_Y);
+
+                /* Set SRC0. */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                VIR_Operand_SetImmediateInt(pNewOpnd, 0);
+
+                /* Update the offset parameter. */
+                errCode = VIR_Function_NewOperand(func, &pNewOpnd);
+                ON_ERROR(errCode, "new operand");
+                VIR_Operand_SetSymbol(pNewOpnd, func, newOffsetSymId);
+                VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_INTEGER_X2);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_TypeId_Conv2Swizzle(VIR_TYPE_INTEGER_X2));
+                VIR_Operand_SetTexldOffset(pTexldOperand, pNewOpnd);
+            }
+        }
     }
 
 OnError:
