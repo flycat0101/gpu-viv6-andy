@@ -1311,6 +1311,11 @@ static VkResult halti5_program_blit_const(
                    +  hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->firstValidHwChannel;
 
     addresses[addrCount++] = pScratchMem->memory->devAddr;
+    if (devCtx->database->ROBUSTNESS)
+    {
+        addresses[addrCount++] = pScratchMem->memory->devAddr;
+        addresses[addrCount++] = pScratchMem->memory->devAddr + 144 - 1;
+    }
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, addrCount, addresses);
 
 
@@ -1743,6 +1748,10 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
                                  | VSC_COMPILER_FLAG_COMPILE_CODE_GEN
                                  | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                  | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
+        if (devCtx->database->ROBUSTNESS)
+        {
+            vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+        }
         vscLinkParams.cfg.optFlags = VSC_COMPILER_OPT_FULL;
         vscLinkParams.pPgResourceLayout = &vscResLayout;
         __VK_ONERROR(vscLinkProgram(&vscLinkParams, &blitProg->pep, &blitProg->hwStates));

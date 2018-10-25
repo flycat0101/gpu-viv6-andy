@@ -789,6 +789,9 @@ __VK_INLINE VkResult halti5_setIndexBufferCmd(
 {
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
 
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+    const gcsFEATURE_DATABASE *database = devCtx->pPhyDevice->phyDevConfig.database;
+
     static const uint32_t xlateIndexType[] =
     {
         /* VK_INDEX_TYPE_UINT16*/
@@ -847,6 +850,12 @@ __VK_INLINE VkResult halti5_setIndexBufferCmd(
     {
         __vkCmdLoadSingleHWState(pCmdBuffer, 0x019D, VK_FALSE,
             xlatePRindex[cmdBuf->bindInfo.indexBuffer.indexType]);
+    }
+
+    if (database->ROBUSTNESS)
+    {
+        uint32_t endAddress = srcAddr + (uint32_t)buf->memReq.size - 1;
+        __vkCmdLoadSingleHWState(pCmdBuffer, 0x01FE, VK_FALSE, endAddress);
     }
 
     return VK_SUCCESS;
@@ -3057,6 +3066,7 @@ VkResult halti5_setVertexBuffers(
     uint32_t dirtyMask = cmdBuf->bindInfo.vertexBuffers.dirtyBits;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)
         cmdBuf->bindInfo.pipeline.graphics->chipPriv;
+    const gcsFEATURE_DATABASE *database = cmdBuf->devCtx->database;
 
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
     while(dirtyMask)
@@ -3073,6 +3083,12 @@ VkResult halti5_setVertexBuffers(
                 srcAddr += cmdBuf->bindInfo.vertexBuffers.firstInstance * chipGfxPipeline->instancedVertexBindingStride[i];
             }
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5180 + i, VK_FALSE, srcAddr);
+
+            if (database->ROBUSTNESS)
+            {
+                uint32_t endAddress = srcAddr + (uint32_t)buf->memReq.size - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x51B0 + i, VK_FALSE, endAddress);
+            }
         }
         dirtyMask &= ~(1 << i);
         i++;
@@ -3562,6 +3578,12 @@ VkResult halti5_setRenderTargets(
  19:18) + 1))))))) << (0 ? 19:18)))
                         );
                 }
+
+                if (database->ROBUSTNESS)
+                {
+                    uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5270, VK_FALSE, endAddress);
+                }
             }
             else
             {
@@ -3627,6 +3649,12 @@ VkResult halti5_setRenderTargets(
                     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E28 + hwRtIndex, VK_FALSE,
                         (rtImageView->createInfo.subresourceRange.layerCount > 0) ? (uint32_t)pLevel->sliceSize : 0);
                 }
+
+                if (database->ROBUSTNESS)
+                {
+                    uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5270 + hwRtIndex, VK_FALSE, endAddress);
+                }
             }
             partIndex++;
         }
@@ -3685,6 +3713,12 @@ VkResult halti5_setRenderTargets(
         {
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E23, VK_FALSE,
                 (dsImageView->createInfo.subresourceRange.layerCount > 0) ? (uint32_t)pLevel->sliceSize : 0);
+        }
+
+        if (database->ROBUSTNESS)
+        {
+            uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1 ;
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0531, VK_FALSE, endAddress);
         }
     }
 
@@ -4901,12 +4935,17 @@ static VkResult halti5_helper_setDescSetStorage(
                 case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                     {
                         uint32_t physical;
-                        uint32_t data[3];
+                        uint32_t data[4];
                         uint32_t dataCount = 0;
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)resInfo->u.bufferInfo.offset;
                         data[dataCount++] = physical;
+                        if (devCtx->database->ROBUSTNESS)
+                        {
+                            data[dataCount++] = physical;
+                            data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
+                        }
                         if (hwMapping->accessMode == SHADER_UAV_ACCESS_MODE_RESIZABLE)
                         {
                             VkDeviceSize ssboSize = (resInfo->u.bufferInfo.range == VK_WHOLE_SIZE) ?
@@ -4918,7 +4957,7 @@ static VkResult halti5_helper_setDescSetStorage(
                     break;
                 case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
                     {
-                        uint32_t data[3];
+                        uint32_t data[4];
                         uint32_t dataCount = 0;
                         uint32_t physical;
                         uint32_t offset = (uint32_t)resInfo->u.bufferInfo.offset + dynamicOffsets[(*dynamicOffsetIndex) + arrayIdx];
@@ -4926,6 +4965,11 @@ static VkResult halti5_helper_setDescSetStorage(
                         physical = buf->memory->devAddr;
                         physical += offset;
                         data[dataCount++] = physical;
+                        if (devCtx->database->ROBUSTNESS)
+                        {
+                            data[dataCount++] = physical;
+                            data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
+                        }
                        if (hwMapping->accessMode == SHADER_UAV_ACCESS_MODE_RESIZABLE)
                         {
                             VkDeviceSize ssboSize = (resInfo->u.bufferInfo.range == VK_WHOLE_SIZE) ?
@@ -5022,21 +5066,37 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
                 case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
                     {
                         uint32_t physical;
+                        uint32_t data[3];
+                        uint32_t dataCount = 0;
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)resInfo->u.bufferInfo.offset;
-                        __vkCmdLoadSingleHWState(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE,
-                            physical);
+                        data[dataCount++] = physical;
+                        if (devCtx->database->ROBUSTNESS)
+                        {
+                            data[dataCount++] = physical;
+                            data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
+                        }
+
+                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, dataCount, data);
                     }
                     break;
                 case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
                     {
                         uint32_t physical;
+                        uint32_t data[3];
+                        uint32_t dataCount = 0;
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)resInfo->u.bufferInfo.offset + dynamicOffsets[(*dynamicOffsetIndex) + arrayIdx];
-                        __vkCmdLoadSingleHWState(commandBuffer, hwConstRegAddr + (arrayIdx *4 ), VK_FALSE,
-                            physical);
+                        data[dataCount++] = physical;
+                        if (devCtx->database->ROBUSTNESS)
+                        {
+                            data[dataCount++] = physical;
+                            data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
+                        }
+
+                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, dataCount, data);
                     }
                     break;
 

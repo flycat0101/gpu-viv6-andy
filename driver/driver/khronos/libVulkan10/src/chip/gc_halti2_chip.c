@@ -139,49 +139,95 @@ VkResult halti2_pip_emit_vsinput(
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0180 + attribIdx, VK_FALSE,
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
- 13:12) + 1))))))) << (0 ? 13:12))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwSize) & ((gctUINT32) ((((1 ?
- 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
- 13:12) + 1))))))) << (0 ? 13:12)))
+ 13:12) - (0 ?
+ 13:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ?
+ 13:12))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwSize) & ((gctUINT32) ((((1 ?
+ 13:12) - (0 ?
+ 13:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:12) - (0 ? 13:12) + 1))))))) << (0 ? 13:12)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwDataType) & ((gctUINT32) ((((1 ?
- 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)))
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
- 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwNormalized) & ((gctUINT32) ((((1 ?
- 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
- 15:14) + 1))))))) << (0 ? 15:14)))
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ?
+ 15:14))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwNormalized) & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:4) - (0 ?
- 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4)))
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
- 6:6))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
  11:8))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].sortedAttributeDescPtr->binding) & ((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8)))
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
- 23:16) + 1))))))) << (0 ? 23:16))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].sortedAttributeDescPtr->offset) & ((gctUINT32) ((((1 ?
- 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
- 23:16) + 1))))))) << (0 ? 23:16)))
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1))))))) << (0 ?
+ 23:16))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].sortedAttributeDescPtr->offset) & ((gctUINT32) ((((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:16) - (0 ? 23:16) + 1))))))) << (0 ? 23:16)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
- 31:24) + 1))))))) << (0 ? 31:24))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwFetchSize) & ((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
- 31:24) + 1))))))) << (0 ? 31:24)))
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ?
+ 31:24))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwFetchSize) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
  7:7))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwFetchBreak) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
- 7:7))));
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))));
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5E80 + attribIdx, VK_FALSE, hwVertexAttribDesc[attribIdx].integer ? 1 : 0x3F800000);
 
@@ -191,31 +237,51 @@ VkResult halti2_pip_emit_vsinput(
             case 0:
             default:
                 vsInputState = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)));
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
                 break;
             case 1:
                 vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
- 13:8))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ? 13:8) - (0 ?
- 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
- 13:8)));
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1))))))) << (0 ?
+ 13:8))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8)));
                 break;
             case 2:
                 vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16)));
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ?
+ 21:16))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
                 break;
             case 3:
                 vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24)));
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ?
+ 29:24))) | (((gctUINT32) ((gctUINT32) (hwRegNo) & ((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:24) - (0 ? 29:24) + 1))))))) << (0 ? 29:24)));
                 /* Store the current shader input control value. */
                 __vkCmdLoadSingleHWState(&pCmdBuffer, vsInputHWRegAddr, VK_FALSE, vsInputState);
                 vsInputHWRegAddr++;
@@ -238,56 +304,106 @@ VkResult halti2_pip_emit_vsinput(
                 {
                 __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0180, VK_FALSE,
                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
- 13:12) + 1))))))) << (0 ? 13:12))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
- 13:12) + 1))))))) << (0 ? 13:12)))
+ 13:12) - (0 ?
+ 13:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ?
+ 13:12))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 13:12) - (0 ?
+ 13:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:12) - (0 ? 13:12) + 1))))))) << (0 ? 13:12)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)))
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
- 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
- 15:14) + 1))))))) << (0 ? 15:14)))
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ?
+ 15:14))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:4) - (0 ?
- 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4)))
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
- 6:6))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 6:6) - (0 ?
- 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
- 6:6)))
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8)))
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
- 23:16) + 1))))))) << (0 ? 23:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
- 23:16) + 1))))))) << (0 ? 23:16)))
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1))))))) << (0 ?
+ 23:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:16) - (0 ? 23:16) + 1))))))) << (0 ? 23:16)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
- 31:24) + 1))))))) << (0 ? 31:24))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
- 31:24) + 1))))))) << (0 ? 31:24)))
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ?
+ 31:24))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
- 7:7))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 7:7) - (0 ?
- 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
- 7:7))));
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))));
 
                 vsInputState = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)));
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
                 vsInputCount++;
                 }
             }
@@ -299,31 +415,51 @@ VkResult halti2_pip_emit_vsinput(
                 case 0:
                 default:
                     vsInputState = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
  5:0))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)));
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
                     break;
                 case 1:
                     vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1))))))) << (0 ?
  13:8))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
- 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
- 13:8)));
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8)));
                     break;
                 case 2:
                     vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16)));
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ?
+ 21:16))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
                     break;
                 case 3:
                     vsInputState = ((((gctUINT32) (vsInputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24)));
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ?
+ 29:24))) | (((gctUINT32) ((gctUINT32) (hwRegForID) & ((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:24) - (0 ? 29:24) + 1))))))) << (0 ? 29:24)));
                     break;
                 }
             }
@@ -457,19 +593,21 @@ VkResult halti2_clearImageWithRS(
 {
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image);
     __vkImageLevel *pLevel = &img->pImgLevels[subResource->mipLevel];
-    uint32_t address;
     uint32_t clearVals[2] = {0}, clearMasks[2] = {0};
     uint32_t hwConfig, hwDstStride;
     uint32_t dstStride, dstTiling, dstSuperTile;
-    uint32_t *states = gcvNULL;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     uint32_t partIndex = 0;
     uint32_t hwFormat;
     uint32_t ditherTable[2] = { ~0U, ~0U };
     uint32_t hwSrcStride, hwControl;
     uint32_t hwWindowSize, hwOffset;
+    uint32_t dstTileMode = 0;
+    __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkDevContext *devCtx = cmd->devCtx;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
-    __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
+    __VK_ASSERT(devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
 
     if ((rect->offset.x & 0x3)     || (rect->offset.y & 0x3) ||
         (rect->extent.width & 0xF) || (rect->extent.height & 0x3))
@@ -489,6 +627,18 @@ VkResult halti2_clearImageWithRS(
         dstRes.u.img.subRes.arrayLayer = subResource->arrayLayer;
 
         return (halti5_computeClear(commandBuffer, clearValue, &dstRes));
+    }
+
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        if (img->halTiling == gcvSUPERTILED)
+        {
+            dstTileMode = 0x1;
+        }
+        else if (img->halTiling == gcvYMAJOR_SUPERTILED)
+        {
+            dstTileMode = 0x2;
+        }
     }
 
     switch (img->formatInfo.bitsPerBlock / img->formatInfo.partCount)
@@ -514,9 +664,14 @@ VkResult halti2_clearImageWithRS(
 
     rsConfigTiling(img, &dstTiling, &dstSuperTile);
 
+    __VK_ASSERT(cmd->curScrachBufIndex == 0);
+    pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
+
     while (partIndex < pLevel->partCount)
     {
-        __VK_ONERROR(__vkComputeClearVal(img,
+        uint32_t address;
+
+        __VK_ERR_BREAK(__vkComputeClearVal(img,
             subResource->aspectMask,
             clearValue,
             partIndex,
@@ -525,82 +680,152 @@ VkResult halti2_clearImageWithRS(
             clearMasks));
 
         hwConfig = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) ((gctUINT32) (hwFormat) & ((gctUINT32) ((((1 ? 4:0) - (0 ?
- 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0)))
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) ((gctUINT32) (hwFormat) & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) ((gctUINT32) (hwFormat) & ((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8)))
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:14) - (0 ?
- 14:14) + 1))))))) << (0 ? 14:14))) | (((gctUINT32) ((gctUINT32) (dstTiling) & ((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:14) - (0 ?
- 14:14) + 1))))))) << (0 ? 14:14)));
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1))))))) << (0 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (dstTiling) & ((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)));
 
         hwSrcStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29)));
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)));
 
         hwControl = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) ((clearMasks[0] | (clearMasks[1] << 4))) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
- 17:16) + 1))))))) << (0 ? 17:16))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
- 17:16) + 1))))))) << (0 ? 17:16)));
+ 17:16) - (0 ?
+ 17:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ?
+ 17:16))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 17:16) - (0 ?
+ 17:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
 
         dstStride = (uint32_t)pLevel->stride * (dstTiling == 0x0 ? 1 : 4);
 
         hwDstStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:0) - (0 ?
+ 19:0) + 1))))))) << (0 ?
  19:0))) | (((gctUINT32) ((gctUINT32) (dstStride) & ((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0)))
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ? 19:0)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (dstSuperTile) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31)))
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (dstSuperTile) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)))
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
- 28:27) + 1))))))) << (0 ? 28:27))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
- 28:27) + 1))))))) << (0 ? 28:27)));
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) (dstTileMode) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)));
 
         hwOffset = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0) - (0 ?
+ 12:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:0) - (0 ?
+ 12:0) + 1))))))) << (0 ?
  12:0))) | (((gctUINT32) ((gctUINT32) (rect->offset.x * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0)))
+ 12:0) - (0 ?
+ 12:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ? 12:0)))
                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (rect->offset.y * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16)));
+ 28:16) - (0 ?
+ 28:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ?
+ 28:16))) | (((gctUINT32) ((gctUINT32) (rect->offset.y * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
+ 28:16) - (0 ?
+ 28:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:16) - (0 ? 28:16) + 1))))))) << (0 ? 28:16)));
 
         hwWindowSize = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (rect->extent.width * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (rect->extent.height * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ? 31:16)));
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (rect->extent.height * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)));
 
         address = img->memory->devAddr;
         address += (uint32_t)(img->memOffset
@@ -608,51 +833,103 @@ VkResult halti2_clearImageWithRS(
             + pLevel->offset
             + subResource->arrayLayer * pLevel->sliceSize);
 
-        __vk_CmdAquireBuffer(commandBuffer, 10 * 2 + 8, &states);
 
-        __vkCmdLoadSingleHWState(&states, 0x0581, VK_FALSE, hwConfig);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0581, VK_FALSE, hwConfig);
 
-        __vkCmdLoadBatchHWStates(&states, 0x058C, VK_FALSE, 2, ditherTable);
+        __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x058C, VK_FALSE, 2, ditherTable);
 
-        __vkCmdLoadSingleHWState(&states, 0x0585, VK_FALSE, hwDstStride);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0585, VK_FALSE, hwDstStride);
 
-        __vkCmdLoadSingleHWState(&states, 0x0583, VK_FALSE, hwSrcStride);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0583, VK_FALSE, hwSrcStride);
 
-        __vkCmdLoadBatchHWStates(&states, 0x0590, VK_FALSE, 2, clearVals);
+        __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0590, VK_FALSE, 2, clearVals);
 
-        __vkCmdLoadSingleHWState(&states, 0x058F, VK_FALSE, hwControl);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x058F, VK_FALSE, hwControl);
 
-        __vkCmdLoadSingleHWState(&states, 0x05A8, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 20:20) - (0 ?
- 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
- 20:20))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 20:20) - (0 ?
- 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
- 20:20))));
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05A8, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20))));
 
-        __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->database->RS_NEW_BASEADDR);
+        __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
 
-        __vkCmdLoadSingleHWState(&states, 0x05B8, VK_FALSE, address);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, address);
+        if (devCtx->database->ROBUSTNESS)
+        {
+            if (!devCtx->database->SH_ROBUSTNESS_FIX)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+            }
+            else
+            {
+                uint32_t endAddr = address + (uint32_t)pLevel->sliceSize - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x06B9, VK_FALSE, endAddr);
+            }
+        }
 
-        __vkCmdLoadSingleHWState(&states, 0x0588, VK_FALSE, hwWindowSize);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0588, VK_FALSE, hwWindowSize);
 
-        __vkCmdLoadSingleHWState(&states, 0x05C0, VK_FALSE, hwOffset);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05C0, VK_FALSE, hwOffset);
 
-        __vkCmdLoadSingleHWState(&states, 0x05AE, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) (VK_TRUE) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))));
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05AE, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (VK_TRUE) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
-        __vkCmdLoadSingleHWState(&states, 0x0580, VK_FALSE, 0xBADABEEB);
-
-        __vk_CmdReleaseBuffer(commandBuffer, 10 * 2 + 8);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
         partIndex++;
-
     }
-    return VK_SUCCESS;
-OnError:
+
+    if (__VK_IS_SUCCESS(result))
+    {
+        uint32_t *states = gcvNULL;
+
+        cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+        __vk_CmdAquireBuffer(commandBuffer, cmd->curScrachBufIndex, &states);
+        __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+        __vk_CmdReleaseBuffer(commandBuffer, cmd->curScrachBufIndex);
+        cmd->curScrachBufIndex = 0;
+    }
+
     return result;
 }
 
@@ -665,8 +942,8 @@ VkResult halti2_copyImageWithRS(
 {
     HwRsDesc srcRsDesc = {0}, dstRsDesc = {0};
     uint32_t srcAddress, dstAddress;
+    uint32_t srcEndAddr, dstEndAddr;
     uint32_t srcSuperTile, srcTiling, dstSuperTile, dstTiling;
-    uint32_t *states = gcvNULL;
     gcsSAMPLES srcSampleInfo = {0}, dstSampleInfo = {0};
     uint32_t srcStride = 0, dstStride = 0;
     uint32_t srcFormat, dstFormat;
@@ -678,6 +955,10 @@ VkResult halti2_copyImageWithRS(
     VkResult result = VK_SUCCESS;
     uint32_t hwConfig, hwSrcStride, hwDstStride, hwOffset, hwWindowSize;
     uint32_t ditherTable[2] = { ~0U, ~0U };
+    uint32_t srcTileMode = 0, dstTileMode = 0;
+    __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkDevContext *devCtx = cmd->devCtx;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -701,8 +982,21 @@ VkResult halti2_copyImageWithRS(
         srcAddress = srcImg->memory->devAddr;
         srcAddress += (uint32_t)(srcImg->memOffset + pSrcLevel->offset +
                                  srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
+        srcEndAddr = srcAddress + (uint32_t)pSrcLevel->sliceSize - 1;
         srcMsaa = (srcImg->sampleInfo.product > 1);
         rsConfigTiling(srcImg, &srcTiling, &srcSuperTile);
+
+        if (devCtx->database->CACHE128B256BPERLINE)
+        {
+            if(srcImg->halTiling == gcvSUPERTILED)
+            {
+                srcTileMode = 0x1;
+            }
+            else if (srcImg->halTiling == gcvYMAJOR_SUPERTILED)
+            {
+                srcTileMode = 0x2;
+            }
+        }
     }
     else
     {
@@ -716,6 +1010,7 @@ VkResult halti2_copyImageWithRS(
 
         srcAddress = srcBuf->memory->devAddr;
         srcAddress += (uint32_t)(srcBuf->memOffset + srcRes->u.buf.offset);
+        srcEndAddr = srcAddress + (uint32_t)srcBuf->memReq.size - 1;
         srcTiling    = 0x0;
         srcSuperTile = 0x0;
         srcMsaa      = VK_FALSE;
@@ -743,8 +1038,21 @@ VkResult halti2_copyImageWithRS(
         dstAddress = dstImg->memory->devAddr;
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
+        dstEndAddr = dstAddress + (uint32_t)pDstLevel->sliceSize - 1;
         dstMsaa = (dstImg->sampleInfo.product > 1);
         rsConfigTiling(dstImg, &dstTiling, &dstSuperTile);
+
+        if (devCtx->database->CACHE128B256BPERLINE)
+        {
+            if (dstImg->halTiling == gcvSUPERTILED)
+            {
+                dstTileMode = 0x1;
+            }
+            else if (dstImg->halTiling == gcvYMAJOR_SUPERTILED)
+            {
+                dstTileMode = 0x2;
+            }
+        }
     }
     else
     {
@@ -758,6 +1066,7 @@ VkResult halti2_copyImageWithRS(
 
         dstAddress = dstBuf->memory->devAddr;
         dstAddress += (uint32_t)(dstBuf->memOffset + dstRes->u.buf.offset);
+        dstEndAddr = dstAddress + (uint32_t)dstBuf->memReq.size - 1;
         dstTiling    = 0x0;
         dstSuperTile = 0x0;
         dstMsaa      = VK_FALSE;
@@ -867,45 +1176,86 @@ VkResult halti2_copyImageWithRS(
     __VK_ASSERT(srcSampleInfo.product >= dstSampleInfo.product);
 
     hwConfig = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) ((gctUINT32) (srcRsDesc.hwFormat) & ((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0)))
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
  7:7))) | (((gctUINT32) ((gctUINT32) (srcTiling) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
- 7:7)))
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) ((gctUINT32) (dstRsDesc.hwFormat) & ((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8)))
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:14) - (0 ?
- 14:14) + 1))))))) << (0 ? 14:14))) | (((gctUINT32) ((gctUINT32) (dstTiling) & ((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:14) - (0 ?
- 14:14) + 1))))))) << (0 ? 14:14)))
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1))))))) << (0 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (dstTiling) & ((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) ((gctUINT32) ((srcRsDesc.flipRB ^ dstRsDesc.flipRB)) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29)))
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) ((gctUINT32) ((srcRsDesc.flipRB ^ dstRsDesc.flipRB)) & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) ((gctUINT32) (VK_FALSE) & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)))
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (VK_FALSE) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:5) - (0 ? 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
- 6:5))) | (((gctUINT32) ((gctUINT32) ((srcMsaa && !dstMsaa) ? 0x3 : 0x0) & ((gctUINT32) ((((1 ?
- 6:5) - (0 ? 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
- 6:5)))
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1))))))) << (0 ?
+ 6:5))) | (((gctUINT32) ((gctUINT32) ((srcMsaa && !dstMsaa) ?
+ 0x3 : 0x0) & ((gctUINT32) ((((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ? 6:5)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:13) - (0 ? 13:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:13) - (0 ?
- 13:13) + 1))))))) << (0 ? 13:13))) | (((gctUINT32) ((gctUINT32) (VK_FALSE) & ((gctUINT32) ((((1 ?
- 13:13) - (0 ? 13:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:13) - (0 ?
- 13:13) + 1))))))) << (0 ? 13:13)));
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1))))))) << (0 ?
+ 13:13))) | (((gctUINT32) ((gctUINT32) (VK_FALSE) & ((gctUINT32) ((((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:13) - (0 ? 13:13) + 1))))))) << (0 ? 13:13)));
 
     srcStride = srcStride * (srcTiling == 0x0 ? 1 : 4);
     dstStride = dstStride * (dstTiling == 0x0 ? 1 : 4);
@@ -915,63 +1265,138 @@ VkResult halti2_copyImageWithRS(
     gcmASSERT(dstStride <= ((gctUINT32) ((((1 ? 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))));
 
     hwSrcStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:0) - (0 ?
+ 19:0) + 1))))))) << (0 ?
  19:0))) | (((gctUINT32) ((gctUINT32) (srcStride) & ((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0)))
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ? 19:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (srcSuperTile) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31)))
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (srcSuperTile) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)))
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) ((gctUINT32) (srcMsaa) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29)));
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) ((gctUINT32) (srcMsaa) & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) (srcTileMode) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)));
 
     hwDstStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:0) - (0 ?
+ 19:0) + 1))))))) << (0 ?
  19:0))) | (((gctUINT32) ((gctUINT32) (dstStride) & ((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0)))
+ 19:0) - (0 ?
+ 19:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ? 19:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (dstSuperTile) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31)))
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (dstSuperTile) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)));
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) (dstTileMode) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)));
 
     hwOffset = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
+ 12:0) - (0 ?
+ 12:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:0) - (0 ?
+ 12:0) + 1))))))) << (0 ?
  12:0))) | (((gctUINT32) ((gctUINT32) (srcOffset.x * srcSampleInfo.x) & ((gctUINT32) ((((1 ?
- 12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0)))
+ 12:0) - (0 ?
+ 12:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ? 12:0)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (srcOffset.y * srcSampleInfo.y) & ((gctUINT32) ((((1 ?
- 28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16)));
+ 28:16) - (0 ?
+ 28:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:16) - (0 ?
+ 28:16) + 1))))))) << (0 ?
+ 28:16))) | (((gctUINT32) ((gctUINT32) (srcOffset.y * srcSampleInfo.y) & ((gctUINT32) ((((1 ?
+ 28:16) - (0 ?
+ 28:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:16) - (0 ? 28:16) + 1))))))) << (0 ? 28:16)));
 
     hwWindowSize = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
  15:0))) | (((gctUINT32) ((gctUINT32) (srcExtent.width * srcSampleInfo.x) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (srcExtent.height * srcSampleInfo.y) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ? 31:16)));
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (srcExtent.height * srcSampleInfo.y) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)));
 
     if (dstTiling == 0x0)
     {
@@ -983,51 +1408,127 @@ VkResult halti2_copyImageWithRS(
         __VK_ASSERT((srcAddress & 0x3F) == 0);
     }
 
-    __vk_CmdAquireBuffer(commandBuffer, 11*2 + 4, &states);
+    __VK_ASSERT(cmd->curScrachBufIndex == 0);
+    pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
 
-    __vkCmdLoadSingleHWState(&states, 0x0581, VK_FALSE, hwConfig);
-    __vkCmdLoadSingleHWState(&states, 0x0583, VK_FALSE, hwSrcStride);
-    __vkCmdLoadSingleHWState(&states, 0x0585, VK_FALSE, hwDstStride);
-    __vkCmdLoadBatchHWStates(&states, 0x058C, VK_FALSE, 2, ditherTable);
-    __vkCmdLoadSingleHWState(&states, 0x058F, VK_FALSE, 0);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0581, VK_FALSE, hwConfig);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0583, VK_FALSE, hwSrcStride);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0585, VK_FALSE, hwDstStride);
+    __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x058C, VK_FALSE, 2, ditherTable);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x058F, VK_FALSE, 0);
 
-    __vkCmdLoadSingleHWState(&states, 0x05A8, VK_FALSE,
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:0) - (0 ?
- 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05A8, VK_FALSE,
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 20:20) - (0 ?
- 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1))))))) << (0 ?
  20:20))) | (((gctUINT32) ((gctUINT32) (VK_TRUE) & ((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
- 20:20) + 1))))))) << (0 ? 20:20)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:6) - (0 ?
- 7:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:6) - (0 ? 7:6) + 1))))))) << (0 ?
- 7:6))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 7:6) - (0 ? 7:6) + 1) == 32) ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:6) - (0 ?
+ 7:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:6) - (0 ?
+ 7:6) + 1))))))) << (0 ?
+ 7:6))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 7:6) - (0 ?
+ 7:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:6) - (0 ? 7:6) + 1))))))) << (0 ? 7:6)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:8) - (0 ?
- 9:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
- 9:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 9:8) - (0 ? 9:8) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:8) - (0 ?
+ 9:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:8) - (0 ?
+ 9:8) + 1))))))) << (0 ?
+ 9:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 9:8) - (0 ?
+ 9:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ? 9:8))));
 
-    __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->database->RS_NEW_BASEADDR);
+    __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B0, VK_FALSE, srcAddress);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, dstAddress);
 
-    __vkCmdLoadSingleHWState(&states, 0x05B0, VK_FALSE, srcAddress);
-    __vkCmdLoadSingleHWState(&states, 0x05B8, VK_FALSE, dstAddress);
+    if (devCtx->database->ROBUSTNESS)
+    {
+        if (!devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
+        else
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x069A, VK_FALSE, srcEndAddr);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x06B9, VK_FALSE, dstEndAddr);
+        }
+    }
 
-    __vkCmdLoadSingleHWState(&states, 0x0588, VK_FALSE, hwWindowSize);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0588, VK_FALSE, hwWindowSize);
 
-    __vkCmdLoadSingleHWState(&states, 0x05C0, VK_FALSE, hwOffset);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05C0, VK_FALSE, hwOffset);
 
-    __vkCmdLoadSingleHWState(&states, 0x05AE, VK_FALSE,
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05AE, VK_FALSE,
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
-    __vkCmdLoadSingleHWState(&states, 0x0580, VK_FALSE, 0xBADABEEB);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
-    __vk_CmdReleaseBuffer(commandBuffer, 11 * 2 + 4);
+
+    cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+    __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    if (cmd->curScrachBufIndex > 0)
+    {
+        uint32_t *states = gcvNULL;
+
+        __vk_CmdAquireBuffer(commandBuffer, cmd->curScrachBufIndex, &states);
+        __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+        __vk_CmdReleaseBuffer(commandBuffer, cmd->curScrachBufIndex);
+        cmd->curScrachBufIndex = 0;
+    }
 
     return result;
 }
@@ -1108,86 +1609,164 @@ void halti2_helper_convertHwSampler(
     hwSamplerDesc->halti2.anisoLog = anisoLog;
 
     hwSamplerDesc->halti2.hwSamplerMode_p0 =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
- 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:3) - (0 ?
+ 4:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:3) - (0 ?
+ 4:3) + 1))))))) << (0 ?
  4:3))) | (((gctUINT32) ((gctUINT32) (s_addressXlate[createInfo->addressModeU]) & ((gctUINT32) ((((1 ?
- 4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
- 4:3)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:5) - (0 ?
- 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
+ 4:3) - (0 ?
+ 4:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ? 4:3)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1))))))) << (0 ?
  6:5))) | (((gctUINT32) ((gctUINT32) (s_addressXlate[createInfo->addressModeV]) & ((gctUINT32) ((((1 ?
- 6:5) - (0 ? 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
- 6:5)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:7) - (0 ?
- 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ? 6:5)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:7) - (0 ?
+ 8:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:7) - (0 ?
+ 8:7) + 1))))))) << (0 ?
  8:7))) | (((gctUINT32) ((gctUINT32) (s_minXlate[createInfo->minFilter]) & ((gctUINT32) ((((1 ?
- 8:7) - (0 ? 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
- 8:7)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:11) - (0 ?
- 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ? 12:11) + 1))))))) << (0 ?
+ 8:7) - (0 ?
+ 8:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ? 8:7)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:11) - (0 ?
+ 12:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ?
  12:11))) | (((gctUINT32) ((gctUINT32) (s_magXlate[createInfo->magFilter]) & ((gctUINT32) ((((1 ?
- 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
- 12:11) + 1))))))) << (0 ? 12:11)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:9) - (0 ?
- 10:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 12:11) - (0 ?
+ 12:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:11) - (0 ? 12:11) + 1))))))) << (0 ? 12:11)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1))))))) << (0 ?
  10:9))) | (((gctUINT32) ((gctUINT32) (s_mipXlate[createInfo->mipmapMode]) & ((gctUINT32) ((((1 ?
- 10:9) - (0 ? 10:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
- 10:9)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:18) - (0 ?
- 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ?
- 18:18))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 18:18) - (0 ?
- 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ?
- 18:18)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:19) - (0 ?
- 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
- 19:19))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:19) - (0 ?
- 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
- 19:19)));
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1))))))) << (0 ?
+ 18:18))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ? 18:18)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1))))))) << (0 ?
+ 19:19))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19)));
 
     hwSamplerDesc->halti2.hwSamplerLOD  =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) ((lodbias == 0 ? 0 : 1)) & ((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:1) - (0 ?
- 10:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ?
- 10:1))) | (((gctUINT32) ((gctUINT32) (maxlod) & ((gctUINT32) ((((1 ? 10:1) - (0 ?
- 10:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ?
- 10:1)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 20:11) - (0 ?
- 20:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ?
- 20:11))) | (((gctUINT32) ((gctUINT32) (minlod) & ((gctUINT32) ((((1 ? 20:11) - (0 ?
- 20:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ?
- 20:11)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 30:21) - (0 ?
- 30:21) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:21) - (0 ? 30:21) + 1))))))) << (0 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) ((lodbias == 0 ?
+ 0 : 1)) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1))))))) << (0 ?
+ 10:1))) | (((gctUINT32) ((gctUINT32) (maxlod) & ((gctUINT32) ((((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ? 10:1)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1))))))) << (0 ?
+ 20:11))) | (((gctUINT32) ((gctUINT32) (minlod) & ((gctUINT32) ((((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ? 20:11)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:21) - (0 ?
+ 30:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:21) - (0 ?
+ 30:21) + 1))))))) << (0 ?
  30:21))) | (((gctUINT32) ((gctUINT32) (lodbias) & ((gctUINT32) ((((1 ?
- 30:21) - (0 ? 30:21) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:21) - (0 ?
- 30:21) + 1))))))) << (0 ? 30:21)));
+ 30:21) - (0 ?
+ 30:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:21) - (0 ? 30:21) + 1))))))) << (0 ? 30:21)));
 
     hwSamplerDesc->halti2.hwBaseLOD_p0 =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
- 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
- 16:16))) | (((gctUINT32) ((gctUINT32) (createInfo->compareEnable ? 1 : 0) & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:20) - (0 ?
- 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) ((gctUINT32) (createInfo->compareEnable ?
+ 1 : 0) & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
  22:20))) | (((gctUINT32) ((gctUINT32) (s_funcXlate[createInfo->compareOp]) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
- 22:20) + 1))))))) << (0 ? 22:20)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:23) - (0 ?
- 24:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ?
- 24:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 24:23) - (0 ? 24:23) + 1) == 32) ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1))))))) << (0 ?
+ 24:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ? 24:23)));
 
     hwSamplerDesc->halti2.hwSampler3D_p0 =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:28) - (0 ?
- 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
  29:28))) | (((gctUINT32) ((gctUINT32) (s_addressXlate[createInfo->addressModeW]) & ((gctUINT32) ((((1 ?
- 29:28) - (0 ? 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ?
- 29:28) + 1))))))) << (0 ? 29:28)));
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)));
 
     return;
 }
@@ -1347,38 +1926,63 @@ VkResult halti2_helper_convertHwTxDesc(
     case VK_FORMAT_R16G16_SINT:
     case VK_FORMAT_R16G16B16A16_SINT:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) ((gctUINT32) (0x2) & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) ((gctUINT32) (0x2) & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     case VK_FORMAT_R8_SINT:
     case VK_FORMAT_R8G8_SINT:
     case VK_FORMAT_R8G8B8A8_SINT:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) ((gctUINT32) (0x1) & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) ((gctUINT32) (0x1) & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)))
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)))
                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16)));
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)));
         break;
     default:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     }
     partCount = residentFormatInfo->partCount;
@@ -1393,161 +1997,311 @@ VkResult halti2_helper_convertHwTxDesc(
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 
         hwTxDesc[partIdx].halti2.hwSamplerMode_p1 =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
- 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) ((gctUINT32) (s_xlateType[viewType].hwType) & ((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0)))
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:13) - (0 ? 17:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:13) - (0 ?
- 17:13) + 1))))))) << (0 ? 17:13))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT)) & ((gctUINT32) ((((1 ?
- 17:13) - (0 ? 17:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:13) - (0 ?
- 17:13) + 1))))))) << (0 ? 17:13)))
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1))))))) << (0 ?
+ 17:13))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT)) & ((gctUINT32) ((((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:13) - (0 ? 17:13) + 1))))))) << (0 ? 17:13)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:20) - (0 ? 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ?
- 21:20) + 1))))))) << (0 ? 21:20))) | (((gctUINT32) ((gctUINT32) (addressing) & ((gctUINT32) ((((1 ?
- 21:20) - (0 ? 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ?
- 21:20) + 1))))))) << (0 ? 21:20)))
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1))))))) << (0 ?
+ 21:20))) | (((gctUINT32) ((gctUINT32) (addressing) & ((gctUINT32) ((((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:22) - (0 ? 23:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:22) - (0 ?
- 23:22) + 1))))))) << (0 ? 23:22))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 23:22) - (0 ? 23:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:22) - (0 ?
- 23:22) + 1))))))) << (0 ? 23:22)));
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1))))))) << (0 ?
+ 23:22))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)));
 
         hwTxDesc[partIdx].halti2.hwSamplerModeEx =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
  5:0))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT)) & ((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:8) - (0 ?
- 10:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
  10:8))) | (((gctUINT32) ((gctUINT32) (swizzle_r) & ((gctUINT32) ((((1 ?
- 10:8) - (0 ? 10:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
- 10:8)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:12) - (0 ?
- 14:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ? 10:8)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1))))))) << (0 ?
  14:12))) | (((gctUINT32) ((gctUINT32) (swizzle_g) & ((gctUINT32) ((((1 ?
- 14:12) - (0 ? 14:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:12) - (0 ?
- 14:12) + 1))))))) << (0 ? 14:12)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:16) - (0 ?
- 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
  18:16))) | (((gctUINT32) ((gctUINT32) (swizzle_b) & ((gctUINT32) ((((1 ?
- 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ? 18:16)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:20) - (0 ?
- 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
  22:20))) | (((gctUINT32) ((gctUINT32) (swizzle_a) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
- 22:20) + 1))))))) << (0 ? 22:20)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:15) - (0 ?
- 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ?
- 15:15))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 15:15) - (0 ?
- 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ?
- 15:15)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 30:30) - (0 ?
- 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ?
- 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 30:30) - (0 ? 30:30) + 1) == 32) ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ?
+ 15:15))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:24) - (0 ?
- 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
  24:24))) | (((gctUINT32) ((gctUINT32) (s_xlateType[viewType].hwIsArray) & ((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ? 24:24)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 28:26) - (0 ?
- 28:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1))))))) << (0 ?
  28:26))) | (((gctUINT32) ((gctUINT32) (hAlignment) & ((gctUINT32) ((((1 ?
- 28:26) - (0 ? 28:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:26) - (0 ?
- 28:26) + 1))))))) << (0 ? 28:26)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 25:25) - (0 ?
- 25:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ?
- 25:25))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 25:25) - (0 ? 25:25) + 1) == 32) ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ? 28:26)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1))))))) << (0 ?
+ 25:25))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:29) - (0 ?
- 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 29:29) - (0 ? 29:29) + 1) == 32) ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:31) - (0 ?
- 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 31:31) - (0 ? 31:31) + 1) == 32) ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:23) - (0 ?
- 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ?
  23:23))) | (((gctUINT32) ((gctUINT32) (msaaImage) & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23)));
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)));
 
         hwTxDesc[partIdx].halti2.hwBaseLOD_p1 =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
  11:8))) | (((gctUINT32) ((gctUINT32) (subResourceRange->levelCount - 1) & ((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8)));
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
 
         hwTxDesc[partIdx].halti2.hwSampleWH =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:0) - (0 ?
- 14:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1))))))) << (0 ?
  14:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedW) & ((gctUINT32) ((((1 ?
- 14:0) - (0 ? 14:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ?
- 14:0)))
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:16) - (0 ? 30:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:16) - (0 ?
- 30:16) + 1))))))) << (0 ? 30:16))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedH) & ((gctUINT32) ((((1 ?
- 30:16) - (0 ? 30:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:16) - (0 ?
- 30:16) + 1))))))) << (0 ? 30:16)));
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1))))))) << (0 ?
+ 30:16))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedH) & ((gctUINT32) ((((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)));
 
         hwTxDesc[partIdx].halti2.hwSampleLogWH_p1 =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:0) - (0 ?
- 9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
- 9:0))) | (((gctUINT32) ((gctUINT32) (logWidth) & ((gctUINT32) ((((1 ? 9:0) - (0 ?
- 9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
- 9:0)))
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:0) - (0 ?
+ 9:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:0) - (0 ?
+ 9:0) + 1))))))) << (0 ?
+ 9:0))) | (((gctUINT32) ((gctUINT32) (logWidth) & ((gctUINT32) ((((1 ?
+ 9:0) - (0 ?
+ 9:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ? 9:0)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:10) - (0 ? 19:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:10) - (0 ?
- 19:10) + 1))))))) << (0 ? 19:10))) | (((gctUINT32) ((gctUINT32) (logHeight) & ((gctUINT32) ((((1 ?
- 19:10) - (0 ? 19:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:10) - (0 ?
- 19:10) + 1))))))) << (0 ? 19:10)))
+ 19:10) - (0 ?
+ 19:10) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:10) - (0 ?
+ 19:10) + 1))))))) << (0 ?
+ 19:10))) | (((gctUINT32) ((gctUINT32) (logHeight) & ((gctUINT32) ((((1 ?
+ 19:10) - (0 ?
+ 19:10) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:10) - (0 ? 19:10) + 1))))))) << (0 ? 19:10)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ? 30:30)))
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
- 28:27) + 1))))))) << (0 ? 28:27))) | (((gctUINT32) ((gctUINT32) ((astcImage ?
- 2 : 0)) & ((gctUINT32) ((((1 ? 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)))
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ?
+ 28:27))) | (((gctUINT32) ((gctUINT32) ((astcImage ?
+ 2 : 0)) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ?
+ 28:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ? 28:27)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (hwTxDesc[partIdx].sRGB) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ? 31:31)));
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (hwTxDesc[partIdx].sRGB) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
 
         hwTxDesc[partIdx].halti2.hwSliceSize = (uint32_t)baseLevel->sliceSize;
 
         hwTxDesc[partIdx].halti2.hwTxConfig3 =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:3) - (0 ?
- 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:3) - (0 ?
+ 3:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:3) - (0 ?
+ 3:3) + 1))))))) << (0 ?
  3:3))) | (((gctUINT32) ((gctUINT32) (msaaImage) & ((gctUINT32) ((((1 ?
- 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
- 3:3)))
-          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 3:3) - (0 ?
+ 3:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (hwTxDesc[partIdx].sampleStencil) & ((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)));
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
 
         hwTxDesc[partIdx].halti2.hwSamplerLinearStride =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 17:0) - (0 ?
- 17:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1))))))) << (0 ?
  17:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->stride) & ((gctUINT32) ((((1 ?
- 17:0) - (0 ? 17:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ?
- 17:0)));
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ? 17:0)));
 
         hwTxDesc[partIdx].halti2.hwTxConfig2 = txConfig2;
 
@@ -1555,29 +2309,49 @@ VkResult halti2_helper_convertHwTxDesc(
         {
             hwTxDesc[partIdx].halti2.hwSampler3D_p1 =
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1))))))) << (0 ?
  13:0))) | (((gctUINT32) ((gctUINT32) (subResourceRange->layerCount) & ((gctUINT32) ((((1 ?
- 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
- 13:0)))
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ? 13:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (logDepth) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16)));
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (logDepth) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
         }
         else
         {
             hwTxDesc[partIdx].halti2.hwSampler3D_p1 =
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1))))))) << (0 ?
  13:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->requestD) & ((gctUINT32) ((((1 ?
- 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
- 13:0)))
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ? 13:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (logDepth) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16)));
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (logDepth) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
         }
 
 
@@ -1618,45 +2392,85 @@ VkResult halti2_helper_convertHwTxDesc(
 
             hwTxDesc[partIdx].halti2.hwTxASTCEx =
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)))
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ? 4:4) - (0 ?
- 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4)))
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
  11:8))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
- 11:8) - (0 ? 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8)))
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
- 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1))))))) << (0 ? 12:12)))
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ?
+ 12:12))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
- 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
- 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
- 19:16) + 1))))))) << (0 ? 19:16)))
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ? 19:16)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
- 20:20) + 1))))))) << (0 ? 20:20))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ?
- 20:20) + 1))))))) << (0 ? 20:20)))
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
- 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
- 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
- 27:24) + 1))))))) << (0 ? 27:24)))
+ 27:24) - (0 ?
+ 27:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (astcSize) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ?
+ 27:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ? 28:28))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
- 28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ? 28:28)));
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) ((gctUINT32) (astcSrgb) & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
         }
     }
 
@@ -1682,19 +2496,29 @@ void halti2_helper_setSamplerStates(
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
             ((((gctUINT32) (shaderConfigData)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))));
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
     }
     else
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
             ((((gctUINT32) (shaderConfigData)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))));
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
     }
 
 
@@ -1718,11 +2542,16 @@ void halti2_helper_setSamplerStates(
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x4040 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSampleLogWH_p1
-      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:29) - (0 ?
- 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
+      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
  29:29))) | (((gctUINT32) ((gctUINT32) (txDesc->fast_filter && ((samplerDesc->halti2.anisoLog == 0) || txDesc->isCubmap)) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29))));
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29))));
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x40C0 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSampler3D_p1 | samplerDesc->halti2.hwSampler3D_p0);
@@ -1872,38 +2701,63 @@ VkResult halti2_program_blit_src_tex(
     case VK_FORMAT_R16G16_SINT:
     case VK_FORMAT_R16G16B16A16_SINT:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     case VK_FORMAT_R8_SINT:
     case VK_FORMAT_R8G8_SINT:
     case VK_FORMAT_R8G8B8A8_SINT:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)))
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)))
                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16)));
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)));
         break;
     default:
         txConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 19:18) - (0 ? 19:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ? 19:18)));
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
         break;
     }
 
@@ -1923,230 +2777,441 @@ VkResult halti2_program_blit_src_tex(
 
     __vkCmdLoadSingleHWState(states, 0x022D + hwSamplerNo, VK_FALSE,
         ((((gctUINT32) (pHints->shaderConfigData)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
- 16:16) + 1))))))) << (0 ? 16:16))));
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
 
     __vkCmdLoadSingleHWState(states, 0x4000 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
- 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) ((gctUINT32) (txType) & ((gctUINT32) ((((1 ? 2:0) - (0 ?
- 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 17:13) - (0 ?
- 17:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:13) - (0 ? 17:13) + 1))))))) << (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (txType) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1))))))) << (0 ?
  17:13))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT)) & ((gctUINT32) ((((1 ?
- 17:13) - (0 ? 17:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:13) - (0 ?
- 17:13) + 1))))))) << (0 ? 17:13)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 21:20) - (0 ?
- 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:13) - (0 ? 17:13) + 1))))))) << (0 ? 17:13)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) ((gctUINT32) (txAddressing) & ((gctUINT32) ((((1 ?
- 21:20) - (0 ? 21:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:20) - (0 ?
- 21:20) + 1))))))) << (0 ? 21:20)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:22) - (0 ?
- 23:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ?
- 23:22))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 23:22) - (0 ? 23:22) + 1) == 32) ?
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1))))))) << (0 ?
+ 23:22))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
- 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
- 4:3))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 4:3) - (0 ? 4:3) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:3) - (0 ?
+ 4:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:3) - (0 ?
+ 4:3) + 1))))))) << (0 ?
+ 4:3))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 4:3) - (0 ?
+ 4:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ? 4:3)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:5) - (0 ?
- 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
- 6:5))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 6:5) - (0 ? 6:5) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1))))))) << (0 ?
+ 6:5))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 6:5) - (0 ?
+ 6:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ? 6:5)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:7) - (0 ?
- 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:7) - (0 ?
+ 8:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:7) - (0 ?
+ 8:7) + 1))))))) << (0 ?
  8:7))) | (((gctUINT32) ((gctUINT32) (minXlate[filter]) & ((gctUINT32) ((((1 ?
- 8:7) - (0 ? 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
- 8:7)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:11) - (0 ?
- 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ? 12:11) + 1))))))) << (0 ?
+ 8:7) - (0 ?
+ 8:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ? 8:7)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:11) - (0 ?
+ 12:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ?
  12:11))) | (((gctUINT32) ((gctUINT32) (magXlate[filter]) & ((gctUINT32) ((((1 ?
- 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
- 12:11) + 1))))))) << (0 ? 12:11)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:9) - (0 ?
- 10:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
- 10:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ 12:11) - (0 ?
+ 12:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:11) - (0 ? 12:11) + 1))))))) << (0 ? 12:11)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:19) - (0 ?
- 19:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
- 19:19))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 19:19) - (0 ? 19:19) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1))))))) << (0 ?
+ 19:19))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 19:19) - (0 ?
+ 19:19) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x40E0 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
  5:0))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT)) & ((gctUINT32) ((((1 ?
- 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:7) - (0 ?
- 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
  7:7))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_COLOR_SWIZZLE_SHIFT)) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
- 7:7)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:8) - (0 ?
- 10:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
  10:8))) | (((gctUINT32) ((gctUINT32) (hwTxFmtInfo->hwSwizzles[0]) & ((gctUINT32) ((((1 ?
- 10:8) - (0 ? 10:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
- 10:8)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:12) - (0 ?
- 14:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ? 10:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1))))))) << (0 ?
  14:12))) | (((gctUINT32) ((gctUINT32) (hwTxFmtInfo->hwSwizzles[1]) & ((gctUINT32) ((((1 ?
- 14:12) - (0 ? 14:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:12) - (0 ?
- 14:12) + 1))))))) << (0 ? 14:12)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:16) - (0 ?
- 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
  18:16))) | (((gctUINT32) ((gctUINT32) (hwTxFmtInfo->hwSwizzles[2]) & ((gctUINT32) ((((1 ?
- 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ? 18:16)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:20) - (0 ?
- 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
  22:20))) | (((gctUINT32) ((gctUINT32) (hwTxFmtInfo->hwSwizzles[3]) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
- 22:20) + 1))))))) << (0 ? 22:20)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 28:26) - (0 ?
- 28:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1))))))) << (0 ?
  28:26))) | (((gctUINT32) ((gctUINT32) (txHAlign) & ((gctUINT32) ((((1 ?
- 28:26) - (0 ? 28:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:26) - (0 ?
- 28:26) + 1))))))) << (0 ? 28:26)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 30:30) - (0 ?
- 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ?
- 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 30:30) - (0 ? 30:30) + 1) == 32) ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ? 28:26)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:24) - (0 ?
- 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ?
- 24:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 24:24) - (0 ? 24:24) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
+ 24:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:23) - (0 ?
- 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ?
- 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 23:23) - (0 ? 23:23) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ?
+ 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x41E0 + hwSamplerNo, VK_FALSE, txConfig2);
 
     __vkCmdLoadSingleHWState(states, 0x44A0 + hwSamplerNo, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x4480 + hwSamplerNo, VK_FALSE, txSliceSize);
 
     __vkCmdLoadSingleHWState(states, 0x4020 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:0) - (0 ?
- 14:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1))))))) << (0 ?
  14:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.width) & ((gctUINT32) ((((1 ?
- 14:0) - (0 ? 14:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ?
- 14:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 30:16) - (0 ?
- 30:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ?
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1))))))) << (0 ?
  30:16))) | (((gctUINT32) ((gctUINT32) (params->srcSize.height) & ((gctUINT32) ((((1 ?
- 30:16) - (0 ? 30:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:16) - (0 ?
- 30:16) + 1))))))) << (0 ? 30:16)))
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x4040 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:0) - (0 ?
- 9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:0) - (0 ?
+ 9:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:0) - (0 ?
+ 9:0) + 1))))))) << (0 ?
  9:0))) | (((gctUINT32) ((gctUINT32) (gcoMATH_Log2in5dot5(params->srcSize.width)) & ((gctUINT32) ((((1 ?
- 9:0) - (0 ? 9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
- 9:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:10) - (0 ?
- 19:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:10) - (0 ? 19:10) + 1))))))) << (0 ?
+ 9:0) - (0 ?
+ 9:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ? 9:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:10) - (0 ?
+ 19:10) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:10) - (0 ?
+ 19:10) + 1))))))) << (0 ?
  19:10))) | (((gctUINT32) ((gctUINT32) (gcoMATH_Log2in5dot5(params->srcSize.height)) & ((gctUINT32) ((((1 ?
- 19:10) - (0 ? 19:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:10) - (0 ?
- 19:10) + 1))))))) << (0 ? 19:10)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:31) - (0 ?
- 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31))) | (((gctUINT32) ((gctUINT32) (txSRGB) & ((gctUINT32) ((((1 ? 31:31) - (0 ?
- 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:29) - (0 ?
- 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
+ 19:10) - (0 ?
+ 19:10) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:10) - (0 ? 19:10) + 1))))))) << (0 ? 19:10)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (txSRGB) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
  29:29))) | (((gctUINT32) ((gctUINT32) (txIntCtrl) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ? 29:29)))
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x40C0 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:28) - (0 ?
- 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ?
- 29:28))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 29:28) - (0 ? 29:28) + 1) == 32) ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 13:0) - (0 ?
- 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1))))))) << (0 ?
  13:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.depth) & ((gctUINT32) ((((1 ?
- 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
- 13:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ? 13:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
  25:16))) | (((gctUINT32) ((gctUINT32) (gcoMATH_Log2in5dot5(params->srcSize.depth)) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16)))
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x4060 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:1) - (0 ?
- 10:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ?
- 10:1))) | (((gctUINT32) ((gctUINT32) (0x3FF) & ((gctUINT32) ((((1 ? 10:1) - (0 ?
- 10:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ?
- 10:1)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 20:11) - (0 ?
- 20:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ?
- 20:11))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 20:11) - (0 ?
- 20:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ?
- 20:11)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 30:21) - (0 ?
- 30:21) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:21) - (0 ? 30:21) + 1))))))) << (0 ?
- 30:21))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 30:21) - (0 ?
- 30:21) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:21) - (0 ? 30:21) + 1))))))) << (0 ?
- 30:21)))
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1))))))) << (0 ?
+ 10:1))) | (((gctUINT32) ((gctUINT32) (0x3FF) & ((gctUINT32) ((((1 ?
+ 10:1) - (0 ?
+ 10:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:1) - (0 ? 10:1) + 1))))))) << (0 ? 10:1)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1))))))) << (0 ?
+ 20:11))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 20:11) - (0 ?
+ 20:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:11) - (0 ? 20:11) + 1))))))) << (0 ? 20:11)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:21) - (0 ?
+ 30:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:21) - (0 ?
+ 30:21) + 1))))))) << (0 ?
+ 30:21))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 30:21) - (0 ?
+ 30:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:21) - (0 ? 30:21) + 1))))))) << (0 ? 30:21)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x41C0 + hwSamplerNo, VK_FALSE,
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
- 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
- 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 16:16) - (0 ? 16:16) + 1) == 32) ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:23) - (0 ?
- 24:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ?
- 24:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 24:23) - (0 ? 24:23) + 1) == 32) ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1))))))) << (0 ?
+ 24:23))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 24:23) - (0 ?
+ 24:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ? 24:23)))
         );
 
     __vkCmdLoadSingleHWState(states, 0x4200 + (hwSamplerNo << 4), VK_FALSE, address);
 
     __vkCmdLoadSingleHWState(states, 0x40A0 + hwSamplerNo, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 17:0) - (0 ?
- 17:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1))))))) << (0 ?
  17:0))) | (((gctUINT32) ((gctUINT32) (txStride) & ((gctUINT32) ((((1 ?
- 17:0) - (0 ? 17:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ?
- 17:0)))
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ? 17:0)))
         );
 
     return result;
 }
-
 
 
 
