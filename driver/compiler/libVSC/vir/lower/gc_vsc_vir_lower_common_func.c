@@ -310,11 +310,12 @@ VIR_Lower_AdjustCoordSwizzleForShadow(
     switch (samplerType)
     {
     case VIR_TYPE_SAMPLER_2D_SHADOW:
-    case VIR_TYPE_SAMPLER_1D_ARRAY_SHADOW:
         newSwizzle = VIR_SWIZZLE_XYYY;
         break;
 
     case VIR_TYPE_SAMPLER_CUBE_SHADOW:
+    /* We treat 1DArray as a 2DArray. */
+    case VIR_TYPE_SAMPLER_1D_ARRAY_SHADOW:
     case VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW:
         newSwizzle = VIR_SWIZZLE_XYZZ;
         break;
