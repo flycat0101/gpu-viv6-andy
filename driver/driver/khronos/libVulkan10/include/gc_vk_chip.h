@@ -26,7 +26,7 @@ typedef struct __vkChipFuncTableRec
     VkResult (*FillBuffer)(VkCommandBuffer cmdBuf, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
     VkResult (*CopyBuffer)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, uint64_t copySize);
     VkResult (*UpdateBuffer)(VkCommandBuffer cmdBuf, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size, const uint32_t* pData);
-    VkResult (*ComputeBlit)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, VkBool3D *reverse, VkFilter filter);
+    VkResult (*ComputeBlit)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, VkBool32 rawCopy, VkBool3D *reverse, VkFilter filter);
     VkResult (*Draw)(VkCommandBuffer cmdBuf, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
     VkResult (*DrawIndexed)(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
     VkResult (*DrawIndirect)(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t count, uint32_t stride);

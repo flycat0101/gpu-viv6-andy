@@ -1145,13 +1145,13 @@ VkResult halti3_copyBuffer(
          /* use rowLength and imgHeight to fake a 2d image*/
         if(copySize > 0)
         {
-        srcRes->u.buf.rowLength =(uint32_t)  copySize;
-        srcRes->u.buf.imgHeight = 1;
+            srcRes->u.buf.rowLength =(uint32_t)  copySize;
+            srcRes->u.buf.imgHeight = 1;
 
-        dstRes->u.buf.rowLength = (uint32_t) copySize;
-        dstRes->u.buf.imgHeight = 1;
+            dstRes->u.buf.rowLength = (uint32_t) copySize;
+            dstRes->u.buf.imgHeight = 1;
 
-        halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvNULL,VK_FILTER_NEAREST);
+            halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
         }
     }
     else
@@ -1161,7 +1161,7 @@ VkResult halti3_copyBuffer(
         srcRes->u.buf.imgHeight = height;
         dstRes->u.buf.rowLength = maxTexSize;
         dstRes->u.buf.imgHeight = height;
-        halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvNULL,VK_FILTER_NEAREST);
+        halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
         if (copySize % maxTexSize)
         {
             VkDeviceSize addOffset = maxTexSize * height;
@@ -1170,7 +1170,7 @@ VkResult halti3_copyBuffer(
             srcRes->u.buf.offset += addOffset;
             dstRes->u.buf.offset += addOffset;
 
-            halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvNULL,VK_FILTER_NEAREST);
+            halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
 
             /*restore to orignal offset*/
             srcRes->u.buf.offset -= addOffset;

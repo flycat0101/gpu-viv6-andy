@@ -317,39 +317,52 @@ typedef struct
 enum
 {
     HALTI5_BLIT_2D_UNORM_FLOAT = 0,
-    HALTI5_BLIT_2D_UNORM_A1R5G5B5_PACKED,
-    HALTI5_BLIT_2D_UNORM_A2B10G10R10_PACKED,
+    HALTI5_BLIT_2D_UNORM_FLOAT_HWDOUBLEROUNDING,
+    HALTI5_BLIT_2D_UNORM_TO_PACK16,
     HALTI5_BLIT_2D_SINT,
     HALTI5_BLIT_2D_UINT,
-    HALTI5_BLIT_2D_UINT_A2B10G10R10_PACKED,
-    HALTI5_BLIT_2D_UNORM_R5G6B5_PACKED,
-    HALTI5_BLIT_2D_UNORM_A4R4G4B4_PACKED,
+    HALTI5_BLIT_2D_UINT_TO_A2B10G10R10_PACK,
+
+    HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE,
+    HALTI5_BLIT_2D_SINT_DOWNSAMPLE,
+    HALTI5_BLIT_2D_UINT_DOWNSAMPLE,
 
     HALTI5_BLIT_3D_UNORM_FLOAT,
-    HALTI5_BLIT_3D_UNORM_A1R5G5B5_PACKED,
-    HALTI5_BLIT_3D_UNORM_A2B10G10R10_PACKED,
+    HALTI5_BLIT_3D_UNORM_TO_PACK16,
     HALTI5_BLIT_3D_SINT,
     HALTI5_BLIT_3D_UINT,
-    HALTI5_BLIT_3D_UINT_A2B10G10R10_PACKED,
-    HALTI5_BLIT_3D_UNORM_R5G6B5_PACKED,
-    HALTI5_BLIT_3D_UNORM_A4R4G4B4_PACKED,
+    HALTI5_BLIT_3D_UINT_TO_A2B10G10R10_PACK,
 
     HALTI5_BLIT_2LAYERS_IMG_TO_BUF,
     HALTI5_BLIT_BUF_TO_2LAYERS_IMG,
-
     HALTI5_BLIT_COPY_2D_UNORM_FLOAT,
-
-    HALTI5_BLIT_COPY_BUF_TO_X8D24_IMG,
-    HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_STENCIL,
-    HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_DEPTH,
-    HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_STENCIL,
-    HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_DEPTH,
 
     HALTI3_CLEAR_2D_UINT,
     HALTI3_CLEAR_TO_2LAYERS_IMG,
     HALTI3_BLIT_BUFFER_2D,
 
     HALTI5_BLIT_NUM,
+};
+
+enum
+{
+    __CHANNEL_MASK_R    = 0x1,
+    __CHANNEL_MASK_G    = 0x2,
+    __CHANNEL_MASK_B    = 0x4,
+    __CHANNEL_MASK_A    = 0x8,
+    __CHANNEL_MASK_RGB  = __CHANNEL_MASK_R | __CHANNEL_MASK_G | __CHANNEL_MASK_B,
+    __CHANNEL_MASK_GBA  = __CHANNEL_MASK_G | __CHANNEL_MASK_B | __CHANNEL_MASK_A,
+    __CHANNEL_MASK_RGBA = __CHANNEL_MASK_RGB | __CHANNEL_MASK_A,
+};
+
+enum
+{
+    __PACK_FORMAT_INVALID     = 0,
+    __PACK_FORMAT_A4R4G4B4    = 1,
+    __PACK_FORMAT_B4G4R4A4    = 2,
+    __PACK_FORMAT_R5G6B5      = 3,
+    __PACK_FORMAT_A1R5G5B5    = 4,
+    __PACK_FORMAT_A2B10G10R10 = 5,
 };
 
 #define HALTI5_INSTANCE_CMD_BUFSIZE 10
@@ -366,14 +379,24 @@ typedef struct
 
 typedef struct __vkComputeBlitParams
 {
+    VkBool32   rawCopy;
     VkBool3D   reverse;
     VkBool32   srcSRGB;
     VkBool32   dstSRGB;
+    uint32_t   srcFormat;   /* tex format finally used to program compute blit */
+    uint32_t   dstFormat;   /* img format finally used to program compute blit */
+    uint32_t   srcParts;
+    uint32_t   dstParts;
+    const VkComponentMapping *txSwizzles;
+    VkBool32   flushTex;
+
     VkOffset3D srcOffset;
     VkOffset3D dstOffset;
     VkExtent3D srcExtent;
     VkExtent3D dstExtent;
     VkExtent3D srcSize;
+    uint32_t   packFormat;
+    uint32_t   channelWriteMask;    /* channel level write mask */
     uint32_t   uClearValue0[4];
     uint32_t   uClearValue1[4];
 } __vkComputeBlitParams;
@@ -386,7 +409,7 @@ typedef struct halti5_vscprogram_blit
     PROGRAM_EXECUTABLE_PROFILE      pep;
     VSC_HW_PIPELINE_SHADERS_STATES  hwStates;
 
-    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY    *srcTexEntry;
+    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY    *srcTexEntry[2];
     PROG_VK_STORAGE_TABLE_ENTRY                 *srcImgEntry[2];
     PROG_VK_STORAGE_TABLE_ENTRY                 *dstImgEntry[2];
     PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY          *constEntry;
@@ -737,7 +760,7 @@ VkResult __vkComputeClearVal(
     );
 
 uint32_t halti5_helper_convertHwTxSwizzle(
-    __vkFormatInfo * residentFormatInfo,
+    const __vkFormatInfo * residentFormatInfo,
     VkComponentSwizzle swizzle,
     uint32_t currentSwizzle,
     const uint32_t hwComponentSwizzle[]
@@ -785,6 +808,7 @@ VkResult halti5_computeBlit(
     VkCommandBuffer cmdBuf,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
+    VkBool32 rawCopy,
     VkBool3D *reverse,
     VkFilter filter
     );
