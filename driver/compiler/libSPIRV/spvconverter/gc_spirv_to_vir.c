@@ -4847,20 +4847,18 @@ static VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
 
     spv->operandSize -= 1;
 
+    /* TODO: need to unfold all the operations,
+             instead of treating them as non-constant operations. */
     switch (spv->opCode)
     {
     case SpvOpIAdd:
+        __SpvFoldingSpecConstantOp(spv, virShader);
+        break;
     case SpvOpISub:
     case SpvOpIMul:
     case SpvOpFAdd:
     case SpvOpFSub:
     case SpvOpFMul:
-    case SpvOpCompositeInsert:
-    case SpvOpCompositeExtract:
-    case SpvOpVectorShuffle:
-        __SpvFoldingSpecConstantOp(spv, virShader);
-        break;
-
     case SpvOpSNegate:
     case SpvOpNot:
     case SpvOpUDiv:
@@ -4901,6 +4899,17 @@ static VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
         __SpvEmitInstructions(spv, virShader);
         break;
 
+    case SpvOpVectorShuffle:
+        __SpvEmitVectorShuffle(spv, virShader);
+        break;
+
+    case SpvOpCompositeExtract:
+        __SpvEmitCompositeExtract(spv, virShader);
+        break;
+
+    case SpvOpCompositeInsert:
+        __SpvEmitCompositeInsert(spv, virShader);
+        break;
 
     case SpvOpQuantizeToF16:
         __SpvEmitIntrisicCall(spv, virShader);
@@ -6294,9 +6303,6 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
-    (void)dstVirTypeId;
-    (void)dstVirType;
-
     for (i = 0; i < 2; i++)
     {
         if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_SYMBOL)
@@ -6327,40 +6333,46 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
         gctUINT srcVec0CompNum = SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_SYM_SPV_TYPE(spv->operands[0]));
         gctUINT src0Component[4] = { 0 };
         gctUINT src1Component[4] = { 0 };
-        gctUINT src0Index = 0;
-        gctUINT src1Index = 0;
+        gctUINT componentCount[2] = {0, 0};
+        gctBOOL bHasUndef = gcvFALSE;
 
         emitRound = (spv->operands[0] == spv->operands[1] ? 1 : 2);
 
         /* determine component */
         for (i = 2; i < spv->operandSize; i++)
         {
-            if (spv->operands[i] < srcVec0CompNum)
+            if (spv->operands[i] == 0xFFFFFFFF)
+            {
+                bHasUndef = gcvTRUE;
+            }
+            else if (spv->operands[i] < srcVec0CompNum)
             {
                 dstEnable[0] |= virEnable[i - 2];
-                src0Component[src0Index++] = spv->operands[i];
+                src0Component[componentCount[0]] = spv->operands[i];
+                componentCount[0]++;
             }
             else
             {
                 /* operands exceed the vec1's component number is vec2's component */
                 dstEnable[1] |= virEnable[i - 2];
-                src1Component[src1Index++] = spv->operands[i] - srcVec0CompNum;
+                src1Component[componentCount[1]] = spv->operands[i] - srcVec0CompNum;
+                componentCount[1]++;
             }
         }
 
         /* copy the last swizzle */
-        if (src0Index > 0)
+        if (componentCount[0] > 0)
         {
-            for (i = src0Index; i < 4; i++)
+            for (i = componentCount[0]; i < 4; i++)
             {
-                src0Component[i] = src0Component[src0Index - 1];
+                src0Component[i] = src0Component[componentCount[0] - 1];
             }
         }
-        if (src1Index > 0)
+        if (componentCount[1] > 0)
         {
-            for (i = src1Index; i < 4; i++)
+            for (i = componentCount[1]; i < 4; i++)
             {
-                src1Component[i] = src1Component[src1Index - 1];
+                src1Component[i] = src1Component[componentCount[1] - 1];
             }
         }
 
@@ -6374,12 +6386,16 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
         for (i = 0; i < emitRound; i++)
         {
             SpvId elementType = SPV_ID_TYPE_VEC_COMP_TYPE(SPV_ID_SYM_SPV_TYPE(spv->resultId));
-            gctUINT componentCount = i == 0 ? src0Index : src1Index;
+
+            if (componentCount[i] == 0)
+            {
+                continue;
+            }
 
             /* Get vector element base type id */
             typeId = SPV_ID_VIR_TYPE_ID(elementType);
 
-            typeId = virVector[spvVecMagicBase[componentCount] + __GetMagicOffsetByTypeId(typeId)];
+            typeId = virVector[spvVecMagicBase[componentCount[i]] + __GetMagicOffsetByTypeId(typeId)];
 
             VIR_Function_AddInstruction(spv->virFunction,
                 virOpcode,
