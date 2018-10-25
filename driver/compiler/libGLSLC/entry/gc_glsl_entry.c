@@ -70,6 +70,11 @@ sltOPTIMIZATION_OPTIONS _GetOptions(sleSHADER_TYPE shaderType)
         opt &= ~slvOPTIMIZATION_SHARE_VEC_CONSTANTS;
     }
 
+    if (gcmOPT_hasFeature(FB_DISABLE_GL_LOOP_UNROLLING))
+    {
+        opt &= ~slvOPTIMIZATION_UNROLL_ITERATION;
+    }
+
     return opt;
 }
 

@@ -1625,6 +1625,8 @@ extern gctBOOL VirSHADER_DoDual16(gctINT ShaderId);
 #define FB_FORCE_LS_ACCESS        0x8000  /* triage use: enforce all load/store as local storage access,
                                              remove this feature bit once local storage access is supported */
 
+#define FB_DISABLE_GL_LOOP_UNROLLING    0x10000 /* Disable loop unrolling for GL FE. */
+
 #define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
                                    gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
 #define gcmOPT_SetSplitVecMUL() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
