@@ -619,6 +619,20 @@ gbm_surface_get_in_fence_fd(struct gbm_surface *surf)
 }
 
 /**
+ * Set the GBM render to sync or async mode.
+ *
+ * \param surf The surface
+ * \param sync_post
+ *         0: async post
+ *         1:  sync post
+ */
+GBM_EXPORT void
+gbm_surface_set_sync_post(struct gbm_surface *surf, int sync_post)
+{
+   return surf->gbm->surface_set_sync_post(surf, sync_post);
+}
+
+/**
  * Return whether or not a surface has free (non-locked) buffers
  *
  * Before starting a new frame, the surface must have a buffer

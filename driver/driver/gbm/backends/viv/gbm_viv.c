@@ -991,15 +991,22 @@ gbm_viv_surface_has_free_buffers(
     return 0;
 }
 
+static void
+gbm_viv_surface_set_sync_post(
+    struct gbm_surface *surface,
+    int sync_post
+    )
+{
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
+
+    surf->sync_post = sync_post;
+}
+
 static int
 gbm_viv_surface_get_in_fence_fd(
     struct gbm_surface *surface
     )
 {
-    struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
-    if(surf->sync_post)
-        surf->sync_post = 0;
-
     return surface->fence_fd;
 }
 
@@ -1081,6 +1088,7 @@ viv_device_create(int fd)
     dev->base.surface_release_buffer = gbm_viv_surface_release_buffer;
     dev->base.surface_has_free_buffers = gbm_viv_surface_has_free_buffers;
     dev->base.surface_get_in_fence_fd = gbm_viv_surface_get_in_fence_fd;
+    dev->base.surface_set_sync_post = gbm_viv_surface_set_sync_post;
     dev->base.surface_destroy = gbm_viv_surface_destroy;
     dev->base.name = gbm_viv_backend.backend_name;
 

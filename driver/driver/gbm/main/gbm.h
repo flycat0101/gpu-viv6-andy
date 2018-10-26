@@ -388,6 +388,9 @@ int
 gbm_surface_get_in_fence_fd(struct gbm_surface *surface);
 
 void
+gbm_surface_set_sync_post(struct gbm_surface *surface, int sync_post);
+
+void
 gbm_surface_destroy(struct gbm_surface *surface);
 
 #ifdef __cplusplus
