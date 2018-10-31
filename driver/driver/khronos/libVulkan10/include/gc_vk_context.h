@@ -123,7 +123,7 @@ struct __vkDevContextRec
     /* shortcuts */
     const __vkDrvCtrlOption *option;
     const __vkChipInfo *chipInfo;
-    const gcsFEATURE_DATABASE *database;
+    gcsFEATURE_DATABASE *database;
     VSC_SYS_CONTEXT vscSysCtx;
 
     __vkChipFuncTable *chipFuncs;
@@ -148,7 +148,7 @@ typedef struct __vkPhysicalDeviceConfigRec
     uint32_t ecoID;
     uint32_t customerID;
     uint32_t chipFlags;
-    const gcsFEATURE_DATABASE *database;
+    gcsFEATURE_DATABASE *database;
     gcsHAL_QUERY_CHIP_OPTIONS options;
 }__vkPhysicalDeviceConfig;
 

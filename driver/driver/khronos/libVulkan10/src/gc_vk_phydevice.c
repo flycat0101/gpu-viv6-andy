@@ -564,7 +564,7 @@ static void __vki_InitializePhysicalDeviceFeatures(
     __VK_VERIFY_OK(__vk_DeviceControl(&iface, 0));
     phyDevConfig->options = iface.u.QueryChipOptions;
 
-    phyDev->phyDevFeatures.robustBufferAccess                      = VK_FALSE; /* phyDevConfig->database->ROBUSTNESS */
+    phyDev->phyDevFeatures.robustBufferAccess                      = VK_TRUE; /* phyDevConfig->database->ROBUSTNESS */
     phyDev->phyDevFeatures.fullDrawIndexUint32                     = VK_FALSE;
     phyDev->phyDevFeatures.imageCubeArray                          = phyDevConfig->database->REG_Halti5;
     phyDev->phyDevFeatures.independentBlend                        = phyDevConfig->database->REG_Halti5;

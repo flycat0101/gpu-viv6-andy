@@ -320,6 +320,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     devCtx->option = &phyDev->pInst->drvOption;
     devCtx->chipInfo = &phyDev->pInst->chipInfo;
     devCtx->database = phyDev->phyDevConfig.database;
+    devCtx->database->ROBUSTNESS = 0;
 
 #if __VK_RESOURCE_INFO
     __VK_ONERROR(gcoOS_AtomConstruct(gcvNULL, &devCtx->atom_id));
