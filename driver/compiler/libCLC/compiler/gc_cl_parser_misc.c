@@ -9656,7 +9656,21 @@ IN cloIR_EXPR InitExpr
            if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
         }
         if(name->decl.dataType->accessQualifier == clvQUALIFIER_CONST) {
-           name->u.variableInfo.u.constant = (cloIR_CONSTANT)(&initExpr->base);
+           cloIR_CONSTANT constantExpr = (cloIR_CONSTANT)(&initExpr->base);
+
+           if(clmDECL_IsScalar(&constantExpr->exprBase.decl) && !clmDECL_IsScalar(&name->decl)) {
+               status = cloCOMPILER_CloneDecl(Compiler,
+                                              initExpr->decl.dataType->accessQualifier,
+                                              initExpr->decl.dataType->addrSpaceQualifier,
+                                              &name->decl,
+                                              &constantExpr->exprBase.decl);
+               if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+
+               constantExpr->allValuesEqual = gcvTRUE;
+           }
+
+           name->u.variableInfo.u.constant = constantExpr;
+
            name->u.variableInfo.u.constant->variable = name;
            if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
               (clmDECL_IsAggregateType(&name->decl) ||
