@@ -19,7 +19,7 @@
 #include "debug/gc_vsc_debug.h"
 
 #define _cldFILENAME_MAX 1024
-#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   1
+#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   0
 
 /* cloCOMPILER object. */
 struct _cloCOMPILER
