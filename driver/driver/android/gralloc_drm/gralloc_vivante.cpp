@@ -48,6 +48,7 @@ struct gralloc_vivante_t {
     /* drm driver fd. */
     int fd;
     struct drm_vivante *drm;
+    int use_virtual_pool;
 };
 
 static int gralloc_vivante_getpid(void)
@@ -164,6 +165,9 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
     }
 
     /* flags. */
+    if (drv->use_virtual_pool)
+        flags |= DRM_VIV_GEM_VIRTUAL_POOL;
+
     if ((gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_WRITE_OFTEN) ||
             (gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_READ_OFTEN))
         flags |= DRM_VIV_GEM_CACHED;
@@ -171,8 +175,11 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
     if (gralloc_handle_usage(handle) & GRALLOC_USAGE_PROTECTED)
         flags |= DRM_VIV_GEM_SECURE;
 
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB)
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB) {
+        // fb should be contiguous.
+        flags &= ~DRM_VIV_GEM_VIRTUAL_POOL;
         flags |= DRM_VIV_GEM_CONTIGUOUS;
+    }
 
     if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_COMPOSER)
         flags |= DRM_VIV_GEM_CMA_LIMIT;
@@ -399,6 +406,11 @@ int gralloc_vivante_create(gralloc_module_t const *module,
 
     drv->module = const_cast<gralloc_module_t *>(module);
     drv->fd = fd;
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("sys.hwc.disable", value, "0");
+    drv->use_virtual_pool = atoi(value);
+
     *pDrv = drv;
     gralloc_trace(1, "ok: fd=%d drm=%p drv=%p", fd, drv->drm, drv);
     return 0;
