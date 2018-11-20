@@ -1063,18 +1063,15 @@ VIR_BB_ChangeSuccBBs(
     {
         VIR_BB* succBB = CFG_EDGE_GET_TO_BB(succEdge);
         gctBOOL remove = gcvFALSE;
-        VIR_Label* label = gcvNULL;
 
         if((newJmpTo && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_FALSE))
         {
             gcmASSERT(bbEndOp == VIR_OP_JMPC);
-            label = VIR_Operand_GetLabel(bbEndDest);
             remove = gcvTRUE;
         }
         else if((newJmpTo && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_ALWAYS))
         {
             gcmASSERT(bbEndOp == VIR_OP_JMP);
-            label = VIR_Operand_GetLabel(bbEndDest);
             remove = gcvTRUE;
         }
         else if((newFallThru && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_ALWAYS))
@@ -1092,15 +1089,6 @@ VIR_BB_ChangeSuccBBs(
         {
             vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
         }
-        if(label)
-        {
-            VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)bbEnd);
-
-            if(link)
-            {
-                VIR_Function_FreeLink(func, link);
-            }
-        }
     }
 
     /* add new edges */
@@ -1112,6 +1100,18 @@ VIR_BB_ChangeSuccBBs(
 
         gcmASSERT(bbEndOp == VIR_OP_JMP ||
                   bbEndOp == VIR_OP_JMPC);
+
+        /* remove old link */
+        label = VIR_Operand_GetLabel(bbEndDest);
+        if (label)
+        {
+            link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)bbEnd);
+
+            if (link)
+            {
+                VIR_Function_FreeLink(func, link);
+            }
+        }
 
         errCode = vscVIR_AddEdgeToCFG(BB_GET_CFG(bb),
                                       bb,
@@ -1147,6 +1147,7 @@ VIR_BB_ChangeSuccBBs(
                 VIR_Label_SetDefInst(newLabel, newLabelInst);
                 label = newLabel;
             }
+
             VIR_Operand_SetLabel(bbEndDest, label);
             VIR_Function_NewLink(func, &link);
             VIR_Link_SetReference(link, (gctUINTPTR_T)bbEnd);
