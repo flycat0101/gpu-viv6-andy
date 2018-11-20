@@ -1031,9 +1031,16 @@ __SpvID2Swizzle (
     default: gcmASSERT(gcvFALSE); break;
     }
 
-    if (SPV_ID_TYPE_IS_POINTER(idType) && SPV_ID_TYPE_IS_VECTOR(idType))
+    if (SPV_ID_TYPE_IS_POINTER(idType))
     {
-        virSwizzle = virSwizzleCompact[SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(idType))];
+        if (SPV_ID_TYPE_IS_VECTOR(idType))
+        {
+            virSwizzle = virSwizzleCompact[SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(idType))];
+        }
+        else
+        {
+            virSwizzle = VIR_SWIZZLE_XXXX;
+        }
     }
     else if (SPV_ID_TYPE_IS_VECTOR(idType))
     {
@@ -4117,6 +4124,7 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
         /* GLSL have no pointer, but SPV always pointer even GLSL, so record to VIR_Shader type too,
            but when recognize this type variable, we get pointer objType to set variable
         */
+        virTypeId = VIR_TYPE_UINT32;
         SPV_ID_TYPE_POINTER_STORAGE_CLASS(spv->resultId) = (SpvStorageClass)spv->operands[0];
         SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(spv->resultId) = spv->operands[1];
         SPV_ID_TYPE_IS_VECTOR(spv->resultId) = SPV_ID_TYPE_IS_VECTOR(spv->operands[1]);
@@ -9800,7 +9808,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             }
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, VIR_Symbol_GetTypeId(VIR_Operand_GetSymbol(operand)));
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);

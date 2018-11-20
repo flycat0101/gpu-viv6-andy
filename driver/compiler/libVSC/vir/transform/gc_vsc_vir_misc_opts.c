@@ -1309,6 +1309,7 @@ static VIR_Uniform* _FindMemBaseUniform(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Operand*              pThisOpnd;
     VIR_Symbol*               pSym = gcvNULL;
     VIR_OperandInfo           operandInfo;
+    VIR_Uniform*              pUniform;
 
     vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pMemInst, pOpnd, gcvFALSE, gcvFALSE);
 
@@ -1316,14 +1317,31 @@ static VIR_Uniform* _FindMemBaseUniform(VIR_DEF_USAGE_INFO* pDuInfo,
          pDef != gcvNULL;
          pDef = vscVIR_GeneralUdIterator_Next(&udIter))
     {
+        VIR_OpCode opCode;
+        if (VIR_IS_SPECIAL_INST(pDef->defKey.pDefInst))
+        {
+            continue;
+        }
+        opCode = VIR_Inst_GetOpcode(pDef->defKey.pDefInst);
         for (i = 0; i < VIR_Inst_GetSrcNum(pDef->defKey.pDefInst); ++i)
         {
+            if (opCode == VIR_OP_MAD ||
+                opCode == VIR_OP_IMADLO0 ||
+                opCode == VIR_OP_IMADLO1)
+            {
+                /* only check src2 if it is MAD operation */
+                i = 2;
+            }
+
             pThisOpnd = VIR_Inst_GetSource(pDef->defKey.pDefInst, i);
             pSym = VIR_Operand_GetSymbol(pThisOpnd);
 
-            if (VIR_Operand_GetOpKind(pThisOpnd) == VIR_OPND_SYMBOL && VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
+            if (VIR_Operand_GetOpKind(pThisOpnd) == VIR_OPND_SYMBOL &&
+                (VIR_Symbol_isUniform(pSym)   ||
+                 VIR_Symbol_isImage(pSym)       )  )
             {
-                return VIR_Symbol_GetUniform(pSym);
+                return VIR_Symbol_isUniform(pSym) ? VIR_Symbol_GetUniform(pSym)
+                                                  : VIR_Symbol_GetImage(pSym);
             }
             else
             {
@@ -1331,7 +1349,11 @@ static VIR_Uniform* _FindMemBaseUniform(VIR_DEF_USAGE_INFO* pDuInfo,
 
                 if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
                 {
-                    return _FindMemBaseUniform(pDuInfo, pDef->defKey.pDefInst, pThisOpnd);
+                    pUniform = _FindMemBaseUniform(pDuInfo, pDef->defKey.pDefInst, pThisOpnd);
+                    if (pUniform)
+                    {
+                        return pUniform;
+                    }
                 }
             }
         }
@@ -1373,6 +1395,9 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_GENERAL_UD_ITERATOR   udIter;
     VIR_DEF*                  pDef;
     VIR_Operand *             opnd;
+    VIR_Type *                symType;
+    VIR_TypeId                newSymTypeId;
+    VIR_Type *                newSymType;
 
     if (!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK))
     {
@@ -1395,6 +1420,7 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            gctBOOL bFullRange = gcvFALSE;  /* set bounds to <0x00, 0xFFFFFFFF> */
             /* Uniform for SSBO base-addr has Y channel to store size of SSBO, now with OOB enable,
                we need move it to W channel because XYZ will be use as base/low-limit/upper-limit */
             for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++ i)
@@ -1431,6 +1457,8 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
             bNeedInsertMov = gcvFALSE;
             if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL && VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
             {
+                /* the uniform has the pointer bound in its .y/.z channel,
+                 * so there is no need to insert a bounds info to the pointer */
                 pMemBaseUniform = VIR_Symbol_GetUniform(pSym);
             }
             else
@@ -1452,24 +1480,66 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
             pSymForMemBaseUniform = VIR_Shader_GetSymFromId(pShader, pMemBaseUniform->sym);
 
-            /* Change uniform type to vec2 to hold mem-size in Y channel. */
-            if (VIR_Symbol_HasFlag(pSymForMemBaseUniform, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
+            if (VIR_Symbol_isImage(pSymForMemBaseUniform))
             {
-                pUnderlyingSym = VIR_Shader_GetSymFromId(pShader, pMemBaseUniform->baseBindingUniform);
-
-                gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pUnderlyingSym))) &
-                           VIR_TYFLAG_ISINTEGER));
-
-                VIR_Symbol_SetType(pUnderlyingSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_ATOMIC_UINT4));
+                VIR_Operand *offsetOpnd = VIR_Inst_GetSource(inst, 1);
+                /* if the image atomic operation has offset 0, then we don't need to insert bounds */
+                gcmASSERT(VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)));
+                if (VIR_Operand_isImm(offsetOpnd) &&
+                    VIR_Operand_GetImmediateInt(offsetOpnd) == 0)
+                {
+                    bNeedInsertMov = gcvFALSE;
+                }
+                else
+                {
+                    /* otherwise assume the image atomic address calculation is done bounds check,
+                     * so the bounds can be extended to full range, we can set the instruction not
+                     * to do bounds check if HW support per-inst bound check flag in future */
+                    bFullRange = gcvTRUE;
+                }
             }
             else
             {
-                gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSymForMemBaseUniform))) &
-                           VIR_TYFLAG_ISINTEGER));
+                /* Change uniform type to vec4 to hold lower/upper bounds in x/y and mem-size in W channel. */
+                if (VIR_Symbol_HasFlag(pSymForMemBaseUniform, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
+                {
+                    pUnderlyingSym = VIR_Shader_GetSymFromId(pShader, pMemBaseUniform->baseBindingUniform);
 
-                VIR_Symbol_SetType(pSymForMemBaseUniform, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4));
+                    symType = VIR_Symbol_GetType(pUnderlyingSym);
+                    gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(symType)) & VIR_TYFLAG_ISINTEGER));
+                    if (VIR_Type_isArray(symType))
+                    {
+                        errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_ATOMIC_UINT4,
+                                                          VIR_Type_GetArrayLength(symType), 0, &newSymTypeId);
+                        ON_ERROR(errCode, "Add array type");
+                        newSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
+                        VIR_Symbol_SetType(pUnderlyingSym, newSymType);
+                    }
+                    else
+                    {
+                        VIR_Symbol_SetType(pUnderlyingSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_ATOMIC_UINT4));
+                    }
+                }
+                else
+                {
+                    symType = VIR_Symbol_GetType(pSymForMemBaseUniform);
+                    gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(symType)) & VIR_TYFLAG_ISINTEGER));
+
+                    if (VIR_Type_isArray(symType))
+                    {
+                        errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_UINT_X4,
+                                                          VIR_Type_GetArrayLength(symType), 0, &newSymTypeId);
+                        ON_ERROR(errCode, "Add array type");
+                        newSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
+                        VIR_Symbol_SetType(pSymForMemBaseUniform, newSymType);
+                    }
+                    else
+                    {
+                        VIR_Symbol_SetType(pSymForMemBaseUniform,
+                                            VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4));
+                    }
+                }
             }
-
             /* If src0 is not mem-base uniform, insert following 3 movs, and cast src0 to new dst-of-mov
                1. mov from src0.x,
                2. mov from Y channel of mem-base-addr uniform (low-limit)
@@ -1508,7 +1578,6 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetSwizzle(opnd, VIR_Operand_GetSwizzle(pOpnd));
                 VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
                 VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-
                 vscVIR_AddNewDef(pDuInfo,
                                  pNewInsertedInstX,
                                  newDstRegNo,
@@ -1553,11 +1622,17 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
                 /* src */
                 opnd = VIR_Inst_GetSource(pNewInsertedInstY, VIR_Operand_Src0);
-                VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
-                VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_YYYY);
-                VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
-                VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-
+                if (bFullRange)
+                {
+                    VIR_Operand_SetImmediateUint(opnd, 0);
+                }
+                else
+                {
+                    VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
+                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_YYYY);
+                    VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
+                    VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
+                }
                 vscVIR_AddNewDef(pDuInfo,
                                  pNewInsertedInstY,
                                  newDstRegNo,
@@ -1582,11 +1657,17 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
                 /* src */
                 opnd = VIR_Inst_GetSource(pNewInsertedInstZ, VIR_Operand_Src0);
-                VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
-                VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_ZZZZ);
-                VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
-                VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-
+                if (bFullRange)
+                {
+                    VIR_Operand_SetImmediateUint(opnd, 0xFFFFFFFF);
+                }
+                else
+                {
+                    VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
+                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_ZZZZ);
+                    VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
+                    VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
+                }
                 vscVIR_AddNewDef(pDuInfo,
                                  pNewInsertedInstZ,
                                  newDstRegNo,
@@ -1635,9 +1716,9 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                                         VIR_HALF_CHANNEL_MASK_FULL,
                                         gcvNULL);
             }
-
             /* Change the swizzle of src0 to XYZ */
             VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYZZ);
+
         }
     }
 
