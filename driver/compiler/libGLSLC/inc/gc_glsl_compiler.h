@@ -494,6 +494,12 @@ typedef enum _sleEXTENSION
                                                                          | slvEXTENSION_IMAGE_ATOMIC,
 
     slvEXTENSION_SHADER_FRAMEBUFFER_FETCH                   = 0x04000000,
+    slvEXTENSION_DOUBLE_DATA_TYPE                           = 0x08000000,
+
+    slvEXTENSION_SUPPORT_SAMPLER1D                          = 0x10000000,
+    slvEXTENSION_INTEGER_MIX                                = 0x20000000,
+
+    slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3                   = 0x40000000,
 
     slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION_BLEND_EQUATION_ADVANCED              |
                                                               slvEXTENSION_SAMPLE_VARIABLES                     |
@@ -519,6 +525,7 @@ typedef enum _sleEXTENSION
                                                               slvEXTENSION_TEXTURE_ARRAY |
                                                               slvEXTENSION_FRAG_DEPTH |
                                                               slvEXTENSION_EGL_IMAGE_EXTERNAL |
+                                                              slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3 |
                                                               slvEXTENSION_SHADOW_SAMPLER |
                                                               slvEXTENSION_BLEND_EQUATION_ADVANCED |
                                                               slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |

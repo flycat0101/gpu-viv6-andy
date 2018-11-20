@@ -41,6 +41,7 @@ static slsEXTENSION_INFO _DefinedExtensions[] =
     {"GL_OES_standard_derivatives", slvEXTENSION_STANDARD_DERIVATIVES, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
     {"GL_OES_texture_3D", slvEXTENSION_TEXTURE_3D, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
     {"GL_OES_EGL_image_external", slvEXTENSION_EGL_IMAGE_EXTERNAL, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
+    {"GL_OES_EGL_image_external_essl3", slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
     {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     {"GL_OES_shader_image_atomic", slvEXTENSION_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* sample shading extension. */
