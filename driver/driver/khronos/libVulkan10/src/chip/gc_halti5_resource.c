@@ -10656,7 +10656,8 @@ VkResult halti5_allocDescriptorSet(
     halti5_descriptorSet *chipDescSet;
     __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet*, descriptorSet);
     uint32_t numofEntries = descSet->descSetLayout->samplerDescriptorCount
-                          + descSet->descSetLayout->samplerBufferDescriptorCount;
+                          + descSet->descSetLayout->samplerBufferDescriptorCount
+                          + descSet->descSetLayout->inputAttachmentDescriptorCount;
     size_t bytes = __VK_ALIGN(sizeof(halti5_descriptorSet), 8)
                  + __VK_ALIGN(sizeof(halti5_patch_key)  * numofEntries, 8)
                  + __VK_ALIGN(sizeof(halti5_patch_info) * numofEntries, 8);
@@ -10802,7 +10803,7 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SINT_2_R32G32SINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
@@ -10813,7 +10814,7 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32UINT_2_R32G32UINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
@@ -11060,7 +11061,6 @@ VkResult halti5_updateDescriptorSet(
     halti5_patch_key *patchKeys = chipDescSet->patchKeys;
     halti5_patch_info *patchInfos = chipDescSet->patchInfos;
 
-
     __VK_MEMZERO(patchKeys, sizeof(halti5_patch_key) * chipDescSet->numofEntries);
     __VK_MEMZERO(patchInfos, sizeof(halti5_patch_info) * chipDescSet->numofEntries);
 
@@ -11147,7 +11147,9 @@ VkResult halti5_updateDescriptorSet(
                 }
                 entryIdx++;
                 break;
+
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkImageView *imgv = resInfo->u.imageInfo.imageView;
@@ -11171,7 +11173,6 @@ VkResult halti5_updateDescriptorSet(
                 entryIdx++;
                 break;
 
-            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
             case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
                 break;
 

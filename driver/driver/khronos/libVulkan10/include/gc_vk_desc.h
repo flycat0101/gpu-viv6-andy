@@ -100,6 +100,8 @@ typedef struct __vkDescriptorSetLayoutRec
 
     uint32_t samplerBufferDescriptorCount; /* uniform texel buffer descriptor count  */
 
+    uint32_t inputAttachmentDescriptorCount; /* input attachment descriptor count */
+
     uint32_t totalEntries;
 
 }__vkDescriptorSetLayout;

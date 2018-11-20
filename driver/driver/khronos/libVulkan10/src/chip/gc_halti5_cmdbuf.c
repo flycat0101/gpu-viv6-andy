@@ -4652,7 +4652,8 @@ static VkResult halti5_helper_setDescSetInputAttach(
     {
         if (activeStageMask & (1 << stageIdx))
         {
-            SHADER_UAV_SLOT_MAPPING *hwMapping = &inputAttachEntry->hwMappings[stageIdx].uavMapping;
+            PROG_VK_INPUT_ATTACHMENT_HW_MAPPING *iaHwMapping = &inputAttachEntry->hwMappings[stageIdx];
+            SHADER_UAV_SLOT_MAPPING *hwMapping = &iaHwMapping->uavMapping;
             uint32_t hwConstRegAddrBase = hints->hwConstRegBases[stageIdx];
             uint32_t TxHwRegisterIdx = (stageIdx < VSC_SHADER_STAGE_PS) ? 0 : 1;
 
@@ -4687,13 +4688,28 @@ static VkResult halti5_helper_setDescSetInputAttach(
                                                                       commandBuffer,
                                                                       VK_NULL_HANDLE,
                                                                       TxHwRegisterIdx,
-                                                                      chipImgv->txDesc,
+                                                                      &chipImgv->txDesc[0],
                                                                       &chipImgv->samplerDesc,
                                                                       0,
                                                                       (hwSamplerNo + arrayIdx),
                                                                       hints->shaderConfigData);
                     chipCommandBuffer->newResourceViewUsageMask |=
                         halti5_check_resView_firstUse(&chipImgv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+
+                    if (iaHwMapping->ppExtraSamplerArray && iaHwMapping->ppExtraSamplerArray[arrayIdx])
+                    {
+                        hwSamplerNo = iaHwMapping->ppExtraSamplerArray[arrayIdx]->pSampler->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
+
+                        (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
+                                                                          commandBuffer,
+                                                                          VK_NULL_HANDLE,
+                                                                          TxHwRegisterIdx,
+                                                                          &chipImgv->txDesc[1],
+                                                                          &chipImgv->samplerDesc,
+                                                                          0,
+                                                                          (hwSamplerNo + arrayIdx),
+                                                                          hints->shaderConfigData);
+                    }
                 }
                 else
                 {

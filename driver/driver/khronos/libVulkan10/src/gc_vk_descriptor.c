@@ -644,6 +644,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorSetLayout(
             case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
                 dsl->samplerBufferDescriptorCount += pBinding->std.descriptorCount;
                 break;
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                dsl->inputAttachmentDescriptorCount += pBinding->std.descriptorCount;
             default:
                 break;
             }
