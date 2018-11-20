@@ -260,18 +260,21 @@ static VSC_ErrCode _VSC_CPP_ReplaceSource(
 static gctBOOL _VSC_CPP_CopySrcTypeFromMov(
     IN OUT VSC_CPP_CopyPropagation* pCpp,
     IN     VIR_Instruction*         pInst,
-    IN     VIR_Instruction*         pMovInst
+    IN     VIR_Instruction*         pMovInst,
+    IN     VIR_Operand*             pNewSrc
     )
 {
     gctBOOL         bCopySrcTypeFromMov = gcvFALSE;
+    VIR_Operand*    pSrc0 = VIR_Inst_GetSource(pInst, 0);
 
     if (VSC_CPP_GetFlag(pCpp) & VSC_CPP_USE_SRC_TYPE_FROM_MOVE)
     {
         VIR_OpCode  opCode = VIR_Inst_GetOpcode(pInst);
 
-        /* Now we only copy the src type from MOV for imageFetch. */
+        /* Now we only copy the src type from MOV for imageFetch(sampler2DMS). */
         if (opCode == VIR_OP_INTRINSIC &&
-            VIR_Intrinsics_isImageFetch(VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pInst, 0))))
+            VIR_Intrinsics_isImageFetch(VIR_Operand_GetIntrinsicKind(pSrc0)) &&
+            VIR_TypeId_isSamplerMS(VIR_Operand_GetTypeId(pNewSrc)))
         {
             bCopySrcTypeFromMov = gcvTRUE;
         }
@@ -916,7 +919,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         VIR_Operand_SetSwizzle(newSrc, newSwizzle);
                         VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
 
-                        if (!_VSC_CPP_CopySrcTypeFromMov(cpp, inst, defInst))
+                        if (!_VSC_CPP_CopySrcTypeFromMov(cpp, inst, defInst, newSrc))
                         {
                             VIR_Operand_SetTypeId(newSrc, ty);
                         }
