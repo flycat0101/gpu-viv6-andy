@@ -4890,12 +4890,13 @@ void _VIR_RA_FillPsInputPosPCCompValid(
 }
 
 static gctBOOL
-_VIR_RA_ShaderHasSymDepth(
+_VIR_RA_ShaderEnableDepth(
     VIR_Shader *pShader
     )
 {
     gctUINT                 outputIdx;
     VIR_AttributeIdList     *pOutputs = VIR_Shader_GetOutputs(pShader);
+    gctBOOL                 bHasOutputColor = gcvFALSE;
 
     gcmASSERT(pShader->shaderKind == VIR_SHADER_FRAGMENT);
 
@@ -4909,8 +4910,22 @@ _VIR_RA_ShaderHasSymDepth(
             {
                 return gcvTRUE;
             }
+            /*
+            ** If there is no color ouput in a fragment shader, driver still enables depth no matter
+            ** gl_FragDepth is used or not. In this case, we need to use r0.w for sampleMask.
+            */
+            else if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_COLOR)
+            {
+                bHasOutputColor = gcvTRUE;
+            }
         }
     }
+
+    if (!bHasOutputColor)
+    {
+        return gcvTRUE;
+    }
+
     return gcvFALSE;
 }
 
@@ -4937,7 +4952,7 @@ _VIR_RA_LS_GetStartReg(
             gctUINT unusedChannel = _VIR_RA_Check_First_Unused_Pos_Attr_Channel(pRA);
 
             /* sepcial symbol depth will use r0.z and reset unusedChannel to next channel */
-            if (_VIR_RA_ShaderHasSymDepth(pRA->pShader) && (unusedChannel == CHANNEL_Z))
+            if (_VIR_RA_ShaderEnableDepth(pRA->pShader) && (unusedChannel == CHANNEL_Z))
             {
                 unusedChannel = CHANNEL_W;
             }
