@@ -23,10 +23,16 @@ BEGIN_EXTERN_C()
 /* Right now, all the chips have the same call stack limitation, 4. */
 #define VSC_MAX_CALL_STACK_DEPTH    3
 
+typedef struct _VSC_IL_PASS_DATA
+{
+    gctUINT32                   passIndex;
+    gctBOOL                     bCheckAlwaysInlineOnly;
+} VSC_IL_PASS_DATA;
+
 typedef struct _VSC_IL_INST_LIST_NODE
 {
-    VSC_UNI_LIST_NODE         node;
-    VIR_Instruction           *inst;
+    VSC_UNI_LIST_NODE           node;
+    VIR_Instruction             *inst;
 }VSC_IL_INST_LIST_NODE;
 
 #define CAST_INST_NODE_2_ULN(pInstNode)            (VSC_UNI_LIST_NODE*)(pInstNode)
@@ -57,6 +63,7 @@ typedef struct VIR_INLINER
     VIR_CALL_GRAPH              *pCG;
     VSC_HASH_TABLE              *pCandidates; /* inline candidate */
 
+    VSC_IL_PASS_DATA            *pILPassData;
     gctBOOL                     bCheckAlwaysInlineOnly;
     gctINT                      inlineBudget;
 
@@ -75,6 +82,8 @@ typedef struct VIR_INLINER
 #define VSC_IL_GetCallGraph(inliner)       ((inliner)->pCG)
 #define VSC_IL_SetCallGraph(inliner, cg)   ((inliner)->pCG = (cg))
 #define VSC_IL_GetCandidates(inliner)      ((inliner)->pCandidates)
+#define VSC_IL_GetPassData(inliner)        ((inliner)->pILPassData)
+#define VSC_IL_SetPassData(inliner, data)  ((inliner)->pILPassData = (data))
 #define VSC_IL_GetCheckAlwaysInlineOnly(inliner)    ((inliner)->bCheckAlwaysInlineOnly)
 #define VSC_IL_SetCheckAlwaysInlineOnly(inliner, V) ((inliner)->bCheckAlwaysInlineOnly = (V))
 #define VSC_IL_GetInlineBudget(inliner)     ((inliner)->inlineBudget)

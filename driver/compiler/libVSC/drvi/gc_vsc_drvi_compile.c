@@ -697,7 +697,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
-    gctBOOL             bCheckAlwaysInlineOnly = gcvFALSE;
+    VSC_IL_PASS_DATA    ilPassData = { 2, gcvFALSE };
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
@@ -710,7 +710,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 
     /* Call (schedule) passes of LL by ourselves */
     CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, gcvNULL);
-    CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+    CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &ilPassData);
     CALL_SH_PASS(VSC_SCPP_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VIR_LoopOpts_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
@@ -934,7 +934,6 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_ShLevel         libShLevel;
     gctBOOL             bIsRecompiler = (pShPassMnger->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_RECOMPILER);
-    gctBOOL             bCheckAlwaysInlineOnly = gcvTRUE;
 
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_ML);
 
@@ -947,6 +946,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
         {
             VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE, gcvFALSE };
             VSC_CPP_PASS_DATA           cppPassData = { VSC_CPP_NONE, gcvTRUE };
+            VSC_IL_PASS_DATA            ilPassData = { 0, gcvTRUE };
 
             /* If this is from recompiler, we need to do these processes before linking external lib functions. */
             if (bIsRecompiler)
@@ -958,7 +958,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
                 CALL_SH_PASS(vscVIR_CheckMustInlineFuncForML, 0, gcvNULL);
 
                 /* Inline some always inline functions. */
-                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &ilPassData);
 
                 /* Do some postprocess works for inline. */
                 CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
@@ -976,7 +976,8 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
                 CALL_SH_PASS(vscVIR_CheckMustInlineFuncForML, 0, gcvNULL);
 
                 /* Inline some always inline functions. */
-                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+                ilPassData.passIndex = 1;
+                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &ilPassData);
 
                 /* Initialize variables here to make CPP work. */
                 CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);

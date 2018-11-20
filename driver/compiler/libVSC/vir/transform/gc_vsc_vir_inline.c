@@ -148,7 +148,7 @@ OnError:
 /* Duplicate a new instruction in Function based on OrigInst */
 VSC_ErrCode
 VSC_IL_DupInstruction(
-    IN  VIR_Shader      *pShader,
+    VIR_Inliner         *pInliner,
     IN  VIR_Function    *OrigFunction,
     IN  VIR_Function    *Function,
     IN  VIR_Instruction *OrigInst,
@@ -160,6 +160,7 @@ VSC_IL_DupInstruction(
     )
 {
     VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_Shader      *pShader = VSC_IL_GetShader(pInliner);
 
     VIR_Instruction *inst = (VIR_Instruction *)vscMM_Alloc(
                                                &Function->hostShader->pmp.mmWrapper,
@@ -221,9 +222,10 @@ VSC_IL_DupInstruction(
             gcoOS_PrintStrSafe(labelName,
                                gcmSIZEOF(labelName),
                                &offset,
-                               "%s_%u_%u",
+                               "%s_%u_%u_%u",
                                VIR_Shader_GetSymNameString(Function->hostShader,
                                VIR_Function_GetSymbol(OrigFunction)),
+                               VSC_IL_GetPassData(pInliner)->passIndex,
                                callerIdx,
                                VIR_Label_GetId(label));
 
@@ -262,7 +264,7 @@ VSC_IL_DupInstruction(
 
 static VSC_ErrCode
 VSC_IL_DupSingleVariable(
-    IN  VIR_Shader      *pShader,
+    IN  VIR_Inliner     *pInliner,
     IN  VIR_Function    *pCallerFunc,
     IN  VIR_Function    *pCalleeFunc,
     IN  VIR_Symbol      *pOldSym,
@@ -271,6 +273,7 @@ VSC_IL_DupSingleVariable(
     )
 {
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_Shader          *pShader = VSC_IL_GetShader(pInliner);
     VIR_TypeId          oldTypeId, oldBaseTypeId;
     VIR_SymId           oldRegId = VIR_INVALID_ID;
     gctSTRING           oldName = gcvNULL;
@@ -304,6 +307,12 @@ VSC_IL_DupSingleVariable(
         gcoOS_StrCopySafe(newVarName, 128, temp);
         gcoOS_StrCatSafe(newVarName, 128, oldName);
 
+        /* Pass index. */
+        offset = 0;
+        gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", VSC_IL_GetPassData(pInliner)->passIndex);
+        gcoOS_StrCatSafe(newVarName, 128, temp);
+
+        /* Caller index.  */
         offset = 0;
         gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", callerIdx);
         gcoOS_StrCatSafe(newVarName, 128, temp);
@@ -397,7 +406,7 @@ OnError:
 
 static VSC_ErrCode
 VSC_IL_DupVariableList(
-    IN  VIR_Shader      *pShader,
+    IN  VIR_Inliner     *pInliner,
     IN  VIR_Function    *pCallerFunc,
     IN  VIR_Function    *pCalleeFunc,
     IN  VIR_VariableIdList *pVarList,
@@ -415,7 +424,7 @@ VSC_IL_DupVariableList(
         oldSymId = VIR_IdList_GetId(pVarList, i);
         pOldSym = VIR_Function_GetSymFromId(pCalleeFunc, oldSymId);
 
-        errCode = VSC_IL_DupSingleVariable(pShader,
+        errCode = VSC_IL_DupSingleVariable(pInliner,
                                            pCallerFunc,
                                            pCalleeFunc,
                                            pOldSym,
@@ -430,7 +439,7 @@ OnError:
 
 VSC_ErrCode
 VSC_IL_DupParamsAndLocalVars(
-    IN  VIR_Shader      *pShader,
+    IN  VIR_Inliner     *pInliner,
     IN  VIR_Function    *pCallerFunc,
     IN  VIR_Function    *pCalleeFunc,
     IN  gctUINT         callerIdx,
@@ -440,7 +449,7 @@ VSC_IL_DupParamsAndLocalVars(
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
 
     /* Duplicate all paramters. */
-    errCode = VSC_IL_DupVariableList(pShader,
+    errCode = VSC_IL_DupVariableList(pInliner,
                                      pCallerFunc,
                                      pCalleeFunc,
                                      &pCalleeFunc->paramters,
@@ -449,7 +458,7 @@ VSC_IL_DupParamsAndLocalVars(
     ON_ERROR(errCode, "dupliate parameters");
 
     /* Duplicate all local variables. */
-    errCode = VSC_IL_DupVariableList(pShader,
+    errCode = VSC_IL_DupVariableList(pInliner,
                                      pCallerFunc,
                                      pCalleeFunc,
                                      &pCalleeFunc->localVariables,
@@ -555,7 +564,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                 */
 
                 /* Copy arguments and local variables to the caller function. */
-                retValue = VSC_IL_DupParamsAndLocalVars(pShader,
+                retValue = VSC_IL_DupParamsAndLocalVars(pInliner,
                                                         pCallerFunc,
                                                         pCalleeFunc,
                                                         callerIdx,
@@ -573,11 +582,12 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                     gcoOS_PrintStrSafe(labelName,
                                        gcmSIZEOF(labelName),
                                        &offset,
-                                       "%s_%s_%u",
+                                       "%s_%s_%u_%u",
                                        VIR_Shader_GetSymNameString(pCallerFunc->hostShader,
                                        VIR_Function_GetSymbol(pCallerFunc)),
                                        VIR_Shader_GetSymNameString(pCallerFunc->hostShader,
                                        VIR_Function_GetSymbol(pCalleeFunc)),
+                                       VSC_IL_GetPassData(pInliner)->passIndex,
                                        callerIdx);
 
                     retValue = VIR_Function_AddLabel(pCallerFunc,
@@ -621,7 +631,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                     }
                     else
                     {
-                        retValue = VSC_IL_DupInstruction(pShader, pCalleeFunc, pCallerFunc,
+                        retValue = VSC_IL_DupInstruction(pInliner, pCalleeFunc, pCallerFunc,
                             pInst, callerIdx, &pNewInst, pLabelSet, pJmpSet, pTempSet);
                     }
 
@@ -993,7 +1003,7 @@ static void _VSC_IL_Init(
     VIR_Dumper          *pDumper,
     VIR_CALL_GRAPH      *pCG,
     VSC_MM*             pMM,
-    gctBOOL             bCheckAlwaysInlineOnly)
+    VSC_IL_PASS_DATA    *pILPassData)
 {
     gctUINT             maxInstCount = 0;
 
@@ -1002,6 +1012,7 @@ static void _VSC_IL_Init(
     VSC_IL_SetDumper(pInliner, pDumper);
     VSC_IL_SetOptions(pInliner, pOptions);
     VSC_IL_SetCallGraph(pInliner, pCG);
+    VSC_IL_SetPassData(pInliner, pILPassData);
 
     /* initialize the memory pool */
     pInliner->pMM = pMM;
@@ -1066,7 +1077,7 @@ static void _VSC_IL_Init(
 
     VSC_IL_SetInlineBudget(pInliner, maxInstCount);
 
-    VSC_IL_SetCheckAlwaysInlineOnly(pInliner, bCheckAlwaysInlineOnly);
+    VSC_IL_SetCheckAlwaysInlineOnly(pInliner, pILPassData->bCheckAlwaysInlineOnly);
 
     if ((VSC_OPTN_ILOptions_GetInlineLevel(pOptions) == VSC_OPTN_ILOptions_LEVEL1))
     {
@@ -1109,10 +1120,15 @@ VSC_ErrCode VSC_IL_PerformOnShader(
     VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
     VSC_OPTN_ILOptions  *pOption = (VSC_OPTN_ILOptions*)pPassWorker->basePassWorker.pBaseOption;
     gctUINT             countOfFuncBlk = vscDG_GetNodeCount(&pCG->dgGraph);
-    gctBOOL             bCheckAlwaysInlineOnly = *(gctBOOL *)pPassWorker->basePassWorker.pPrvData;
+    VSC_IL_PASS_DATA    ILPassData = { 0, gcvFALSE };
+
+    if (pPassWorker->basePassWorker.pPrvData != gcvNULL)
+    {
+        ILPassData = *(VSC_IL_PASS_DATA *)pPassWorker->basePassWorker.pPrvData;
+    }
 
     _VSC_IL_Init(&inliner, pShader, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
-                 pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM, bCheckAlwaysInlineOnly);
+                 pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM, &ILPassData);
 
     /* dump */
     if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
