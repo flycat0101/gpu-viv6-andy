@@ -210,6 +210,9 @@ _CreateIntrinsicLib(
         gcLibUmulExtended_Func_VK,
         gcLibImulExtended_Func_VK,
         gcLibMatrixTranspose_Func,
+        gcLibNMin_Func,
+        gcLibNMax_Func,
+        gcLibNClamp_Func,
         gcLibTextureCommon_Func,
     };
 

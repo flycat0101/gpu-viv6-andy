@@ -1991,6 +1991,9 @@ static VIR_Pattern* _intrisicPatterns[] = {
     _intrinClampPattern, /* (clamp) */
     _intrinMinPattern, /* (min) */
     _intrinMaxPattern, /* (max) */
+    gcvNULL, /* (nclamp)*/
+    gcvNULL, /* (nmin)*/
+    gcvNULL, /* (nmax)*/
     _intrinAbsPattern, /* (abs) */
     _intrinSignPattern, /* (sign) */
     _intrinFloorPattern, /* (floor) */

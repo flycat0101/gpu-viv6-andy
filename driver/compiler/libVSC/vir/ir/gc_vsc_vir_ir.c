@@ -256,9 +256,9 @@ static VIR_IntrinsicsKind GLSL_STD_450[] =
     VIR_IK_interpolateAtCentroid, /* GLSLstd450InterpolateAtCentroid = 79, */
     VIR_IK_interpolateAtSample, /* GLSLstd450InterpolateAtSample = 80, */
     VIR_IK_interpolateAtOffset, /* GLSLstd450InterpolateAtOffset = 81, */
-    VIR_IK_min, /* GLSLstd450NMin = 38, */
-    VIR_IK_max, /* GLSLstd450NMax = 42, */
-    VIR_IK_clamp, /* GLSLstd450NClamp = 46, */
+    VIR_IK_nmin, /* GLSLstd450NMin = 38, */
+    VIR_IK_nmax, /* GLSLstd450NMax = 42, */
+    VIR_IK_nclamp, /* GLSLstd450NClamp = 46, */
 
 
     /* GLSLstd450Count */

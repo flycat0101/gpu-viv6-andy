@@ -26,6 +26,7 @@
 /* 0.0.1.1 add chipModel and ChipRevision, Nov. 30, 2017 */
 /* 1.3 for 6.2.4 release */
 /* 0.0.1.4 add atomic patch library function */
+/* 0.0.1.5 implement lib function nmin, nmax and nclamp, Oct. 24, 2018 */
 /* 0.0.1.6 add imageFetch for sampler, Nov. 2, 2018 */
 #define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 6)
 
