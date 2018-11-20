@@ -2482,7 +2482,7 @@ _ConvGetSamplerIdx(
 
 DEF_QUERY_PASS_PROP(vscVIR_ConvertVirtualInstructions)
 {
-   pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+   pPassProp->supportedLevels = VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL;
 }
 
 VSC_ErrCode
