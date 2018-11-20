@@ -4669,10 +4669,20 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 
                             __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
 
-                            data[0] = chipBufv->txDesc[0].baseWidth;
-                            data[1] = chipBufv->txDesc[0].baseHeight;
-                            data[2] = chipBufv->txDesc[0].baseDepth;
-                            data[3] = chipBufv->txDesc[0].baseSlice;
+                            if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER)
+                            {
+                                data[0] = chipBufv->txDesc[0].baseWidth;
+                                data[1] = chipBufv->txDesc[0].baseHeight;
+                                data[2] = chipBufv->txDesc[0].baseDepth;
+                                data[3] = chipBufv->txDesc[0].baseSlice;
+                            }
+                            else
+                            {
+                                data[0] = chipBufv->imgDesc[0].baseWidth;
+                                data[1] = chipBufv->imgDesc[0].baseHeight;
+                                data[2] = chipBufv->imgDesc[0].baseDepth;
+                                data[3] = chipBufv->imgDesc[0].baseSlice;
+                            }
                             __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
                         }
                     }

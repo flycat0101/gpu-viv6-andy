@@ -6974,6 +6974,11 @@ VkResult halti5_helper_convertHwImgDesc(
             }
         }
         stride = (uint32_t)(width / residentFormatInfo->blockSize.width) * residentFormatInfo->bitsPerBlock / 8;
+
+        hwImgDesc[0].baseWidth = width;
+        hwImgDesc[0].baseHeight = height;
+        hwImgDesc[0].baseDepth = 1;
+        hwImgDesc[0].baseSlice = stride * height;
     }
     else
     {
