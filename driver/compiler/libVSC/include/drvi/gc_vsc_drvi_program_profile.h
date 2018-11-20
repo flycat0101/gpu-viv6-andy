@@ -678,7 +678,14 @@ typedef union PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING
     /* For HW does not natively supports separated texture */
     struct
     {
-        SHADER_SAMPLER_SLOT_MAPPING             samplerMapping;
+        SHADER_HW_MEM_ACCESS_MODE               hwMemAccessMode;
+
+        union
+        {
+            SHADER_SAMPLER_SLOT_MAPPING         samplerMapping;
+
+            SHADER_CONSTANT_HW_LOCATION_MAPPING*pHwDirectAddrBase;
+        } hwLoc;
 
         /* The array size is utbBinding::arraySize */
         SHADER_PRIV_SAMPLER_ENTRY**             ppExtraSamplerArray;

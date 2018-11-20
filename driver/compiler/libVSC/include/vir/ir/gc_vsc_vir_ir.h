@@ -1216,6 +1216,10 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_SetLastIndexingIndex(Uniform, l)    ((Uniform)->lastIndexingIndex = (l))
 #define VIR_Uniform_GetGCSLIndex(Uniform)               ((Uniform)->gcslIndex)
 #define VIR_Uniform_SetGCSLIndex(Uniform, g)            ((Uniform)->gcslIndex = (g))
+#define VIR_Uniform_SetFlags(Uniform, Val)              do {(Uniform)->flags = (Val); } while (0)
+#define VIR_Uniform_GetFlags(Uniform)                   ((Uniform)->flags)
+#define VIR_Uniform_SetFlag(Uniform, Val)               do {(Uniform)->flags |= (Val); } while (0)
+#define VIR_Uniform_ClrFlag(Uniform, Val)               do {(Uniform)->flags &= ~(Val); } while (0)
 #define VIR_Uniform_GetVarCategory(Uniform)             ((Uniform)->_varCategory)
 #define VIR_Uniform_SetVarCategory(Uniform, vc)         ((Uniform)->_varCategory = (vc))
 #define VIR_Uniform_GetImageSamplerIndex(Uniform)       ((Uniform)->imageSamplerIndex)
@@ -2358,6 +2362,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_SAMPLED_IMAGE,
     VIR_UNIFORM_EXTRA_LAYER,
     VIR_UNIFORM_BASE_INSTANCE,
+    VIR_UNIFORM_TEXELBUFFER_TO_IMAGE,
     /* should not larger than 2^6, since it is using storageClass */
 } VIR_UniformKind;
 
@@ -3778,6 +3783,16 @@ struct _VIR_UNIFORMBLOCK
 #define VIR_UBO_GetUniforms(UBlock)                ((UBlock)->uniforms)
 #define VIR_UBO_SetUniforms(UBlock, s)             (VIR_UBO_GetUniforms(UBlock) = s)
 
+typedef enum VIR_UNIFORMFLAG
+{
+    VIR_UNIFORMFLAG_NONE                        = 0x00000000,
+    VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED        = 0x00000001,
+    VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG     = 0x00000002,
+} VIR_UniformFlag;
+
+#define VIR_Uniform_IsImageCanBeSampled(u)      (((u)->flags & VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED) != 0)
+#define VIR_Uniform_IsTreatTexelBufferAsImg(u)  (((u)->flags & VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG) != 0)
+
 /* Structure that defines an uniform (constant register) for a shader. */
 struct _VIR_UNIFORM
 {
@@ -3785,6 +3800,8 @@ struct _VIR_UNIFORM
     gcsOBJECT               object;
     VIR_UniformId           index : 16 ;   /* uniform index number: uniform(10) */
     gctINT16                gcslIndex ;    /* corresponding glsl uniform's index */
+
+    VIR_UniformFlag         flags;
 
     /* A conservative uniform indexing range check.
        NOTE: we should remove this after using better algorithm for constant RA. Because
@@ -3837,6 +3854,13 @@ struct _VIR_UNIFORM
             VIR_SymId       extraImageLayer; /* The extraImageLayer uniform for this image. */
 
             VIR_SymId       parentSamplerSymId;  /* indicating this attribute uniform belongs to which sampler/image. */
+
+            /*
+            ** Indicating this attribute uniform belongs to which sampler/image.
+            ** So far it is used for vulkan-recompiler only.
+            */
+            VIR_SymId       texelBufferToImageSymId;
+
             /*
             ** VIV:TODO:
             ** If parent is an array, which array index in parent, we use this for link lib entry.
@@ -4416,9 +4440,13 @@ typedef enum _VIR_MEMORY_ACCESS_FLAG
 
 typedef enum _VIR_SHADER_RESOURCE_ENTRY_FLAG
 {
-    VIR_SRE_FLAG_NONE               = 0x0000,
+    VIR_SRE_FLAG_NONE                           = 0x0000,
+
     /* Treat this inputAttachment as a sampler. */
-    VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER= 0x0001,
+    VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER            = 0x0001,
+
+    /* Treat a texelBuffer as an image. */
+    VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE     = 0x0002,
 } VIR_ShaderResourceEntryFlag;
 
 typedef struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY
@@ -5451,6 +5479,12 @@ VIR_TypeId_ComposeNonOpaqueArrayedType(
 
 gctUINT
 VIR_TypeId_GetSamplerCoordComponentCount(
+    IN VIR_TypeId       SamplerType
+    );
+
+VIR_TypeId
+VIR_TypeId_ConvertSamplerTypeToImageType(
+    IN VIR_Shader *     Shader,
     IN VIR_TypeId       SamplerType
     );
 

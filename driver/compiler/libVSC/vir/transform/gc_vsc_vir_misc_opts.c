@@ -2677,6 +2677,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         lodMinMaxUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerUniform);
                         lodMinMaxUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+                        lodMinMaxUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -2767,6 +2768,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         levelBaseSizeUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelBaseSizeUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+                        levelBaseSizeUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -2851,6 +2853,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         levelsSamplesUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelsSamplesUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+                        levelsSamplesUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);

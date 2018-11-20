@@ -4578,11 +4578,24 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
         if (activeStageMask & (1 << stageIdx))
         {
             uint32_t TxHwRegisterIdx = (stageIdx < VSC_SHADER_STAGE_PS) ? 0 : 1;
-            SHADER_SAMPLER_SLOT_MAPPING *hwMapping = &samplerBufEntry->hwMappings[stageIdx].s.samplerMapping;
-            uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
+            uint32_t arraySize;
+            SHADER_HW_MEM_ACCESS_MODE hwMemAccessMode = samplerBufEntry->hwMappings[stageIdx].s.hwMemAccessMode;
 
+            __VK_ASSERT(hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR ||
+                        hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER);
             __VK_ASSERT(descriptorBinding->std.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER);
-            for (arrayIdx = 0; arrayIdx < descriptorBinding->std.descriptorCount; arrayIdx++)
+
+            if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR)
+            {
+                arraySize = descriptorBinding->std.descriptorCount;
+            }
+            else
+            {
+                arraySize = descriptorBinding->std.descriptorCount;
+            }
+            __VK_ASSERT(arraySize);
+
+            for (arrayIdx = 0; arrayIdx < arraySize; arrayIdx++)
             {
                 __vkDescriptorResourceRegion curDescRegion;
                 __vkDescriptorResourceInfo *resInfo;
@@ -4601,17 +4614,45 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                 bufv = resInfo->u.bufferView;
                 chipBufv = (halti5_bufferView *)bufv->chipPriv;
 
-                (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
-                                                                  commandBuffer,
-                                                                  VK_NULL_HANDLE,
-                                                                  TxHwRegisterIdx,
-                                                                  chipBufv->txDesc,
-                                                                  &chipBufv->samplerDesc,
-                                                                  0,
-                                                                  (hwSamplerNo + arrayIdx),
-                                                                  hints->shaderConfigData);
-                chipCommandBuffer->newResourceViewUsageMask |=
-                    halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+                if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER)
+                {
+                    SHADER_SAMPLER_SLOT_MAPPING *hwMapping = &samplerBufEntry->hwMappings[stageIdx].s.hwLoc.samplerMapping;
+                    uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
+                    (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
+                                                                      commandBuffer,
+                                                                      VK_NULL_HANDLE,
+                                                                      TxHwRegisterIdx,
+                                                                      chipBufv->txDesc,
+                                                                      &chipBufv->samplerDesc,
+                                                                      0,
+                                                                      (hwSamplerNo + arrayIdx),
+                                                                      hints->shaderConfigData);
+                    chipCommandBuffer->newResourceViewUsageMask |=
+                        halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
+                }
+                else
+                {
+                    uint32_t hwConstRegNo;
+                    uint32_t hwConstRegAddr;
+                    uint32_t hwConstRegAddrBase = hints->hwConstRegBases[stageIdx];
+
+                    __vkBufferView *bufv;
+                    halti5_bufferView *chipBufv;
+                    bufv = resInfo->u.bufferView;
+                    chipBufv = (halti5_bufferView *)bufv->chipPriv;
+
+                    __VK_ASSERT(hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
+
+                    hwConstRegNo = samplerBufEntry->hwMappings[stageIdx].s.hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo;
+                    hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo * 4)
+                        + samplerBufEntry->hwMappings[stageIdx].s.hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+
+                    chipCommandBuffer->newResourceViewUsageMask |=
+                        halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_SH);
+
+                    __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
+                        chipBufv->imgDesc[0].imageInfo);
+                }
 
                 for (layerIdx = 0; layerIdx < 2; layerIdx++)
                 {

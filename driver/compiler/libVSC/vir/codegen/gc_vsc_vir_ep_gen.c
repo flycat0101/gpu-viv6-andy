@@ -3260,9 +3260,10 @@ static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_PRIV_CONSTANT_ENTRY**     
     return errCode;
 }
 
-static VSC_ErrCode _AddExtraImageLayer(SHADER_PRIV_UAV_ENTRY**          ppExtraImageLayer,
-                                       VSC_SHADER_RESOURCE_BINDING*     pBinding,
-                                       SHADER_EXECUTABLE_PROFILE*       pSep)
+static VSC_ErrCode _AddPrivateImageUniform(SHADER_PRIV_UAV_ENTRY**          ppPrivateImageUniform,
+                                           VSC_SHADER_RESOURCE_BINDING*     pBinding,
+                                           SHADER_EXECUTABLE_PROFILE*       pSep,
+                                           SHS_PRIV_MEM_FLAG                memFlag)
 {
     VSC_ErrCode                     errCode = VSC_ERR_NONE;
     SHADER_PRIV_UAV_ENTRY *         pPrivUavEntry;
@@ -3271,7 +3272,7 @@ static VSC_ErrCode _AddExtraImageLayer(SHADER_PRIV_UAV_ENTRY**          ppExtraI
     VIR_Type*                       pSymType;
     gctUINT                         i, firstPrivUavIdxForExtraImgLayer = NOT_ASSIGNED;
 
-    if (ppExtraImageLayer == gcvNULL)
+    if (ppPrivateImageUniform == gcvNULL)
     {
         return errCode;
     }
@@ -3280,7 +3281,7 @@ static VSC_ErrCode _AddExtraImageLayer(SHADER_PRIV_UAV_ENTRY**          ppExtraI
     {
         pPrivUavEntry = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
 
-        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER)
+        if ((SHS_PRIV_MEM_FLAG)pPrivUavEntry->commonPrivm.privmFlag == memFlag)
         {
             pImageSym = (VIR_Symbol*)pPrivUavEntry->commonPrivm.pPrivateData;
 
@@ -3300,17 +3301,17 @@ static VSC_ErrCode _AddExtraImageLayer(SHADER_PRIV_UAV_ENTRY**          ppExtraI
                 VIR_Symbol_GetBinding(pImageSym) == pBinding->binding &&
                 resArraySize == pBinding->arraySize)
             {
-                if (ppExtraImageLayer)
+                if (ppPrivateImageUniform)
                 {
-                    if (*ppExtraImageLayer == gcvNULL)
+                    if (*ppPrivateImageUniform == gcvNULL)
                     {
-                        *ppExtraImageLayer= pPrivUavEntry;
+                        *ppPrivateImageUniform= pPrivUavEntry;
                         firstPrivUavIdxForExtraImgLayer = i;
                     }
                     else
                     {
                         if (pPrivUavEntry->pBuffer->uavSlotIndex -
-                            (*ppExtraImageLayer)->pBuffer->uavSlotIndex !=
+                            (*ppPrivateImageUniform)->pBuffer->uavSlotIndex !=
                             (i - firstPrivUavIdxForExtraImgLayer))
                         {
                             gcmASSERT(gcvFALSE);
@@ -3635,7 +3636,9 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(PROG_VK_UNIFORM_TEXEL
                                                            SHADER_EXECUTABLE_PROFILE* pSep)
 {
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                                   i, utbEntryIndex;
+    gctUINT                                   i, utbEntryIndex, channel, hwChannel;
+    gctBOOL                                   bIsImage = gcvFALSE;
+    SHADER_CONSTANT_HW_LOCATION_MAPPING*      pHwDirectAddrBase;
 
     for (i = 0; i < pUtbTable->countOfEntries; i ++)
     {
@@ -3654,9 +3657,47 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(PROG_VK_UNIFORM_TEXEL
         memcpy(&pUtbEntry->utbBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
     }
 
+    if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE)
+    {
+        pUtbEntry->hwMappings[stageIdx].s.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
+        bIsImage = gcvTRUE;
+    }
+    else
+    {
+        pUtbEntry->hwMappings[stageIdx].s.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER;
+    }
+
+    /* Allocate the resource. */
+    if (bIsImage)
+    {
+        /* Alloc direct mem addr constant reg location mapping */
+        if (gcoOS_Allocate(gcvNULL, sizeof(SHADER_CONSTANT_HW_LOCATION_MAPPING),
+                           (gctPOINTER*)&pUtbEntry->hwMappings[stageIdx].s.hwLoc.pHwDirectAddrBase) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
+
+        pHwDirectAddrBase = pUtbEntry->hwMappings[stageIdx].s.hwLoc.pHwDirectAddrBase;
+        vscInitializeCnstHwLocMapping(pHwDirectAddrBase);
+
+        /* Fill direct mem base addr constant reg */
+        pHwDirectAddrBase->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
+
+        pHwDirectAddrBase->hwLoc.hwRegNo = pResAllocEntry->hwRegNo;
+
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
+            _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+        }
+    }
+    else
+    {
+        pUtbEntry->hwMappings[stageIdx].s.hwLoc.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+    }
+
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
-    pUtbEntry->hwMappings[stageIdx].s.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
 
     /* Set texture size */
     _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
@@ -3799,9 +3840,10 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
                       pSep);
 
         /* Extra image layer */
-        _AddExtraImageLayer(&pUtbEntry->pExtraLayer[stageIdx],
-                            &pUtbEntry->iaBinding,
-                            pSep);
+        _AddPrivateImageUniform(&pUtbEntry->pExtraLayer[stageIdx],
+                                &pUtbEntry->iaBinding,
+                                pSep,
+                                SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER);
     }
 
     return VSC_ERR_NONE;
@@ -3918,9 +3960,10 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(PROG_VK_STORAGE_TABLE* 
                   pSep);
 
     /* Extra image layer */
-    _AddExtraImageLayer(&pStorageEntry->pExtraLayer[stageIdx],
-                        &pStorageEntry->storageBinding,
-                        pSep);
+    _AddPrivateImageUniform(&pStorageEntry->pExtraLayer[stageIdx],
+                            &pStorageEntry->storageBinding,
+                            pSep,
+                            SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER);
 
     return VSC_ERR_NONE;
 }
