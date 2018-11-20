@@ -4903,6 +4903,7 @@ _VIR_RA_ShaderEnableDepth(
     for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputs); outputIdx ++)
     {
         VIR_Symbol  *pOutputSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputs, outputIdx));
+        VIR_NameId  outputNameId = VIR_Symbol_GetName(pOutputSym);
 
         if (!isSymUnused(pOutputSym))
         {
@@ -4911,10 +4912,11 @@ _VIR_RA_ShaderEnableDepth(
                 return gcvTRUE;
             }
             /*
-            ** If there is no color ouput in a fragment shader, driver still enables depth no matter
+            ** If there is no color output in a fragment shader, driver still enables depth no matter
             ** gl_FragDepth is used or not. In this case, we need to use r0.w for sampleMask.
+            ** PS, by default, if a output is not a built-in output, then it should be a color output.
             */
-            else if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_COLOR)
+            else if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_COLOR || !VIR_Shader_IsNameBuiltIn(pShader, outputNameId))
             {
                 bHasOutputColor = gcvTRUE;
             }
