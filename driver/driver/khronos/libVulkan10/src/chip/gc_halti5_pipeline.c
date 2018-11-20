@@ -1355,6 +1355,8 @@ static VkResult halti5_pip_emit_graphicsProgram(
 
     halti5_helper_GetPsOutputSetting(devCtx, pip, &outputMode0to7, &saturationMode0to3, &psOutCntl4to7);
 
+    chipGfxPipeline->psOutCntl4to7 = psOutCntl4to7;
+
     colorOutCount = ((subPass->colorCount + chipGfxPipeline->patchOutput.count) != 0) ?
         (subPass->colorCount + chipGfxPipeline->patchOutput.count - 1) : 0;
 
@@ -1526,8 +1528,6 @@ static VkResult halti5_pip_emit_graphicsProgram(
         (bypass ? 1 : hints->shader2PaOutputCount));
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x040C, VK_FALSE, outputMode0to7);
-
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x040B, VK_FALSE, psOutCntl4to7);
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x020C, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:0) - (0 ?

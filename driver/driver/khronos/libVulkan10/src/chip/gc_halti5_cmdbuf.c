@@ -352,6 +352,8 @@ static VkResult halti5_draw_validate(
                 chipPipeline->cmdBuffer, chipPipeline->curCmdIndex * sizeof(uint32_t));
             cmdBuf->curScrachBufIndex += chipPipeline->curCmdIndex;
             bindInfo->pipeline.dirty &= ~__VK_CMDBUF_BINDNIGINFO_PIPELINE_GRAPHICS_DIRTY;
+
+            __VK_ERR_BREAK(halti5_setPsOutputMode(cmdBuf, pip));
         }
 
         if (bindInfo->indexBuffer.dirty)
@@ -3372,6 +3374,28 @@ VkResult halti5_setLineWidth(
     return VK_SUCCESS;
 }
 
+VkResult halti5_setPsOutputMode(
+    __vkCommandBuffer *cmdBuf,
+    __vkPipeline* pip
+    )
+{
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
+    uint32_t psOutCntl4to7 = hints->psOutCntl4to7;
+
+    pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+    halti5_helper_set_psOutputMode(devCtx, &pCmdBuffer, chipGfxPipeline->psOutCntl4to7, psOutCntl4to7);
+
+    cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+    __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    return VK_SUCCESS;
+}
 
 VkResult halti5_setRenderTargets(
     __vkCommandBuffer *cmdBuf

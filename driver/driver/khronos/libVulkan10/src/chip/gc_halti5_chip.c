@@ -754,6 +754,68 @@ VkResult halti5_helper_set_linewidth(
     return VK_SUCCESS;
 }
 
+VkResult halti5_helper_set_psOutputMode(
+    __vkDevContext *devCtx,
+    uint32_t **commandBuffer,
+    uint32_t oldPsOutCntl4to7,
+    uint32_t newPsOutCntl4to7
+    )
+{
+    uint32_t oldPsOutputCntlSaturate[4];
+    uint32_t psOutCntl4to7;
+
+    oldPsOutputCntlSaturate[0]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 7:7)) & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1)))))) );
+    oldPsOutputCntlSaturate[1]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 15:15)) & ((gctUINT32) ((((1 ? 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1)))))) );
+    oldPsOutputCntlSaturate[2]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 23:23)) & ((gctUINT32) ((((1 ? 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1)))))) );
+    oldPsOutputCntlSaturate[3]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 31:31)) & ((gctUINT32) ((((1 ? 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1)))))) );
+
+    psOutCntl4to7 = newPsOutCntl4to7 |
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[0]) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))) |
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ?
+ 15:15))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[1]) & ((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15))) |
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ?
+ 23:23))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[2]) & ((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23))) |
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[3]) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
+
+    __vkCmdLoadSingleHWState(commandBuffer, 0x040B, VK_FALSE, psOutCntl4to7);
+
+    return VK_SUCCESS;
+}
+
 VkResult halti5_helper_set_stencilStates(
     __vkDevContext *devCtx,
     VkFrontFace frontFace,
