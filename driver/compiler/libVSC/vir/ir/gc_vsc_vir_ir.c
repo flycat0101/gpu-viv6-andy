@@ -15212,20 +15212,20 @@ void VIR_SrcOperand_Iterator_Init(
     Iter->inst      = Inst;
     Iter->skipUndefs = gcvTRUE;
     _Reset_SrcOperand_Iterator(Iter);
-    Iter->expandSpecialNode = 1;
+    Iter->expandNodeFlag = VIR_SRCOPERAND_FLAG_EXPAND_ALL_NODE;
 }
 
 void VIR_SrcOperand_Iterator_Init1(
     IN  VIR_Instruction *           Inst,
     OUT VIR_SrcOperand_Iterator *   Iter,
-    IN  gctBOOL                     ExpandSpecialNode,
+    IN  VIR_SrcOperand_Iter_ExpandFlag ExpandFlag,
     IN  gctBOOL                     SkipUndef
     )
 {
     Iter->inst      = Inst;
     Iter->skipUndefs = SkipUndef;
     _Reset_SrcOperand_Iterator(Iter);
-    Iter->expandSpecialNode = ExpandSpecialNode;
+    Iter->expandNodeFlag = ExpandFlag;
 }
 
 
@@ -15268,14 +15268,27 @@ VIR_SrcOperand_Iterator_Next(
         opnd = VIR_Inst_GetSource(Iter->inst, Iter->curSrcNo);
         gcmASSERT(opnd != gcvNULL);
         /* check if it is special node */
-        if (Iter->expandSpecialNode && VIR_Operand_GetOpKind(opnd) == VIR_OPND_TEXLDPARM)
+        if ((Iter->expandNodeFlag & VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE)
+            &&
+            VIR_Operand_isTexldParm(opnd))
         {
             Iter->specialNode = 1;
             Iter->useOpndList = 0;
             /* get the first effective modifier */
             return VIR_SrcOperand_Iterator_Next(Iter);
         }
-        else if (Iter->expandSpecialNode && VIR_Operand_GetOpKind(opnd) == VIR_OPND_ARRAY)
+        else if ((Iter->expandNodeFlag & VIR_SRCOPERAND_FLAG_EXPAND_PARAM_NODE)
+                 &&
+                 VIR_Operand_isParameters(opnd))
+        {
+            Iter->specialNode = 1;
+            Iter->useOpndList = 0;
+            /* get the first effective modifier */
+            return VIR_SrcOperand_Iterator_Next(Iter);
+        }
+        else if ((Iter->expandNodeFlag & VIR_SRCOPERAND_FLAG_EXPAND_ARRAY_NODE)
+                 &&
+                 VIR_Operand_isArray(opnd))
         {
             /* set operand info for next iteration */
             Iter->specialNode = 1;
@@ -15317,17 +15330,40 @@ VIR_SrcOperand_Iterator_Next(
             {
                 return gcvNULL;
             }
-            gcmASSERT(VIR_Operand_GetOpKind(opndInInst) == VIR_OPND_TEXLDPARM);
-            while (Iter->inSrcNo < VIR_TEXLDMODIFIER_COUNT)
+
+            if (VIR_Operand_isParameters(opndInInst))
             {
-                opnd = VIR_Operand_GetTexldModifier(opndInInst, Iter->inSrcNo);
-                Iter->inSrcNo++;
-                if (opnd != gcvNULL)
+                VIR_ParmPassing *parm = VIR_Operand_GetParameters(opndInInst);
+
+                gcmASSERT(Iter->expandNodeFlag & VIR_SRCOPERAND_FLAG_EXPAND_PARAM_NODE);
+
+                while (Iter->inSrcNo < parm->argNum)
                 {
-                    /* found the modifier operand */
-                    return opnd;
+                    opnd = parm->args[Iter->inSrcNo];
+                    Iter->inSrcNo++;
+                    if (opnd != gcvNULL)
+                    {
+                        /* found the modifier operand */
+                        return opnd;
+                    }
                 }
             }
+            else
+            {
+                gcmASSERT(VIR_Operand_isTexldParm(opndInInst) && (Iter->expandNodeFlag & VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE));
+
+                while (Iter->inSrcNo < VIR_TEXLDMODIFIER_COUNT)
+                {
+                    opnd = VIR_Operand_GetTexldModifier(opndInInst, Iter->inSrcNo);
+                    Iter->inSrcNo++;
+                    if (opnd != gcvNULL)
+                    {
+                        /* found the modifier operand */
+                        return opnd;
+                    }
+                }
+            }
+
             /* nothing left in the current operand, move to next src */
             MOVE_TO_NEXT_SRC(Iter);
 
@@ -15341,11 +15377,11 @@ VIR_SrcOperand_Iterator_Next(
 void VIR_Operand_Iterator_Init(
     IN  VIR_Instruction *        Inst,
     OUT VIR_Operand_Iterator *   Iter,
-    IN  gctBOOL                  ExpandSpecialNode,
+    IN  VIR_SrcOperand_Iter_ExpandFlag ExpandFlag,
     IN  gctBOOL                  SkipUndef
     )
 {
-    VIR_SrcOperand_Iterator_Init1(Inst, &Iter->header, ExpandSpecialNode, SkipUndef);
+    VIR_SrcOperand_Iterator_Init1(Inst, &Iter->header, ExpandFlag, SkipUndef);
     Iter->curNo = 0;
     Iter->texldModifierName = VIR_TEXLDMODIFIER_COUNT;
     Iter->dest = gcvFALSE;

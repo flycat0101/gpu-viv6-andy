@@ -219,6 +219,12 @@ _Pattern_GetOperandByPattern(
     )
 {
     VIR_PatternMatchInst  *matchInsts = Pattern->matchInsts;
+    VIR_SrcOperand_Iter_ExpandFlag expandFlag = VIR_SRCOPERAND_FLAG_DEFAULT;
+
+    if (Pattern->flags & VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE)
+    {
+        expandFlag &= ~VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE;
+    }
 
     while(matchInsts != gcvNULL)
     {
@@ -231,7 +237,7 @@ _Pattern_GetOperandByPattern(
             return gcvNULL;
         }
 
-        VIR_Operand_Iterator_Init(Inst, &opndIter, !(Pattern->flags & VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE), gcvFALSE);
+        VIR_Operand_Iterator_Init(Inst, &opndIter, expandFlag, gcvFALSE);
 
         for (i = 0, opnd = VIR_Operand_Iterator_First(&opndIter);
             i < VIR_PATTERN_OPND_COUNT && opnd != gcvNULL;
@@ -482,6 +488,12 @@ _Pattern_isMatched(
     {
         gctSIZE_T i         = 0;
         gctBOOL   isMatched = gcvTRUE;
+        VIR_SrcOperand_Iter_ExpandFlag expandFlag = VIR_SRCOPERAND_FLAG_DEFAULT;
+
+        if (curPattern->flags & VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE)
+        {
+            expandFlag &= ~VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE;
+        }
 
         curInst     = Inst;
 
@@ -547,7 +559,7 @@ _Pattern_isMatched(
             if (!isMatched)   break;
 
 
-            VIR_Operand_Iterator_Init(curInst, &opndIter, !(curPattern->flags & VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE), gcvFALSE);
+            VIR_Operand_Iterator_Init(curInst, &opndIter, expandFlag, gcvFALSE);
 
             for (j = 0, curOpnd = VIR_Operand_Iterator_First(&opndIter);
                 j < VIR_PATTERN_OPND_COUNT;
