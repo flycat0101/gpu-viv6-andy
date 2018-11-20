@@ -2430,6 +2430,13 @@ _ConvGetSamplerIdx(
             continue;
         }
         srcSym = VIR_Operand_GetSymbol(src);
+
+        /* If this is a baseSampler+offset, we need to check the offset. */
+        if (VIR_Symbol_GetIndex(srcSym) == VIR_Shader_GetBaseSamplerId(pShader) &&
+            VIR_Operand_GetRelAddrMode(src) != VIR_INDEXED_NONE)
+        {
+            srcSym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(src));
+        }
         virRegId = VIR_Symbol_GetVregIndex(srcSym);
 
         if (VIR_Operand_GetSymbol(dest)->u1.vregIndex == virRegId)
