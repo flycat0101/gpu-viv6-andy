@@ -1132,7 +1132,7 @@
     VIR_OPINFO(IJMP, 0, HasDest|ControlFlow, 0, NU), /* unconditional indirect branch, not supported in Dual16*/
     VIR_OPINFO(CALL, 0, HasDest|ControlFlow, 0, AL), /* function call, destination is FuncId */
     VIR_OPINFO(EXTCALL, 2, HasDest|ControlFlow|EPHP, 0, HM), /* Extern function call, src0 is extern func's nameId, src1 is parameters */
-    VIR_OPINFO(INTRINSIC, 2, HasDest|ControlFlow|EPHP, 0, HM), /* intrinsic call, src0 is funcId, src1 is parameters */
+    VIR_OPINFO(INTRINSIC, 2, HasDest|ControlFlow|EPHP, 1, HM), /* intrinsic call, src0 is funcId, src1 is parameters */
     VIR_OPINFO(ICALL, 0, HasDest|ControlFlow, 0, NU), /* indirect call */
     VIR_OPINFO(RET, 0, NoDest|ControlFlow, 0, AL), /* function return */
     VIR_OPINFO(PHI, 1, HasDest|ControlFlow, 1, AL), /* PHI node */
