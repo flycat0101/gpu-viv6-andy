@@ -1416,7 +1416,7 @@ VkResult VKAPI_CALL __vk_CreateAndroidSurfaceKHR(
         surf->supportedTransforms       = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         surf->currentTransform          = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         surf->supportedCompositeAlpha   = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
-        surf->supportedUsageFlags       = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        surf->supportedUsageFlags       = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
         /* Assign platform tpye. */
         surf->base.platform             = __VK_ICD_WSI_PLATFORM_ANDROID;
