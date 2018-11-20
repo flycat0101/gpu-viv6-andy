@@ -545,7 +545,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_BGRA_EXT:
 
         case GL_SRGB8:
-        case GL_SRGB8_ALPHA8:
 
         case GL_LUMINANCE:
         case GL_LUMINANCE8_OES:
@@ -588,6 +587,16 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_SRGB_EXT:
         case GL_SRGB_ALPHA_EXT:
             if (!__glExtension[__GL_EXTID_EXT_sRGB].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30)
+            {
+                invalid = GL_TRUE;
+            }
+            break;
+
+        /* In GLES spec2.0 and extention, There is no place explain GL_SRGB8_ALPHA8 is a valid texture format;
+        ** but in GLES spec3.0, it is a valid texture format.
+        */
+        case GL_SRGB8_ALPHA8:
+            if(gc->apiVersion < __GL_API_VERSION_ES30)
             {
                 invalid = GL_TRUE;
             }
