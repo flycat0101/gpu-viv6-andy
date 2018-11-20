@@ -1710,6 +1710,7 @@ VSC_ErrCode VIR_PARAM_Optimization_PerformOnShader(
     LONG_SIZE_ARGUMENT *lastArgument = gcvNULL;
     VSC_OPTN_ParamOptOptions* paramOptsOptions = (VSC_OPTN_ParamOptOptions*)pPassWorker->basePassWorker.pBaseOption;
     VIR_NameId nameId;
+    gctBOOL    needBoundsCheck = (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
 
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(pPassWorker->basePassWorker.pMM,
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
@@ -1762,7 +1763,7 @@ VSC_ErrCode VIR_PARAM_Optimization_PerformOnShader(
     }
 
     /*Creat operand of argument start address.*/
-    spillMemUniform = VIR_Shader_GetTempRegSpillAddrUniform(shader);
+    spillMemUniform = VIR_Shader_GetTempRegSpillAddrUniform(shader, needBoundsCheck);
     if (spillMemUniform == gcvNULL)
     {
         return VSC_ERR_OUT_OF_MEMORY;

@@ -16566,16 +16566,23 @@ VIR_Shader_AdjustWorkGroupSize(
     return adjusted;
 }
 
+/* if bound check the address has 3 components:
+ *   .x: 32 bit address points to the memory to be accessed
+ *   .y: start address of the valid memory block to access
+ *   .z: end address of the valid memory block to access
+ */
 VIR_Uniform *
 VIR_Shader_GetTempRegSpillAddrUniform(
-    IN VIR_Shader *  Shader
+    IN VIR_Shader *  Shader,
+    IN gctBOOL       bNeedBoundsCheck
     )
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Symbol  *spillMemSym;
     VIR_Uniform *virUniform = gcvNULL;
-    gctUINT offset = 0;
-    gctCHAR spillMemAddrName[64];
+    gctUINT      offset = 0;
+    gctCHAR      spillMemAddrName[64];
+    VIR_TypeId   addressTypeId = bNeedBoundsCheck ? VIR_TYPE_UINT_X3 : VIR_TYPE_UINT32;
 
     gcoOS_PrintStrSafe(spillMemAddrName,
         64,
@@ -16586,12 +16593,13 @@ VIR_Shader_GetTempRegSpillAddrUniform(
     spillMemSym = VIR_Shader_FindSymbolByName(Shader, VIR_SYM_UNIFORM, spillMemAddrName);
     if (spillMemSym != gcvNULL)
     {
+        gcmASSERT(VIR_Symbol_GetTypeId(spillMemSym) == addressTypeId);
         return VIR_Symbol_GetUniform(spillMemSym);
     }
 
     /* not found add a new one */
     errCode = VIR_Shader_AddNamedUniform(Shader, spillMemAddrName,
-                             VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32), &spillMemSym);
+                             VIR_Shader_GetTypeFromId(Shader, addressTypeId), &spillMemSym);
 
     ON_ERROR(errCode, "Failed AddTempRegSpillMemAddrUniform");
 

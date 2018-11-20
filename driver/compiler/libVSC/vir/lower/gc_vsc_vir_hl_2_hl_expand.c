@@ -1601,7 +1601,9 @@ _AllocateBaseAddrUniformForIB(
     VIR_TypeId                   baseAddrTypeId = VIR_TYPE_UINT32;
     VIR_SymFlag                  symFlag = VIR_SYMFLAG_NONE;
 
-    /* For SBO, the base address uniform is a uvec2. */
+
+    /* For SBO, the address uniform is a uvec2, the x channel is base address,
+     * the y channel is the size of the SBO. */
     if (IBSymbolKind == VIR_SYM_UBO)
     {
         baseAddrTypeId = VIR_TYPE_UINT32;
