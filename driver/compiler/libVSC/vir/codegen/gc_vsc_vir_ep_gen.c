@@ -3210,22 +3210,47 @@ static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_PRIV_CONSTANT_ENTRY**     
                 {
                     if (ppTextureSize)
                     {
-                        *ppTextureSize = pPrivCnstEntry;
+                        if ((ppTextureSize)[0] == gcvNULL)
+                        {
+                            (ppTextureSize)[0] = pPrivCnstEntry;
+                        }
+                        else
+                        {
+                            gcmASSERT((ppTextureSize)[1] == gcvNULL);
+                            (ppTextureSize)[1] = pPrivCnstEntry;
+                        }
                     }
                 }
                 else if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX)
                 {
                     if (ppLodMinMax)
                     {
-                        *ppLodMinMax = pPrivCnstEntry;
+                        if ((ppLodMinMax)[0] == gcvNULL)
+                        {
+                            (ppLodMinMax)[0] = pPrivCnstEntry;
+                        }
+                        else
+                        {
+                            gcmASSERT((ppLodMinMax)[1] == gcvNULL);
+                            (ppLodMinMax)[1] = pPrivCnstEntry;
+                        }
                     }
                 }
                 else
                 {
                     gcmASSERT(pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES);
+
                     if (ppLevelsSamples)
                     {
-                        *ppLevelsSamples = pPrivCnstEntry;
+                        if ((ppLevelsSamples)[0] == gcvNULL)
+                        {
+                            (ppLevelsSamples)[0] = pPrivCnstEntry;
+                        }
+                        else
+                        {
+                            gcmASSERT((ppLevelsSamples)[1] == gcvNULL);
+                            (ppLevelsSamples)[1] = pPrivCnstEntry;
+                        }
                     }
                 }
             }
@@ -3407,9 +3432,9 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_
     }
 
     /* Set textureSize/lodMinMax */
-    _AddTextureSizeAndLodMinMax(&pCombTsEntry->pTextureSize[stageIdx],
-                                &pCombTsEntry->pLodMinMax[stageIdx],
-                                &pCombTsEntry->pLevelsSamples[stageIdx],
+    _AddTextureSizeAndLodMinMax(pCombTsEntry->pTextureSize[stageIdx],
+                                pCombTsEntry->pLodMinMax[stageIdx],
+                                pCombTsEntry->pLevelsSamples[stageIdx],
                                 &pCombTsEntry->combTsBinding,
                                 pSep);
 
@@ -3634,7 +3659,7 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(PROG_VK_UNIFORM_TEXEL
     pUtbEntry->hwMappings[stageIdx].s.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
 
     /* Set texture size */
-    _AddTextureSizeAndLodMinMax(&pUtbEntry->pTextureSize[stageIdx],
+    _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
                                 gcvNULL,
                                 gcvNULL,
                                 &pUtbEntry->utbBinding,
@@ -3760,9 +3785,9 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
                               0);
 
         /* Set textureSize/lodMinMax */
-        _AddTextureSizeAndLodMinMax(&pUtbEntry->pTextureSize[stageIdx],
-                                    &pUtbEntry->pLodMinMax[stageIdx],
-                                    &pUtbEntry->pLevelsSamples[stageIdx],
+        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
+                                    pUtbEntry->pLodMinMax[stageIdx],
+                                    pUtbEntry->pLevelsSamples[stageIdx],
                                     &pUtbEntry->iaBinding,
                                     pSep);
     }
@@ -4300,7 +4325,7 @@ static VSC_ErrCode _PostProcessVkCombStTable(PROG_VK_COMBINED_TEXTURE_SAMPLER_TA
 {
     VSC_ErrCode                                errCode = VSC_ERR_NONE;
     PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY*  pComTsEntry = gcvNULL;
-    gctUINT                                    i, j;
+    gctUINT                                    i, j, layerIdx;
     SHADER_PRIV_SAMPLER_ENTRY*                 pPrivSamplerEntry;
     SHADER_PRIV_CONSTANT_ENTRY*                pPrivCnstEntry;
 
@@ -4322,28 +4347,31 @@ static VSC_ErrCode _PostProcessVkCombStTable(PROG_VK_COMBINED_TEXTURE_SAMPLER_TA
             }
         }
 
-        /* Texture size */
-        pPrivCnstEntry = pComTsEntry->pTextureSize[stageIdx];
-        if (pPrivCnstEntry)
+        for (layerIdx = 0; layerIdx < 2; layerIdx++)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
-        }
+            /* Texture size */
+            pPrivCnstEntry = pComTsEntry->pTextureSize[stageIdx][layerIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+            }
 
-        /* lodMinMax */
-        pPrivCnstEntry = pComTsEntry->pLodMinMax[stageIdx];
-        if (pPrivCnstEntry)
-        {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
-        }
+            /* lodMinMax */
+            pPrivCnstEntry = pComTsEntry->pLodMinMax[stageIdx][layerIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+            }
 
-        /* levelsSamples */
-        pPrivCnstEntry = pComTsEntry->pLevelsSamples[stageIdx];
-        if (pPrivCnstEntry)
-        {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+            /* levelsSamples */
+            pPrivCnstEntry = pComTsEntry->pLevelsSamples[stageIdx][layerIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+            }
         }
     }
 
@@ -4361,7 +4389,7 @@ static VSC_ErrCode _PostProcessVkUtbEntryTable(PROG_VK_UNIFORM_TEXEL_BUFFER_TABL
 {
     VSC_ErrCode                               errCode = VSC_ERR_NONE;
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                                   i;
+    gctUINT                                   i, layerIdx;
     SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
 
     for (i = 0; i < pUniformTexBufTable->countOfEntries; i ++)
@@ -4369,11 +4397,14 @@ static VSC_ErrCode _PostProcessVkUtbEntryTable(PROG_VK_UNIFORM_TEXEL_BUFFER_TABL
         pUtbEntry = &pUniformTexBufTable->pUtbEntries[i];
 
         /* Texture size */
-        pPrivCnstEntry = pUtbEntry->pTextureSize[stageIdx];
-        if (pPrivCnstEntry)
+        for (layerIdx = 0; layerIdx < 2; layerIdx++)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
+            pPrivCnstEntry = pUtbEntry->pTextureSize[stageIdx][layerIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
+            }
         }
     }
 
@@ -4421,7 +4452,7 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(PROG_VK_INPUT_ATTACHMENT_T
 {
     VSC_ErrCode                          errCode = VSC_ERR_NONE;
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY*pIaEntries;
-    gctUINT                              i, j;
+    gctUINT                              i, j, layerIdx;
     SHADER_PRIV_CONSTANT_ENTRY*          pPrivCnstEntry;
     SHADER_PRIV_UAV_ENTRY*               pPrivUavEntry;
     SHADER_PRIV_SAMPLER_ENTRY*           pPrivSamplerEntry;
@@ -4449,28 +4480,32 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(PROG_VK_INPUT_ATTACHMENT_T
                 }
             }
 
-            /* Texture size */
-            pPrivCnstEntry = pIaEntries->pTextureSize[stageIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-            }
 
-            /* lodMinMax */
-            pPrivCnstEntry = pIaEntries->pLodMinMax[stageIdx];
-            if (pPrivCnstEntry)
+            for (layerIdx = 0; layerIdx < 2; layerIdx++)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-            }
+                /* Texture size */
+                pPrivCnstEntry = pIaEntries->pTextureSize[stageIdx][layerIdx];
+                if (pPrivCnstEntry)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                }
 
-            /* levelsSamples */
-            pPrivCnstEntry = pIaEntries->pLevelsSamples[stageIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                /* lodMinMax */
+                pPrivCnstEntry = pIaEntries->pLodMinMax[stageIdx][layerIdx];
+                if (pPrivCnstEntry)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                }
+
+                /* levelsSamples */
+                pPrivCnstEntry = pIaEntries->pLevelsSamples[stageIdx][layerIdx];
+                if (pPrivCnstEntry)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                }
             }
         }
         else

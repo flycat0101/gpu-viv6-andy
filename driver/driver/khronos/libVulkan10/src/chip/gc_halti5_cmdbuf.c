@@ -4414,6 +4414,7 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                 __vkSampler *sampler;
                 halti5_sampler *chipSampler;
                 halti5_imageView *chipImgv;
+                uint32_t layerIdx = 0;
 
                 __vk_utils_region_mad(&curDescRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curDescRegion.resource);
@@ -4465,66 +4466,69 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                                                                       hints->shaderConfigData);
                 }
 
-                if (samplerEntry->pTextureSize[stageIdx])
+                for (layerIdx = 0; layerIdx < 2; layerIdx++)
                 {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerEntry->pTextureSize[stageIdx];
-
-                    if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                    /* texture size constant. */
+                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerEntry->pTextureSize[stageIdx][layerIdx];
+                    if (privEntry != gcvNULL)
                     {
-                        uint32_t data[4] = {0};
-                        uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                        uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            uint32_t data[4] = {0};
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
 
-                        __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
+                            __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
 
-                        data[0] = chipImgv->txDesc[0].baseWidth;
-                        data[1] = chipImgv->txDesc[0].baseHeight;
-                        data[2] = chipImgv->txDesc[0].baseDepth;
-                        data[3] = chipImgv->txDesc[0].baseSlice;
-                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                            data[0] = chipImgv->txDesc[0].baseWidth;
+                            data[1] = chipImgv->txDesc[0].baseHeight;
+                            data[2] = chipImgv->txDesc[0].baseDepth;
+                            data[3] = chipImgv->txDesc[0].baseSlice;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
                     }
-                }
 
-                if (samplerEntry->pLodMinMax[stageIdx])
-                {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerEntry->pLodMinMax[stageIdx];
-
-                    if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                    /* lodMinMax constant. */
+                    privEntry = samplerEntry->pLodMinMax[stageIdx][layerIdx];
+                    if (privEntry != gcvNULL)
                     {
-                        uint32_t data[4] = {0};
-                        uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                        uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            uint32_t data[4] = {0};
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
 
-                        __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX);
+                            __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX);
 
-                        data[0] = (gctINT)sampler->createInfo.minLod;
-                        data[1] = (gctINT)sampler->createInfo.maxLod;
-                        data[2] = (sampler->createInfo.minFilter == VK_FILTER_NEAREST) ? 0 : 1;
-                        data[3] = 0;
-                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                            data[0] = (gctINT)sampler->createInfo.minLod;
+                            data[1] = (gctINT)sampler->createInfo.maxLod;
+                            data[2] = (sampler->createInfo.minFilter == VK_FILTER_NEAREST) ? 0 : 1;
+                            data[3] = 0;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
                     }
-                }
 
-                if (samplerEntry->pLevelsSamples[stageIdx])
-                {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerEntry->pLevelsSamples[stageIdx];
-
-                    if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                    /* levels samples constant. */
+                    privEntry = samplerEntry->pLevelsSamples[stageIdx][layerIdx];
+                    if (privEntry != gcvNULL)
                     {
-                        uint32_t data[4] = {0};
-                        uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                        uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            uint32_t data[4] = {0};
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
 
-                        __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES);
+                            __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES);
 
-                        data[0] = (gctINT)imgv->createInfo.subresourceRange.levelCount;
-                        data[1] = (gctINT)img->sampleInfo.product;
-                        data[2] = 0;
-                        data[3] = 0;
-                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                            data[0] = (gctINT)imgv->createInfo.subresourceRange.levelCount;
+                            data[1] = (gctINT)img->sampleInfo.product;
+                            data[2] = 0;
+                            data[3] = 0;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
                     }
                 }
             }
@@ -4584,6 +4588,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                 __vkDescriptorResourceInfo *resInfo;
                 __vkBufferView *bufv;
                 halti5_bufferView *chipBufv;
+                uint32_t layerIdx;
 
                 __vk_utils_region_mad(&curDescRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curDescRegion.resource);
@@ -4608,24 +4613,27 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                 chipCommandBuffer->newResourceViewUsageMask |=
                     halti5_check_resView_firstUse(&chipBufv->usedUsageMask, HW_RESOURCEVIEW_USAGE_TX);
 
-                if (samplerBufEntry->pTextureSize[stageIdx])
+                for (layerIdx = 0; layerIdx < 2; layerIdx++)
                 {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pTextureSize[stageIdx];
-
-                    if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                    /* texture size constant. */
+                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pTextureSize[stageIdx][layerIdx];
+                    if (privEntry != gcvNULL)
                     {
-                        uint32_t data[4] = {0};
-                        uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                        uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            uint32_t data[4] = {0};
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
 
-                        __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
+                            __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
 
-                        data[0] = chipBufv->txDesc[0].baseWidth;
-                        data[1] = chipBufv->txDesc[0].baseHeight;
-                        data[2] = chipBufv->txDesc[0].baseDepth;
-                        data[3] = chipBufv->txDesc[0].baseSlice;
-                        __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                            data[0] = chipBufv->txDesc[0].baseWidth;
+                            data[1] = chipBufv->txDesc[0].baseHeight;
+                            data[2] = chipBufv->txDesc[0].baseDepth;
+                            data[3] = chipBufv->txDesc[0].baseSlice;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
                     }
                 }
             }
