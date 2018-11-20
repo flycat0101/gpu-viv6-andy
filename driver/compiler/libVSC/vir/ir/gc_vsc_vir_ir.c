@@ -1848,6 +1848,22 @@ VIR_Shader_Construct0(
     Shader->samplerBaseOffset           = -1;
     Shader->baseSamplerId               = VIR_INVALID_ID;
 
+    /* initialize the execution mode in tcs and tes to UNDEFINED */
+    if (ShaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+    {
+        Shader->shaderLayout.tcs.tessOrdering = VIR_TESS_ORDER_UNDEFINED;
+        Shader->shaderLayout.tcs.tessPrimitiveMode = VIR_TESS_PMODE_UNDEFINED;
+        Shader->shaderLayout.tcs.tessVertexSpacing = VIR_TESS_SPACING_UNDEFINED;
+        Shader->shaderLayout.tcs.tessPointMode = gcvFALSE; /* default is disable */
+    }
+    else if (ShaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
+    {
+        Shader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_UNDEFINED;
+        Shader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_UNDEFINED;
+        Shader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_UNDEFINED;
+        Shader->shaderLayout.tes.tessPointMode = gcvFALSE; /* default is disable */
+    }
+
     /* init dumper */
     errCode = _VIR_Shader_DumperInit(Shader, VSC_GET_DUMPER_FILE(), 2048);
     CHECK_ERROR(errCode, "Shader_DumperInit");
