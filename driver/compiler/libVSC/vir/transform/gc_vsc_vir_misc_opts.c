@@ -3934,9 +3934,10 @@ gctBOOL _CheckMLLevelAlwaysInlineFunction(
         VIR_Operand        *pOperand = gcvNULL;
         VIR_OperandInfo     opndInfo;
         /*
-        ** If source0 of a TEXLD is not a uniform, then we need to inline it because it may need to be recompiled.
+        ** If source0 of a TEXLD/image-related opcode is not a uniform,
+        ** then we need to inline it because it may need to be recompiled.
         */
-        if (VIR_OPCODE_isTexLd(opcode))
+        if (VIR_OPCODE_isTexLd(opcode) || VIR_OPCODE_isGetSamplerInfo(opcode) || VIR_OPCODE_isImgRelated(opcode))
         {
             pOperand = VIR_Inst_GetSource(pInst, 0);
             VIR_Operand_GetOperandInfo(pInst, pOperand, &opndInfo);
