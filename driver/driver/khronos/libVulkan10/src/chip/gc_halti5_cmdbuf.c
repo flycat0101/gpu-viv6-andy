@@ -5050,7 +5050,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         uint32_t dataCount = 0;
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
-                        physical += (uint32_t)resInfo->u.bufferInfo.offset;
+                        physical += (uint32_t)(buf->memOffset + resInfo->u.bufferInfo.offset);
                         data[dataCount++] = physical;
                         if (devCtx->database->ROBUSTNESS)
                         {
@@ -5181,7 +5181,7 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
                         uint32_t dataCount = 0;
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
-                        physical += (uint32_t)resInfo->u.bufferInfo.offset;
+                        physical += (uint32_t)(buf->memOffset + resInfo->u.bufferInfo.offset);
                         data[dataCount++] = physical;
                         if (devCtx->database->ROBUSTNESS)
                         {
