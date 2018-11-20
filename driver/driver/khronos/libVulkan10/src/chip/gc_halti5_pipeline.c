@@ -1623,8 +1623,11 @@ static VkResult halti5_pip_emit_graphicsProgram(
     /* Flush private constant uniform. */
     if (chipGfxPipeline->sampleLocation.bUsed)
     {
+        __VK_ASSERT(chipGfxPipeline->sampleLocation.hwRegCount != 0 && chipGfxPipeline->sampleLocation.hwRegCount <= 4);
+
+        /* Compiler may not active the whole constant array, so we only need to flush the used part. */
         __vkCmdLoadBatchHWStates(&pCmdBuffer, chipGfxPipeline->sampleLocation.hwRegAddress, VK_FALSE,
-            4 * 4, &chipModule->sampleLocations[0][0]);
+            chipGfxPipeline->sampleLocation.hwRegCount * 4, &chipModule->sampleLocations[0][0]);
     }
 
     if (chipGfxPipeline->ehableMultiSampleBuffers.bUsed)
