@@ -3612,6 +3612,8 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
     if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER)
     {
         pUtbEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+
+        _SetResOpBits(pShader, &pUtbEntry->iaBinding, &pUtbEntry->pResOpBits);
     }
     else
     {

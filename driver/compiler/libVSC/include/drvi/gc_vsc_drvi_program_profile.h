@@ -757,6 +757,10 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
        this is the first entry of extra-image */
     SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
 
+    /* Which kinds of inst operation acting on sampler (has flag VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER). The count of
+       this resOpBit is same as iaBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
     /* Different shader stage may have different HW mappings. */
     PROG_VK_INPUT_ATTACHMENT_HW_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
 }

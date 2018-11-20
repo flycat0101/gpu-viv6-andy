@@ -342,6 +342,12 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
                                 gcoOS_Free(gcvNULL, iaEntry.hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase);
                             }
                         }
+
+                        if (iaEntry.pResOpBits)
+                        {
+                            gcoOS_Free(gcvNULL, iaEntry.pResOpBits);
+                            iaEntry.pResOpBits = gcvNULL;
+                        }
                     }
 
                     gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries);
