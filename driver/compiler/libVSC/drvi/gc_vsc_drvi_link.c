@@ -1920,7 +1920,7 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
                                         pLowerUniformSym,
                                         pUpperShader,
                                         upperUniformSym,
-                                        bCheckPrecision,
+                                        bCheckPrecision && (upperUniformKind != VIR_UNIFORM_BLOCK_MEMBER),
                                         &matched);
 
         ON_ERROR(errCode, "Check uniform error");
