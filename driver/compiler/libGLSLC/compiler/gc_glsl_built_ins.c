@@ -3411,6 +3411,7 @@ _GenTextureCode(
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
+    case slvTYPE_SAMPLEREXTERNALOES:
         genCode = _GenTexture2DCode;
         break;
 
@@ -3600,6 +3601,7 @@ _GenTextureProjCode(
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
+    case slvTYPE_SAMPLEREXTERNALOES:
         genCode = _GenTexture2DProjCode;
         break;
 
