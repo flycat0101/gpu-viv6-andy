@@ -6794,7 +6794,8 @@ VIR_Shader_FindParmInst(
     IN VIR_Function    *pCalleeFunc,
     IN VIR_Instruction *pCallInst,
     IN gctBOOL          bForward,
-    IN VIR_Symbol      *parmSym
+    IN VIR_Symbol      *parmSym,
+    INOUT VIR_Operand  **ppOpnd
     );
 
 void
