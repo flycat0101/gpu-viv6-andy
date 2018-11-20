@@ -6070,10 +6070,22 @@ VIR_UBO_Member_Identical(
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctBOOL                    matched = gcvFALSE;
 
-    matched = VIR_Symbol_isNameMatch(Shader1,
-        Sym1,
-        Shader2,
-        Sym2);
+    /* If input uniform has SkipNameCheck flag, then check DescriptorSet and binding, instead of checking name string. */
+    if (isSymSkipNameCheck(Sym1))
+    {
+        if ((VIR_Symbol_GetBinding(Sym1) == VIR_Symbol_GetBinding(Sym2)) &&
+            (VIR_Symbol_GetDescriptorSet(Sym1) == VIR_Symbol_GetDescriptorSet(Sym2)))
+        {
+            matched = gcvTRUE;
+        }
+    }
+    else
+    {
+        matched = VIR_Symbol_isNameMatch(Shader1,
+            Sym1,
+            Shader2,
+            Sym2);
+    }
 
     if (matched == gcvFALSE)
     {
