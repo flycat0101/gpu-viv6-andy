@@ -696,7 +696,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
-    gctBOOL             bGlobalCPP = gcvTRUE;
+    VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
     gctBOOL             bCheckAlwaysInlineOnly = gcvFALSE;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
@@ -717,7 +717,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
     CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);
-    CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &bGlobalCPP);
+    CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &cppPassData);
     CALL_SH_PASS(VSC_PARAM_Optimization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
@@ -741,7 +741,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
-    gctBOOL             bGlobalCPP = gcvFALSE;
+    VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvFALSE };
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Machine ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Low);
@@ -760,7 +760,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
         CALL_SH_PASS(vscVIR_PutScalarConstToImm, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PutImmValueToUniform, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_CheckPosAndDepthConflict, 0, gcvNULL);
-        CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &bGlobalCPP);
+        CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &cppPassData);
         CALL_SH_PASS(VSC_DCE_Perform, 1, gcvNULL);
         CALL_SH_PASS(vscVIR_FixDynamicIdxDep, 0, gcvNULL);
     }

@@ -18,6 +18,18 @@
 
 BEGIN_EXTERN_C()
 
+typedef enum _VSC_CPP_FLAG
+{
+    VSC_CPP_NONE                    = 0x00,
+    VSC_CPP_USE_SRC_TYPE_FROM_MOVE  = 0x01,
+} VSC_CPP_FLAG;
+
+typedef struct _VSC_CPP_PASS_DATA
+{
+    VSC_CPP_FLAG            cppFlag;
+    gctBOOL                 bGlobalCPP;
+} VSC_CPP_PASS_DATA;
+
 typedef struct VIR_CPP_COPYPROPAGATION
 {
     VIR_Shader              *shader;
@@ -26,7 +38,7 @@ typedef struct VIR_CPP_COPYPROPAGATION
     VSC_OPTN_CPPOptions     *options;
     VIR_Dumper              *dumper;
 
-    gctBOOL                 globalCPP;
+    VSC_CPP_PASS_DATA       *passData;
 
     gctINT                  fwOptCount;
     gctINT                  bwOptCount;
@@ -43,10 +55,13 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetDUInfo(cpp, d)       ((cpp)->du_info = (d))
 #define VSC_CPP_GetOptions(cpp)         ((cpp)->options)
 #define VSC_CPP_SetOptions(cpp, o)      ((cpp)->options = (o))
+#define VSC_CPP_GetPassData(cpp)        ((cpp)->passData)
+#define VSC_CPP_SetPassData(cpp, d)     ((cpp)->passData = (d))
 #define VSC_CPP_GetDumper(cpp)          ((cpp)->dumper)
 #define VSC_CPP_SetDumper(cpp, d)       ((cpp)->dumper = (d))
-#define VSC_CPP_isGlobalCPP(cpp)        ((cpp)->globalCPP)
-#define VSC_CPP_SetGlobalCPP(cpp, g)    ((cpp)->globalCPP = (g))
+#define VSC_CPP_isGlobalCPP(cpp)        ((cpp)->passData->bGlobalCPP)
+#define VSC_CPP_SetGlobalCPP(cpp, g)    ((cpp)->passData->bGlobalCPP = (g))
+#define VSC_CPP_GetFlag(cpp)            ((cpp)->passData->cppFlag)
 #define VSC_CPP_GetFWOptCount(cpp)      ((cpp)->fwOptCount)
 #define VSC_CPP_SetFWOptCount(cpp, s)   ((cpp)->fwOptCount = (s))
 #define VSC_CPP_GetBWOptCount(cpp)      ((cpp)->bwOptCount)
