@@ -722,10 +722,10 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, 0, gcvNULL);
-    /* peep hole may delete no used jmp, cfo could help to delete no-used label */
-    CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
+    CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
+
     CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_DoLocalVectorization, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, 0, gcvNULL);
