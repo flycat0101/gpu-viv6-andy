@@ -182,6 +182,7 @@ _CreateIntrinsicLib(
     gctBOOL     supportTexelFetchForMSAA = pHwCfg->hwFeatureFlags.supportMSAATexture;
     gctBOOL     supportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
     gctBOOL     supportMSShading = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_shader_multisample_interpolation", gcvNULL);
+    gctBOOL     supportSamplerBuffer = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_buffer", gcvNULL);
     gctBOOL     supportImgAddr = pHwCfg->hwFeatureFlags.supportImgAddr;
     gctBOOL     supportImgInst = supportImgAddr;
     VIR_Shader* virIntrinsicLibrary = gcvNULL;
@@ -510,7 +511,6 @@ _CreateIntrinsicLib(
         gcLibTexelFetch_Sampler2D,
         gcLibTexelFetch_Sampler2DArray,
         gcLibTexelFetch_Sampler3D,
-        gcLibTexelFetch_SamplerBuffer,
     };
 
     gctSTRING TexelFetchLib_halti4[] =
@@ -518,6 +518,15 @@ _CreateIntrinsicLib(
         gcLibTexelFetch_Sampler2D_halti4,
         gcLibTexelFetch_Sampler2DArray_halti4,
         gcLibTexelFetch_Sampler3D_halti4,
+    };
+
+    gctSTRING TexelFetchSamplerBuffer[] =
+    {
+        gcLibTexelFetch_SamplerBuffer,
+    };
+
+    gctSTRING TexelFetchSamplerBuffer_halti4[] =
+    {
         gcLibTexelFetch_SamplerBuffer_halti4,
     };
 
@@ -739,6 +748,16 @@ _CreateIntrinsicLib(
                 gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, TexelFetchLib_halti4[i]);
             }
+
+            if (supportSamplerBuffer)
+            {
+                stringNum = sizeof(TexelFetchSamplerBuffer_halti4) / sizeof(gctSTRING);
+                for (i = 0; i < stringNum; i++)
+                {
+                    gcoOS_StrCatSafe(sloBuiltinSource,
+                        __LL_LIB_LENGTH__, TexelFetchSamplerBuffer_halti4[i]);
+                }
+            }
         }
         else
         {
@@ -747,6 +766,16 @@ _CreateIntrinsicLib(
             {
                 gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, TexelFetchLib[i]);
+            }
+
+            if (supportSamplerBuffer)
+            {
+                stringNum = sizeof(TexelFetchSamplerBuffer) / sizeof(gctSTRING);
+                for (i = 0; i < stringNum; i++)
+                {
+                    gcoOS_StrCatSafe(sloBuiltinSource,
+                        __LL_LIB_LENGTH__, TexelFetchSamplerBuffer[i]);
+                }
             }
         }
 
