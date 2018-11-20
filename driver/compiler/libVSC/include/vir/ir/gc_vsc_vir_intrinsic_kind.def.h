@@ -239,7 +239,12 @@
 
     VIR_INTRINSIC_INFO(quantizeToF16),
 
-    VIR_INTRINSIC_INFO(image_fetch),
+    VIR_INTRINSIC_INFO(image_fetch), /*
+                                                ** The source of image_fetch can be a image or a sampler:
+                                                ** 1) If it is a image, we convert it to a image_load.
+                                                ** 2) If it is a sampler, we convert it to a image_fetch_for_sampler.
+                                                */
+    VIR_INTRINSIC_INFO(image_fetch_for_sampler),
     VIR_INTRINSIC_INFO(image_addr),
     VIR_INTRINSIC_INFO(image_query_format),
     VIR_INTRINSIC_INFO(image_query_order),

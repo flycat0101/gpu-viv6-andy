@@ -2120,6 +2120,7 @@ typedef enum _VIR_INTRINSICSKIND
                                                       VIR_Intrinsics_isImageQuery(Kind)         || \
                                                       VIR_Intrinsics_isImageFetch(Kind))
 #define VIR_Intrinsics_isImageFetch(Kind)           ((Kind) == VIR_IK_image_fetch)
+#define VIR_Intrinsics_isImageFetchForSampler(Kind) ((Kind) == VIR_IK_image_fetch_for_sampler)
 
 #define VIR_Intrinsics_isTexLdRelated(Kind)         (((Kind) == VIR_IK_texld)                   || \
                                                      ((Kind) == VIR_IK_texldpcf)                || \

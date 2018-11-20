@@ -2149,6 +2149,7 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* quantizeToF16 */
 
     gcvNULL, /* image fetch */
+    gcvNULL, /* image fetch for sampler */
     gcvNULL, /* image address */
     gcvNULL, /* image_query_format */
     gcvNULL, /* image_query_order */
