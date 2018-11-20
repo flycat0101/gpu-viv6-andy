@@ -435,6 +435,12 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Function_SetFlag(Func, Val)         do {(Func)->flags |= (Val); } while (0)
 #define VIR_Function_ClrFlag(Func, Val)         do {(Func)->flags &= ~(Val); } while (0)
 
+/* Get the extension_1 flags. */
+#define VIR_Shader_GetFlagsExt1(Shader)             ((Shader)->flagsExt1)
+#define VIR_Shader_SetFlagsExt1(Shader, Flags)      do { (Shader)->flagsExt1 = (Flags); } while (0)
+#define VIR_Shader_SetFlagExt1(Shader, Val)         do {(Shader)->flagsExt1 |= (Val); } while (0)
+#define VIR_Shader_ClrFlagExt1(Shader, Val)         do {(Shader)->flagsExt1 &= ~(Val); } while (0)
+
 #define VIR_Function_GetSymTable(Func)  ((VIR_SymTable*)&((Func)->symTable))
 #define VIR_Function_GetLabelTable(Func)  ((VIR_LabelTable*)&((Func)->labelTable))
 #define VIR_Function_GetOperandTable(Func)  ((VIR_OperandTable*)&((Func)->operandTable))
@@ -4205,6 +4211,15 @@ typedef enum _VIR_SHADERFLAGS
 
 } VIR_ShaderFlags;
 
+typedef enum _VIR_SHADERFLAGS_EXT1
+{
+    VIR_SHFLAG_EXT1_NONE                        = 0x00000000,
+    VIR_SHFLAG_EXT1_HAS_INPUT_COMP_MAP          = 0x00000001, /* Whether the shader has input component mapping. */
+    VIR_SHFLAG_EXT1_HAS_OUTPUT_COMP_MAP         = 0x00000002, /* Whether the shader has output component mapping. */
+    VIR_SHFLAG_EXT1_ENABLE_MULTI_GPU            = 0x00000004, /* Whether enable multi-GPU. */
+    VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK         = 0x00000020, /* Whether enable robust out-of-bounds memory access check. */
+} VIR_ShaderFlagsExt1;
+
 #define VIR_Shader_GetFlags(Shader)                 (Shader)->flags)
 #define VIR_Shader_SetFlags(Shader, Flags)          do { (Shader)->flags = (Flags); } while (0)
 
@@ -4245,6 +4260,12 @@ typedef enum _VIR_SHADERFLAGS
 #define VIR_Shader_PS_NeedAlphaKillPatch(Shader)    (((Shader)->flags & VIR_SHFLAG_PS_NEED_ALPHA_KILL_PATCH) != 0)
 #define VIR_Shader_TCS_UseDriverInput(Shader)       (((Shader)->flags & VIR_SHFLAG_TCS_USE_DRIVER_INPUT) != 0)
 #define VIR_Shader_TCS_UsePackedRemap(Shader)       (((Shader)->flags & VIR_SHFLAG_TCS_USE_PACKED_REMAP)!= 0)
+
+/* Shader extension_1 flags. */
+#define VIR_Shader_HAS_INPUT_COMP_MAP(Shader)       (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_INPUT_COMP_MAP)!= 0)
+#define VIR_Shader_HAS_OUTPUT_COMP_MAP(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_OUTPUT_COMP_MAP)!= 0)
+#define VIR_Shader_IsEnableMultiGPU(Shader)         (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_MULTI_GPU) != 0)
+#define VIR_Shader_IsEnableRobustCheck(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 
@@ -4461,6 +4482,9 @@ struct _VIR_SHADER
 
     /* Flags */
     VIR_ShaderFlags     flags;
+
+    /* Flags extension_1. */
+    VIR_ShaderFlagsExt1 flagsExt1;
 
     /* Frontend compiler version */
     gctUINT32           compilerVersion[2];

@@ -1120,7 +1120,13 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
            output are all LE 4 */
         gctUINT                   bIoUSCAddrsPackedToOneReg       : 1;
 
-        gctUINT                   reserved                        : 12;
+        /* Whether enable robust out-of-bounds check for memory access . */
+        gctUINT                   bEnableRobustCheck              : 1;
+
+        gctUINT                   reserved                        : 11;
+
+        gctUINT                   gprSpillSize;  /* the byte count of register spill mem to be
+                                                  * allocated by driver in MultiGPU mode*/
     } globalStates;
 
     struct

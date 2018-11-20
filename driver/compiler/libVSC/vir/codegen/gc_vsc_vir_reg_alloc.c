@@ -11904,6 +11904,14 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     gctBOOL             needBoundsCheck =
                            (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
 
+    if (needBoundsCheck)
+    {
+            VIR_Shader_SetFlagsExt1(pShader, VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK);
+    }
+    else
+    {
+            VIR_Shader_ClrFlagExt1(pShader, VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK);
+    }
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE))
     {

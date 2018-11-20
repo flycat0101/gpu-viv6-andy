@@ -2018,6 +2018,7 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
     pOutSEP->exeHints.derivedHints.globalStates.hwStartRegChannelForUSCAddrs = pShader->remapChannelStart;
     pOutSEP->exeHints.derivedHints.globalStates.bIoUSCAddrsPackedToOneReg = (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL) ?
                                                                              VIR_Shader_TCS_UsePackedRemap(pShader) : gcvFALSE;
+    pOutSEP->exeHints.derivedHints.globalStates.bEnableRobustCheck = VIR_Shader_IsEnableRobustCheck(pShader);
 
     pOutSEP->exeHints.derivedHints.prePaStates.bOutPosZDepW = pShader->vsPositionZDependsOnW;
 
