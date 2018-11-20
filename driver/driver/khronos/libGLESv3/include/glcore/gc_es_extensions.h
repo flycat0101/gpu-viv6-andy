@@ -41,6 +41,7 @@ typedef enum
     __GL_EXTID_OES_standard_derivatives,
     __GL_EXTID_OES_EGL_image,
     __GL_EXTID_OES_EGL_image_external,
+    __GL_EXTID_OES_EGL_image_external_essl3,
     __GL_EXTID_OES_EGL_sync,
     __GL_EXTID_OES_texture_stencil8,
     __GL_EXTID_OES_shader_image_atomic,

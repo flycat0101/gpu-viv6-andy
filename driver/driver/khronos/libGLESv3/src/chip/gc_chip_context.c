@@ -429,6 +429,7 @@ gcChipInitExtension(
 
 #if defined(ANDROID) || defined(__QNXNTO__)
     __glExtension[__GL_EXTID_OES_EGL_image_external].bEnabled = GL_TRUE;
+    __glExtension[__GL_EXTID_OES_EGL_image_external_essl3].bEnabled = GL_TRUE;
 #endif
 
     if (chipCtx->chipFeature.hwFeature.hasTxBorderClamp)

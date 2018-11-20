@@ -57,6 +57,7 @@ __GLextension __glExtension[] =
     {"GL_OES_standard_derivatives",                 GL_FALSE, GL_TRUE },
     {"GL_OES_EGL_image",                            GL_FALSE, GL_FALSE},
     {"GL_OES_EGL_image_external",                   GL_FALSE, GL_TRUE },
+    {"GL_OES_EGL_image_external_essl3",             GL_FALSE, GL_TRUE },
     {"GL_OES_EGL_sync",                             GL_FALSE, GL_FALSE},
     {"GL_OES_texture_stencil8",                     GL_FALSE, GL_FALSE},
     {"GL_OES_shader_image_atomic",                  GL_FALSE, GL_TRUE },
