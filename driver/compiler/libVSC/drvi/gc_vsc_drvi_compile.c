@@ -938,22 +938,6 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_ML);
 
-    /* If this is from recompiler, we need to do these processes before linking external lib functions. */
-    if (bIsRecompiler)
-    {
-        /* Link intrinsic functions. */
-        CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
-
-        /* Do some preprocess works for inline. */
-        CALL_SH_PASS(vscVIR_PreprocessMLPostShader, 0, gcvNULL);
-
-        /* Inline some always inline functions. */
-        CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
-
-        /* Do some postprocess works for inline. */
-        CALL_SH_PASS(vscVIR_PostprocessMLPostShader, 0, gcvNULL);
-    }
-
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
@@ -961,8 +945,44 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Medium)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, 3, gcvNULL);
+            VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE, gcvFALSE };
+            VSC_CPP_PASS_DATA           cppPassData = { VSC_CPP_NONE, gcvTRUE };
+
+            /* If this is from recompiler, we need to do these processes before linking external lib functions. */
+            if (bIsRecompiler)
+            {
+                /* Link intrinsic functions. */
+                CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
+
+                /* Do some preprocess works for inline. */
+                CALL_SH_PASS(vscVIR_CheckMustInlineFuncForML, 0, gcvNULL);
+
+                /* Inline some always inline functions. */
+                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+
+                /* Do some postprocess works for inline. */
+                CALL_SH_PASS(vscVIR_PostprocessMLPostShader, 0, gcvNULL);
+
+                externalLinkPassData.bNeedToInvalidCFG = gcvTRUE;
+            }
+
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 3, &externalLinkPassData);
             ON_ERROR(errCode, "Lib link");
+
+            if (externalLinkPassData.bChanged)
+            {
+                /* Do some preprocess works for inline. */
+                CALL_SH_PASS(vscVIR_CheckMustInlineFuncForML, 0, gcvNULL);
+
+                /* Inline some always inline functions. */
+                CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
+
+                /* Initialize variables here to make CPP work. */
+                CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);
+
+                cppPassData.cppFlag |= VSC_CPP_USE_SRC_TYPE_FROM_MOVE;
+                CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &cppPassData);
+            }
         }
     }
 

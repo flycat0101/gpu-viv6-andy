@@ -4670,14 +4670,22 @@ _texldInstMod(
     case VIR_RES_OP_TYPE_TEXLDP_BIAS:
         retValue = TEXLDMOD_BIAS;
         break;
+
     case VIR_RES_OP_TYPE_TEXLD_LOD:
     case VIR_RES_OP_TYPE_TEXLDP_LOD:
         retValue = TEXLDMOD_LOD;
         break;
+
     case VIR_RES_OP_TYPE_GATHER:
     case VIR_RES_OP_TYPE_GATHER_PCF:
         retValue = TEXLDMOD_GATHER;
         break;
+
+    /* Share with LOD. */
+    case VIR_RES_OP_TYPE_FETCH_MS:
+        retValue = TEXLDMOD_LOD;
+        break;
+
     default:
         retValue = TEXLDMOD_NONE;
         break;
@@ -5541,6 +5549,8 @@ _LinkLib_Transform(
            since the lib call site itself already has the right parameters/return passing*/
         errCode = VIR_Lib_UpdateCallSites(pShader, pHwCfg, pMM, &vCallSites);
         ON_ERROR(errCode, "_LinkLib_Transform");
+
+        Context->changed = gcvTRUE;
     }
 
     /* clear the flag: extcall atomic should be link the lib and replace by call */
@@ -5728,7 +5738,8 @@ VIR_LinkLibLibrary(
     IN VSC_HW_CONFIG            *pHwCfg,
     IN VSC_MM                   *pMM,
     IN VIR_Shader               *pShader,
-    IN VSC_SHADER_LIB_LINK_TABLE*pLibLinkTable
+    IN VSC_SHADER_LIB_LINK_TABLE*pLibLinkTable,
+    INOUT gctBOOL               *pChanged
     )
 {
     VSC_ErrCode                errCode  = VSC_ERR_NONE;
@@ -5741,6 +5752,8 @@ VIR_LinkLibLibrary(
     {
         return errCode;
     }
+
+    vContext.changed = gcvFALSE;
 
     for (i = 0; i < pLibLinkTable->shLinkEntryCount; i ++)
     {
@@ -5810,7 +5823,6 @@ VIR_LinkLibLibrary(
                 errCode = VIR_Shader_ReverseFacingValue(pShader);
                 ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_CCW");
                 continue;
-                break;
 
             case VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT:
                 errCode = VIR_Shader_FacingValueAlwaysFront(pShader);
@@ -5828,6 +5840,11 @@ VIR_LinkLibLibrary(
         }
 
         _FinalizeLibLinkEntryData(pMM, libEntry);
+    }
+
+    if (pChanged)
+    {
+        *pChanged = vContext.changed;
     }
 
     _LinkLibContext_Finalize(&vContext);
@@ -5855,13 +5872,32 @@ DEF_QUERY_PASS_PROP(VIR_LinkExternalLibFunc)
 VSC_ErrCode
 VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
 {
-    VSC_ErrCode                errCode  = VSC_ERR_NONE;
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    gctBOOL                     bChanged = gcvFALSE;
+    VSC_EXTERNAL_LINK_PASS_DATA passData = { gcvFALSE, gcvFALSE};
+
+    if (pPassWorker->basePassWorker.pPrvData != gcvNULL)
+    {
+        passData = *(VSC_EXTERNAL_LINK_PASS_DATA*)pPassWorker->basePassWorker.pPrvData;
+    }
 
     errCode = VIR_LinkLibLibrary(&pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                                  pPassWorker->basePassWorker.pMM,
                                  (VIR_Shader *)pPassWorker->pCompilerParam->hShader,
-                                 pPassWorker->pCompilerParam->pShLibLinkTable);
+                                 pPassWorker->pCompilerParam->pShLibLinkTable,
+                                 &bChanged);
     ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
+
+    /* Check if we need to invalid CFG/CG. */
+    if (bChanged && passData.bNeedToInvalidCFG)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+
+        gcmASSERT(pPassWorker->basePassWorker.pPrvData);
+        ((VSC_EXTERNAL_LINK_PASS_DATA*)pPassWorker->basePassWorker.pPrvData)->bChanged = gcvTRUE;
+    }
 
 OnError:
     return errCode;
@@ -5939,7 +5975,8 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
         errCode = VIR_LinkLibLibrary(&pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                                      pPassWorker->basePassWorker.pMM,
                                      (VIR_Shader *)pPassWorker->pCompilerParam->hShader,
-                                     &libLinkTable);
+                                     &libLinkTable,
+                                     gcvNULL);
         ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
     }
 

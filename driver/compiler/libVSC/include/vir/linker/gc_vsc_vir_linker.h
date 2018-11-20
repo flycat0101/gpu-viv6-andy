@@ -236,8 +236,15 @@ VIR_LinkLibLibrary(
     IN VSC_HW_CONFIG            *pHwCfg,
     IN VSC_MM                   *pMM,
     IN VIR_Shader               *pShader,
-    IN VSC_SHADER_LIB_LINK_TABLE*pLibLinkTable
+    IN VSC_SHADER_LIB_LINK_TABLE*pLibLinkTable,
+    INOUT gctBOOL               *pChanged
     );
+
+typedef struct _VSC_EXTERNAL_LINK_PASS_DATA
+{
+    gctBOOL                     bNeedToInvalidCFG;
+    gctBOOL                     bChanged;
+} VSC_EXTERNAL_LINK_PASS_DATA;
 
 VSC_ErrCode
 VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker);
