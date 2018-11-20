@@ -498,6 +498,8 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
     gctUINT           numChange;
     VIR_PrimitiveTypeId dstElemType = VIR_TYPE_VOID, dstType = VIR_TYPE_VOID;
 
+    memset(&ImmValues, 0, sizeof(VIR_ConstVal) * VIR_MAX_SRC_NUM);
+    memset(&immTypeId, 0, sizeof(VIR_TypeId) * VIR_MAX_SRC_NUM);
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
