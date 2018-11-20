@@ -4889,6 +4889,31 @@ void _VIR_RA_FillPsInputPosPCCompValid(
     }
 }
 
+static gctBOOL
+_VIR_RA_ShaderHasSymDepth(
+    VIR_Shader *pShader
+    )
+{
+    gctUINT                 outputIdx;
+    VIR_AttributeIdList     *pOutputs = VIR_Shader_GetOutputs(pShader);
+
+    gcmASSERT(pShader->shaderKind == VIR_SHADER_FRAGMENT);
+
+    for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputs); outputIdx ++)
+    {
+        VIR_Symbol  *pOutputSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputs, outputIdx));
+
+        if (!isSymUnused(pOutputSym))
+        {
+            if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_DEPTH)
+            {
+                return gcvTRUE;
+            }
+        }
+    }
+    return gcvFALSE;
+}
+
 static gctUINT
 _VIR_RA_LS_GetStartReg(
     VIR_RA_LS       *pRA)
@@ -4910,6 +4935,12 @@ _VIR_RA_LS_GetStartReg(
         if (VIR_Shader_PS_NeedSampleMaskId(pShader))
         {
             gctUINT unusedChannel = _VIR_RA_Check_First_Unused_Pos_Attr_Channel(pRA);
+
+            /* sepcial symbol depth will use r0.z and reset unusedChannel to next channel */
+            if (_VIR_RA_ShaderHasSymDepth(pRA->pShader) && (unusedChannel == CHANNEL_Z))
+            {
+                unusedChannel = CHANNEL_W;
+            }
 
             /* In dual16, Sample mask should always be in HIGHP.
                Because,
@@ -5698,8 +5729,10 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
     else if (pShader->shaderKind == VIR_SHADER_FRAGMENT &&
              VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5)
     {
+        /* skip .z in make color if sampleMaskId use .w */
+        gctUINT channels = ((pShader->sampleMaskIdRegStart == 0) && (pShader->sampleMaskIdChannelStart == CHANNEL_W))? 0xA : 0xF;
         _VIR_RA_LS_SetUsedColor(pRA, VIR_RA_HWREG_GR, 0,
-            (pShader->sampleMaskIdRegStart == 0 && VIR_Shader_PS_NeedSampleMaskId(pShader)) ? 0xF : 0x3);
+            (pShader->sampleMaskIdRegStart == 0 && VIR_Shader_PS_NeedSampleMaskId(pShader)) ? channels : 0x3);
         _VIR_RA_MakeColor(0, 0, &LRColor);
         _VIR_RA_LS_SetMaxAllocReg(pRA, LRColor, VIR_RA_HWREG_GR, 1);
     }
