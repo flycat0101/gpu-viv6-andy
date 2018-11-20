@@ -3763,9 +3763,9 @@ gcSHADER_LoadHeader(
     version = (gctUINT32 *) (version + 1);
 
     if (Shader->type == gcSHADER_TYPE_VERTEX || Shader->type == gcSHADER_TYPE_FRAGMENT) {
-       if(*version > _SHADER_HALTI_VERSION) {
+       if(*version > _SHADER_ES40_VERSION) {
            gctUINT8 *inputVerPtr, *curVerPtr;
-           gctUINT32 curVer[1] = {_SHADER_HALTI_VERSION};
+           gctUINT32 curVer[1] = {_SHADER_ES40_VERSION};
 
            inputVerPtr = (gctUINT8 *) version;
            curVerPtr = (gctUINT8 *)curVer;
