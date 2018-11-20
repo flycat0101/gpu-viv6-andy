@@ -5035,6 +5035,11 @@ VIR_Shader_AddNamedUniform(
     OUT VIR_Symbol **     UniformSym
     );
 
+VSC_ErrCode
+VIR_Shader_ChangeAddressUniformTypeToFatPointer(
+    VIR_Shader *   pShader,
+    VIR_Symbol *   pSym);
+
 gctUINT
 VIR_Shader_GetLogicalCount(
     IN  VIR_Shader *    Shader,

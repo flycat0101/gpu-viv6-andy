@@ -224,7 +224,8 @@ VSC_AllShaders_Initialize(
     IN VIR_Shader* ps_shader,
     IN VIR_Shader* cs_shader,
     IN VIR_Dumper* dumper,
-    IN VSC_MM* mem_pool
+    IN VSC_MM* mem_pool,
+    IN VSC_COMPILER_CONFIG* compilerCfg
     );
 
 void

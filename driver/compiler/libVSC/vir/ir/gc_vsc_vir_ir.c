@@ -2991,6 +2991,46 @@ VIR_Shader_AddNamedUniform(
     return errCode;
 }
 
+VSC_ErrCode
+VIR_Shader_ChangeAddressUniformTypeToFatPointer(
+    VIR_Shader *   pShader,
+    VIR_Symbol *   pSym)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Type *          symType;
+    VIR_TypeId          newSymTypeId;
+    VIR_Type *          newSymType;
+
+    /* set base address uniform's sym to use vector 4 for fat pointer,
+     * so even the pointer is not used in shader, we still allocate correct
+     * size for API specified bindings */
+
+    if (VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM &&
+        (VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS ||
+            VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS ||
+            VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS))
+    {
+        symType = VIR_Symbol_GetType(pSym);
+        gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(symType)) & VIR_TYFLAG_ISINTEGER));
+
+        if (VIR_Type_isArray(symType))
+        {
+            errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_UINT_X4,
+                                                VIR_Type_GetArrayLength(symType), 0, &newSymTypeId);
+            ON_ERROR(errCode, "Add array type");
+            newSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
+            VIR_Symbol_SetType(pSym, newSymType);
+        }
+        else
+        {
+            VIR_Symbol_SetType(pSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4));
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
 gctUINT
 VIR_Shader_GetLogicalCount(
     IN  VIR_Shader *    Shader,
@@ -8511,7 +8551,7 @@ VIR_Shader_GetCUBO(
         /* create default ubo address */
         {
             virErrCode = VIR_Shader_AddString(Shader,
-                "#ConstantUBO",
+                "#ConstantUBO_addr",
                 &cubo_addr_nameId);
             if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
@@ -8519,7 +8559,8 @@ VIR_Shader_GetCUBO(
             virErrCode = VIR_Shader_AddSymbol(Shader,
                 VIR_SYM_UNIFORM,
                 cubo_addr_nameId,
-                VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
+                VIR_Shader_IsEnableRobustCheck(Shader) ? VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT_X3)
+                                                       : VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
                 VIR_STORAGE_UNKNOWN,
                 &cubo_addr_symId);
 
