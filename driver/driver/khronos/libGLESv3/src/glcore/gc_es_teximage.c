@@ -598,7 +598,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         */
         case GL_SRGB8_ALPHA8:
             gcoHAL_GetPatchID(gcvNULL, &patchID);
-            if(gc->apiVersion < __GL_API_VERSION_ES30 && patchID != gcvPATCH_ANDROID_CTS_UIRENDERING)
+            if(gc->apiVersion < __GL_API_VERSION_ES30 && (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
             {
                 invalid = GL_TRUE;
             }
