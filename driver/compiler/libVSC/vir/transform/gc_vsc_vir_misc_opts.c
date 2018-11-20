@@ -1621,11 +1621,6 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
                 /* src */
                 opnd = VIR_Inst_GetSource(pNewInsertedInstY, VIR_Operand_Src0);
-                if (bFullRange)
-                {
-                    VIR_Operand_SetImmediateUint(opnd, 0);
-                }
-                else
                 {
                     VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
                     VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_YYYY);
