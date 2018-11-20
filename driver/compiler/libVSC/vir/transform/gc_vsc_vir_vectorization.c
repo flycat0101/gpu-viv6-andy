@@ -1254,7 +1254,7 @@ static gctBOOL _CanMoveInstToSeedInst(VIR_Shader* pShader,
         {
             pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
 
-            if (pDef->defKey.channel == channel)
+            if (pDef->defKey.channel == channel && !VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst))
             {
                 /* WAW */
                 if ((VIR_Inst_GetId(pDef->defKey.pDefInst) > VIR_Inst_GetId(pSeedInst)) &&
