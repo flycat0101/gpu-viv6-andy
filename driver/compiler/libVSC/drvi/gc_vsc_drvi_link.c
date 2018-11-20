@@ -1897,10 +1897,12 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
     for (uniformIdx = 0; uniformIdx < upperUniformCount; uniformIdx++)
     {
         gctBOOL                matched = gcvFALSE;
+        VIR_UniformKind        upperUniformKind;
         upperUniformSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(upperUniformList, uniformIdx));
-
-        if (VIR_Symbol_GetUniformKind(upperUniformSym) != VIR_UNIFORM_NORMAL &&
-            VIR_Symbol_GetUniformKind(upperUniformSym) != VIR_UNIFORM_STRUCT)
+        upperUniformKind = VIR_Symbol_GetUniformKind(upperUniformSym);
+        if (upperUniformKind != VIR_UNIFORM_NORMAL &&
+            upperUniformKind != VIR_UNIFORM_STRUCT &&
+            upperUniformKind != VIR_UNIFORM_BLOCK_MEMBER)
         {
             continue;
         }
@@ -1956,10 +1958,12 @@ static VSC_ErrCode _LinkUniformsBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* p
 
     for (uniformIdx = 0; uniformIdx < lowerUniformCount; uniformIdx++)
     {
+        VIR_UniformKind        lowerUniformKind;
         lowerUniformSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(lowerUniformList, uniformIdx));
-
-        if (VIR_Symbol_GetUniformKind(lowerUniformSym) != VIR_UNIFORM_NORMAL &&
-            VIR_Symbol_GetUniformKind(lowerUniformSym) != VIR_UNIFORM_STRUCT)
+        lowerUniformKind = VIR_Symbol_GetUniformKind(lowerUniformSym);
+        if (lowerUniformKind != VIR_UNIFORM_NORMAL &&
+            lowerUniformKind != VIR_UNIFORM_STRUCT &&
+            lowerUniformKind != VIR_UNIFORM_BLOCK_MEMBER)
         {
             continue;
         }

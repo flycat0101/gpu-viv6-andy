@@ -5970,6 +5970,39 @@ VIR_Uniform_Identical(
                 errCode = VSC_ERR_UNIFORM_TYPE_MISMATCH;
                 ON_ERROR(errCode, "Uniform \"%s\" location mismatch.", name1);
             }
+            /* Check uniform kind: normal uniform cannot match ubo member
+             * GLSL Spec: It is a link-time error if any particular shader interface contains
+             *  o two different blocks, each having no instance name, and each having a member
+             *    of the same name
+             * or
+             *  o a variable outside a block, and a block with no instance name, where the
+             *    variable has the same name as a member in the block.
+             */
+            if (VIR_Symbol_GetUniformKind(Sym1) != VIR_Symbol_GetUniformKind(Sym2))
+            {
+                errCode = VSC_ERR_UNIFORM_TYPE_MISMATCH;
+                ON_ERROR(errCode, "Uniform \"%s\" location mismatch.", name1);
+            }
+            else if (VIR_Symbol_GetUniformKind(Sym1) == VIR_UNIFORM_BLOCK_MEMBER &&
+                     VIR_Symbol_GetUniformKind(Sym2) == VIR_UNIFORM_BLOCK_MEMBER )
+            {
+                /* two different non instanced ubo member having the same name */
+                VIR_Symbol *UBOSym1 = VIR_Shader_GetSymFromId(Shader1,
+                                          VIR_IdList_GetId(VIR_Shader_GetUniformBlocks(Shader1),
+                                                           VIR_Symbol_GetIOBlockIndex(Sym1)));
+                VIR_Symbol *UBOSym2 = VIR_Shader_GetSymFromId(Shader2,
+                                          VIR_IdList_GetId(VIR_Shader_GetUniformBlocks(Shader2),
+                                                           VIR_Symbol_GetIOBlockIndex(Sym2)));
+                gctBOOL hasInstanceName1 = (VIR_IB_GetFlags(UBOSym1->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
+                gctBOOL hasInstanceName2 = (VIR_IB_GetFlags(UBOSym2->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
+                gctSTRING uboName1 = VIR_Shader_GetSymNameString(Shader1, UBOSym1);
+                gctSTRING uboName2 = VIR_Shader_GetSymNameString(Shader2, UBOSym2);
+                if(!hasInstanceName1 && !hasInstanceName2 && !gcmIS_SUCCESS(gcoOS_StrCmp(uboName1, uboName2)))
+                {
+                    errCode = VSC_ERR_UNIFORM_TYPE_MISMATCH;
+                    ON_ERROR(errCode, "UBO member \"%s\" appeared in differnt named UBOs which has no instance name.", name1);
+                }
+            }
         }
     } while(gcvFALSE);
 
