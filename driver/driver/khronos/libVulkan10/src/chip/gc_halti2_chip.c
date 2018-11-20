@@ -861,6 +861,7 @@ VkResult halti2_clearImageWithRS(
         __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, address);
+
         if (devCtx->database->ROBUSTNESS)
         {
             if (!devCtx->database->SH_ROBUSTNESS_FIX)
@@ -915,6 +916,33 @@ VkResult halti2_clearImageWithRS(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
         partIndex++;
+    }
+
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
     }
 
     if (__VK_IS_SUCCESS(result))
@@ -1515,6 +1543,33 @@ VkResult halti2_copyImageWithRS(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
+
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+    }
 
     cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
     __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);

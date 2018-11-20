@@ -2773,18 +2773,16 @@ VkResult halti5_clearImage(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            if (!devCtx->database->SH_ROBUSTNESS_FIX)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2800,15 +2798,12 @@ VkResult halti5_clearImage(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-            }
-            else
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
-                    (address + (uint32_t)pLevel->sliceSize - 1));
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
-                    (address + (uint32_t)pLevel->sliceSize - 1));
-            }
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
+                (address + (uint32_t)pLevel->sliceSize - 1));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
+                (address + (uint32_t)pLevel->sliceSize - 1));
         }
 
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5011, VK_FALSE, 2, clearVals);
@@ -3983,18 +3978,16 @@ VkResult halti5_copyImage(
             (srcBltDesc.bltSwizzleEx | (dstBltDesc.bltSwizzleEx << 12))
             );
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            if (!devCtx->database->SH_ROBUSTNESS_FIX)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4010,15 +4003,12 @@ VkResult halti5_copyImage(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-            }
-            else
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
-                    (srcAddress + srcPartSize - 1));
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
-                    (dstAddress + dstPartSize - 1));
-            }
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
+                (srcAddress + srcPartSize - 1));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
+                (dstAddress + dstPartSize - 1));
         }
 
         if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
@@ -4632,18 +4622,17 @@ VkResult halti5_fillBuffer(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-    if (devCtx->database->ROBUSTNESS)
+
+    if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
     {
-        if (!devCtx->database->SH_ROBUSTNESS_FIX)
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4659,15 +4648,12 @@ VkResult halti5_fillBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-        }
-        else
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
-                (address + (uint32_t)size - 1));
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
-                (address + (uint32_t)size - 1));
-        }
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
+            (address + (uint32_t)size - 1));
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
+            (address + (uint32_t)size - 1));
     }
 
     if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
@@ -4889,18 +4875,16 @@ VkResult halti5_fillBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            if (!devCtx->database->SH_ROBUSTNESS_FIX)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4916,15 +4900,12 @@ VkResult halti5_fillBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-            }
-            else
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
-                    (address + extraSize - 1));
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
-                    (address + extraSize - 1));
-            }
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE,
+                (address + extraSize - 1));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
+                (address + extraSize - 1));
         }
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
@@ -5144,18 +5125,18 @@ VkResult halti5_copyBuffer(
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
 
-            if (devCtx->database->ROBUSTNESS)
+            if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
             {
-                if (!devCtx->database->SH_ROBUSTNESS_FIX)
-                {
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                        (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                uint64_t endAddress;
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5171,17 +5152,12 @@ VkResult halti5_copyBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-                }
-                else
-                {
-                    uint64_t endAddress ;
 
-                    endAddress = srcAddr + copyBytes - 1;
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+                endAddress = srcAddr + copyBytes - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
 
-                    endAddress = dstAddr + copyBytes - 1;
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-                }
+                endAddress = dstAddr + copyBytes - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
             }
 
             srcAddr += copyBytes;
@@ -5209,44 +5185,15 @@ VkResult halti5_copyBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copySize);
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            if (!devCtx->database->SH_ROBUSTNESS_FIX)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-            }
-            else
-            {
-                uint64_t endAddress;
+            uint64_t endAddress;
 
-                endAddress = srcAddress + copySize - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+            endAddress = srcAddress + copySize - 1;
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
 
-                endAddress = dstAddress + copySize - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-            }
+            endAddress = dstAddress + copySize - 1;
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
         }
     }
 
@@ -5448,18 +5395,18 @@ VkResult halti5_updateBuffer(
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
 
-            if (devCtx->database->ROBUSTNESS)
+            if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
             {
-                if (!devCtx->database->SH_ROBUSTNESS_FIX)
-                {
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                        (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                uint64_t endAddress;
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5475,17 +5422,12 @@ VkResult halti5_updateBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-                }
-                else
-                {
-                    uint64_t endAddress ;
 
-                    endAddress = srcAddr + copyBytes - 1;
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+                endAddress = srcAddr + copyBytes - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
 
-                    endAddress = dstAddr + copyBytes - 1;
-                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-                }
+                endAddress = dstAddr + copyBytes - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
             }
 
             srcAddr += copyBytes;
@@ -5512,18 +5454,18 @@ VkResult halti5_updateBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)size);
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            if (!devCtx->database->SH_ROBUSTNESS_FIX)
-            {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            uint64_t endAddress;
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  28:28) - (0 ?
  28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5539,17 +5481,12 @@ VkResult halti5_updateBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-            }
-            else
-            {
-                uint64_t endAddress;
 
-                endAddress = srcAddress + size - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+            endAddress = srcAddress + size - 1;
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
 
-                endAddress = dstAddress + size - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-            }
+            endAddress = dstAddress + size - 1;
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
         }
     }
 
