@@ -997,12 +997,13 @@ _DumpSymbol(
         case VIR_SYM_TEXTURE:
         case VIR_SYM_IMAGE:
         case VIR_SYM_TYPE:
-        case VIR_SYM_LABEL:
         case VIR_SYM_VIRREG:
         case VIR_SYM_CONST:
-        case VIR_SYM_FIELD:
         case VIR_SYM_IOBLOCK:
             str = _GetStorageClassString(VIR_Symbol_GetStorageClass(Sym));
+            break;
+        case VIR_SYM_LABEL:
+        case VIR_SYM_FIELD:
             break;
         case VIR_SYM_UNKNOWN:
         default:

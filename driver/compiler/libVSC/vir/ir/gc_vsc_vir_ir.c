@@ -6028,12 +6028,14 @@ VIR_Uniform_Identical(
                      VIR_Symbol_GetUniformKind(Sym2) == VIR_UNIFORM_BLOCK_MEMBER )
             {
                 /* two different non instanced ubo member having the same name */
+                VIR_Uniform * uniform1 = VIR_Symbol_GetUniform(Sym1);
                 VIR_Symbol *UBOSym1 = VIR_Shader_GetSymFromId(Shader1,
                                           VIR_IdList_GetId(VIR_Shader_GetUniformBlocks(Shader1),
-                                                           VIR_Symbol_GetIOBlockIndex(Sym1)));
+                                                           VIR_Uniform_GetBlockIndex(uniform1)));
+                VIR_Uniform * uniform2 = VIR_Symbol_GetUniform(Sym2);
                 VIR_Symbol *UBOSym2 = VIR_Shader_GetSymFromId(Shader2,
                                           VIR_IdList_GetId(VIR_Shader_GetUniformBlocks(Shader2),
-                                                           VIR_Symbol_GetIOBlockIndex(Sym2)));
+                                                           VIR_Uniform_GetBlockIndex(uniform2)));
                 gctBOOL hasInstanceName1 = (VIR_IB_GetFlags(UBOSym1->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
                 gctBOOL hasInstanceName2 = (VIR_IB_GetFlags(UBOSym2->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
                 gctSTRING uboName1 = VIR_Shader_GetSymNameString(Shader1, UBOSym1);
@@ -6068,12 +6070,10 @@ VIR_UBO_Member_Identical(
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctBOOL                    matched = gcvFALSE;
 
-    errCode = VIR_Uniform_Identical(Shader1,
+    matched = VIR_Symbol_isNameMatch(Shader1,
         Sym1,
         Shader2,
-        Sym2,
-        gcvFALSE,
-        &matched);
+        Sym2);
 
     if (matched == gcvFALSE)
     {
