@@ -1009,6 +1009,83 @@ __SpvGetResultTypeId (
 }
 
 static VIR_Swizzle
+__ConvVectorIndexToSwizzle(
+    IN  VIR_TypeId          typeId,
+    IN  gctUINT             vectorIndex,
+    IN  gctBOOL             needWShift
+    )
+{
+    VIR_Swizzle             swizzle = VIR_SWIZZLE_XXXX;
+    gctUINT                 compCount = VIR_GetTypeComponents(typeId);
+
+    if (needWShift)
+    {
+        swizzle = __SpvConstIndexToVIRSwizzle(vectorIndex);
+    }
+    else
+    {
+        switch (vectorIndex)
+        {
+        case 0:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_XXXX;
+                break;
+            case 2:
+                swizzle = VIR_SWIZZLE_XYYY;
+                break;
+            case 3:
+                swizzle = VIR_SWIZZLE_XYZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_XYZW;
+                break;
+            }
+            break;
+
+        case 1:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_YYYY;
+                break;
+            case 2:
+                swizzle = VIR_SWIZZLE_YZZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_YZWW;
+                break;
+            }
+            break;
+
+        case 2:
+            switch (compCount)
+            {
+            case 1:
+                swizzle = VIR_SWIZZLE_ZZZZ;
+                break;
+            default:
+                swizzle = VIR_SWIZZLE_ZWWW;
+                break;
+            break;
+            }
+
+        case 3:
+            swizzle = VIR_SWIZZLE_WWWW;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    return swizzle;
+}
+
+
+static VIR_Swizzle
 __SpvID2Swizzle (
     IN gcSPV spv,
     IN gctUINT id
@@ -1046,7 +1123,22 @@ __SpvID2Swizzle (
         }
         else
         {
-            virSwizzle = VIR_SWIZZLE_XXXX;
+            /* vec4 in_te_attr[] and get value of in_te_attr[0].z,
+             * resultId.enable is set .z, set virSwizzle is of src0 .zzzz instead of .x
+             *   ATTR_LD            hp global  #spv_id61.hp.z, hp  #spv_id22.hp.z,  uint 0,   uint 0
+             */
+            if (spv->resultId &&
+                (SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId) != VIR_INVALID_ID) &&
+                (SPV_ID_SYM_VECTOR_OFFSET_TYPE(spv->resultId) == VIR_SYM_CONST))
+            {
+                virSwizzle = __ConvVectorIndexToSwizzle(SPV_ID_VIR_TYPE_ID(spv->resultId),
+                                                        SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId),
+                                                        !SPV_ID_SYM_NO_NEED_WSHIFT(spv->resultId));
+            }
+            else
+            {
+                virSwizzle = VIR_SWIZZLE_XXXX;
+            }
         }
     }
     else if (SPV_ID_TYPE_IS_VECTOR(idType))
@@ -1714,82 +1806,6 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     }
 
     return virErrCode;
-}
-
-static VIR_Swizzle
-__ConvVectorIndexToSwizzle(
-    IN  VIR_TypeId          typeId,
-    IN  gctUINT             vectorIndex,
-    IN  gctBOOL             needWShift
-    )
-{
-    VIR_Swizzle             swizzle = VIR_SWIZZLE_XXXX;
-    gctUINT                 compCount = VIR_GetTypeComponents(typeId);
-
-    if (needWShift)
-    {
-        swizzle = __SpvConstIndexToVIRSwizzle(vectorIndex);
-    }
-    else
-    {
-        switch (vectorIndex)
-        {
-        case 0:
-            switch (compCount)
-            {
-            case 1:
-                swizzle = VIR_SWIZZLE_XXXX;
-                break;
-            case 2:
-                swizzle = VIR_SWIZZLE_XYYY;
-                break;
-            case 3:
-                swizzle = VIR_SWIZZLE_XYZZ;
-                break;
-            default:
-                swizzle = VIR_SWIZZLE_XYZW;
-                break;
-            }
-            break;
-
-        case 1:
-            switch (compCount)
-            {
-            case 1:
-                swizzle = VIR_SWIZZLE_YYYY;
-                break;
-            case 2:
-                swizzle = VIR_SWIZZLE_YZZZ;
-                break;
-            default:
-                swizzle = VIR_SWIZZLE_YZWW;
-                break;
-            }
-            break;
-
-        case 2:
-            switch (compCount)
-            {
-            case 1:
-                swizzle = VIR_SWIZZLE_ZZZZ;
-                break;
-            default:
-                swizzle = VIR_SWIZZLE_ZWWW;
-                break;
-            break;
-            }
-
-        case 3:
-            swizzle = VIR_SWIZZLE_WWWW;
-            break;
-
-        default:
-            gcmASSERT(gcvFALSE);
-            break;
-        }
-    }
-
-    return swizzle;
 }
 
 static void
