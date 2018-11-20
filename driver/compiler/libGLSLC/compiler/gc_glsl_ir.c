@@ -3266,6 +3266,25 @@ slsNAME_SPACE_CreateName(
 
         if (Name != gcvNULL) *Name = name;
 
+        if (DataType != gcvNULL)
+        {
+            switch (DataType->qualifiers.storage)
+            {
+            case slvSTORAGE_QUALIFIER_VARYING_OUT:
+            case slvSTORAGE_QUALIFIER_FRAGMENT_OUT:
+                Compiler->context.applyOutputLayout.bHasVariable = gcvTRUE;
+                break;
+
+            case slvSTORAGE_QUALIFIER_ATTRIBUTE:
+            case slvSTORAGE_QUALIFIER_VARYING_IN:
+                Compiler->context.applyInputLayout.bHasVariable = gcvTRUE;
+                break;
+
+            default:
+                break;
+            }
+        }
+
         gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
         return gcvSTATUS_OK;
     }

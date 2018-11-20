@@ -16938,6 +16938,90 @@ OnError:
 }
 
 static gceSTATUS
+_ApplyLayoutOnNameSpace(
+    IN sloCOMPILER              Compiler,
+    IN slsNAME_SPACE*           pNameSpace,
+    IN slsLAYOUT_QUALIFIER*     pLayoutQual,
+    IN gctBOOL                  bIsInput
+    )
+{
+    gceSTATUS                   status = gcvSTATUS_OK;
+    slsNAME*                    pName = gcvNULL;
+    slsDATA_TYPE*               pDataType = gcvNULL;
+
+    FOR_EACH_DLINK_NODE(&pNameSpace->names, slsNAME, pName)
+    {
+        if (pName == gcvNULL || pName->type != slvVARIABLE_NAME || pName->dataType == gcvNULL)
+        {
+            continue;
+        }
+
+        pDataType = pName->dataType;
+
+        if (bIsInput)
+        {
+             if (pDataType->qualifiers.storage != slvSTORAGE_QUALIFIER_ATTRIBUTE &&
+                 pDataType->qualifiers.storage != slvSTORAGE_QUALIFIER_VARYING_IN)
+             {
+                 continue;
+             }
+        }
+        else
+        {
+            if (pDataType->qualifiers.storage != slvSTORAGE_QUALIFIER_VARYING_OUT &&
+                pDataType->qualifiers.storage != slvSTORAGE_QUALIFIER_FRAGMENT_OUT)
+             {
+                 continue;
+             }
+        }
+
+        /* Merge the layout. */
+        status = sloCOMPILER_MergeLayoutId(Compiler,
+                                           pLayoutQual,
+                                           &pDataType->qualifiers.layout);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
+    return status;
+}
+
+static gceSTATUS
+_ApplyLayoutOnShader(
+    IN sloCOMPILER              Compiler
+    )
+{
+    gceSTATUS                   status = gcvSTATUS_OK;
+    slsLAYOUT_QUALIFIER         layoutQual;
+    sloApplyLayout*             pApplyLayouts[2] = { &Compiler->context.applyInputLayout, &Compiler->context.applyOutputLayout };
+    sloApplyLayout*             pApplyLayout;
+    gctUINT                     i;
+
+    for (i = 0; i < 2; i++)
+    {
+        pApplyLayout = pApplyLayouts[i];
+
+        if (pApplyLayout->bApplyLayout)
+        {
+            /* Get the default input layout. */
+            status = sloCOMPILER_GetDefaultLayout(Compiler,
+                                                  &layoutQual,
+                                                  pApplyLayout->storageQual);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            /* Apply global space. */
+            status = _ApplyLayoutOnNameSpace(Compiler,
+                                             sloCOMPILER_GetGlobalSpace(Compiler),
+                                             &layoutQual,
+                                             pApplyLayout->storageQual == slvSTORAGE_QUALIFIER_IN);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        }
+    }
+
+    return status;
+}
+
+static gceSTATUS
 _CheckLayout(
     IN sloCOMPILER Compiler
     )
@@ -18094,6 +18178,10 @@ sloIR_SET_GenCode(
 
         if (isRoot)
         {
+            /* Apply layouts first before doing any checking. */
+            status = _ApplyLayoutOnShader(Compiler);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
             status = _CheckQualifier(Compiler);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
