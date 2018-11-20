@@ -12303,9 +12303,10 @@ slGenArithmeticExprCode(
     {
         gctUINT columnCount;
 
-        slsIOPERAND        intermIOperands[5];
+        slsIOPERAND      intermIOperands[5];
         gcsTARGET        intermTargets[5];
         gcsSOURCE        intermSources[5];
+        slsROPERAND      rOperandSlice[1];
 
         gcmASSERT(gcGetMatrixDataTypeRowCount(IOperand->dataType)
                     == gcGetMatrixDataTypeRowCount(ROperand0->dataType));
@@ -12335,11 +12336,16 @@ slGenArithmeticExprCode(
                                                             &source0);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-            status = _ConvROperandToSourceReg(
-                                            Compiler,
-                                            ROperand1,
-                                            _ConvVectorIndexToComponentSelection(i),
-                                            &source1);
+            slGetVectorROperandSlice(ROperand1,
+                                     (gctUINT8)i,
+                                     1,
+                                     rOperandSlice);
+
+            status = _ConvNormalROperandToSource(Compiler,
+                                                 LineNo,
+                                                 StringNo,
+                                                 rOperandSlice,
+                                                 &source1);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
             status = slEmitCode2(
