@@ -2101,7 +2101,7 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
             int ret = 0;
 
             pthread_mutex_lock(&egl_surface->commit_mutex);
-            while (buffer->frame_callback && ret != -1)
+            while (buffer->frame_callback && buffer->state != BUFFER_STATE_FREE && ret != -1)
             {
                 ret = dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
             }
