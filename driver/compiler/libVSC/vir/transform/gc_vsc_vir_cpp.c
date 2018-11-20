@@ -227,15 +227,42 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
     return errCode;
 }
 
-/* Forward propagation
-       MOV t1.x t2.y
-       ADD dst.x, t1.x, t3.x
-       ==>
-       ADD dst.x, t2.y, t3.x
-*/
-static VSC_ErrCode _VSC_CPP_CopyFromMOV(
+static VSC_ErrCode _VSC_CPP_ReplaceSource(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
-    IN     VIR_Instruction          *inst
+    IN     VIR_Instruction          *inst,
+    IN     VIR_Operand              *parentSrcOpnd,
+    IN     gctUINT                  srcNum,
+    IN     VIR_Operand              *newSrc
+    )
+{
+    VSC_ErrCode     errCode  = VSC_ERR_NONE;
+    VIR_Function    *function = VIR_Inst_GetFunction(inst);
+
+    if (parentSrcOpnd != gcvNULL)
+    {
+        VIR_ParmPassing *parm = VIR_Operand_GetParameters(parentSrcOpnd);
+
+        gcmASSERT(VIR_Operand_isParameters(parentSrcOpnd) && srcNum < parm->argNum);
+
+        VIR_Function_FreeOperand(function, parm->args[srcNum]);
+
+        parm->args[srcNum] = newSrc;
+    }
+    else
+    {
+        VIR_Inst_FreeSource(inst, srcNum);
+        VIR_Inst_SetSource(inst, srcNum, newSrc);
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
+    IN OUT VSC_CPP_CopyPropagation  *cpp,
+    IN     VIR_Instruction          *inst,
+    IN     VIR_Operand              *srcOpnd,
+    IN     VIR_Operand              *parentSrcOpnd, /* For texldParm or parameter only. */
+    IN     gctUINT                  srcNum
     )
 {
     VSC_ErrCode     errCode  = VSC_ERR_NONE;
@@ -250,17 +277,8 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
     VIR_GENERAL_UD_ITERATOR udIter;
     VIR_DEF         *pDef;
 
-    gctUINT         srcNum;
-
-    if (instDst == gcvNULL)
+    do
     {
-        return errCode;
-    }
-
-    srcNum = VIR_Inst_GetSrcNum(inst);
-    while (srcNum-- && (errCode ==  VSC_ERR_NONE))
-    {
-        VIR_Operand         *srcOpnd = VIR_Inst_GetSource(inst, srcNum);
         VIR_Enable          srcEnable = VIR_Swizzle_2_Enable(
                                             VIR_Operand_GetSwizzle(srcOpnd));
         VIR_OperandInfo     srcInfo;
@@ -453,9 +471,10 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                         gcmASSERT(movSrcInfo.isImmVal);
                         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_XXXX);
                     }
-                    /* free the original operand */
-                    VIR_Inst_FreeSource(inst, srcNum);
-                    VIR_Inst_SetSource(inst, srcNum, newSrc);
+
+                    /* Replace the source. */
+                    _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
+
                     /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
                     if (VIR_OPCODE_isVXOnly(instOpcode))
                     {
@@ -873,9 +892,11 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                         VIR_Function_DupOperand(func, movSrc, &newSrc);
                         VIR_Operand_SetSwizzle(newSrc, newSwizzle);
                         VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
-                        VIR_Inst_FreeSource(inst, srcNum);
                         VIR_Operand_SetTypeId(newSrc, ty);
-                        VIR_Inst_SetSource(inst, srcNum, newSrc);
+
+                        /* Replace the source. */
+                        _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
+
                         srcOpnd = gcvNULL;    /* reset srcOpnd to avoid misuse */
                     }
 
@@ -925,8 +946,60 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                 break;
             }
         }
+    } while (gcvFALSE);
+
+    return errCode;
+}
+
+/* Forward propagation
+       MOV t1.x t2.y
+       ADD dst.x, t1.x, t3.x
+       ==>
+       ADD dst.x, t2.y, t3.x
+*/
+static VSC_ErrCode _VSC_CPP_CopyFromMOV(
+    IN OUT VSC_CPP_CopyPropagation  *cpp,
+    IN     VIR_Instruction          *inst
+    )
+{
+    VSC_ErrCode     errCode  = VSC_ERR_NONE;
+    VIR_Operand     *instDst = VIR_Inst_GetDest(inst);
+    VIR_OpCode      opCode = VIR_Inst_GetOpcode(inst);
+    gctUINT         srcNum;
+
+    if (instDst == gcvNULL)
+    {
+        return errCode;
     }
 
+    srcNum = VIR_Inst_GetSrcNum(inst);
+    while (srcNum-- && (errCode ==  VSC_ERR_NONE))
+    {
+        VIR_Operand         *srcOpnd = VIR_Inst_GetSource(inst, srcNum);
+
+        /* Enable for INTRINSIC only now. */
+        if (VIR_Operand_isParameters(srcOpnd) && opCode == VIR_OP_INTRINSIC)
+        {
+            VIR_ParmPassing *parm = VIR_Operand_GetParameters(srcOpnd);
+            gctUINT         i;
+
+            for (i = 0; i < parm->argNum; i++)
+            {
+                if (parm->args[i])
+                {
+                    errCode = _VSC_CPP_CopyFromMOVOnOperand(cpp, inst, parm->args[i], srcOpnd, i);
+                    ON_ERROR(errCode, "copy from MOV for a single operand");
+                }
+            }
+        }
+        else
+        {
+            errCode = _VSC_CPP_CopyFromMOVOnOperand(cpp, inst, srcOpnd, gcvNULL, srcNum);
+            ON_ERROR(errCode, "copy from MOV for a single operand");
+        }
+    }
+
+OnError:
     return errCode;
 }
 
