@@ -167,7 +167,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
     constants->maxElementsIndices = 65535;
 
     constants->pointSizeMin = 0.5;
-    constants->pointSizeMax = 100.0;
+    constants->pointSizeMax = 128.0;
 
     constants->lineWidthMin = 1.0f;
     constants->lineWidthMax = 1.0f;
