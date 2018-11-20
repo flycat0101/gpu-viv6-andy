@@ -640,7 +640,9 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             pUsage = GET_USAGE_BY_IDX(&VSC_CPP_GetDUInfo(cpp)->usageTable, pUsageNode->usageIdx);
                             pUseInst = pUsage->usageKey.pUsageInst;
 
-                            if (pUseInst == VIR_OUTPUT_USAGE_INST)
+                            if (pUseInst == VIR_OUTPUT_USAGE_INST ||
+                                VIR_Inst_GetOpcode(pUseInst) == VIR_OP_EMIT ||
+                                VIR_Inst_GetOpcode(pUseInst) == VIR_OP_EMIT0) /* skip copy if usage is emit */
                             {
                                 invalidCase = gcvTRUE;
                                 break;
