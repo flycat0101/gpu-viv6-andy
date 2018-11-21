@@ -23,7 +23,7 @@ endif
 OBJS := g2d_overlay_test.o
 
 ifeq ($(SDK_BUILD), 1)
-CFLAGS += -I $(ROOTFS_USR)/include -I $(KERNEL_DIR)/include -I ../../include
+CFLAGS += -I $(ROOTFS_USR)/include -I ../../include
 
 LFLAGS += -Wl,-rpath-link,$(SDK_DIR)/drivers -Wl,-rpath-link,$(ROOTFS_USR)/lib -L $(SDK_DIR)/drivers -L $(ROOTFS_USR)/lib -lg2d
 else
