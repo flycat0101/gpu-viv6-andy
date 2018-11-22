@@ -2265,7 +2265,58 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             libName = VIR_Shader_GetSymNameString(pLibShader, libSym);
             newVarSym = VIR_Shader_FindSymbolByName(pShader, libSym->_kind, libName);
 
-            if (newVarSym == gcvNULL)
+           /* create attribute localInvocationID if need */
+           if (gcmIS_SUCCESS(gcoOS_StrCmp(libName, "gl_LocalInvocationID")))
+           {
+               VIR_Symbol   *pLocIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_ID);
+               if (pLocIdSym == gcvNULL)
+               {
+                   VIR_SymId     outRegId;
+                   VIR_AttributeIdList *pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
+                   gctUINT       attrCount = VIR_IdList_Count(pAttrIdLsts);
+                   gctUINT       attrIdx;
+                   gctUINT       nextAttrLlSlot = 0;
+                   for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
+                   {
+                       VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
+                       VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(pShader, attrSymId);
+                       gctUINT         thisOutputRegCount;
+
+                       if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
+                       {
+                           gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
+
+                           thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pAttrSym);
+                           if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
+                           {
+                               nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
+                           }
+                       }
+                   }
+
+                   pLocIdSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT_X4, gcvFALSE, VIR_NAME_LOCAL_INVOCATION_ID);
+                   outRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                   VIR_Shader_AddSymbol(pShader,
+                                        VIR_SYM_VIRREG,
+                                        outRegId,
+                                        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                        VIR_STORAGE_UNKNOWN,
+                                        &newVarId);
+                   VIR_Symbol_SetVariableVregIndex(pLocIdSym, outRegId);
+                   VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(pShader, newVarId), pLocIdSym);
+                   VIR_Symbol_SetIndexRange(pLocIdSym, outRegId + 1);
+                   VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, newVarId), outRegId + 1);
+                   VIR_Symbol_SetFirstSlot(pLocIdSym, nextAttrLlSlot);
+
+                   newVarSym = VIR_Function_GetSymFromId(pFunc, newVarId);
+               }
+               else
+               {
+                   VIR_SymId vregindex = VIR_Symbol_GetVariableVregIndex(pLocIdSym);
+                   newVarSym = VIR_Shader_FindSymbolByTempIndex(pShader, vregindex);
+               }
+           }
+           else if (newVarSym == gcvNULL)
             {
                 errCode = VIR_Shader_AddString(pShader,
                                                libName,
