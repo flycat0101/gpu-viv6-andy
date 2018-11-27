@@ -141,6 +141,26 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
         residentFormat = g_vkFormatInfoTable[desc->format].residentImgFormat;
         desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
 
+        if (desc->sampleCount == 4 && desc->formatInfo->bitsPerBlock == 64 &&
+            !devCtx->database->CACHE128B256BPERLINE)
+        {
+            switch (desc->formatInfo->residentImgFormat)
+            {
+            case VK_FORMAT_R16G16B16A16_SFLOAT:
+                residentFormat = __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT;
+                break;
+            case VK_FORMAT_R16G16B16A16_SINT:
+                residentFormat = __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT;
+                break;
+            case VK_FORMAT_R16G16B16A16_UINT:
+                residentFormat = __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT;
+                break;
+            default:
+                break;
+            }
+            desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
+        }
+
         switch (desc->format)
         {
         case VK_FORMAT_S8_UINT:
