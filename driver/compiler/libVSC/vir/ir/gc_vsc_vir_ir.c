@@ -13963,6 +13963,7 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     IN  VIR_Function       *Function,
     IN  gctUINT             ResultId,
     IN  VIR_Symbol         *BaseSymbol,
+    IN  VIR_TypeId          BaseTypeId,
     IN  gctUINT            *AccessChain,
     IN  VIR_SymbolKind     *AccessChainType,
     IN  gctUINT             AccessChainLength,
@@ -13972,7 +13973,7 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     VSC_ErrCode             errCode   = VSC_ERR_NONE;
     VIR_Symbol             *indexSymbol;
     VIR_NameId              nameId;
-    VIR_Type               *type = VIR_Symbol_GetType(BaseSymbol);
+    VIR_Type               *type = VIR_Shader_GetTypeFromId(Shader, BaseTypeId);
     VIR_Symbol             *fieldSymbol = gcvNULL;
     VIR_Type               *baseType = gcvNULL;
     VIR_SymbolKind          blockIndexType = VIR_SYM_CONST;

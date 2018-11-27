@@ -92,7 +92,7 @@
 #define SPV_ID_TYPE_FUNC_ARG_NUM(id) (spv->idDescriptor[id].u.type.u.func.argNum)
 #define SPV_ID_TYPE_VIR_TYPE_ID(id) (spv->idDescriptor[id].virTypeId)
 #define SPV_ID_TYPE_VIR_TYPE(id) (VIR_Shader_GetTypeFromId(virShader, SPV_ID_TYPE_VIR_TYPE_ID(id)))
-#define SPV_ID_TYPE_STRUCT_MEMBER(id, mem) (spv->idDescriptor[id].u.type.u.st.member[mem])
+#define SPV_ID_TYPE_STRUCT_MEMBER(id, mem) (spv->idDescriptor[id].u.type.u.st.fields[mem].member])
 #define SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(id) (spv->idDescriptor[id].u.type.u.image.sampledType)
 #define SPV_ID_TYPE_IMAGE_DIM(id) (spv->idDescriptor[id].u.type.u.image.dimension)
 #define SPV_ID_TYPE_IMAGE_DEPTH(id) (spv->idDescriptor[id].u.type.u.image.depth)
@@ -172,8 +172,10 @@
 #define SPV_ID_VIR_CONST(id) (spv->idDescriptor[id].u.cst.virConst)
 #define SPV_ID_CST_VEC_SPVID(id, index) (spv->idDescriptor[id].u.cst.vecSpvId[index])
 #define SPV_ID_TYPE(id) (spv->idDescriptor[id].idType)
-#define SPV_ID_FIELD_HAS_NAME(id, mem) (spv->idDescriptor[id].u.type.u.st.hasName[mem])
-#define SPV_ID_FIELD_VIR_NAME_ID(id, mem) (spv->idDescriptor[id].u.type.u.st.field[mem])
+#define SPV_ID_FIELD_HAS_NAME(id, mem) ((gctUINT)(mem) < spv->idDescriptor[(id)].u.type.u.st.maxNumField ? \
+                                       spv->idDescriptor[(id)].u.type.u.st.fields[mem].hasName : gcvFALSE)
+#define SPV_ID_FIELD_VIR_NAME_ID(id, mem) ((gctUINT)(mem) < spv->idDescriptor[(id)].u.type.u.st.maxNumField ? \
+                                            spv->idDescriptor[(id)].u.type.u.st.fields[mem].field : VIR_INVALID_ID)
 #define SPV_ID_COND(id) (spv->idDescriptor[id].u.cond.virCond)
 #define SPV_ID_COND_OP(id, index) (spv->idDescriptor[id].u.cond.op[index])
 #define SPV_ID_FUNC_CONTROL(id) (spv->idDescriptor[id].u.func.funcControl)
@@ -281,10 +283,28 @@
     }
 
 #define SPV_SET_IDDESCRIPTOR_FIELD_NAME(spv, id, fieldId, sid) \
-    { \
-            spv->idDescriptor[id].u.type.u.st.field[fieldId] = sid; \
-            spv->idDescriptor[id].u.type.u.st.hasName[fieldId] = gcvTRUE; \
-    }
+    do { \
+        SPV_CHECK_DYNAMIC_SIZE( spv->spvMemPool, \
+                                spv->idDescriptor[id].u.type.u.st.fields, \
+                                SpvStructMembers, \
+                                spv->idDescriptor[id].u.type.u.st.maxNumField, \
+                                (gctUINT)(fieldId) + 1, \
+                                SPV_STRUCT_FIELD_NUM); \
+        gcmASSERT(spv->idDescriptor[id].u.type.u.st.fields); \
+        spv->idDescriptor[id].u.type.u.st.fields[fieldId].field = (sid); \
+        spv->idDescriptor[id].u.type.u.st.fields[fieldId].hasName = gcvTRUE; \
+    } while (gcvFALSE)
+
+#define SPV_SET_IDDESCRIPTOR_FIELD_MEMBER(spv, id, fieldId, sid) \
+    do { \
+        SPV_CHECK_DYNAMIC_SIZE( spv->spvMemPool, \
+                                spv->idDescriptor[id].u.type.u.st.fields, \
+                                SpvStructMembers, \
+                                spv->idDescriptor[id].u.type.u.st.maxNumField, \
+                                (gctUINT)(fieldId) + 1, \
+                                SPV_STRUCT_FIELD_NUM); \
+        spv->idDescriptor[id].u.type.u.st.fields[(fieldId)].member = (sid); \
+    } while (gcvFALSE)
 
 #define SPV_SET_IDDESCRIPTOR_SYM(spv, id, sid) \
     { \
@@ -625,7 +645,7 @@ static gctCHAR * SpvBuiltInName [] =
     "", /* SpvBuiltInNumEnqueuedSubgroups = 39, */
     "", /* SpvBuiltInSubgroupId = 40, */
     "", /* SpvBuiltInSubgroupLocalInvocationId = 41, */
-    "gl_VertexID", /* SpvBuiltInVertexIndex = 42, */
+    "gl_VertexIndex", /* SpvBuiltInVertexIndex = 42, */
     "gl_InstanceIndex", /* SpvBuiltInInstanceIndex = 43, */
 };
 
@@ -1084,6 +1104,176 @@ __ConvVectorIndexToSwizzle(
     return swizzle;
 }
 
+static gctBOOL
+__SpvHasAccessChain(
+    IN  gcSPV               spv,
+    IN  SpvId               ResultId,
+    IN  SpvOffsetType       spvOffsetType
+    )
+{
+    gctBOOL                 bHasAccessChain = gcvFALSE;
+    VIR_SymbolKind          baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(ResultId);
+    VIR_SymbolKind          vecOffsetType = SPV_ID_SYM_VECTOR_OFFSET_TYPE(ResultId);
+    VIR_SymbolKind          blockOffsetType = SPV_ID_SYM_BLOCK_OFFSET_TYPE(ResultId);
+
+    switch (spvOffsetType)
+    {
+    case SpvOffsetType_None:
+        break;
+
+    case SpvOffsetType_Normal:
+        if (baseOffsetType != VIR_SYM_UNKNOWN || vecOffsetType != VIR_SYM_UNKNOWN)
+        {
+            bHasAccessChain = gcvTRUE;
+        }
+        break;
+
+    case SpvOffsetType_UBO:
+        if (baseOffsetType != VIR_SYM_UNKNOWN || vecOffsetType != VIR_SYM_UNKNOWN)
+        {
+            bHasAccessChain = gcvTRUE;
+        }
+        break;
+
+    case SpvOffsetType_UBO_Array:
+        if (blockOffsetType != VIR_SYM_UNKNOWN)
+        {
+            bHasAccessChain = gcvTRUE;
+        }
+        break;
+
+    case SpvOffsetType_PER_VERTEX:
+        if (baseOffsetType != VIR_SYM_UNKNOWN || vecOffsetType != VIR_SYM_UNKNOWN)
+        {
+            bHasAccessChain = gcvTRUE;
+        }
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return bHasAccessChain;
+}
+
+static VSC_ErrCode
+__SpvCombineAccessChainOffset(
+    IN  gcSPV               spv,
+    IN  VIR_Shader*         pVirShader,
+    IN  SpvId               ResultId,
+    IN  SpvId               SrcId,
+    IN  VIR_AC_OFFSET_INFO* pAcInfo
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_SymbolKind          srcOffsetType, dstOffsetType;
+    gctUINT                 srcOffset, dstOffset;
+
+    /* I: handle block offset: for a LOAD/STORE, it can only have one block offset. */
+    srcOffsetType = SPV_ID_SYM_BLOCK_OFFSET_TYPE(SrcId);
+    srcOffset = SPV_ID_SYM_BLOCK_OFFSET_VALUE(SrcId);
+    if (srcOffsetType != VIR_SYM_UNKNOWN)
+    {
+        pAcInfo->blockIndexType = srcOffsetType;
+        pAcInfo->blockIndex = srcOffset;
+    }
+
+    /* II: handle base offset: add the src baseOffset if needed. */
+    srcOffsetType = SPV_ID_SYM_OFFSET_TYPE(SrcId);
+    srcOffset = SPV_ID_SYM_OFFSET_VALUE(SrcId);
+    if (srcOffsetType != VIR_SYM_UNKNOWN)
+    {
+        dstOffsetType = pAcInfo->baseOffsetType;
+        dstOffset = pAcInfo->baseOffset;
+
+        if (dstOffsetType == VIR_SYM_UNKNOWN)
+        {
+            pAcInfo->baseOffsetType = srcOffsetType;
+            pAcInfo->baseOffset = srcOffset;
+        }
+        else if (dstOffsetType == VIR_SYM_CONST && srcOffsetType == VIR_SYM_CONST)
+        {
+            pAcInfo->baseOffset = srcOffset + dstOffset;
+        }
+        else if (!(srcOffsetType == VIR_SYM_CONST && srcOffset == 0))
+        {
+            VIR_SymId       dstIndexSymId = VIR_INVALID_ID;
+            VIR_Symbol*     pDstIndexSym = gcvNULL;
+            VIR_Instruction*pNewInst = gcvNULL;
+            VIR_Operand*    pOpnd = gcvNULL;
+
+            if (dstOffsetType == VIR_SYM_CONST)
+            {
+                gctCHAR     name[32];
+                gctUINT     offset = 0;
+                VIR_NameId  nameId = VIR_INVALID_ID;
+
+                gcoOS_PrintStrSafe(name, 32, &offset, "_spv_ac_id_%d", ResultId);
+
+                /* Create the index symbol if it is not existed. */
+                VIR_Shader_AddString(pVirShader, name, &nameId);
+                VIR_Shader_AddSymbol(pVirShader,
+                                     VIR_SYM_VARIABLE,
+                                     nameId,
+                                     VIR_Shader_GetTypeFromId(pVirShader, VIR_TYPE_UINT32),
+                                     VIR_STORAGE_GLOBAL,
+                                     &dstIndexSymId);
+            }
+            else
+            {
+                dstIndexSymId = dstOffset;
+            }
+            gcmASSERT(dstIndexSymId != VIR_INVALID_ID);
+
+            pDstIndexSym = VIR_Shader_GetSymFromId(pVirShader, dstIndexSymId);
+            VIR_Symbol_SetFlag(pDstIndexSym, VIR_SYMFLAG_WITHOUT_REG);
+
+            /* Insert a ADD instruction. */
+            errCode = VIR_Function_AddInstruction(spv->virFunction,
+                                                  VIR_OP_ADD,
+                                                  VIR_TYPE_UINT32,
+                                                  &pNewInst);
+            ON_ERROR(errCode, "insert a ADD instruction");
+
+            /* Set DEST. */
+            pOpnd = VIR_Inst_GetDest(pNewInst);
+            VIR_Operand_SetSymbol(pOpnd, spv->virFunction, dstIndexSymId);
+            VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+            /* Set SRC0. */
+            pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+            if (dstOffsetType == VIR_SYM_CONST)
+            {
+                VIR_Operand_SetImmediateUint(pOpnd, dstOffset);
+            }
+            else
+            {
+                VIR_Operand_SetSymbol(pOpnd, spv->virFunction, dstIndexSymId);
+                VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+            }
+
+            /* Set SRC1. */
+            pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+            if (srcOffsetType == VIR_SYM_CONST)
+            {
+                VIR_Operand_SetImmediateUint(pOpnd, srcOffset);
+            }
+            else
+            {
+                VIR_Operand_SetSymbol(pOpnd, spv->virFunction, srcOffset);
+                VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+            }
+
+            /* Update the offset. */
+            pAcInfo->baseOffsetType = VIR_SYM_VARIABLE;
+            pAcInfo->baseOffset = dstIndexSymId;
+        }
+    }
+
+OnError:
+    return errCode;
+}
 
 static VIR_Swizzle
 __SpvID2Swizzle (
@@ -1819,7 +2009,7 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
 }
 
 static void
-__SetAccessChainOffsetToOperand(
+__SpvSetAccessChainOffsetToOperand(
     IN  gcSPV               spv,
     IN  SpvId               ResultId,
     IN  VIR_Operand        *Operand,
@@ -2808,7 +2998,7 @@ static VIR_SymId __SpvAddIdSymbol(
     }
 
     /* The image format is saved in the base type id. */
-    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId) & !treatSubPassAsSampler)
+    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId) && !treatSubPassAsSampler)
     {
         if (attachmentDesc != gcvNULL)
         {
@@ -3599,7 +3789,6 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
 
     switch (magic)
     {
-        /* TODO: 1D has no difference between Integer and UInteger ? */
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 2):
@@ -4007,7 +4196,7 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                 __SpvReplaceBuiltInName(spv, virShader, VIR_STORAGE_UNKNOWN, spv->resultId, i);
 
                 fieldNameId = SPV_ID_FIELD_VIR_NAME_ID(spv->resultId, i);
-                SPV_ID_TYPE_STRUCT_MEMBER(spv->resultId, i) = spv->operands[i];
+                SPV_SET_IDDESCRIPTOR_FIELD_MEMBER(spv, spv->resultId, i, spv->operands[i]);
                 type = SPV_ID_TYPE_VIR_TYPE(spv->operands[i]);
                 typeId = VIR_Type_GetNameId(type);
 
@@ -5085,7 +5274,6 @@ static VSC_ErrCode __SpvAddConstant(gcSPV spv, VIR_Shader * virShader)
         SPV_ID_VIR_TYPE_ID(targetId) = typeID;
         SPV_ID_CST_SPV_TYPE(targetId) = spv->resultTypeId;
     }
-    /* TODO: add sampler support. */
     else if (SPV_ID_TYPE_IS_SAMPLER(spv->resultTypeId))
     {
         gcmASSERT(0);
@@ -5229,7 +5417,7 @@ static VSC_ErrCode __SpvAddLabel(gcSPV spv, VIR_Shader * virShader)
     gcmVERIFY_OK(gcoOS_PrintStrSafe(labelName,
                                     20,
                                     &offset,
-                                    "#sh_%u",
+                                    "#spv_%u",
                                     spv->resultId));
 
     virErrCode = VIR_Function_AddLabel(spv->virFunction,
@@ -5366,7 +5554,7 @@ static VSC_ErrCode __SpvAddFuncCall(gcSPV spv, VIR_Shader * virShader)
     virErrCode = VIR_Function_AddInstruction(
         spv->virFunction,
         VIR_OP_PARM,
-        SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId), /* TODO: type should be what? */
+        SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId),
         &virInst);
 
     VIR_Inst_SetConditionOp(virInst, VIR_COP_ALWAYS);
@@ -5789,7 +5977,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
             {
                 gcmASSERT(0);
             }
-            __SetAccessChainOffsetToOperand(spv, spv->operands[i], srcOpnd, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spv->operands[i], srcOpnd, SpvOffsetType_Normal);
         }
     }
     VIR_Operand_SetParameters(VIR_Inst_GetSource(virInst, 1), parmOpnd);
@@ -6254,6 +6442,7 @@ static VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
     VIR_AC_OFFSET_INFO virAcOffsetInfo;
     gctBOOL copyFromObject = (spv->opCode == SpvOpCompositeInsert);
     gctBOOL isAllIndexLiteral = (spv->opCode == SpvOpCompositeInsert);
+    gctBOOL bHasPrevAcOffset = !copyFromObject && __SpvHasAccessChain(spv, spv->operands[0], SpvOffsetType_Normal);
 
     gcoOS_ZeroMemory(&virAcOffsetInfo, gcmSIZEOF(VIR_AC_OFFSET_INFO));
 
@@ -6297,15 +6486,34 @@ static VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         spv->virFunction,
         spv->resultId,
         baseSymbol,
+        bHasPrevAcOffset ? SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[0]) : VIR_Symbol_GetTypeId(baseSymbol),
         accessChain,
         accessChainType,
         accessChainLength,
         &virAcOffsetInfo);
 
+    /* If the base object is created by a previous OpAccessChain, we need to add the previous offset. */
+    if (bHasPrevAcOffset)
+    {
+        __SpvCombineAccessChainOffset(spv, virShader, spv->resultId, spv->operands[0], &virAcOffsetInfo);
+    }
+
     SPV_SET_IDDESCRIPTOR_SPV_OFFSET(spv, spv->resultId, virAcOffsetInfo);
     if (!copyFromObject)
     {
-        SPV_ID_SYM_SRC_SPV_TYPE(spv->resultId) = SPV_ID_SYM_SPV_TYPE(spv->resultId);
+        /*
+        ** Save the base source spv type, we need to use it to check if the source is a block.
+        ** If the base source is from another OpAccessChain, we need to use the type from another OpAccessChain.
+        */
+        if (bHasPrevAcOffset)
+        {
+            SPV_ID_SYM_SRC_SPV_TYPE(spv->resultId) = SPV_ID_SYM_SRC_SPV_TYPE(spv->operands[0]);
+        }
+        else
+        {
+            SPV_ID_SYM_SRC_SPV_TYPE(spv->resultId) = SPV_ID_SYM_SPV_TYPE(spv->resultId);
+        }
+
         SPV_ID_SYM_SPV_TYPE(spv->resultId) = spv->resultTypeId;
         SPV_ID_TYPE_VIR_TYPE_ID(spv->resultId) = SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(spv->resultTypeId));
     }
@@ -6510,7 +6718,7 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
     VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
-    __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+    __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
 
     operand = VIR_Inst_GetSource(virInst, 0);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
@@ -6567,7 +6775,6 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
             SPV_SET_UNHANDLE_VAR_OPERAND(spv, spvOperand, virInst, newOperands);
         }
 
-        /* TODO: the initialization should in SPV or VSC? */
         VIR_PhiOperand_SetValue(phiOperand, newOperands);
         VIR_PhiOperand_SetLabel(phiOperand, gcvNULL);
         VIR_PhiOperand_SetFlags(phiOperand, 0);
@@ -6838,6 +7045,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             spv->virFunction,
             spv->resultId,
             baseSymbol,
+            VIR_Symbol_GetTypeId(baseSymbol),
             accessChain,
             accessChainType,
             accessChainLength,
@@ -6958,7 +7166,6 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
     }
     else if (SPV_ID_TYPE_IS_POINTER(spvTypeId))
     {
-        /* TODO, pointer type, we need get object type */
         gcmASSERT(0);
     }
     else
@@ -7619,7 +7826,7 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
         gctUINT offset = 0;
 
         gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_conv_int_%d", spv->operands[1]);
+        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_conv_int_%d", spv->operands[1]);
         VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
         VIR_Shader_AddSymbol(
@@ -7670,7 +7877,7 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
 
         offset = 0;
         gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_subpass_coord_%d", spv->operands[1]);
+        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_subpass_coord_%d", spv->operands[1]);
         VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
         VIR_Shader_AddSymbol(
@@ -7759,6 +7966,9 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
     spv->operands[1] = instId;
 
     virErrCode = __SpvAddIntrisicFunction(spv, virShader);
+
+    /* Reset the internalSym. */
+    spv->internalSym = gcvNULL;
 
     return virErrCode;
 }
@@ -7929,7 +8139,7 @@ static VSC_ErrCode __SpvDecodeImageOperand(
                 {
                     gcmASSERT(gcvFALSE);
                 }
-                __SetAccessChainOffsetToOperand(spv, spvOperand, paramOperand[k], SpvOffsetType_Normal);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, paramOperand[k], SpvOffsetType_Normal);
             }
 
             __SpvSetTexldModifier(spv, virShader, operand, paramOperand, maskCount, singleMask);
@@ -8114,7 +8324,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-    __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+    __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
 
     if (useIntrinsicFunc)
     {
@@ -8184,7 +8394,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         {
             gcmASSERT(gcvFALSE);
         }
-        __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
         virOpIndex++;
     }
@@ -8244,7 +8454,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             gcmASSERT(gcvFALSE);
         }
 
-        __SetAccessChainOffsetToOperand(spv, spvOperand, paramOperand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spvOperand, paramOperand, SpvOffsetType_Normal);
 
         VIR_Operand_SetTexldGatherRefZ(operand, paramOperand);
     }
@@ -8289,7 +8499,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
                 gcmASSERT(gcvFALSE);
             }
 
-            __SetAccessChainOffsetToOperand(spv, spvOperand, paramOperand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, paramOperand, SpvOffsetType_Normal);
         }
 
         VIR_Operand_SetTexldGatherComp(operand, paramOperand);
@@ -8356,6 +8566,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
     VIR_Symbol_SetLocation(sym, -1);
 
+    /* Add the group offset. */
     VIR_Function_AddInstructionBefore(spv->virFunction,
         VIR_OP_ADD,
         VIR_TYPE_UINT32,
@@ -8372,6 +8583,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
     VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
+    /* Offset in shared ssbo. */
     operand = VIR_Inst_GetSource(virInst, 0);
     sym = VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->groupOffsetSymId);
     VIR_Operand_SetSym(operand, sym);
@@ -8382,6 +8594,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Operand_SetSwizzle(operand, virSwizzle);
     VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
+    /* Offset from SPIR-V. */
     operand = VIR_Inst_GetSource(virInst, 1);
     if (baseOffsetType == VIR_SYM_VARIABLE)
     {
@@ -8706,6 +8919,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             spv->virFunction,
             src,
             baseSymbol,
+            VIR_Symbol_GetTypeId(baseSymbol),
             &accessChain,
             &accessChainType,
             accessChainLength,
@@ -8768,7 +8982,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-        __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
     }
 
     virOpndId = 0;
@@ -8865,6 +9079,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             {
                 gcmASSERT(gcvFALSE);
             }
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8907,7 +9122,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-            __SetAccessChainOffsetToOperand(
+            __SpvSetAccessChainOffsetToOperand(
                 spv,
                 spvOperand,
                 operand,
@@ -9048,12 +9263,12 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
 
             if (SPV_ID_SYM_PER_VERTEX(spvOperand))
             {
-                __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_PER_VERTEX);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_PER_VERTEX);
 
             }
             else
             {
-                __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
             }
         }
     }
@@ -9068,7 +9283,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-        __SetAccessChainOffsetToOperand(spv, spv->operands[0], operand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spv->operands[0], operand, SpvOffsetType_Normal);
     }
     else
     {
@@ -9268,7 +9483,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
         }
         else if (useLoadToAccessBlock)
         {
@@ -9296,7 +9511,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
             VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
             /* for opstore and is block, we need set src0 to base address,
             src1 base offset, src2 is dest value */
@@ -9317,7 +9532,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(
+            __SpvSetAccessChainOffsetToOperand(
                 spv,
                 spvOperand,
                 operand,
@@ -9360,6 +9575,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 }
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
             }
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9382,7 +9598,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
         }
         else
         {
@@ -9396,7 +9612,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetTypeId(operand, dstVirTypeId);
             VIR_Operand_SetSym(operand, dstVirSym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
             /* Set SOURCE0 by operands[1]. */
             spvOperand = spv->operands[1];
@@ -9416,7 +9632,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
             }
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
             if(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(virInst))) == VIR_TYPE_BOOLEAN &&
                VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(virInst, 0))) != VIR_TYPE_BOOLEAN)
@@ -9556,7 +9772,7 @@ static VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-    __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+    __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
 
     /* operands[0] */
     if (SPV_ID_TYPE(spvOperand) == SPV_ID_TYPE_SYMBOL)
@@ -9578,7 +9794,7 @@ static VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
                 VIR_Operand_SetSym(operand, virSym0);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
                 /* spvOperand1 is last field: to-check */
             }
@@ -9685,7 +9901,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-        __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
     }
 
     /*
@@ -9704,7 +9920,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
 
         /* Create a new symbol. */
         gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_atomcmpxchg_%d", spv->resultId);
+        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_atomcmpxchg_%d", spv->resultId);
         VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
         VIR_Shader_AddSymbol(
@@ -9745,7 +9961,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
             if (SPV_ID_TYPE(spvOperand) == SPV_ID_TYPE_SYMBOL)
             {
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
@@ -9850,7 +10066,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
 
             if (i == 0)
             {
-                __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_None);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_None);
 
                 operand = virInst->src[++virOpndId];
                 if (isWorkGroup)
@@ -9878,13 +10094,14 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
                         VIR_Operand_SetSwizzle(operand, virSwizzle);
                     }
                 }
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             }
             else
             {
-                __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+                __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
             }
         }
         else if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_CONST)
@@ -9899,7 +10116,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-            __SetAccessChainOffsetToOperand(spv, spv->operands[i], operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spv->operands[i], operand, SpvOffsetType_Normal);
         }
         else
         {
@@ -10002,7 +10219,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-        __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+        __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
     }
 
     virOpndId = 0;
@@ -10031,7 +10248,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-            __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
         }
         else if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_CONST)
         {
@@ -10045,7 +10262,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-            __SetAccessChainOffsetToOperand(spv, spv->operands[i], operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, spv->operands[i], operand, SpvOffsetType_Normal);
         }
         else
         {
@@ -10182,7 +10399,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             if (!dstBlockSym)
             {
-                __SetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_Normal);
+                __SpvSetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_Normal);
             }
 
             /* Set src block addr. */
@@ -10194,7 +10411,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(
+            __SpvSetAccessChainOffsetToOperand(
                 spv,
                 srcId,
                 operand,
@@ -10219,7 +10436,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_None);
+            __SpvSetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_None);
         }
 
         /* Write the data if need. */
@@ -10251,7 +10468,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(
+            __SpvSetAccessChainOffsetToOperand(
                 spv,
                 targetId,
                 operand,
@@ -10276,7 +10493,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_None);
+            __SpvSetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_None);
 
             /* Set data. */
             operand = VIR_Inst_GetSource(virInst, 2);
@@ -10334,7 +10551,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(
+            __SpvSetAccessChainOffsetToOperand(
                 spv,
                 targetId,
                 operand,
@@ -10359,7 +10576,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-            __SetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_None);
+            __SpvSetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_None);
 
             /* Set data. */
             operand = VIR_Inst_GetSource(virInst, 2);
@@ -10379,7 +10596,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSrcSwizzle);
             VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(srcId));
-            __SetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
         }
         else
         {
@@ -10397,7 +10614,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetTypeId(operand, virDstTypeId);
             VIR_Operand_SetSym(operand, dstSym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-            __SetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_Normal);
 
             operand = VIR_Inst_GetSource(virInst, 0);
             if (SPV_ID_TYPE(srcId) == SPV_ID_TYPE_SYMBOL)
@@ -10416,7 +10633,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSrcSwizzle);
             VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(srcId));
-            __SetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
+            __SpvSetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
         }
     }
 
@@ -10564,7 +10781,6 @@ static VSC_ErrCode __SpvAddName(gcSPV spv, VIR_Shader * virShader)
         /* TO_DO, if string size is not enough */
         /* Don't cat base struct name. */
         gcoOS_StrCopySafe(spv->virName, SPV_VIR_NAME_SIZE, name);
-
         VIR_Shader_AddString(virShader, spv->virName, &nameId);
         SPV_SET_IDDESCRIPTOR_FIELD_NAME(spv, id, field, nameId);
     }
@@ -10574,7 +10790,7 @@ static VSC_ErrCode __SpvAddName(gcSPV spv, VIR_Shader * virShader)
         name = (gctCHAR*)*((gctUINTPTR_T*)(&(spv->operands[i++])));
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(name, SPV_DEFAULT_PARAM_NAME, SPV_DEFAULT_PARAM_LENGTH)))
         {
-            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_%s_%d", name, spv->operands[0]);
+            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_%s_%d", name, spv->operands[0]);
             VIR_Shader_AddString(virShader, spv->virName, &nameId);
         }
         else
@@ -11092,8 +11308,8 @@ static void __SpvSetClientVersion(
     }
 
     /*
-    ** OpSource is belong to debug information, which is not required.
-    ** If there is OpSource in this binary, get the srcLanguage from OpMemoryModel, which is required.
+    ** SrcLanguage is saved in Opsource, which is belong to debug information and not required.
+    ** So there is not OpSource in this binary, get the srcLanguage from OpMemoryModel.
     */
     if (spv->srcLanguage == SpvSourceLanguageUnknown)
     {
@@ -11110,7 +11326,10 @@ static void __SpvSetClientVersion(
         }
     }
 
-    /* base on srcLanguageVersion/srcLanguage to decide client version */
+    /*
+    ** Base on srcLanguageVersion/srcLanguage to decide client version.
+    ** VIV:TODO: Now we always treats it as a GLES, not desktop GL.
+    */
     if (spv->srcLanguage == SpvSourceLanguageESSL ||
         spv->srcLanguage == SpvSourceLanguageGLSL)
     {
@@ -11150,6 +11369,47 @@ static void __SpvSetWorkgroupSize(
             virShader->shaderLayout.compute.workGroupSize[2] = spv->exeModeDescriptor[execModeCount].extraOp[2];
         }
     }
+}
+
+static gceSTATUS _SpvReallocateOperands(
+    IN gcSPV            spv,
+    IN gctUINT          operandSize
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gctBOOL             bCurOperand = (spv->operands != gcvNULL);
+    gctUINT             curMaxOperandSize = spv->maxOperandSize;
+    gctUINT*            pNewOperands = gcvNULL;
+
+    /* Skip if there is enough operand now. */
+    if (operandSize <= curMaxOperandSize)
+    {
+        return status;
+    }
+
+    /* Allocate a new operand memory. */
+    gcmONERROR(spvAllocate(spv->spvMemPool, sizeof(gctUINT) * operandSize, (gctPOINTER *)&pNewOperands));
+    gcoOS_ZeroMemory(pNewOperands, sizeof(gctUINT) * operandSize);
+
+    /* Copy back the operands if needed. */
+    if (spv->operandSize != 0)
+    {
+        gcmASSERT(spv->operandSize < operandSize && bCurOperand);
+        gcoOS_MemCopy(pNewOperands, spv->operands, sizeof(gctUINT) * spv->operandSize);
+    }
+
+    /* Free the old operands if needed. */
+    if (bCurOperand)
+    {
+        spvFree(gcvNULL, spv->operands);
+    }
+
+    /* Save the new operands. */
+    spv->operands = pNewOperands;
+    spv->maxOperandSize = operandSize;
+
+OnError:
+    return status;
 }
 
 static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
@@ -11392,7 +11652,6 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         optionalLiteralCount = spv->nextInst - spv->word;
         for (j = 0; j < optionalLiteralCount; j++)
         {
-            /* TODO: there are more information for opSource, do we need them??? */
             SPV_NEXT_WORD;
         }
 
@@ -11419,6 +11678,11 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         }
 
         spv->operandSize = 0;
+
+        if (spv->numOperands > spv->maxOperandSize)
+        {
+            _SpvReallocateOperands(spv, spv->numOperands);
+        }
 
         for (i=0; i < InstructionDesc[spv->opCode].oprandSize && (spv->numOperands > 0); i++)
         {
@@ -11479,6 +11743,7 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                 }
                 else
                 {
+                    SPV_NEXT_WORD_WO_OPERAND;
                     gcmASSERT(0);
                 }
                 break;
@@ -11491,6 +11756,7 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                 }
                 else
                 {
+                    SPV_NEXT_WORD_WO_OPERAND;
                     gcmASSERT(0);
                 }
                 break;
@@ -11637,11 +11903,11 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     {
         VIR_Function       *function;
 
-        /* Add a internal function "#sh_viv_InitializeFunc" here to
+        /* Add a internal function "#spv_viv_InitializeFunc" here to
         ** initialize all constant variables and global variables. */
         VIR_Shader_AddFunction(*virShader,
                                gcvFALSE,
-                               "#sh_viv_InitializeFunc",
+                               "#spv_viv_InitializeFunc",
                                VIR_TYPE_VOID,
                                &function);
         VIR_Function_SetFlag(function, VIR_FUNCFLAG_INITIALIZE_FUNC);
@@ -12207,6 +12473,7 @@ static gceSTATUS __SpvValidate(
     for (i = 0; i < SPV_INTERNAL_ID_NUM; i++)
     {
         spv->internalId[i] = spv->bound + i;
+        spv->internalIdUsed[i] = gcvFALSE;
     }
 
     /* reserved schema, must be 0 for now */
@@ -12271,9 +12538,10 @@ gceSTATUS __SpvInitialize(
 
     gcoOS_MemFill(Spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
     gcoOS_MemFill(Spv->tempName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-    gcoOS_MemFill(Spv->operands, 0, SPV_MAX_OPERAND_NUM * gcmSIZEOF(gctUINT));
 
     Spv->operandSize = 0;
+    gcmONERROR(_SpvReallocateOperands(Spv, SPV_DEFAULT_OPERAND_NUM));
+
     Spv->unknowId = 0;
 
     Spv->entryID = 0;
@@ -12300,11 +12568,11 @@ gceSTATUS __SpvInitialize(
     Spv->workgroupInfo = gcvNULL;
     Spv->hasWorkGroup = gcvFALSE;
 
+    Spv->internalSym = gcvNULL;
     Spv->renderpassInfo = gcvNULL;
     Spv->subPass = ~0U;
 
-    Spv->internalSym = gcvNULL;
-
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -12567,6 +12835,32 @@ static SpvExecutionModel __SpvVkStageBitToSpvModel(VkShaderStageFlagBits stage)
      return model;
 }
 
+/*store .spv file to fileName */
+static gceSTATUS __gcSpvDumpSprivToFile(
+    IN gctUINT * stream,
+    IN gctUINT   sizeInByte,
+    IN gctCONST_STRING fileName)
+{
+    gceSTATUS  status = gcvSTATUS_OK;
+    gctFILE    file;
+
+    if (gcoOS_Open(gcvNULL, fileName, gcvFILE_CREATE, &file) == gcvSTATUS_OK)
+    {
+        status = gcoOS_Write(gcvNULL, file, sizeInByte, stream);
+        if (!gcmIS_SUCCESS(status))
+        {
+            gcoOS_Print("__gcSpvDumpSprivToFile: Failed to write the buffer to file %s", fileName);
+        }
+        gcoOS_Close(gcvNULL, file);
+    }
+    else
+    {
+        gcoOS_Print("__gcSpvDumpSprivToFile: Failed to open the file %s for writing", fileName);
+    }
+    return status;
+}
+
+
 void * gcSPV_CreateSPV(
     SpvMemPool * spvMemPool,
     SpvDecodeInfo * info)
@@ -12673,10 +12967,10 @@ gcSPV_Decode(
 #endif
 
     /*  Porcess Instructions */
-    __SpvProcessInstruction(Spv, VirShader);
+    gcmONERROR(__SpvProcessInstruction(Spv, VirShader));
 
     /* Do some clean up which can only be done after we finish all instructions processing. */
-    __SpvCleanUpShader(Spv, *VirShader);
+    gcmONERROR(__SpvCleanUpShader(Spv, *VirShader));
 
 #if _DEBUG_VIR_IO_COPY
     {
@@ -12722,10 +13016,10 @@ gcSPV_Decode(
         vscPrintShader(*VirShader, gcvNULL, "", gcvTRUE);
     }
 
+OnError:
     /* Uninitialize, this will destroy Spv */
     spvUninitializeMemPool(spvMemPool);
 
-    /* Success. */
     gcmFOOTER();
     return status;
 }
@@ -12763,31 +13057,38 @@ gcSPV_PreDecode(
 
     if (Spv->src == gcvNULL)
     {
-        return gcvSTATUS_INVALID_DATA;
+        status = gcvSTATUS_INVALID_DATA;
     }
+    gcmONERROR(status);
 
     __SpvParameterize(Spv);
 
     /* check first several byte for magic number/version/genereator/boundID/schema*/
     if (gcmIS_ERROR(__SpvValidate(Spv)))
     {
-        return gcvSTATUS_INVALID_DATA;
+        status = gcvSTATUS_INVALID_DATA;
+    }
+    else if (gcmIS_ERROR(__SpvCreateFuncCallTable(spvMemPool, &funcTable)))
+    {
+        status = gcvSTATUS_INVALID_DATA;
+    }
+    else if (gcmIS_ERROR(__SpvProcessFuncCall(Spv, funcTable)))
+    {
+        status = gcvSTATUS_INVALID_DATA;
     }
 
-    if (gcmIS_ERROR(__SpvCreateFuncCallTable(spvMemPool, &funcTable)))
-    {
-        return gcvSTATUS_INVALID_DATA;
-    }
-
-    if (gcmIS_ERROR(__SpvProcessFuncCall(Spv, funcTable)))
-    {
-        return gcvSTATUS_INVALID_DATA;
-    }
+    gcmONERROR(status);
 
     /* the memory is created by spirv converter, we need free it by call gcSPV_PostDecode */
+    if (FuncTable)
+    {
+        *FuncTable = funcTable;
+    }
+    return status;
 
-    *FuncTable = funcTable;
-
+OnError:
+    /* Uninitialize, this will destroy Spv */
+    spvUninitializeMemPool(spvMemPool);
     return status;
 }
 
