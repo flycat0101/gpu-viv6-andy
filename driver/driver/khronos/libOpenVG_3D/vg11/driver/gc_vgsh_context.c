@@ -197,7 +197,7 @@ void flush(_VGContext *context)
         /* Dec cache counter for all paths. */
     _PSCManagerShuffle(&context->pscm, -1);
         /* Kick out paths cache counter below than -10. (not used for more than 10 frames)*/
-    _PSCManagerDismiss(context, -10);
+    _PSCManagerDismiss(context, -20);
 #endif
 
     gcmFOOTER_NO();
@@ -699,6 +699,8 @@ void _PSCManagerDismiss(_VGContext *context, gctINT32 qual)
                     gcoINDEX_Destroy(path->tessellateResult.strokeIndexBuffer.index);
                     path->tessellateResult.strokeIndexBuffer.index = gcvNULL;
                 }
+                path->transformScale[0] = 0;
+                path->transformScale[1] = 0;
                 PathDirty(path, VGTessPhase_ALL);
             }
 
