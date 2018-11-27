@@ -164,6 +164,12 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_R32G32_SFLOAT, TX_FORMAT(0, 0x0B, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_R32G32_UINT_2_R32_UINT, TX_FORMAT(0, 0x23, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_R32G32_SINT_2_R32_SINT, TX_FORMAT(0, 0x23, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT, TX_FORMAT(0, 0x0A, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
 
         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, TX_FORMAT(0, 0x1B, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
@@ -747,6 +753,57 @@ VkResult __vkComputeClearVal(
     case VK_FORMAT_R32G32_UINT:
         pClearVals[0] = __vkConvertUINT(vkClearValue->color.uint32[R], 32);
         pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[G], 32);
+        break;
+
+    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
+        switch (partIndex)
+        {
+        case 0:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertSFLOAT(gcvVALUE_FLOAT, vkClearValue->color.float32[R], 32);
+            break;
+        case 1:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertSFLOAT(gcvVALUE_FLOAT, vkClearValue->color.float32[G], 32);
+            break;
+        default:
+            __VK_ASSERT(!"invalid part index value");
+            break;
+        }
+        break;
+
+    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
+        switch (partIndex)
+        {
+        case 0:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertSINT(vkClearValue->color.int32[R], 32);
+            break;
+        case 1:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertSINT(vkClearValue->color.int32[G], 32);
+            break;
+        default:
+            __VK_ASSERT(!"invalid part index value");
+            break;
+        }
+        break;
+
+    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
+        switch (partIndex)
+        {
+        case 0:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[R], 32);
+            break;
+        case 1:
+            pClearVals[0] =
+                pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[G], 32);
+            break;
+        default:
+            __VK_ASSERT(!"invalid part index value");
+            break;
+        }
         break;
 
     case VK_FORMAT_D16_UNORM:
@@ -8857,6 +8914,7 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_UINT:
+    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -8940,6 +8998,7 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_SINT:
+    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -9023,6 +9082,7 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_SFLOAT:
+    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -10376,6 +10436,9 @@ VkResult halti5_createImageView(
     case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
     case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
     case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
+    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
+    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
+    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
         chipImgv->patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT | HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT;
         /* fall through */
     case VK_FORMAT_R32_UINT:
@@ -10702,6 +10765,33 @@ const char * halti5_helper_patchFuc(
             0,
             0
         },
+        {
+            __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
+            HALTI5_PATCH_PE_EXTRA_OUTPUT,
+            0,
+            "_outputcvt_R32G32SFLOAT_2_R32SFLOAT",
+            0,
+            0,
+            0
+        },
+        {
+            __VK_FORMAT_R32G32_SINT_2_R32_SINT,
+            HALTI5_PATCH_PE_EXTRA_OUTPUT,
+            0,
+            "_outputcvt_R32G32SINT_2_R32SINT",
+            0,
+            0,
+            0
+        },
+        {
+            __VK_FORMAT_R32G32_UINT_2_R32_UINT,
+            HALTI5_PATCH_PE_EXTRA_OUTPUT,
+            0,
+            "_outputcvt_R32G32UINT_2_R32UINT",
+            0,
+            0,
+            0
+        },
 
         {
             __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT,
@@ -10771,6 +10861,40 @@ const char * halti5_helper_patchFuc(
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
+        {
+            __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
+            HALTI5_PATCH_TX_EXTRA_INPUT,
+            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
+          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
+            "_inputcvt_R32G32SFLOAT_2_R32SFLOAT",
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+
+        },
+        {
+            __VK_FORMAT_R32G32_SINT_2_R32_SINT,
+            HALTI5_PATCH_TX_EXTRA_INPUT,
+            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
+          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
+            "_inputcvt_R32G32SINT_2_R32SINT",
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+        },
+        {
+            __VK_FORMAT_R32G32_UINT_2_R32_UINT,
+            HALTI5_PATCH_TX_EXTRA_INPUT,
+            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
+          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
+            "_inputcvt_R32G32UINT_2_R32UINT",
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+        },
 
         {
             __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT,
@@ -10799,7 +10923,6 @@ const char * halti5_helper_patchFuc(
             VSC_RES_ACT_BIT_EXTRA_SAMPLER,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
-
 
         {
             VK_FORMAT_R32G32B32A32_SFLOAT,
