@@ -165,6 +165,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
                 residentFormat = __VK_FORMAT_R32G32_UINT_2_R32_UINT;
                 break;
             default:
+                __VK_ASSERT(!"invalid format!");
                 break;
             }
             desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
