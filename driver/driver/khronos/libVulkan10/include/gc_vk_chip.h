@@ -61,6 +61,7 @@ typedef struct __vkChipFuncTableRec
     void (*BindPipeline)(VkCommandBuffer commandBuffer, VkPipeline oldPipeline, VkPipeline newPipeline);
     VkResult (*setMultiGpuSync)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint);
     VkResult (*flushCache)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint, int32_t cacheMask);
+    VkBool32 (*tweakCopy)(VkCommandBuffer cmdBuf, VkBuffer destBuffer);
 } __vkChipFuncTable;
 
 #endif /* __gc_vk_chip_h__ */

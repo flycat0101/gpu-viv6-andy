@@ -52,6 +52,7 @@ __vkChipFuncTable halti5_chip =
     halti5_bindPipeline,
     halti5_setMultiGpuSync,
     halti5_flushCache,
+    halti5_tweakCopy,
 };
 
 static void halti5_helper_computeCentroids(
