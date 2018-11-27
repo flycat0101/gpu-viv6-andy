@@ -1261,16 +1261,24 @@ VkBool32 halti5_tweakCopy(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
     __vkPipeline *pip = cmd->bindInfo.pipeline.graphics;
-    halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
     __vkBuffer *dstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, destBuffer);
 
-    if (chipPipeline->tweakHandler)
+    if (!pip)
     {
-        chipPipeline->tweakHandler->copy(devCtx, pip, dstBuf, chipPipeline->tweakHandler);
-        return VK_TRUE;
+        return VK_FALSE;
     }
     else
     {
-        return VK_FALSE;
+        halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+
+        if (chipPipeline->tweakHandler)
+        {
+            chipPipeline->tweakHandler->copy(devCtx, pip, dstBuf, chipPipeline->tweakHandler);
+            return VK_TRUE;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
     }
 }
