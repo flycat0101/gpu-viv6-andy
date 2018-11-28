@@ -1261,6 +1261,33 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         dstFormat = gcvSURF_YUY2;
         filterblit = gcoHAL_IsFeatureAvailable(context->hal, gcvFEATURE_2D_ONE_PASS_FILTER) == gcvSTATUS_TRUE;
         break;
+      case G2D_NV12:
+        if (srcFormat != gcvSURF_YUY2)
+        {
+            g2d_printf("%s: Invalid src format %d for dst format %d!\n", __FUNCTION__, src->format, dst->format);
+            return -1;
+        }
+        dstFormat = gcvSURF_NV12;
+        uStride = dst->stride;
+        break;
+      case G2D_YV12:
+        if (srcFormat != gcvSURF_YUY2)
+        {
+            g2d_printf("%s: Invalid src format %d for dst format %d!\n", __FUNCTION__, src->format, dst->format);
+            return -1;
+        }
+        dstFormat = gcvSURF_YV12;
+        uStride = vStride = dst->stride / 2;
+        break;
+      case G2D_NV16:
+        if (srcFormat != gcvSURF_YUY2)
+        {
+            g2d_printf("%s: Invalid src format %d for dst format %d!\n", __FUNCTION__, src->format, dst->format);
+            return -1;
+        }
+        dstFormat = gcvSURF_NV16;
+        uStride = dst->stride;
+        break;
       default:
         g2d_printf("%s: Invalid dst format %d!\n", __FUNCTION__, dst->format);
         return -1;
@@ -1715,13 +1742,14 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
                               hMirror,
                               vMirror));
 
-    Stride = dst->stride * dstBits / 8;
-
     /** Setup Target */
+    if(filterblit == gcvFALSE)
+    {
+        Stride = dst->stride * dstBits / 8;
 
-    physAddress = dst->planes[0] - context->baseAddress2D;
+        physAddress = dst->planes[0] - context->baseAddress2D;
 
-    gcmONERROR(
+        gcmONERROR(
             gco2D_SetGenericTarget(context->engine2D,
                                   (gctUINT32_PTR)&physAddress,
                                   1U,
@@ -1732,12 +1760,14 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
                                   dstRot,
                                   dst->width,
                                   dst->height));
+    }
 
     if(filterblit == gcvTRUE)
     {
         gctUINT32 src_planes[3];
         gctUINT32 src_strides[3];
-        gctUINT32 dst_planes0;
+        gctUINT32 dst_planes[3];
+        gctUINT32 dst_strides[3];
 
         if(context->blur == gcvFALSE)
         {
@@ -1851,7 +1881,13 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         src_strides[1] = uStride * srcBits / 8;
         src_strides[2] = vStride * srcBits / 8;
 
-        dst_planes0 = dst->planes[0] - context->baseAddress2D;
+        dst_planes[0] = dst->planes[0] - context->baseAddress2D;
+        dst_planes[1] = dst->planes[1] - context->baseAddress2D;
+        dst_planes[2] = dst->planes[2] - context->baseAddress2D;
+
+        dst_strides[0] = dst->stride * dstBits / 8;
+        dst_strides[1] = uStride * dstBits / 8;
+        dst_strides[2] = vStride * dstBits / 8;
 
         /* Trigger filter blit. */
         gcmONERROR(
@@ -1866,10 +1902,10 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
                                    src->width,
                                    src->height,
                                    &srcRect,
-                                   &dst_planes0,
-                                   1U,
-                                   &Stride,
-                                   1U,
+                                   &dst_planes[0],
+                                   3U,
+                                   &dst_strides[0],
+                                   3U,
                                    dstTile,
                                    dstFormat,
                                    dstRot,
@@ -1883,20 +1919,20 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         {
             gcmONERROR(
                 gco2D_FilterBlitEx2(context->engine2D,
-                                    &dst_planes0,
-                                    1U,
-                                    &Stride,
-                                    1U,
+                                    &dst_planes[0],
+                                    3U,
+                                    &dst_strides[0],
+                                    3U,
                                     dstTile,
                                     dstFormat,
                                     gcvSURF_0_DEGREE,
                                     dst->width,
                                     dst->height,
                                     &dstRect,
-                                    &dst_planes0,
-                                    1U,
-                                    &Stride,
-                                    1U,
+                                    &dst_planes[0],
+                                    3U,
+                                    &dst_strides[0],
+                                    3U,
                                     dstTile,
                                     dstFormat,
                                     gcvSURF_0_DEGREE,

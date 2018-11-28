@@ -4566,7 +4566,11 @@ gco2D_FilterBlitEx2(
     case gcvSURF_NV21:
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) != gcvTRUE)
         {
-            if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE)
+            /*All version of multisource blit support split YUV*/
+            if ((((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE)  &&
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX) != gcvTRUE) &&
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2) != gcvTRUE) &&
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT) != gcvTRUE))
                  || ((SrcFormat != gcvSURF_YUY2) && (SrcFormat != gcvSURF_UYVY)
                      && (SrcFormat != gcvSURF_YVYU) && (SrcFormat != gcvSURF_VYUY)))
                 &&(SrcFormat != DstFormat))
