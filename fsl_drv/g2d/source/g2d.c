@@ -915,11 +915,13 @@ int g2d_query_feature(void *handle, enum g2d_feature feature, int *available)
         *available = 1;
         break;
     case G2D_ROTATION:
-    case G2D_DST_YUV:
         *available = (context->current_type == G2D_HARDWARE_2D) ? 1 : 0;
         break;
+    case G2D_DST_YUV:
     case G2D_MULTI_SOURCE_BLT:
-        *available = ((context->current_type == G2D_HARDWARE_2D) ? 1 : 0) & ((int)(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX) == gcvTRUE));
+        *available = ((context->current_type == G2D_HARDWARE_2D) &&
+                     (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX) ||
+	              gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2))) ? 1 : 0;
         break;
     default:
         break;

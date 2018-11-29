@@ -119,6 +119,8 @@ int main(int argc, char*argv[])
     src.rot    = G2D_ROTATION_0;
 
     dst.planes[0] = d_buf->buf_paddr;
+    dst.planes[1] = d_buf->buf_paddr+test_width*test_height;
+    dst.planes[2] = d_buf->buf_paddr+test_width*test_height*2;
     dst.left = 0;
     dst.top = 0;
     dst.right = test_width;
@@ -127,6 +129,63 @@ int main(int argc, char*argv[])
     dst.width  = test_width;
     dst.height = test_height;
     dst.rot    = G2D_ROTATION_0;
+
+    g2d_query_feature(handle, G2D_DST_YUV, &status);
+    if (status == 1)
+    {
+        printf("---------------- test dst YUV feature ----------------\n");
+        src.format = G2D_YUYV;
+        dst.format = G2D_NV16;
+
+        for(i=0; i<test_height; i++)
+        {
+            for(j=0; j<test_width; j++)
+            {
+                char* p = (char *)(((char*)s_buf->buf_vaddr) + (i*test_width+j)*2);
+                p[0] = (i*test_width+j) % 255;
+                p[1] = (p[0] + 128) % 255;
+            }
+        }
+
+        memset(d_buf->buf_vaddr, 0x0, test_width*test_height*4);
+
+        g2d_blit(handle, &src, &dst);
+
+        g2d_finish(handle);
+
+        //test Y and UV
+        for(i=0; i<test_height; i++)
+        {
+            for(j=0; j<test_width; j++)
+            {
+                char* s = (char *)(((char*)s_buf->buf_vaddr) + (i*test_width+j)*2);
+                char* y = (char *)(((char*)d_buf->buf_vaddr) + (i*test_width+j));
+                char* uv = y + test_width * test_height;
+
+	        if(y[0] != s[0] || uv[0] != s[1])
+                {
+                    printf("YUY2 to NV16 is wrong at [%d,%d] Y = 0x%x (expect 0x%x), UV = 0x%x (expect 0x%x)\n",i,j, y[0], s[0], uv[0], s[1]);
+                }
+            }
+        }
+
+        gettimeofday(&tv1, NULL);
+
+        for(i=0; i<TEST_LOOP; i++)
+        {
+            g2d_blit(handle, &src, &dst);
+        }
+
+        g2d_finish(handle);
+
+        gettimeofday(&tv2, NULL);
+        diff = ((tv2.tv_sec-tv1.tv_sec)*1000000+(tv2.tv_usec-tv1.tv_usec)) / TEST_LOOP;
+
+        printf("YUY2 to NV16 time %dus, %dfps, %dMpixel/s ........\n", diff, 1000000/diff, test_width * test_height / diff);
+    }
+
+    src.format = G2D_RGBA8888;
+    dst.format = G2D_RGBA8888;
 
 /****************************************** test g2d_blit *********************************************************/
     printf("---------------- g2d blit performance ----------------\n");
@@ -143,9 +202,6 @@ int main(int argc, char*argv[])
     diff = ((tv2.tv_sec-tv1.tv_sec)*1000000+(tv2.tv_usec-tv1.tv_usec)) / TEST_LOOP;
 
     printf("g2d blit time %dus, %dfps, %dMpixel/s ........\n", diff, 1000000/diff, test_width * test_height / diff);
-
-    src.format = G2D_RGBA8888;
-    dst.format = G2D_RGBA8888;
 
    /******************************test alpha blending with Porter-Duff modes ***************************************/
     //Clear: alpha blending mode G2D_ZERO, G2D_ZERO
