@@ -45,6 +45,8 @@ struct thread_state {
 	pthread_t tid;
 	gckGALDEVICE device;
 
+	dispatch_t *dispatch;
+
 	struct buf_msg *buf_msg;
 	volatile unsigned *refcnt;
 };

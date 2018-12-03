@@ -28,7 +28,6 @@ static resmgr_io_funcs_t io_funcs;
 static iofunc_attr_t attr;
 
 static struct thread_state thread;
-static int thread_exit = 1;
 
 static struct rsmgr resources[] = {
 	{ -1, RESOURCE_INFO, R_INFO, gc_info_show, NULL },
@@ -272,18 +271,59 @@ io_close(resmgr_context_t *ctp, io_close_t *msg, RESMGR_OCB_T *ocb)
 static void *
 resource_manager_loop(void *arg)
 {
-	dispatch_context_t *dispatch_context = (dispatch_context_t *) arg;
+	struct thread_state *resmgr_thread = (struct thread_state *) arg;
+	dispatch_context_t *dispatch_context = NULL;
 	dprintf_rsmgr("Spawned thread %d:%d\n", getpid(), gettid());
+
+	if (!resmgr_thread) {
+		dprintf_rsmgr("Invalid data!\n");
+		return NULL;
+	}
+
+	if ((dispatch_context = dispatch_context_alloc(resmgr_thread->dispatch)) == NULL) {
+		dprintf_rsmgr("Failed to create a dispatch context!\n");
+		return NULL;
+	}
 
 	do {
 		if ((dispatch_context = dispatch_block(dispatch_context)) == NULL) {
-			return NULL;
+			break;
 		}
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		dispatch_handler(dispatch_context);
-	} while (thread_exit);
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	} while (1);
+
+	dispatch_context_free(dispatch_context);
 
 	dprintf_rsmgr("Resource manager loop exited\n");
 	return NULL;
+}
+
+int
+resource_manager_exit(void)
+{
+	int i;
+
+	/* remove entry for each resource */
+	for (i = 0; i < ARRAY_SIZE(resources); i++) {
+		resmgr_detach(thread.dispatch, resources[i].rsmgr_id, _RESMGR_DETACH_ALL);
+		resources[i].rsmgr_id = -1;
+	}
+
+	/* get rid of resource manager thread */
+	pthread_cancel(thread.tid);
+	pthread_join(thread.tid, NULL);
+
+	/* destroy the dispatch */
+	dispatch_destroy(thread.dispatch);
+
+	/* clean up thread info/resources */
+	free((void *) thread.refcnt);
+	memset(&thread, 0, sizeof(struct thread_state));
+
+	dprintf_rsmgr("Resource manager exited\n");
+	return 0;
 }
 
 /*
@@ -303,8 +343,6 @@ resource_manager_init(gckGALDEVICE device)
 	int i;
 
 	resmgr_attr_t rattr = {};
-	dispatch_t *dispatch = NULL;
-	dispatch_context_t *dispatch_context = NULL;
 
 	memset(&thread, 0, sizeof(struct thread_state));
 
@@ -312,8 +350,8 @@ resource_manager_init(gckGALDEVICE device)
 	thread.refcnt = calloc(1, sizeof(unsigned long));
 	atomic_clr(thread.refcnt, 0);
 
-	dispatch = dispatch_create();
-	if (dispatch == NULL) {
+	thread.dispatch = dispatch_create();
+	if (thread.dispatch == NULL) {
 		dprintf_rsmgr("Failed to init dispatch!\n");
 		return EXIT_FAILURE;
 	}
@@ -340,7 +378,7 @@ resource_manager_init(gckGALDEVICE device)
 
 	/* add entry for each resource */
 	for (i = 0; i < ARRAY_SIZE(resources); i++) {
-		id = resmgr_attach(dispatch, &rattr, resources[i].resource_name,
+		id = resmgr_attach(thread.dispatch, &rattr, resources[i].resource_name,
 				  _FTYPE_ANY, 0, &connect_funcs, &io_funcs, &attr);
 
 		/*
@@ -351,26 +389,17 @@ resource_manager_init(gckGALDEVICE device)
 		rsmgr_add_id(id);
 	}
 
-	dispatch_context = dispatch_context_alloc(dispatch);
-
 	/* spawn a thread as we'll be blocked */
-	ret = pthread_create(&thread.tid, NULL, resource_manager_loop, dispatch_context);
+	ret = pthread_create(&thread.tid, NULL, resource_manager_loop, &thread);
 	if (ret == -1) {
 		dprintf_rsmgr("Failed to create thread to handle resource manager loop\n");
+		resource_manager_exit();
 		return -1;
 	}
+
+	pthread_setname_np(thread.tid, "gal-res-mgr");
 
 	dprintf_rsmgr("Resource manager inited\n");
 	return 0;
 }
 
-int
-resource_manager_exit(void)
-{
-	thread_exit = 0;
-	pthread_join(thread.tid, NULL);
-
-	free((void *) thread.refcnt);
-	dprintf_rsmgr("Resource manager exited\n");
-	return 0;
-}
