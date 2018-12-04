@@ -505,6 +505,7 @@ drv_mempool_destroy()
     memPool.fd = -1;
     memPool.addr = NULL;
     memPool.paddr = 0;
+    ptm_fini();
 }
 
 gctINT
@@ -759,8 +760,6 @@ drv_shm_destroy()
         shmPool = nextPool;
     }
     pthread_mutex_destroy(&shmPoolListMutex);
-
-    ptm_fini();
 
     return gcvSTATUS_OK;
 }

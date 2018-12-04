@@ -151,7 +151,7 @@ ptm_alloc_ctm(size_t size, int shm_fd, int shm_special)
 int
 ctm_map(struct ctm * m, int prot, int flags)
 {
-	assert(m->shm_fd && !m->vaddr && m->size);
+	assert((m->shm_fd  != -1) && !m->vaddr && m->size);
 #ifndef SHMCTL_TYMEM
 	assert(m->vaddr_posix);
 #endif
@@ -186,21 +186,25 @@ ctm_map(struct ctm * m, int prot, int flags)
 void
 ctm_unmap(struct ctm * m)
 {
+#ifdef SHMCTL_TYMEM
 	if (m->vaddr) {
 		/* unlock */
-#ifdef SHMCTL_TYMEM
 		munlock(m->vaddr, m->size);
 		munmap(m->vaddr, m->size);
 		m->vaddr = NULL;
+	}
 #else
+	if (m->vaddr) {
 		munmap(m->vaddr, m->size);
 		m->vaddr = NULL;
+	}
+	if (m->vaddr_posix) {
 		assert(m->vaddr_posix);
 		munlock(m->vaddr_posix, m->size);
 		munmap(m->vaddr_posix,	m->size);
 		m->vaddr_posix = NULL;
-#endif
 	}
+#endif
 }
 
 /* TODO. keep it &  put it into a free list for reuse */
