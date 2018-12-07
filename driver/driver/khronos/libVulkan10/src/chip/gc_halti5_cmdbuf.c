@@ -3542,7 +3542,8 @@ VkResult halti5_setRenderTargets(
                 ** But, For PE swizzle, not support MRT and Blend. So just a simple workround for this mutable group.
                 */
                 if ((rtImage->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-                    (rtImageView->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+                    ((rtImageView->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+                    (rtImageView->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
                 {
                     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0529, VK_FALSE,
                         ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
