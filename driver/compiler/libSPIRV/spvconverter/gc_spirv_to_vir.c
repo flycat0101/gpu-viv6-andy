@@ -2967,10 +2967,15 @@ static VIR_SymId __SpvAddIdSymbol(
     if(errCode == VSC_ERR_REDEFINITION && virSymbolKind == VIR_SYM_VARIABLE && virStorageClass == VIR_STORAGE_LOCAL)
     {
         VIR_Shader_DuplicateVariablelFromSymId(virShader, symId, &symId);
-        setLocation = gcvFALSE;
+        sym = VIR_Shader_GetSymFromId(virShader, symId);
+        gcmASSERT(sym);
+        /* Need to set proper type. The local variable has name identical to others in different scope */
+        VIR_Symbol_SetType(sym, virType);
     }
-
-    sym = VIR_Shader_GetSymFromId(virShader, symId);
+    else
+    {
+        sym = VIR_Shader_GetSymFromId(virShader, symId);
+    }
 
     VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
     VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_NONE);
