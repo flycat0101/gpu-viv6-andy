@@ -5437,13 +5437,210 @@ OnError:
     return errCode;
 };
 
+static VIR_ImageFormat
+_FixImageFormatByImageType(
+    IN VIR_TypeId       imageType,
+    IN VIR_ImageFormat  imageFormat
+    )
+{
+    VIR_ImageFormat     fixedImageFormat = imageFormat;
+
+    if (VIR_TypeId_isImageDataFloat(imageType))
+    {
+        switch (fixedImageFormat)
+        {
+        /* Format RGBA. */
+        case VIR_IMAGE_FORMAT_RGBA32I:
+        case VIR_IMAGE_FORMAT_RGBA32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA32F;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA16I:
+        case VIR_IMAGE_FORMAT_RGBA16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA16F;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA8I:
+        case VIR_IMAGE_FORMAT_RGBA8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA8;
+            break;
+
+        /* Format RG. */
+        case VIR_IMAGE_FORMAT_RG32I:
+        case VIR_IMAGE_FORMAT_RG32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG32F;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG16I:
+        case VIR_IMAGE_FORMAT_RG16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG16F;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG8I:
+        case VIR_IMAGE_FORMAT_RG8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG8;
+            break;
+
+        /* Format R. */
+        case VIR_IMAGE_FORMAT_R32I:
+        case VIR_IMAGE_FORMAT_R32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R32F;
+            break;
+
+        case VIR_IMAGE_FORMAT_R16I:
+        case VIR_IMAGE_FORMAT_R16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R16F;
+            break;
+
+        case VIR_IMAGE_FORMAT_R8I:
+        case VIR_IMAGE_FORMAT_R8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R8;
+            break;
+
+        default:
+            if (!VIR_TypeId_isImageDataFloat(imageType))
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            break;
+        }
+    }
+    else if (VIR_TypeId_isImageDataSignedInteger(imageType))
+    {
+        switch (fixedImageFormat)
+        {
+        /* Format RGBA. */
+        case VIR_IMAGE_FORMAT_RGBA32F:
+        case VIR_IMAGE_FORMAT_RGBA32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA32I;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA16F:
+        case VIR_IMAGE_FORMAT_RGBA16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA16I;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA8:
+        case VIR_IMAGE_FORMAT_RGBA8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA8I;
+            break;
+
+        /* Format RG. */
+        case VIR_IMAGE_FORMAT_RG32F:
+        case VIR_IMAGE_FORMAT_RG32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG32I;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG16F:
+        case VIR_IMAGE_FORMAT_RG16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG16I;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG8:
+        case VIR_IMAGE_FORMAT_RG8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG8I;
+            break;
+
+        /* Format R. */
+        case VIR_IMAGE_FORMAT_R32F:
+        case VIR_IMAGE_FORMAT_R32UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R32I;
+            break;
+
+        case VIR_IMAGE_FORMAT_R16F:
+        case VIR_IMAGE_FORMAT_R16UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R16I;
+            break;
+
+        case VIR_IMAGE_FORMAT_R8:
+        case VIR_IMAGE_FORMAT_R8UI:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R8I;
+            break;
+
+        default:
+            if (!VIR_TypeId_isImageDataSignedInteger(imageType))
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            break;
+        }
+    }
+    else if (VIR_TypeId_isImageDataUnSignedInteger(imageType))
+    {
+        switch (fixedImageFormat)
+        {
+        /* Format RGBA. */
+        case VIR_IMAGE_FORMAT_RGBA32I:
+        case VIR_IMAGE_FORMAT_RGBA32F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA32UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA16I:
+        case VIR_IMAGE_FORMAT_RGBA16F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA16UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA8I:
+        case VIR_IMAGE_FORMAT_RGBA8:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RGBA8UI;
+            break;
+
+        /* Format RG. */
+        case VIR_IMAGE_FORMAT_RG32I:
+        case VIR_IMAGE_FORMAT_RG32F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG32UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG16I:
+        case VIR_IMAGE_FORMAT_RG16F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG16UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_RG8I:
+        case VIR_IMAGE_FORMAT_RG8:
+            fixedImageFormat = VIR_IMAGE_FORMAT_RG8UI;
+            break;
+
+        /* Format R. */
+        case VIR_IMAGE_FORMAT_R32I:
+        case VIR_IMAGE_FORMAT_R32F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R32UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_R16I:
+        case VIR_IMAGE_FORMAT_R16F:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R16UI;
+            break;
+
+        case VIR_IMAGE_FORMAT_R8I:
+        case VIR_IMAGE_FORMAT_R8:
+            fixedImageFormat = VIR_IMAGE_FORMAT_R8UI;
+            break;
+
+        default:
+            if (!VIR_TypeId_isImageDataUnSignedInteger(imageType))
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            break;
+        }
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    return fixedImageFormat;
+}
+
 static VSC_ErrCode
 _AddTexelBufferToImage(
     IN VIR_Shader       *pShader,
     IN VIR_Function     *pFunc,
     IN VIR_Symbol       *pSamplerSym,
     IN VIR_Uniform      *pSamplerUniform,
-    IN gctUINT          arrayIndex
+    IN gctUINT          arrayIndex,
+    IN VIR_ImageFormat  imageFormat
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
@@ -5456,6 +5653,7 @@ _AddTexelBufferToImage(
         VIR_NameId      nameId;
         gctCHAR         name[128] = "#";
         VIR_TypeId      imageType = VIR_TypeId_ConvertSamplerTypeToImageType(pShader, VIR_Symbol_GetTypeId(pSamplerSym));
+        VIR_ImageFormat fixedImageFormat = _FixImageFormatByImageType(imageType, imageFormat);
 
         gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, pSamplerSym));
         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$TexelBufferToImage");
@@ -5481,6 +5679,8 @@ _AddTexelBufferToImage(
         VIR_Symbol_SetAddrSpace(pTexelBufferToImageSym, VIR_AS_CONSTANT);
         VIR_Symbol_SetTyQualifier(pTexelBufferToImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
         pTexelBufferToImageSym->layout = pSamplerSym->layout;
+        /* Set the corresponding image format. */
+        VIR_Symbol_SetImageFormat(pTexelBufferToImageSym, fixedImageFormat);
 
         pTexelBufferToImage = VIR_Symbol_GetImage(pTexelBufferToImageSym);
         pTexelBufferToImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
@@ -5525,7 +5725,9 @@ _InsertCallTexldImg(
                                      pFunc,
                                      pSamplerSym,
                                      pSamplerUniform,
-                                     Context->linkPoint->u.resource.arrayIndex);
+                                     Context->linkPoint->u.resource.arrayIndex,
+                                     /* Need to fix it by the sampler type. */
+                                     VIR_IMAGE_FORMAT_RGBA32F);
     ON_ERROR(errCode, "_InsertCallTexldImg");
 
     /* insert the MOV to pass arguement */
@@ -6057,7 +6259,7 @@ VIR_LinkLibLibrary(
 
     _LinkLibContext_Finalize(&vContext);
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (pChanged && VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "Shader after linking library", pShader, gcvTRUE);
     }

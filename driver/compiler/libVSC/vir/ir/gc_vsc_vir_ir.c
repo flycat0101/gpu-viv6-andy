@@ -7662,7 +7662,7 @@ VIR_TypeId_ConvertSamplerTypeToImageType(
         imageType = VIR_TYPE_IMAGE_3D;
         break;
     case VIR_TYPE_SAMPLER_BUFFER:
-        imageType = VIR_TYPE_IMAGE_2D;
+        imageType = VIR_TYPE_IMAGE_BUFFER;
         break;
 
     /* Signed integer. */
@@ -7682,7 +7682,7 @@ VIR_TypeId_ConvertSamplerTypeToImageType(
         imageType = VIR_TYPE_IIMAGE_3D;
         break;
     case VIR_TYPE_ISAMPLER_BUFFER:
-        imageType = VIR_TYPE_IIMAGE_2D;
+        imageType = VIR_TYPE_IIMAGE_BUFFER;
         break;
 
     /* Unsigned integer. */
@@ -7702,7 +7702,7 @@ VIR_TypeId_ConvertSamplerTypeToImageType(
         imageType = VIR_TYPE_UIMAGE_3D;
         break;
     case VIR_TYPE_USAMPLER_BUFFER:
-        imageType = VIR_TYPE_UIMAGE_2D;
+        imageType = VIR_TYPE_UIMAGE_BUFFER;
         break;
 
     default:
