@@ -788,7 +788,7 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
     CALL_SH_PASS(vscVIR_CheckCstRegFileReadPortLimitation, 0, gcvNULL);
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 0, gcvNULL);
-
+    CALL_SH_PASS(vscVIR_GenRobustBoundCheck, 0, gcvNULL);
     CALL_SH_PASS(VIR_RA_LS_PerformTempRegAlloc, 0, gcvNULL);
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 1, gcvNULL);
