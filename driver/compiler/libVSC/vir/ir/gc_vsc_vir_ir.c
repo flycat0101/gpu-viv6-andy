@@ -4470,6 +4470,7 @@ VSC_ErrCode
 VIR_Shader_UpdateCallParmAssignment(
     IN  VIR_Shader          *pShader,
     IN  VIR_Function        *pCalleeFunc,
+    IN  VIR_Function        *pLibCalleeFunc,
     IN  VIR_Function        *pCallerFunc,
     IN  VIR_Instruction     *pCallerInst,
     IN  gctBOOL             bMapTemp,
@@ -4480,6 +4481,8 @@ VIR_Shader_UpdateCallParmAssignment(
     gctUINT                 i, j, k;
     VIR_SymId               parmSymId, parmVregId;
     VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_SymId               calleeParmSymId, calleeParmVregId;
+    VIR_Symbol              *calleeParmSym = gcvNULL, *calleeParmVregSym = gcvNULL;
     VIR_Symbol              *newParmVregSym = gcvNULL;
     VIR_TypeId              parmTypeId, parmBaseTypeId;
     VIR_Instruction         *newInst;
@@ -4488,12 +4491,13 @@ VIR_Shader_UpdateCallParmAssignment(
     gctUINT                 regCount;
     gctUINT                 compCount;
     gctBOOL                 bInCompMask[VIR_CHANNEL_COUNT], bOutCompMask[VIR_CHANNEL_COUNT];
+    gctBOOL                 bUpdateParamWithLibCalleeFunc = (pCalleeFunc != pLibCalleeFunc);
 
-    for (i = 0; i < VIR_IdList_Count(&pCalleeFunc->paramters); i++)
+    for (i = 0; i < VIR_IdList_Count(&pLibCalleeFunc->paramters); i++)
     {
-        parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, i);
+        parmSymId = VIR_IdList_GetId(&pLibCalleeFunc->paramters, i);
         /* param symbol in func */
-        parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+        parmSym = VIR_Function_GetSymFromId(pLibCalleeFunc, parmSymId);
         parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
 
         parmTypeId = VIR_Symbol_GetTypeId(parmSym);
@@ -4535,10 +4539,35 @@ VIR_Shader_UpdateCallParmAssignment(
         for (j = 0; j < regCount; j++)
         {
             gctBOOL bCheckInParm = gcvTRUE, bCheckOutParm = gcvTRUE;
-            /* param vreg symbol */
-            parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId + j);
+
             pInInstIter = pCallerInst;
             pOutInstIter = pCallerInst;
+
+            if (bUpdateParamWithLibCalleeFunc)
+            {
+                /* I: Get the parameter from the main shader. */
+                calleeParmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, i);
+                calleeParmSym = VIR_Function_GetSymFromId(pCalleeFunc, calleeParmSymId);
+                calleeParmVregId = VIR_Symbol_GetVariableVregIndex(calleeParmSym);
+                calleeParmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, calleeParmVregId + j);
+
+                /* II: Get the parameter vreg symbol from the lib shader. */
+                parmVregSym = VIR_Shader_FindSymbolByTempIndex(VIR_Function_GetShader(pLibCalleeFunc),
+                                                               parmVregId + j);
+                gcmASSERT(parmVregSym);
+
+                /* III: Get the mapping vreg symbol. */
+                gcmASSERT(pTempSet);
+                if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)parmVregSym, (void **)&parmVregSym))
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+            }
+            else
+            {
+                /* param vreg symbol */
+                parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId + j);
+            }
 
             do
             {
@@ -4559,10 +4588,16 @@ VIR_Shader_UpdateCallParmAssignment(
                             gcmASSERT(gcvFALSE);
                         }
                     }
+                    else if (bUpdateParamWithLibCalleeFunc)
+                    {
+                        newParmVregSym = calleeParmVregSym;
+                    }
                     else
                     {
                         newParmVregSym = parmVregSym;
                     }
+
+                    gcmASSERT(newParmVregSym != gcvNULL);
 
                     VIR_Operand_SetTempRegister(pOpnd,
                                                 pCallerFunc,
@@ -4598,10 +4633,17 @@ VIR_Shader_UpdateCallParmAssignment(
                             gcmASSERT(gcvFALSE);
                         }
                     }
+                    else if (bUpdateParamWithLibCalleeFunc)
+                    {
+                        calleeParmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, calleeParmVregId + j);
+                        newParmVregSym = calleeParmVregSym;
+                    }
                     else
                     {
                         newParmVregSym = parmVregSym;
                     }
+
+                    gcmASSERT(newParmVregSym != gcvNULL);
 
                     VIR_Operand_SetTempRegister(pOpnd,
                                                 pCallerFunc,

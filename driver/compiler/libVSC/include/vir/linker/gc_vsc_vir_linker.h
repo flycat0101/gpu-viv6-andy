@@ -39,7 +39,7 @@ struct _VIR_LINKER_CALL_INST_NODE
 {
     VIR_Instruction             *inst;
     union {
-        VIR_IntrinsicsKind       intrinsicKind;  /* intrinsic kind for VIR_OP_INTRINSIC */
+        VIR_IntrinsicsKind       libIntrinsicKind;  /* intrinsic kind for VIR_OP_INTRINSIC */
         VIR_NameId               extFuncName;    /* extern function name for EXTCALL */
     } u;
 };
@@ -80,14 +80,18 @@ VIR_Lib_LinkFunctions(
     IN  VIR_Shader              *pShader,
     IN  VIR_Shader              *pLibShader,
     IN  VSC_MM                  *pMM,
+    OUT VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VIR_LIB_WORKLIST        *pWorkList,
     OUT VIR_LIB_CALLSITES       *pCallSites);
 
 VSC_ErrCode
 VIR_Lib_UpdateCallSites(
+    IN  VIR_LinkLibContext      *Context,
     IN  VIR_Shader              *pShader,
+    IN  VIR_Shader              *pLibShader,
     IN  VSC_HW_CONFIG           *pHwCfg,
     IN  VSC_MM                  *pMM,
+    IN  VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VIR_LIB_CALLSITES       *pCallSites);
 
 /* Intrinsic library list. */

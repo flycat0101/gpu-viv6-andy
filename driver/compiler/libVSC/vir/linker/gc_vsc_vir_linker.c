@@ -2638,6 +2638,7 @@ _VIR_LinkIntrinsicLib_CopyInst(
     IN  VIR_Function            *pFunc,
     IN  VIR_Instruction         *libInst,
     IN  VSC_MM                  *pMM,
+    OUT VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VSC_HASH_TABLE          *pLabelSet,
     OUT VSC_HASH_TABLE          *pJmpSet,
     OUT VSC_HASH_TABLE          *pTempSet,
@@ -2672,15 +2673,15 @@ _VIR_LinkIntrinsicLib_CopyInst(
             {
                 /* add pCallee to the pShader */
                 errCode = VIR_Shader_AddFunction(pShader,
-                                        VIR_Function_GetFlags(libCallee),
-                                        VIR_Function_GetNameString(libCallee),
-                                        newTyId,
-                                        &pCallee);
+                                                 VIR_Function_GetFlags(libCallee),
+                                                 VIR_Function_GetNameString(libCallee),
+                                                 newTyId,
+                                                 &pCallee);
                 ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
 
+                vscHTBL_DirectSet(pAddLibFuncSet, (void*) pCallee, gcvNULL);
                 VIR_LIB_WorkListQueue(pMM, pWorkList, pCallee);
             }
-
 
             errCode = VIR_Function_AddInstruction(pFunc, VIR_OP_CALL, newTyId, &newInst);
             VIR_Operand_SetFunction(VIR_Inst_GetDest(newInst), pCallee);
@@ -2688,7 +2689,7 @@ _VIR_LinkIntrinsicLib_CopyInst(
 
             callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
             callInstNode->inst = newInst;
-            callInstNode->u.intrinsicKind = VIR_IK_NONE;
+            callInstNode->u.libIntrinsicKind = VIR_IK_NONE;
 
             VIR_LIB_CallSitesQueue(pMM, pCallSites, callInstNode);
 
@@ -2804,6 +2805,7 @@ VIR_Lib_LinkFunctions(
     IN  VIR_Shader              *pShader,
     IN  VIR_Shader              *pLibShader,
     IN  VSC_MM                  *pMM,
+    OUT VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VIR_LIB_WORKLIST        *pWorkList,
     OUT VIR_LIB_CALLSITES       *pCallSites)
 {
@@ -3006,7 +3008,19 @@ VIR_Lib_LinkFunctions(
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            _VIR_LinkIntrinsicLib_CopyInst(pShader, pLibShader, libFunc, pFunc, inst, pMM, pLabelSet, pJmpSet, pTempSet, pWorkList, pCallSites, &tempIndexStart);
+            _VIR_LinkIntrinsicLib_CopyInst(pShader,
+                                           pLibShader,
+                                           libFunc,
+                                           pFunc,
+                                           inst,
+                                           pMM,
+                                           pAddLibFuncSet,
+                                           pLabelSet,
+                                           pJmpSet,
+                                           pTempSet,
+                                           pWorkList,
+                                           pCallSites,
+                                           &tempIndexStart);
         }
 
         /* fixup the jmp instruction's label */
@@ -3715,9 +3729,12 @@ _UpdateResOpType(
    CALL:  change the MOV for input/output to the new renamed vreg */
 VSC_ErrCode
 VIR_Lib_UpdateCallSites(
+    IN  VIR_LinkLibContext      *Context,
     IN  VIR_Shader              *pShader,
+    IN  VIR_Shader              *pLibShader,
     IN  VSC_HW_CONFIG           *pHwCfg,
     IN  VSC_MM                  *pMM,
+    IN  VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VIR_LIB_CALLSITES       *pCallSites)
 {
     VSC_ErrCode     errCode = VSC_ERR_NONE;
@@ -3746,7 +3763,7 @@ VIR_Lib_UpdateCallSites(
     {
         VIR_LIB_CallSitesDequeue(pMM, pCallSites, &pCallInstNode);
         pCallerInst = pCallInstNode->inst;
-        intrinsicsKind = pCallInstNode->u.intrinsicKind;
+        intrinsicsKind = pCallInstNode->u.libIntrinsicKind;
 
         callerInstResOpType = VIR_Inst_GetResOpType(pCallerInst);
         destOpnd = VIR_Inst_GetDest(pCallerInst);
@@ -3972,18 +3989,36 @@ VIR_Lib_UpdateCallSites(
         }
         else
         {
+            VIR_Function*   pLibCalleeFunc = gcvNULL;
+
             pCalleeFunc = VIR_Operand_GetFunction(VIR_Inst_GetDest(pCallerInst));
 
             /* Update the instructions of callee function. */
             _UpdateResOpType(callerInstResOpType, pCalleeFunc);
 
+            /*
+            ** If this function is already existed in the main shader, we need to use the parameters of
+            ** the lib function to search the argument assignments(in the temp hash table),
+            ** and replace them with the parameters of the function in the main shader.
+            */
+            if (!vscHTBL_DirectTestAndGet(pAddLibFuncSet, (void *)pCalleeFunc, gcvNULL))
+            {
+                VIR_Shader_GetFunctionByName(pLibShader, VIR_Function_GetNameString(pCalleeFunc), &pLibCalleeFunc);
+                gcmASSERT(pLibCalleeFunc != gcvNULL && pLibCalleeFunc != pCalleeFunc);
+            }
+            else
+            {
+                pLibCalleeFunc = pCalleeFunc;
+            }
+
             /* Update call parameter assignments. */
             errCode = VIR_Shader_UpdateCallParmAssignment(pShader,
                                                           pCalleeFunc,
+                                                          pLibCalleeFunc,
                                                           pCallerFunc,
                                                           pCallerInst,
                                                           gcvFALSE,
-                                                          gcvNULL);
+                                                          (pLibCalleeFunc != pCalleeFunc) ? Context->pTempHashTable : gcvNULL);
         }
 
         /* Free the call inst node. */
@@ -4166,7 +4201,7 @@ _GetIntrinsicOrExtFunc(
 
                 callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
                 callInstNode->inst = inst;
-                callInstNode->u.intrinsicKind = ik;
+                callInstNode->u.libIntrinsicKind = ik;
 
                 _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
             }
@@ -5623,6 +5658,9 @@ _LinkLib_Transform(
     VIR_Shader          *pShader = Context->shader;
     gctSTRING           str = gcvNULL;
 
+    /* Use it to save the lib function that generates during this transform. */
+    VSC_HASH_TABLE      *pAddLibFuncSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+
     VIR_TRANS_WORKLIST  vTranspointslist;
     VIR_LIB_WORKLIST    vFuncList;
     VIR_LIB_CALLSITES   vCallSites;
@@ -5705,7 +5743,7 @@ _LinkLib_Transform(
             VIR_Function_SetFlag(pFunc, VIR_FUNCFLAG_LINKED_LIB);
 
             /* step2.2 linkin the lib-link function */
-            errCode = VIR_Lib_LinkFunctions(Context, pShader, Context->libShader, pMM, &vFuncList, &vCallSites);
+            errCode = VIR_Lib_LinkFunctions(Context, pShader, Context->libShader, pMM, pAddLibFuncSet, &vFuncList, &vCallSites);
             ON_ERROR(errCode, "_LinkLib_Transform");
         }
 
@@ -5714,7 +5752,7 @@ _LinkLib_Transform(
 
         /* step2.4 update the call sites, this is particular for the calls inside the lib function,
            since the lib call site itself already has the right parameters/return passing*/
-        errCode = VIR_Lib_UpdateCallSites(pShader, pHwCfg, pMM, &vCallSites);
+        errCode = VIR_Lib_UpdateCallSites(Context, pShader, Context->libShader, pHwCfg, pMM, pAddLibFuncSet, &vCallSites);
         ON_ERROR(errCode, "_LinkLib_Transform");
 
         Context->changed = gcvTRUE;
@@ -5727,10 +5765,14 @@ _LinkLib_Transform(
     }
 
 OnError:
-
     if (str)
     {
         vscMM_Free(pMM, str);
+    }
+
+    if (pAddLibFuncSet)
+    {
+        vscHTBL_Destroy(pAddLibFuncSet);
     }
 
     QUEUE_FINALIZE(&vTranspointslist);
