@@ -241,10 +241,33 @@ gctSTRING gcLibATAN_Funcs =
 "}\n"
 ;
 
+/* CL spec:
+ * atan2pi (±0, -0 ) = ±1.
+ * atan2pi (±0, +0 ) = ± 0.
+ * atan2pi (±0, x ) returns ± 1 for x < 0.
+ * atan2pi (±0, x ) returns ± 0 for x > 0.
+ * atan2pi (y, ±0 ) returns -0.5 for y < 0.
+ * atan2pi (y, ±0 ) returns 0.5 for y > 0.
+*/
 gctSTRING gcLibATAN2_Funcs =
 "float _viv_atan2_float(float y, float x)\n"
 "{\n"
 "    float result;\n"
+"    if (x == -0.0)\n"
+"    {\n"
+"         if (y == 0.0)  return  3.14159265358979323846f;\n"
+"         if (y == -0.0) return -3.14159265358979323846f;\n"
+"         if (y < 0.0)   return -0.5f;\n"
+"         return 0.5f;\n"
+"    }\n"
+"    else if (x == 0.0)\n"
+"    {\n"
+"         if (y == 0.0)  return  0.0;\n"
+"         if (y == -0.0) return -0.0;\n"
+"         if (y < 0.0)   return -0.5f;\n"
+"         return 0.5f;\n"
+"    }\n"
+"    \n"
 "    _viv_asm(ATAN, result, y / x);\n"
 "    if(sign(x) < 0.0)\n"
 "    {\n"
@@ -262,31 +285,25 @@ gctSTRING gcLibATAN2_Funcs =
 "vec2 _viv_atan2_vec2(vec2 y, vec2 x)\n"
 "{\n"
 "    vec2 result;\n"
-"    _viv_asm(ATAN, result, y / x);\n"
-"    bvec2 sel = lessThanEqual(result, vec2(0.0));\n"
-"    vec2 result2 = mix(result - vec2(3.14159265358979323846f), result + vec2(3.14159265358979323846f), sel);\n"
-"    sel = lessThan(sign(x), vec2(0.0));\n"
-"    result = mix(result, result2, sel);\n"
+"    result.x = _viv_atan2_float(y.x, x.x);\n"
+"    result.y = _viv_atan2_float(y.y, x.y);\n"
 "    return result;\n"
 "}\n"
 "vec3 _viv_atan2_vec3(vec3 y, vec3 x)\n"
 "{\n"
 "    vec3 result;\n"
-"    _viv_asm(ATAN, result, y / x);\n"
-"    bvec3 sel = lessThanEqual(result, vec3(0.0));\n"
-"    vec3 result2 = mix(result - vec3(3.14159265358979323846f), result + vec3(3.14159265358979323846f), sel);\n"
-"    sel = lessThan(sign(x), vec3(0.0));\n"
-"    result = mix(result, result2, sel);\n"
+"    result.x = _viv_atan2_float(y.x, x.x);\n"
+"    result.y = _viv_atan2_float(y.y, x.y);\n"
+"    result.z = _viv_atan2_float(y.z, x.z);\n"
 "    return result;\n"
 "}\n"
 "vec4 _viv_atan2_vec4(vec4 y, vec4 x)\n"
 "{\n"
 "    vec4 result;\n"
-"    _viv_asm(ATAN, result, y / x);\n"
-"    bvec4 sel = lessThanEqual(result, vec4(0.0));\n"
-"    vec4 result2 = mix(result - vec4(3.14159265358979323846f), result + vec4(3.14159265358979323846f), sel);\n"
-"    sel = lessThan(sign(x), vec4(0.0));\n"
-"    result = mix(result, result2, sel);\n"
+"    result.x = _viv_atan2_float(y.x, x.x);\n"
+"    result.y = _viv_atan2_float(y.y, x.y);\n"
+"    result.z = _viv_atan2_float(y.z, x.z);\n"
+"    result.w = _viv_atan2_float(y.w, x.w);\n"
 "    return result;\n"
 "}\n";
 
