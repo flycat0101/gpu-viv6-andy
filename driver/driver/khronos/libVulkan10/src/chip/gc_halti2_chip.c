@@ -862,7 +862,7 @@ VkResult halti2_clearImageWithRS(
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, address);
 
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->database->ROBUSTNESS && devCtx->enabledFeatures.robustBufferAccess)
         {
             if (!devCtx->database->SH_ROBUSTNESS_FIX)
             {
@@ -918,7 +918,9 @@ VkResult halti2_clearImageWithRS(
         partIndex++;
     }
 
-    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    if (devCtx->enabledFeatures.robustBufferAccess &&
+        devCtx->database->ROBUSTNESS &&
+        !devCtx->database->SH_ROBUSTNESS_FIX)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
             (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -1491,7 +1493,7 @@ VkResult halti2_copyImageWithRS(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B0, VK_FALSE, srcAddress);
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, dstAddress);
 
-    if (devCtx->database->ROBUSTNESS)
+    if (devCtx->database->ROBUSTNESS && devCtx->enabledFeatures.robustBufferAccess)
     {
         if (!devCtx->database->SH_ROBUSTNESS_FIX)
         {
@@ -1544,7 +1546,9 @@ VkResult halti2_copyImageWithRS(
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
-    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    if (devCtx->enabledFeatures.robustBufferAccess &&
+        devCtx->database->ROBUSTNESS &&
+       !devCtx->database->SH_ROBUSTNESS_FIX)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
             (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

@@ -536,7 +536,7 @@ VkResult halti5_initializeChipModule(
  ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))));
     }
 
-    if (devCtx->database->ROBUSTNESS)
+    if (devCtx->enabledFeatures.robustBufferAccess && devCtx->database->ROBUSTNESS)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
             (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

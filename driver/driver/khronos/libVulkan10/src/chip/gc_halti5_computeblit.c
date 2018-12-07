@@ -1312,7 +1312,7 @@ static VkResult halti5_program_blit_const(
                    +  hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->firstValidHwChannel;
 
     addresses[addrCount++] = pScratchMem->memory->devAddr;
-    if (devCtx->database->ROBUSTNESS)
+    if (devCtx->enabledFeatures.robustBufferAccess)
     {
         addresses[addrCount++] = pScratchMem->memory->devAddr;
         addresses[addrCount++] = pScratchMem->memory->devAddr + 144 - 1;
@@ -1765,7 +1765,7 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
                                  | VSC_COMPILER_FLAG_COMPILE_CODE_GEN
                                  | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                  | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
-        if (devCtx->database->ROBUSTNESS)
+        if (devCtx->enabledFeatures.robustBufferAccess)
         {
             vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
         }

@@ -125,6 +125,7 @@ struct __vkDevContextRec
     const __vkChipInfo *chipInfo;
     const gcsFEATURE_DATABASE *database;
     VSC_SYS_CONTEXT vscSysCtx;
+    VkPhysicalDeviceFeatures enabledFeatures;
 
     __vkChipFuncTable *chipFuncs;
     void *chipPriv;
