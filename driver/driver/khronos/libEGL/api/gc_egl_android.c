@@ -174,7 +174,7 @@ _AndroidPixelFormats[] =
     {0, 0, 0, 0, 0, gcvSURF_UNKNOWN},  /* PIXEL_FORMAT_NONE. */
     {8, 8, 8, 8, 0, gcvSURF_A8B8G8R8}, /* HAL_PIXEL_FORMAT_RGBA_8888 */
     {8, 8, 8, 0, 0, gcvSURF_X8B8G8R8}, /* HAL_PIXEL_FORMAT_RGBX_8888 */
-    {8, 8, 8, 0, 0, gcvSURF_UNKNOWN},  /* HAL_PIXEL_FORMAT_RGB_888, not supported */
+    {8, 8, 8, 0, 0, gcvSURF_B8G8R8},  /* HAL_PIXEL_FORMAT_RGB_888 */
     {5, 6, 5, 0, 0, gcvSURF_R5G6B5},   /* HAL_PIXEL_FORMAT_RGB_565 */
     {8, 8, 8, 8, 0, gcvSURF_A8R8G8B8}, /* HAL_PIXEL_FORMAT_BGRA_8888 */
     {5, 5, 5, 1, 0, gcvSURF_R5G5B5A1}, /* HAL_PIXEL_FORMAT_RGBA_5551 */
@@ -974,6 +974,9 @@ _TranslateANativeBufferFormat(
             return gcvSURF_R5G6B5;
             break;
 
+        case HAL_PIXEL_FORMAT_RGB_888:
+            return gcvSURF_B8G8R8;
+
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
             return gcvSURF_YUY2;
 
@@ -1496,6 +1499,10 @@ _CreateGenericDrmBufferSurface(
     case gcvSURF_A8B8G8R8:
     case gcvSURF_X8B8G8R8:
         stride *= 4;
+        break;
+
+    case gcvSURF_B8G8R8:
+        stride *= 3;
         break;
 
     case gcvSURF_R5G6B5:
