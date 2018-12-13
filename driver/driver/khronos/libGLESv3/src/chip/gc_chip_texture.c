@@ -5531,6 +5531,12 @@ __glChipGetTextureAttribFromImage(
             type = GL_HALF_FLOAT;
             break;
 
+        case gcvSURF_A2B10G10R10:
+            format = GL_RGBA;
+            internalFormat = GL_RGB10_A2;
+            type = GL_UNSIGNED_INT_2_10_10_10_REV;
+            break;
+
         case gcvSURF_X8B8G8R8:
             format = internalFormat = __GL_RGBX8;
             type = GL_UNSIGNED_BYTE;

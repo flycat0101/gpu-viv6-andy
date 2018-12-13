@@ -573,7 +573,7 @@ _TranslateFormat(
             return gcvSURF_YUY2;
 #if ANDROID_SDK_VERSION >= 26
         case HAL_PIXEL_FORMAT_RGBA_1010102:
-            return gcvSURF_R10G10B10A2;
+            return gcvSURF_A2B10G10R10;
         case HAL_PIXEL_FORMAT_RGBA_FP16:
             return gcvSURF_A16B16G16R16F;
 #endif
@@ -1498,6 +1498,7 @@ _CreateGenericDrmBufferSurface(
     case gcvSURF_X8R8G8B8:
     case gcvSURF_A8B8G8R8:
     case gcvSURF_X8B8G8R8:
+    case gcvSURF_A2B10G10R10:
         stride *= 4;
         break;
 
@@ -3495,8 +3496,10 @@ _ConnectPixmap(
     case gcvSURF_A8B8G8R8:
     case gcvSURF_X8B8G8R8:
     case gcvSURF_A8R8G8B8:
+    case gcvSURF_A2B10G10R10:
         pixmapStride = pixmap->stride * 4;
         break;
+
     case gcvSURF_A8:
         /* Need shadow. */
         pixmapStride = pixmap->stride;

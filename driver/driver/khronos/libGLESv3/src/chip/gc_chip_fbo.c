@@ -2406,6 +2406,7 @@ __glChipEglImageTargetRenderbufferStorageOES(
     case gcvSURF_R4G4B4A4:
     case gcvSURF_X4R4G4B4:
     case gcvSURF_A16B16G16R16F:
+    case gcvSURF_A2B10G10R10:
         type = gcvSURF_RENDER_TARGET;
         break;
 
