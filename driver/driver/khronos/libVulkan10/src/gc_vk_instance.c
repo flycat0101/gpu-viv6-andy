@@ -181,6 +181,11 @@ static VkResult __vki_InitializeChipInfo(
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
     chipCount = iface.u.ChipInfo.count;
 
+    if (inst->patchID == gcvPATCH_SKIA_SKQP)
+    {
+        chipCount = 1;
+    }
+
     for (i = 0; i < chipCount; i++)
     {
         switch (iface.u.ChipInfo.types[i])
@@ -337,12 +342,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
         inst->engineVersion = pAppInfo->engineVersion;
         if (pAppInfo->pApplicationName)
         {
-            const char* caseName = "\x9b\x9a\x8e\x8f"; /* "deqp".*/
+            const char* deqp = "\x9b\x9a\x8e\x8f"; /* "deqp".*/
+            const char* skqp = "\x89\x94\x8b\x9a\x8c\x8b"; /* "vktest".*/
             gcoOS_StrCopySafe((gctSTRING)inst->applicationName, __VK_MAX_NAME_LENGTH, pAppInfo->pApplicationName);
 
-            if (__vk_utils_reverseMatch(inst->applicationName, caseName))
+            if (__vk_utils_reverseMatch(inst->applicationName, deqp))
             {
                 inst->patchID = gcvPATCH_DEQP;
+            }
+
+            if (__vk_utils_reverseMatch(inst->applicationName, skqp))
+            {
+                inst->patchID = gcvPATCH_SKIA_SKQP;
             }
         }
         if (pAppInfo->pEngineName)
