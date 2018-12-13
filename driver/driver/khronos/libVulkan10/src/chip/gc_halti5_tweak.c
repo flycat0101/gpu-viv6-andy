@@ -1222,14 +1222,10 @@ VkResult halti5_tweak_detect(
 
     for (arrayIdx = 0; arrayIdx < __VK_COUNTOF(g_tweakArray); arrayIdx++)
     {
-        char tempBuf[__VK_MAX_NAME_LENGTH];
-        char *pos;
+        VkBool32 matched = __vk_utils_reverseMatch(devCtx->pPhyDevice->pInst->applicationName,
+            g_tweakArray[arrayIdx].reversedName);
 
-        __vk_utils_reverseBytes(g_tweakArray[arrayIdx].reversedName, tempBuf, __VK_MAX_NAME_LENGTH);
-
-        gcoOS_StrStr(devCtx->pPhyDevice->pInst->applicationName, tempBuf, &pos);
-
-        if (pos || (devCtx->pPhyDevice->pInst->applicationName[0] == '\0'))
+        if (matched || (devCtx->pPhyDevice->pInst->applicationName[0] == '\0'))
         {
             tempArray[handleIdx++] = (halti5_tweak_handler *)&g_tweakArray[arrayIdx];
         }

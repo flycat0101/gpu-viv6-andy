@@ -218,6 +218,7 @@ struct __vkInstanceRec
 
     __vkDrvCtrlOption  drvOption;
     __vkChipInfo       chipInfo;
+    gcePATCH_ID        patchID;
 
     struct __vkInstanceRec *pNext;
 };

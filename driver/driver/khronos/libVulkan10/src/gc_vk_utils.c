@@ -1634,5 +1634,18 @@ void __vk_utils_MD5Final(
     __VK_MEMCOPY(digest, ctx->states, 16);
 }
 
+VkBool32 __vk_utils_reverseMatch(
+    const char *source,
+    const char *dest
+    )
+{
+    char tempBuf[__VK_MAX_NAME_LENGTH];
+    char *pos;
 
+    __vk_utils_reverseBytes(dest, tempBuf, __VK_MAX_NAME_LENGTH);
+    gcoOS_StrStr(source, tempBuf, &pos);
+
+    return (pos ? VK_TRUE : VK_FALSE);
+
+}
 

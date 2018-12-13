@@ -1277,9 +1277,10 @@ static VkResult halti5_pickSplitDrawIndexedFunc(
     *pFunc = halti5_drawIndexed;
 
     /* Pick split draw func.*/
-    if (pip->topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+    if ((pip->topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST)
     &&  pos
-    &&  firstIndex == 0
+    &&  (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_DEQP)
+    &&  (firstIndex == 0)
     &&  !database->FE_PATCHLIST_FETCH_FIX
     &&  halti5_needSplitPatchList(commandBuffer, indexCount)
     )

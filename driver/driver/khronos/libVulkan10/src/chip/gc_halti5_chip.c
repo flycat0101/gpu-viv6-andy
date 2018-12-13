@@ -601,7 +601,7 @@ VkResult halti5_initializeChipModule(
 
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-    vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
     vscCompileParams.cfg.ctx.isPatchLib = gcvTRUE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
