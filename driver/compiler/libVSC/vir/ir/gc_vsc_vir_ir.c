@@ -4481,7 +4481,7 @@ VIR_Shader_UpdateCallParmAssignment(
     gctUINT                 i, j, k;
     VIR_SymId               parmSymId, parmVregId;
     VIR_Symbol              *parmSym, *parmVregSym;
-    VIR_SymId               calleeParmSymId, calleeParmVregId;
+    VIR_SymId               calleeParmSymId, calleeParmVregId = VIR_INVALID_ID;
     VIR_Symbol              *calleeParmSym = gcvNULL, *calleeParmVregSym = gcvNULL;
     VIR_Symbol              *newParmVregSym = gcvNULL;
     VIR_TypeId              parmTypeId, parmBaseTypeId;
@@ -4635,6 +4635,7 @@ VIR_Shader_UpdateCallParmAssignment(
                     }
                     else if (bUpdateParamWithLibCalleeFunc)
                     {
+                        gcmASSERT(calleeParmVregId != VIR_INVALID_ID);
                         calleeParmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, calleeParmVregId + j);
                         newParmVregSym = calleeParmVregSym;
                     }
