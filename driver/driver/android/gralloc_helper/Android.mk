@@ -39,6 +39,12 @@ LOCAL_C_INCLUDES += \
         external/libdrm/include/drm
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
+
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \

@@ -72,6 +72,10 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+    system/core/include
+endif
 
 ifeq ($(USE_OPENVX),1)
 LOCAL_SRC_FILES += \

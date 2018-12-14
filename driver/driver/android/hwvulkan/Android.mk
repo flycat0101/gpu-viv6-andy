@@ -25,6 +25,12 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := \
     frameworks/native/vulkan/include
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
+
 LOCAL_CFLAGS := \
     -Wall \
     -Wextra \

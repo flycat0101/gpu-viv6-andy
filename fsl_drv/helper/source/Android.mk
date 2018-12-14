@@ -35,6 +35,12 @@ LOCAL_C_INCLUDES += frameworks/native/libs/nativebase/include
 LOCAL_C_INCLUDES += frameworks/native/libs/arect/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
+
 LOCAL_MODULE := libgpuhelper
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_TAGS    := optional
@@ -69,6 +75,12 @@ ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
 LOCAL_C_INCLUDES += frameworks/native/libs/nativewindow/include
 LOCAL_C_INCLUDES += frameworks/native/libs/nativebase/include
 LOCAL_C_INCLUDES += frameworks/native/libs/arect/include
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
 endif
 
 LOCAL_MODULE := libgpuhelper

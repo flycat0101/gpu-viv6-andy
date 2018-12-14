@@ -75,6 +75,12 @@ LOCAL_C_INCLUDES += \
 	frameworks/native/libs/arect/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        frameworks/native/include \
+        system/core/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/libGLESv11.map

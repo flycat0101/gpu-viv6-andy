@@ -80,6 +80,11 @@ LOCAL_C_INCLUDES += \
 	frameworks/native/libs/arect/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        frameworks/native/include
+endif
+
 ifeq ($(DRM_GRALLOC),1)
 LOCAL_C_INCLUDES += \
 	$(AQROOT)/driver/android/gralloc_drm
