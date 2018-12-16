@@ -4,7 +4,7 @@
 #include <gralloc_handle.h>
 #include <graphics_ext.h>
 
-#include <cutils/log.h>
+#include <log/log.h>
 
 #include <drm.h>
 #include <vivante_drm.h>

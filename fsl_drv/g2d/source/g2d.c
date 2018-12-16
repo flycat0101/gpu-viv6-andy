@@ -42,7 +42,7 @@
 
 #if defined(ANDROID)
 
-#include <cutils/log.h>
+#include <log/log.h>
 
 #if defined(LOGE)
 #define g2d_printf LOGE

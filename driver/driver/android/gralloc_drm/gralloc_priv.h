@@ -40,7 +40,7 @@
 #include <unistd.h>
 
 #include <cutils/native_handle.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 #ifndef GRALLOC_USAGE_TILED_VIV
 #  define GRALLOC_USAGE_TILED_VIV       0x10000000

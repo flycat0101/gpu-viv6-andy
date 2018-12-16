@@ -13,7 +13,7 @@
 
 /* Please add your formats in formatXlate table below. */
 
-#include <cutils/log.h>
+#include <log/log.h>
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>

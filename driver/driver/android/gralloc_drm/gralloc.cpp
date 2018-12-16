@@ -17,7 +17,7 @@
 #include <string.h>
 
 #include <hardware/gralloc.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #include <cutils/properties.h>
 
 #include "gralloc_vivante.h"

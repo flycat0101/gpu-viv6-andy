@@ -131,7 +131,7 @@
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
 #include <hardware/hwcomposer.h>
 
-#include <cutils/log.h>
+#include <log/log.h>
 #include <sync/sync.h>
 
 #include <ui/ANativeObjectBase.h>
