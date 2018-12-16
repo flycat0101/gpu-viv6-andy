@@ -187,6 +187,8 @@ CFLAGS        += -DFSL_ADD_RESERVE
 endif
 endif
 
+CFLAGS        += -Wno-unused-variable -Wno-unused-function -Wno-unused-private-field -Wno-missing-braces -Wno-unused-value -Wno-unused-parameter
+
 soc_vendor    := $(firstword $(subst -, ,$(SOC_PLATFORM)))
 soc_board     := $(lastword  $(subst -, ,$(SOC_PLATFORM)))
 
