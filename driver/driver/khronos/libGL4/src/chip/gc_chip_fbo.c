@@ -2417,6 +2417,10 @@ __glChipEglImageTargetRenderbufferStorageOES(
                                                                              __GL_CHIP_FMT_PATCH_NONE;
 
         chipRBO->formatMapInfo = gcChipGetFormatMapInfo(gc, rbo->formatInfo->drvFormat, patchCase);
+        if (chipRBO->surface != gcvNULL) {
+            gcmONERROR(gcoSURF_Destroy(chipRBO->surface));
+            chipRBO->surface = gcvNULL;
+        }
 
         if (image->type == KHR_IMAGE_TEXTURE_CUBE && (image->u.texture.face > 0 ))
         {
