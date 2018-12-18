@@ -2271,6 +2271,20 @@ _FillInFeatureTable(
 
     Features[gcvFEATURE_USC_ATOMIC_FIX2] = database->USC_ATOMIC_FIX2;
 
+    /*these chip don't have maxpointSize limit, so need fix */
+    if (((chipModel == gcv880) && (chipRevision == 0x5106))
+     || ((chipModel == gcv2000) && (chipRevision == 0x5108))
+     || ((chipModel == gcv600) && (chipRevision == 0x4653))
+     || ((chipModel == gcv400) && (chipRevision == 0x4645))
+       )
+    {
+        Features[gcvFEATURE_MAX_POINTSIZE_CLAMP] = gcvFALSE;
+    }
+    else
+    {
+        Features[gcvFEATURE_MAX_POINTSIZE_CLAMP] = gcvTRUE;
+    }
+
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
 #endif

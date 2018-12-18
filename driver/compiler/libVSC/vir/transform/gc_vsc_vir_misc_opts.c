@@ -8070,3 +8070,97 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+DEF_QUERY_PASS_PROP(vscVIR_ClampPointSize)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+}
+
+VSC_ErrCode vscVIR_ClampPointSize(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OutputIdList*   pOutputList = VIR_Shader_GetOutputs(pShader);
+    gctUINT             i, outputCount = VIR_IdList_Count(pOutputList);
+    VIR_Symbol*         pPointSizeSym = gcvNULL;
+    VIR_Symbol*         pSym = gcvNULL;
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_SymId           vregSymId = VIR_INVALID_ID;
+
+    /* Check for VS only. */
+    if (!VIR_Shader_IsVS(pShader))
+    {
+        return errCode;
+    }
+
+    /* Have HW fix, skip it. */
+    if (pHwCfg->hwFeatureFlags.hasPointSizeFix)
+    {
+        return errCode;
+    }
+
+    /* Find gl_PointSize. */
+    for (i = 0; i < outputCount; i++)
+    {
+        pSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputList, i));
+
+        if (VIR_Symbol_GetName(pSym) == VIR_NAME_POINT_SIZE)
+        {
+            pPointSizeSym = pSym;
+            break;
+        }
+    }
+
+    /* Not found, just return. */
+    if (pPointSizeSym == gcvNULL)
+    {
+        return errCode;
+    }
+
+    errCode = VIR_Shader_GetVirRegSymByVirRegId(pShader,
+                                                VIR_Symbol_GetVregIndex(pPointSizeSym),
+                                                &vregSymId);
+    ON_ERROR(errCode, "Get vreg symbol.");
+
+    /*
+    ** Insert the clamp instructions:
+    **      PointSize = min(max(PointSize, minPointSize), maxPointSize)
+    */
+    errCode = VIR_Function_AddInstruction(pMainFunc,
+                                          VIR_OP_MAX,
+                                          VIR_TYPE_FLOAT32,
+                                          &pNewInst);
+    ON_ERROR(errCode, "Insert MAX instruction.");
+    pOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+    VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->minPointSize);
+
+    errCode = VIR_Function_AddInstruction(pMainFunc,
+                                          VIR_OP_MIN,
+                                          VIR_TYPE_FLOAT32,
+                                          &pNewInst);
+    ON_ERROR(errCode, "Insert MIN instruction.");
+    pOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+    VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->maxPointSize);
+
+OnError:
+    return errCode;
+}
+

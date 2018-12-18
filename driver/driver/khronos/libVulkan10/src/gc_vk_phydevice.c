@@ -255,6 +255,9 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->maxLocalMemSizeInByte = attribBufSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize = database->RESULT_WINDOW_MAX_SIZE;
 
+    pVscHwCfg->minPointSize = 0.5f;
+    pVscHwCfg->maxPointSize = 128.0f;
+
     /*
     ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
     ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
@@ -348,6 +351,7 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     /* Now LODQ can't return the correct raw LOD value as spec require. */
     pVscHwCfg->hwFeatureFlags.hasLODQFix = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix = database->SH_IMAGE_ENABLE_FIX;
+    pVscHwCfg->hwFeatureFlags.hasPointSizeFix = gcvTRUE;
 
     return;
 }

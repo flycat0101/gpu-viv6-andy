@@ -154,6 +154,8 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasDynamicIdxDepFix    : 1;
         gctUINT          hasLODQFix             : 1;
         gctUINT          hasImageLoadEnableFix  : 1;
+        gctUINT          hasPointSizeFix        : 1;
+        gctUINT          reserved1              : 14;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -169,9 +171,8 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          robustAtomic           : 1;
         gctUINT          newGPIPE               : 1;
         gctUINT          supportImgLDSTCLamp    : 1;
-
         gctUINT          hasUSCAtomicFix2       : 1;
-        gctUINT          reserved               : 1;
+        gctUINT          reserved               : 18;
 
     } hwFeatureFlags;
 
@@ -215,6 +216,8 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxResultCacheWinSize;
     gctUINT              vsSamplerNoBaseInInstruction;
     gctUINT              psSamplerNoBaseInInstruction;
+    gctFLOAT             minPointSize;
+    gctFLOAT             maxPointSize;
 
     /* Caps for workGroupSize. */
     gctUINT              initWorkGroupSizeToCalcRegCount;
