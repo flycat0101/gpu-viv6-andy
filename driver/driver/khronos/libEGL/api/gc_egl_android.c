@@ -1404,10 +1404,13 @@ _CreateVivanteDrmBufferSurface(
     /* Initial lock. */
     gcmONERROR(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
 
-    /* Set y-inverted rendering. */
-    gcmONERROR(gcoSURF_SetFlags(surface,
-                                gcvSURF_FLAG_CONTENT_YINVERTED,
-                                gcvTRUE));
+    /* For EGLImage created surface, do not set y-inverted flag. */
+    if(RenderMode != -1){
+        /* Set y-inverted rendering. */
+        gcmONERROR(gcoSURF_SetFlags(surface,
+                                    gcvSURF_FLAG_CONTENT_YINVERTED,
+                                    gcvTRUE));
+    }
 
     if (RenderMode >= 0)
     {
