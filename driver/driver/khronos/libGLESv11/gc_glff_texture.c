@@ -1558,7 +1558,7 @@ static gceSTATUS _BltMipMap(
     gceSTATUS status;
     gcmHEADER_ARG("Context=0x%x Texture=0x%x MaxLevel=%d", Context, Texture, MaxLevel);
 
-    gcmONERROR(gcoTEXTURE_GenerateMipMap(Texture, 0, MaxLevel));
+    gcmONERROR(gcoTEXTURE_GenerateMipMap(Texture, 0, MaxLevel, gcvFALSE));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;

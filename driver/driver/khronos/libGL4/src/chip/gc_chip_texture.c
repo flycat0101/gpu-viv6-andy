@@ -4506,7 +4506,7 @@ __glChipGenerateMipMap(
             {
                 if (level == *maxLevel)
                 {
-                    gcmONERROR(gcoTEXTURE_GenerateMipMap(texInfo->object, baseLevel, level));
+                    gcmONERROR(gcoTEXTURE_GenerateMipMap(texInfo->object, baseLevel, level, (texObj->params.sampler.sRGB != GL_SKIP_DECODE_EXT)));
                 }
             }
             else
