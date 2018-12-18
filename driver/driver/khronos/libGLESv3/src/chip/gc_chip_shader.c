@@ -9389,6 +9389,12 @@ __glChipBuildTexEnableDim(
             {
                 unit = pgInstance[stage]->extraSamplerMap[sampler].unit;
                 enableDim = pgInstance[stage]->extraSamplerMap[sampler].texDim;
+
+                /* For advanced blend, need to set sampler state dirty for programimg rt texture later */
+                if (pgInstance[stage]->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER)
+                {
+                    __glBitmaskSet(&gc->shaderProgram.samplerStateDirty, sampler);
+                }
                 break;
             }
         }
