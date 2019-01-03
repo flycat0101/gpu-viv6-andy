@@ -1272,6 +1272,15 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         dstFormat = gcvSURF_NV12;
         uStride = dst->stride;
         break;
+      case G2D_NV21:
+        if (srcFormat != gcvSURF_YUY2)
+        {
+            g2d_printf("%s: Invalid src format %d for dst format %d!\n", __FUNCTION__, src->format, dst->format);
+            return -1;
+        }
+        dstFormat = gcvSURF_NV21;
+        uStride = dst->stride;
+        break;
       case G2D_YV12:
         if (srcFormat != gcvSURF_YUY2)
         {
@@ -1290,6 +1299,14 @@ static int g2d_blit_2d(void *handle, struct g2d_surfaceEx *srcEx, struct g2d_sur
         dstFormat = gcvSURF_NV16;
         uStride = dst->stride;
         break;
+      case G2D_NV61:
+        if (srcFormat != gcvSURF_YUY2)
+        {
+            g2d_printf("%s: Invalid src format %d for dst format %d!\n", __FUNCTION__, src->format, dst->format);
+            return -1;
+        }
+        dstFormat = gcvSURF_NV61;
+        uStride = dst->stride;
       default:
         g2d_printf("%s: Invalid dst format %d!\n", __FUNCTION__, dst->format);
         return -1;
