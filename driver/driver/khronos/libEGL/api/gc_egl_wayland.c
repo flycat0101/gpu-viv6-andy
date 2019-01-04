@@ -122,6 +122,39 @@ static pthread_mutex_t egl_window_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 
+static void __wl_swapworkers_done(struct wl_egl_window *window)
+{
+    VEGLDisplay dpy = NULL;
+    VEGLSurface sur = NULL;
+
+    /* Go through dpy list to find EGLSurface for window. */
+    gcoOS_LockPLS();
+    for (dpy = (VEGLDisplay)gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO); dpy != NULL; dpy = dpy->next)
+    {
+        for (sur = (VEGLSurface)dpy->surfaceStack; sur != NULL; sur = (VEGLSurface)sur->resObj.next)
+        {
+            if (sur->hwnd == window)
+            {
+                break;
+            }
+        }
+
+        if (sur)
+        {
+            break;
+        }
+    }
+    gcoOS_UnLockPLS();
+
+
+    /* Make sure all workers have been processed. */
+    if (sur && sur->workerDoneSignal != gcvNULL)
+    {
+        gcoOS_WaitSignal(gcvNULL,
+            sur->workerDoneSignal,
+            gcvINFINITE);
+    }
+}
 static void once_init(void)
 {
     wl_list_init(&egl_window_list);
@@ -2092,6 +2125,8 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
 
     wl_egl_window_unregister(egl_surface->wl_win);
 
+    __wl_swapworkers_done(egl_surface->wl_win);
+
     for (i = 0; i < egl_surface->nr_buffers; i++)
     {
         struct wl_egl_buffer *buffer = &egl_surface->buffers[i];
@@ -2099,11 +2134,24 @@ void wl_egl_surface_destroy(struct wl_egl_surface *egl_surface)
         if (display && buffer->frame_callback)
         {
             int ret = 0;
-
+            int looptimes = 0;
             pthread_mutex_lock(&egl_surface->commit_mutex);
-            while (buffer->frame_callback && buffer->state != BUFFER_STATE_FREE && ret != -1)
+            while (buffer->frame_callback && ret != -1)
             {
                 ret = dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
+                if ( looptimes > 5)
+                {
+                    ret = roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
+                    /* After roundtrip_commit_queue, all messages for commit_queue should be processed */
+                    /* frame_callback should be back and destroied. If still not null, this perhaps means wl_surface has been destroied.*/
+                    if (buffer->frame_callback != 0)
+                    {
+                        wl_callback_destroy(buffer->frame_callback);
+                        buffer->frame_callback = NULL;
+                        break;
+                    }
+                }
+                looptimes++;
             }
             pthread_mutex_unlock(&egl_surface->commit_mutex);
         }
