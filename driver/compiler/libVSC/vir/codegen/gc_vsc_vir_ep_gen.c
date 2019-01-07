@@ -3161,6 +3161,197 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
     return errCode;
 }
 
+static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_PRIV_CONSTANT_ENTRY**     ppTextureSize,
+                                               SHADER_PRIV_CONSTANT_ENTRY**     ppLodMinMax,
+                                               SHADER_PRIV_CONSTANT_ENTRY**     ppLevelsSamples,
+                                               VSC_SHADER_RESOURCE_BINDING*     pBinding,
+                                               SHADER_EXECUTABLE_PROFILE*       pSep)
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    SHADER_PRIV_CONSTANT_ENTRY*     pPrivCnstEntry;
+    gctUINT                         resArraySize;
+    VIR_Symbol*                     pTextureSym;
+    VIR_Type*                       pSymType;
+    gctUINT                         i;
+
+    if (ppTextureSize == gcvNULL && ppLodMinMax == gcvNULL && ppLevelsSamples == gcvNULL)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
+    {
+        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
+
+        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE    ||
+            pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX     ||
+            pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES)
+        {
+            pTextureSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pTextureSym);
+
+            pSymType = VIR_Symbol_GetType(pTextureSym);
+            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pTextureSym) == pBinding->set &&
+                VIR_Symbol_GetBinding(pTextureSym) == pBinding->binding &&
+                resArraySize == pBinding->arraySize)
+            {
+                if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE)
+                {
+                    if (ppTextureSize)
+                    {
+                        *ppTextureSize = pPrivCnstEntry;
+                    }
+                }
+                else if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX)
+                {
+                    if (ppLodMinMax)
+                    {
+                        *ppLodMinMax = pPrivCnstEntry;
+                    }
+                }
+                else
+                {
+                    gcmASSERT(pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES);
+                    if (ppLevelsSamples)
+                    {
+                        *ppLevelsSamples = pPrivCnstEntry;
+                    }
+                }
+            }
+        }
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _AddExtraImageLayer(SHADER_PRIV_UAV_ENTRY**          ppExtraImageLayer,
+                                       VSC_SHADER_RESOURCE_BINDING*     pBinding,
+                                       SHADER_EXECUTABLE_PROFILE*       pSep)
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    SHADER_PRIV_UAV_ENTRY *         pPrivUavEntry;
+    gctUINT                         resArraySize;
+    VIR_Symbol*                     pImageSym;
+    VIR_Type*                       pSymType;
+    gctUINT                         i, firstPrivUavIdxForExtraImgLayer = NOT_ASSIGNED;
+
+    if (ppExtraImageLayer == gcvNULL)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < pSep->staticPrivMapping.privUavMapping.countOfEntries; i ++)
+    {
+        pPrivUavEntry = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
+
+        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER)
+        {
+            pImageSym = (VIR_Symbol*)pPrivUavEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pImageSym);
+
+            pSymType = VIR_Symbol_GetType(pImageSym);
+            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pBinding->set &&
+                VIR_Symbol_GetBinding(pImageSym) == pBinding->binding &&
+                resArraySize == pBinding->arraySize)
+            {
+                if (ppExtraImageLayer)
+                {
+                    if (*ppExtraImageLayer == gcvNULL)
+                    {
+                        *ppExtraImageLayer= pPrivUavEntry;
+                        firstPrivUavIdxForExtraImgLayer = i;
+                    }
+                    else
+                    {
+                        if (pPrivUavEntry->pBuffer->uavSlotIndex -
+                            (*ppExtraImageLayer)->pBuffer->uavSlotIndex !=
+                            (i - firstPrivUavIdxForExtraImgLayer))
+                        {
+                            gcmASSERT(gcvFALSE);
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _AddImageSize(SHADER_PRIV_CONSTANT_ENTRY**   ppImageSize,
+                                 VSC_SHADER_RESOURCE_BINDING*   pBinding,
+                                 SHADER_EXECUTABLE_PROFILE*     pSep)
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    SHADER_PRIV_CONSTANT_ENTRY*     pPrivCnstEntry;
+    gctUINT                         resArraySize;
+    VIR_Symbol*                     pImageSym;
+    VIR_Type*                       pSymType;
+    gctUINT                         i;
+
+    if (ppImageSize == gcvNULL)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
+    {
+        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
+
+        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_IMAGE_SIZE)
+        {
+            pImageSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pImageSym);
+
+            pSymType = VIR_Symbol_GetType(pImageSym);
+            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pBinding->set &&
+                VIR_Symbol_GetBinding(pImageSym) == pBinding->binding &&
+                resArraySize == pBinding->arraySize)
+            {
+                if (ppImageSize)
+                {
+                    *ppImageSize = pPrivCnstEntry;
+                }
+                break;
+            }
+        }
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE* pCombinedSampTexTable,
                                                        VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                        VIR_Shader* pShader,
@@ -3169,10 +3360,6 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_
 {
     PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* pCombTsEntry = gcvNULL;
     gctUINT                                   i, combTsEntryIndex;
-    gctUINT                                   resArraySize;
-    VIR_Symbol*                               pTextureSym;
-    VIR_Type*                                 pSymType;
-    SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
 
     for (i = 0; i < pCombinedSampTexTable->countOfEntries; i ++)
     {
@@ -3219,48 +3406,11 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_
     }
 
     /* Set textureSize/lodMinMax */
-    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
-    {
-        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
-
-        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE    ||
-            pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX     ||
-            pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES)
-        {
-            pTextureSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pTextureSym);
-
-            pSymType = VIR_Symbol_GetType(pTextureSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pTextureSym) == pCombTsEntry->combTsBinding.set &&
-                VIR_Symbol_GetBinding(pTextureSym) == pCombTsEntry->combTsBinding.binding &&
-                resArraySize == pCombTsEntry->combTsBinding.arraySize)
-            {
-                if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE)
-                {
-                    pCombTsEntry->pTextureSize[stageIdx] = pPrivCnstEntry;
-                }
-                else if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LOD_MIN_MAX)
-                {
-                    pCombTsEntry->pLodMinMax[stageIdx] = pPrivCnstEntry;
-                }
-                else
-                {
-                    gcmASSERT(pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_LEVELS_SAMPLES);
-                    pCombTsEntry->pLevelsSamples[stageIdx] = pPrivCnstEntry;
-                }
-            }
-        }
-    }
+    _AddTextureSizeAndLodMinMax(&pCombTsEntry->pTextureSize[stageIdx],
+                                &pCombTsEntry->pLodMinMax[stageIdx],
+                                &pCombTsEntry->pLevelsSamples[stageIdx],
+                                &pCombTsEntry->combTsBinding,
+                                pSep);
 
     return VSC_ERR_NONE;
 }
@@ -3459,10 +3609,7 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(PROG_VK_UNIFORM_TEXEL
                                                            SHADER_EXECUTABLE_PROFILE* pSep)
 {
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
-    gctUINT                                   i, utbEntryIndex, resArraySize;
-    VIR_Symbol*                               pTextureSym;
-    VIR_Type*                                 pSymType;
+    gctUINT                                   i, utbEntryIndex;
 
     for (i = 0; i < pUtbTable->countOfEntries; i ++)
     {
@@ -3486,35 +3633,11 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(PROG_VK_UNIFORM_TEXEL
     pUtbEntry->hwMappings[stageIdx].s.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
 
     /* Set texture size */
-    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
-    {
-        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
-
-        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE)
-        {
-            pTextureSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pTextureSym);
-
-            pSymType = VIR_Symbol_GetType(pTextureSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pTextureSym) == pUtbEntry->utbBinding.set &&
-                VIR_Symbol_GetBinding(pTextureSym) == pUtbEntry->utbBinding.binding &&
-                resArraySize == pUtbEntry->utbBinding.arraySize)
-            {
-                pUtbEntry->pTextureSize[stageIdx] = pPrivCnstEntry;
-                break;
-            }
-        }
-    }
+    _AddTextureSizeAndLodMinMax(&pUtbEntry->pTextureSize[stageIdx],
+                                gcvNULL,
+                                gcvNULL,
+                                &pUtbEntry->utbBinding,
+                                pSep);
 
     _SetResOpBits(pShader, &pUtbEntry->utbBinding, &pUtbEntry->pResOpBits);
 
@@ -3561,13 +3684,9 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
                                                    SHADER_EXECUTABLE_PROFILE* pSep)
 {
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                               i, iaEntryIndex, channel, hwChannel, resArraySize;
-    gctUINT                               firstPrivUavIdxForExtraImgLayer = NOT_ASSIGNED;
+    gctUINT                               i, iaEntryIndex, channel, hwChannel;
     SHADER_CONSTANT_HW_LOCATION_MAPPING*  pHwDirectAddrBase;
-    SHADER_PRIV_CONSTANT_ENTRY*           pPrivCnstEntry;
-    SHADER_PRIV_UAV_ENTRY*                pPrivUavEntry;
-    VIR_Symbol*                           pImageSym;
-    VIR_Type*                             pSymType;
+    gctBOOL                               bIsSampler = gcvFALSE;
 
     for (i = 0; i < pIaTable->countOfEntries; i ++)
     {
@@ -3590,6 +3709,7 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
     if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER)
     {
         pUtbEntry->hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER;
+        bIsSampler = gcvTRUE;
     }
     else
     {
@@ -3609,7 +3729,7 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
     /* Fill direct mem base addr constant reg */
     pHwDirectAddrBase->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
 
-    if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER)
+    if (bIsSampler)
     {
         pUtbEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
 
@@ -3627,80 +3747,14 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
     }
 
     /* Set image size */
-    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
-    {
-        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
-
-        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_IMAGE_SIZE)
-        {
-            pImageSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pImageSym);
-
-            pSymType = VIR_Symbol_GetType(pImageSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pUtbEntry->iaBinding.set &&
-                VIR_Symbol_GetBinding(pImageSym) == pUtbEntry->iaBinding.binding &&
-                resArraySize == pUtbEntry->iaBinding.arraySize)
-            {
-                pUtbEntry->pImageSize[stageIdx] = pPrivCnstEntry;
-                break;
-            }
-        }
-    }
+    _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
+                  &pUtbEntry->iaBinding,
+                  pSep);
 
     /* Extra image layer */
-    for (i = 0; i < pSep->staticPrivMapping.privUavMapping.countOfEntries; i ++)
-    {
-        pPrivUavEntry = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
-
-        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER)
-        {
-            pImageSym = (VIR_Symbol*)pPrivUavEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pImageSym);
-
-            pSymType = VIR_Symbol_GetType(pImageSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pUtbEntry->iaBinding.set &&
-                VIR_Symbol_GetBinding(pImageSym) == pUtbEntry->iaBinding.binding &&
-                resArraySize == pUtbEntry->iaBinding.arraySize)
-            {
-                if (pUtbEntry->pExtraLayer[stageIdx] == gcvNULL)
-                {
-                    pUtbEntry->pExtraLayer[stageIdx] = pPrivUavEntry;
-                    firstPrivUavIdxForExtraImgLayer = i;
-                }
-                else
-                {
-                    if (pPrivUavEntry->pBuffer->uavSlotIndex -
-                        pUtbEntry->pExtraLayer[stageIdx]->pBuffer->uavSlotIndex !=
-                        (i - firstPrivUavIdxForExtraImgLayer))
-                    {
-                        gcmASSERT(gcvFALSE);
-                    }
-                }
-
-                break;
-            }
-        }
-    }
+    _AddExtraImageLayer(&pUtbEntry->pExtraLayer[stageIdx],
+                        &pUtbEntry->iaBinding,
+                        pSep);
 
     return VSC_ERR_NONE;
 }
@@ -3745,13 +3799,8 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(PROG_VK_STORAGE_TABLE* 
                                                          SHADER_EXECUTABLE_PROFILE* pSep)
 {
     PROG_VK_STORAGE_TABLE_ENTRY*         pStorageEntry = gcvNULL;
-    gctUINT                              i, StorageEntryIndex, channel, hwChannel, resArraySize;
-    gctUINT                              firstPrivUavIdxForExtraImgLayer = NOT_ASSIGNED;
+    gctUINT                              i, StorageEntryIndex, channel, hwChannel;
     SHADER_CONSTANT_HW_LOCATION_MAPPING* pHwDirectAddrBase;
-    SHADER_PRIV_CONSTANT_ENTRY*          pPrivCnstEntry;
-    SHADER_PRIV_UAV_ENTRY*               pPrivUavEntry;
-    VIR_Symbol*                          pImageSym;
-    VIR_Type*                            pSymType;
 
     for (i = 0; i < pStorageTable->countOfEntries; i ++)
     {
@@ -3816,80 +3865,14 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(PROG_VK_STORAGE_TABLE* 
     }
 
     /* Set image size */
-    for (i = 0; i < pSep->staticPrivMapping.privConstantMapping.countOfEntries; i ++)
-    {
-        pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
-
-        if (pPrivCnstEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_IMAGE_SIZE)
-        {
-            pImageSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pImageSym);
-
-            pSymType = VIR_Symbol_GetType(pImageSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pStorageEntry->storageBinding.set &&
-                VIR_Symbol_GetBinding(pImageSym) == pStorageEntry->storageBinding.binding &&
-                resArraySize == pStorageEntry->storageBinding.arraySize)
-            {
-                pStorageEntry->pImageSize[stageIdx] = pPrivCnstEntry;
-                break;
-            }
-        }
-    }
+    _AddImageSize(&pStorageEntry->pImageSize[stageIdx],
+                  &pStorageEntry->storageBinding,
+                  pSep);
 
     /* Extra image layer */
-    for (i = 0; i < pSep->staticPrivMapping.privUavMapping.countOfEntries; i ++)
-    {
-        pPrivUavEntry = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
-
-        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_EXTRA_UAV_LAYER)
-        {
-            pImageSym = (VIR_Symbol*)pPrivUavEntry->commonPrivm.pPrivateData;
-
-            gcmASSERT(pImageSym);
-
-            pSymType = VIR_Symbol_GetType(pImageSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
-
-            if (VIR_Symbol_GetDescriptorSet(pImageSym) == pStorageEntry->storageBinding.set &&
-                VIR_Symbol_GetBinding(pImageSym) == pStorageEntry->storageBinding.binding &&
-                resArraySize == pStorageEntry->storageBinding.arraySize)
-            {
-                if (pStorageEntry->pExtraLayer[stageIdx] == gcvNULL)
-                {
-                    pStorageEntry->pExtraLayer[stageIdx] = pPrivUavEntry;
-                    firstPrivUavIdxForExtraImgLayer = i;
-                }
-                else
-                {
-                    if (pPrivUavEntry->pBuffer->uavSlotIndex -
-                        pStorageEntry->pExtraLayer[stageIdx]->pBuffer->uavSlotIndex !=
-                        (i - firstPrivUavIdxForExtraImgLayer))
-                    {
-                        gcmASSERT(gcvFALSE);
-                    }
-                }
-
-                break;
-            }
-        }
-    }
+    _AddExtraImageLayer(&pStorageEntry->pExtraLayer[stageIdx],
+                        &pStorageEntry->storageBinding,
+                        pSep);
 
     return VSC_ERR_NONE;
 }
