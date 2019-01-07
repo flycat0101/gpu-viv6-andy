@@ -344,7 +344,7 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     if(gc->apiVersion >= __GL_API_VERSION_ES30 &&
        (magFilter != GL_NEAREST || (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)))
     {
-        if(texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX &&
+        if(__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) &&
            (GL_UNSIGNED_INT == baseFmtInfo->category ||
             GL_INT == baseFmtInfo->category ||
             GL_R32F == interalFormat ||
@@ -355,7 +355,7 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
             return GL_FALSE;
         }
 
-        if(texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX &&
+        if(__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) &&
            (GL_NONE == compareMode &&
            (GL_DEPTH_COMPONENT16 == interalFormat ||
             GL_DEPTH_COMPONENT24 == interalFormat ||
