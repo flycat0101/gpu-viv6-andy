@@ -68,6 +68,7 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
     vx_status       status    = VX_ERROR_INVALID_PARAMETERS;
 
     objData->objType = type;
+    objData->isVirtual = vx_false_e;
 
     param = vxGetParameterByIndex(node, index);
     if (param == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
@@ -81,6 +82,7 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
             vxQueryImage(image, VX_IMAGE_FORMAT, &objData->u.imageInfo.format, sizeof(vx_df_image));
             vxQueryImage(image, VX_IMAGE_WIDTH, &objData->u.imageInfo.width, sizeof(vx_uint32));
             vxQueryImage(image, VX_IMAGE_HEIGHT, &objData->u.imageInfo.height, sizeof(vx_uint32));
+            objData->isVirtual = image->base.isVirtual;
 
             break;
 
@@ -154,6 +156,7 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
             vxQueryPyramid(pyramid, VX_PYRAMID_FORMAT, &objData->u.pyramidInfo.format, sizeof(vx_df_image));
             vxQueryPyramid(pyramid, VX_PYRAMID_WIDTH, &objData->u.pyramidInfo.width, sizeof(vx_uint32));
             vxQueryPyramid(pyramid, VX_PYRAMID_HEIGHT, &objData->u.pyramidInfo.height, sizeof(vx_uint32));
+            objData->isVirtual = pyramid->base.isVirtual;
             break;
 
         case VX_TYPE_ARRAY:
@@ -161,8 +164,8 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
             if (array == VX_NULL) goto ErrorExit;
 
             vxQueryArray(array, VX_ARRAY_ITEMTYPE, &objData->u.arrayInfo.dataType, sizeof(vx_enum));
-
             vxQueryArray(array, VX_ARRAY_CAPACITY, &objData->u.arrayInfo.capacity, sizeof(vx_size));
+            objData->isVirtual = array->base.isVirtual;
             break;
     }
 
@@ -1771,7 +1774,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateInput(vx_node node, vx_ui
     if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    if (objData.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_PARAMETERS;
+    if ((objData.isVirtual == vx_false_e) && (objData.u.imageInfo.format != VX_DF_IMAGE_U8)) return VX_ERROR_INVALID_PARAMETERS;
 
     return VX_SUCCESS;
 }
@@ -1788,7 +1791,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateOutput(vx_node node, vx_u
     if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objDataDst) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    if (objDataDst.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_PARAMETERS;
+     if ((objDataDst.isVirtual == vx_false_e) && (objDataDst.u.imageInfo.format != VX_DF_IMAGE_U8)) return VX_ERROR_INVALID_PARAMETERS;
 
     vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_U8, objDataSrc.u.imageInfo.width, objDataSrc.u.imageInfo.height, 0);
 
