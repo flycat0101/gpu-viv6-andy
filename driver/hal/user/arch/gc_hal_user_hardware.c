@@ -2120,7 +2120,6 @@ _FillInFeatureTable(
         Features[gcvFEATURE_PE_MULTI_RT_BLEND_ENABLE_CONTROL] = gcvTRUE;
         Features[gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE] = gcvTRUE;
         Features[gcvFEATURE_VERTEX_INST_ID_AS_INTEGER] = gcvTRUE;
-        Features[gcvFEATURE_DUAL_16] = gcvTRUE;
         Features[gcvFEATURE_BRANCH_ON_IMMEDIATE_REG] = gcvTRUE;
         Features[gcvFEATURE_V2_COMPRESSION_Z16_FIX] = gcvTRUE;
         Features[gcvFEATURE_MRT_TILE_STATUS_BUFFER] = gcvTRUE;
@@ -2130,6 +2129,12 @@ _FillInFeatureTable(
         Features[gcvFEATURE_TEX_BASELOD] = gcvTRUE;
         Features[gcvFEATURE_TEX_SEAMLESS_CUBE] = gcvTRUE;
         Features[gcvFEATURE_TEX_ETC2] = gcvTRUE;
+
+        /* Dual16 precision can not meet org.skia.skq requirement */
+        if (Hardware->patchID != gcvPATCH_SKIA_SKQP)
+        {
+            Features[gcvFEATURE_DUAL_16] = gcvTRUE;
+        }
     }
 
     if (chipModel == gcv900 && chipRevision == 0x5250)
@@ -4373,6 +4378,16 @@ gcoHARDWARE_DetectProcess(
             gcvPATCH_OGLES3OQ,
             /* OGLES3Occlusion */
             "\xb0\xb8\xb3\xba\xac\xcc\xb0\x9c\x9c\x93\x8a\x8c\x96\x90\x91",
+            gcvFALSE
+        },
+        {
+            gcvPATCH_SKIA_SKQP,
+#if defined(ANDROID)
+            /* org.skia.skq */
+            "\x90\x8d\x98\xd1\x8c\x94\x96\x9e\xd1\x8c\x94\x8e"
+#else
+            "\x9b\x92",
+#endif
             gcvFALSE
         },
 
