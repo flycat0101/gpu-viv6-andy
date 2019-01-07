@@ -822,24 +822,38 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     __wl_egl_surface_unregister(egl_surface);
     __wl_swapworkers_done(egl_surface->window);
 
+    if (display && egl_surface->frame_callback)
+    {
+        int ret = 0;
+        int looptimes = 0;
+        pthread_mutex_lock(&egl_surface->commit_mutex);
+        while (egl_surface->frame_callback && ret != -1)
+        {
+            ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
+            if ( looptimes > 5)
+            {
+                ret = __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
+                /* After roundtrip_commit_queue, all messages for commit_queue should be processed */
+                /* frame_callback should be back and destroied. If still not null, this perhaps means wl_surface has been destroied.*/
+                if (egl_surface->frame_callback != 0)
+                {
+                    wl_callback_destroy(egl_surface->frame_callback);
+                    egl_surface->frame_callback = NULL;
+                    break;
+                }
+            }
+            looptimes++;
+        }
+        pthread_mutex_unlock(&egl_surface->commit_mutex);
+    }
+
+
     for (i = 0; i < egl_surface->nr_buffers; i++)
     {
         __WLEGLBuffer buffer = &egl_surface->buffers[i];
-
-        if (display && egl_surface->frame_callback)
-        {
-            int ret = 0;
-
-            pthread_mutex_lock(&egl_surface->commit_mutex);
-            while (egl_surface->frame_callback && ret != -1)
-            {
-                ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
-            }
-            pthread_mutex_unlock(&egl_surface->commit_mutex);
-        }
-
         __wl_egl_buffer_destroy(egl_surface, buffer);
     }
+
 
     if (display)
     {
