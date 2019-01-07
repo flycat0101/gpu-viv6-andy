@@ -990,7 +990,8 @@ clLinkProgram(
         }
 
         program->binary = (unsigned char *) binary;
-        clmONERROR(gcSHADER_SaveEx(binary,  gcvNULL,  &binarySize), CL_INVALID_VALUE);
+        binary = gcvNULL;
+        clmONERROR(gcSHADER_SaveEx((gcSHADER)program->binary,  gcvNULL,  &binarySize), CL_INVALID_VALUE);
         program->binarySize = binarySize;
     }
 
@@ -1033,8 +1034,14 @@ OnError:
         if (program->binary)
             gcmVERIFY_OK(gcSHADER_Destroy((gcSHADER)program->binary));
 
+        if (program->referenceCount)
+            gcmVERIFY_OK(gcoOS_AtomDestroy(NULL, program->referenceCount));
+
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, program));
     }
+
+    if (binary)
+        gcmVERIFY_OK(gcSHADER_Destroy((gcSHADER)binary));
 
     if (ErrcodeRet)
     {

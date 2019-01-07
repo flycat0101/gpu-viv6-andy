@@ -3860,6 +3860,7 @@ clSetKernelArg(
     gctINT          status;
     gctBOOL         isLocal, isPrivate, isSampler;
     gctBOOL         acquired = gcvFALSE;
+    gctPOINTER      pointer  = gcvNULL;
 
     gcmHEADER_ARG("Kernel=0x%x ArgIndex=%u ArgSize=%u ArgValue=0x%x",
                   Kernel, ArgIndex, ArgSize, ArgValue);
@@ -3950,7 +3951,6 @@ clSetKernelArg(
 
             {
                 gctUINT32           orgArgNum = 0, binarySize = 0;
-                gctPOINTER          pointer;
                 gctUINT32           i;
                 gcsPROGRAM_STATE    programState = {0};
                 gcSHADER            pgmBinary, kernelBinary;
@@ -3977,6 +3977,7 @@ clSetKernelArg(
                     clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
                 }
                 gcoOS_Free(gcvNULL, pointer);
+                pointer = gcvNULL;
 
                 /* Load kernel binary uniforms with the given kernel name */
                 status = gcSHADER_LoadKernel(kernelBinary, Kernel->name);
@@ -4061,6 +4062,11 @@ clSetKernelArg(
     return CL_SUCCESS;
 
 OnError:
+    if (pointer)
+    {
+        gcoOS_Free(gcvNULL, pointer);
+        pointer = gcvNULL;
+    }
     if (acquired)
     {
         gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Kernel->argMutex));
