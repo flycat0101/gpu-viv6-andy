@@ -20,9 +20,9 @@
 
 #define gcvVERSION_PATCH        4
 
-#define gcvVERSION_BUILD     174315
+#define gcvVERSION_BUILD     190076
 
-#define gcvVERSION_STRING    "6.2.4.p3.174315"
+#define gcvVERSION_STRING    "6.2.4.p4.190076"
 
 #endif /* __gc_hal_version_h_ */
 

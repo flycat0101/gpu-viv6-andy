@@ -61,7 +61,7 @@
 #include "gc_hal_driver.h"
 #include "gc_hal_kernel_mutex.h"
 #include "gc_hal_metadata.h"
-#include "gc_hal_user_buffer.h"
+#include "gc_hal_kernel_buffer.h"
 
 
 #if gcdENABLE_VG

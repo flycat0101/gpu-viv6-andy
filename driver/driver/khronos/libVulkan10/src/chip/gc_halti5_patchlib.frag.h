@@ -1,4 +1,17 @@
-/*Auto created on 2018-12-29 13:54:36*/
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
+/*Auto created on 2018-12-18 16:57:17*/
 static uint8_t gc_halti5_patchlib_frag[] = {
   0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00,
   0x01, 0x00, 0x08, 0x00, 0x01, 0x0F, 0x00, 0x00,
@@ -11641,3 +11654,5 @@ static uint8_t gc_halti5_patchlib_frag[] = {
   0xFE, 0x00, 0x02, 0x00, 0xFE, 0x0E, 0x00, 0x00,
   0x38, 0x00, 0x01, 0x00,
 };
+
+
