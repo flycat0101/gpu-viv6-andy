@@ -1305,6 +1305,20 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
 
             subResource.aspectMask = imageView->createInfo.subresourceRange.aspectMask;
             subResource.mipLevel = imageView->createInfo.subresourceRange.baseMipLevel;
+
+            /* Determine correct aspect mask for depth / stencil clear */
+            if (rdp->attachments[i].stencil_loadClear)
+            {
+                subResource.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+
+                if (rdp->attachments[i].loadClear)
+                    subResource.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+            }
+            else
+            {
+                subResource.aspectMask &= ~VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+
             baseArrayLayer = imageView->createInfo.subresourceRange.baseArrayLayer;
 
             for (il = baseArrayLayer; il < (baseArrayLayer + fb->layers); il++)
