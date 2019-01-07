@@ -724,7 +724,8 @@ VkResult __vk_CommitStateBuffers(
         uint32_t count = bLast ? commitCount : (uint32_t)(__VK_MAX_COMMITS << icommitPool);
 
         __VK_MEMZERO(&iface, sizeof(iface));
-        iface.command = gcvHAL_COMMIT_MUTEX;
+        iface.command = gcvHAL_DEVICE_MUTEX;
+        iface.u.DeviceMutex.isMutexLocked = gcvTRUE;
         /* Call kernel service. */
         __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
@@ -745,7 +746,8 @@ VkResult __vk_CommitStateBuffers(
         }
 
         __VK_MEMZERO(&iface, sizeof(iface));
-        iface.command = gcvHAL_RELEASE_MUTEX;
+        iface.command = gcvHAL_DEVICE_MUTEX;
+        iface.u.DeviceMutex.isMutexLocked = gcvFALSE;
         /* Call kernel service. */
         __VK_ONERROR(__vk_DeviceControl(&iface, 0));
         /* Update commit stamp. */

@@ -241,9 +241,8 @@ typedef enum _gceHAL_COMMAND_CODES
     /* Wait until GPU finishes access to a resource. */
     gcvHAL_WAIT_FENCE,
 
-    /* Commit mutex. */
-    gcvHAL_COMMIT_MUTEX,
-    gcvHAL_RELEASE_MUTEX,
+    /* Mutex Operation. */
+    gcvHAL_DEVICE_MUTEX,
 
 #if gcdDEC_ENABLE_AHB
     gcvHAL_DEC300_READ,
@@ -1377,6 +1376,14 @@ typedef struct _gcsHAL_INTERFACE
             IN gceSURF_TYPE             type;
         }
         BottomHalfUnlockVideoMemory;
+
+        /* gcvHAL_DEVICE_MUTEX: */
+        struct _gcsHAL_DEVICE_MUTEX
+        {
+            /* Lock or Release device mutex. */
+            gctBOOL                     isMutexLocked;
+        }
+        DeviceMutex;
 
         gcsHAL_QUERY_CHIP_OPTIONS QueryChipOptions;
     }
