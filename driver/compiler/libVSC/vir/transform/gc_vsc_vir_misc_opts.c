@@ -7737,9 +7737,8 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
     /* invalid callgraph resource if EXTCALL generated*/
     if (VIR_Shader_HasExtcallAtomic(pShader))
     {
-        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
     }
-
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Generating Atom EXTCALL", pShader, gcvTRUE);

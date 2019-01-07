@@ -6050,7 +6050,6 @@ DEF_QUERY_PASS_PROP(VIR_LinkInternalLibFunc)
 
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_ILF_LINK;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
 VSC_ErrCode
@@ -6114,6 +6113,8 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                                      &libLinkTable,
                                      gcvNULL);
         ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
+        /* invalid callgraph resource if library linked */
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
     }
 
 OnError:
