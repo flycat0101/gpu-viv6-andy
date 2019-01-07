@@ -2996,7 +2996,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FreeDescriptorSets(VkDevice device, VkDes
     }
     for (i = 0; i < count; i++)
     {
-        des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]);
+        __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, pDescriptorSets[i]);
+        des = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
         if (!des || des->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_DESCRIPTORSET))
         {
             result = __VK_ERROR_INVALID_HANDLE;
