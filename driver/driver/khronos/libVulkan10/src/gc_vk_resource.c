@@ -1994,7 +1994,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBuffer(
         buf->memCb = __VK_ALLOCATIONCB;
         if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
         {
-            buf->memReq.size = (gctSIZE_T)pCreateInfo->size + 16;
+            buf->memReq.size = __VK_ALIGN(pCreateInfo->size, 16);
         }
         else
         {
