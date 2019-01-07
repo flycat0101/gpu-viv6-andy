@@ -1656,6 +1656,16 @@ static VSC_ErrCode __SpvReplaceBuiltInName(gcSPV spv, VIR_Shader * virShader, VI
     {
         name = "gl_PrimitiveIDIn";
     }
+    else if (spv->shaderStage == VSC_SHADER_STAGE_PS &&
+        builtIn == SpvBuiltInSampleMask &&
+        virStorageClass == VIR_STORAGE_INPUT)
+    {
+        /* If spirv builtin variable "SampleMask" is input, it will be converted to "gl_SampleMaskIn"
+         * and using special register "GCREG_SH_INSTRUCTION_INDEX_SAMPLE_MASK_IN".
+         * If it is an output, it will be converted to gl_SampleMask.
+         */
+        name = "gl_SampleMaskIn";
+    }
 
     if (!SPV_IS_EMPTY_STRING(name) && gcoOS_StrCmp(name, orgName) != gcvSTATUS_OK)
     {
