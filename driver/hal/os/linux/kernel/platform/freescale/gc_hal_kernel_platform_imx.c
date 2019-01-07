@@ -306,7 +306,7 @@ static struct notifier_block thermal_hot_pm_notifier =
     .notifier_call = thermal_hot_pm_notify,
 };
 
-static ssize_t show_gpu3DMinClock(struct device_driver *dev, char *buf)
+static ssize_t gpu3DMinClock_show(struct device_driver *dev, char *buf)
 {
     gctUINT currentf = 0, minf = 0, maxf = 0;
     gckGALDEVICE galDevice;
@@ -323,7 +323,7 @@ static ssize_t show_gpu3DMinClock(struct device_driver *dev, char *buf)
     return strlen(buf);
 }
 
-static ssize_t update_gpu3DMinClock(struct device_driver *dev, const char *buf, size_t count)
+static ssize_t gpu3DMinClock_store(struct device_driver *dev, const char *buf, size_t count)
 {
 
     gctINT fields;
@@ -344,8 +344,11 @@ static ssize_t update_gpu3DMinClock(struct device_driver *dev, const char *buf, 
 
     return count;
 }
-
-static DRIVER_ATTR(gpu3DMinClock, S_IRUGO | S_IWUSR, show_gpu3DMinClock, update_gpu3DMinClock);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
+static DRIVER_ATTR_RW(gpu3DMinClock);
+#else
+static DRIVER_ATTR(gpu3DMinClock, S_IRUGO | S_IWUSR, gpu3DMinClock_show, gpu3DMinClock_store);
+#endif
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
@@ -425,7 +428,7 @@ struct imx_priv
 static struct imx_priv imxPriv;
 
 #if defined(CONFIG_PM_OPP)
-static ssize_t show_gpu_govern(struct device_driver *dev, char *buf)
+static ssize_t gpu_govern_show(struct device_driver *dev, char *buf)
 {
     struct imx_priv *priv = &imxPriv;
     int i;
@@ -452,7 +455,7 @@ static ssize_t show_gpu_govern(struct device_driver *dev, char *buf)
     return len;
 }
 
-static ssize_t update_gpu_govern(struct device_driver *dev, const char *buf, size_t count)
+static ssize_t gpu_govern_store(struct device_driver *dev, const char *buf, size_t count)
 {
     unsigned long core_freq = 0;
     unsigned long shader_freq = 0;
@@ -492,8 +495,11 @@ static ssize_t update_gpu_govern(struct device_driver *dev, const char *buf, siz
 
     return count;
 }
-
-static DRIVER_ATTR(gpu_mode, S_IRUGO | S_IWUSR, show_gpu_govern, update_gpu_govern);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
+static DRIVER_ATTR_RW(gpu_govern);
+#else
+static DRIVER_ATTR(gpu_mode, S_IRUGO | S_IWUSR, gpu_govern_show, gpu_govern_store);
+#endif
 
 int init_gpu_opp_table(struct device *dev)
 {
@@ -563,7 +569,7 @@ int init_gpu_opp_table(struct device *dev)
 
     if (priv->imx_gpu_govern.num_modes > 0)
     {
-        ret = driver_create_file(dev->driver, &driver_attr_gpu_mode);
+        ret = driver_create_file(dev->driver, &driver_attr_gpu_govern);
         if (ret)
             dev_err(dev, "create gpu_mode attr failed (%d)\n", ret);
     }
@@ -587,7 +593,7 @@ int remove_gpu_opp_table(void)
 
     if (i > 0)
     {
-        driver_remove_file(dev->driver, &driver_attr_gpu_mode);
+        driver_remove_file(dev->driver, &driver_attr_gpu_govern);
     }
 
     return 0;
