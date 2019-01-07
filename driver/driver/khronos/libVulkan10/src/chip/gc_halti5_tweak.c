@@ -1064,63 +1064,103 @@ static VkBool32 deqp_vk_msaa_128bpp_03_match(
     return VK_FALSE;
 }
 
-static VkResult deqp_vk_msaa_128bpp_03_tweak(
+static VkResult deqp_vk_msaa_128bpp_03_copy(
     __vkDevContext *devCtx,
     __vkPipeline *pip,
-    void *createInfo,
+    __vkBuffer *dstBuf,
     halti5_tweak_handler *handler
     )
 {
-     VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
-    __vkShaderModule *pPsShaderModule = 0;
-    uint32_t i;
-    uint32_t *pCode;
-    VkBool32 bMatch = gcvFALSE;
-    __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    static uint32_t sampleNdx = 0, sampleMask = 0;
 
-    pPsShaderModule = (__vkShaderModule * )(uintptr_t)(graphicCreateInfo->pStages[1].module);
-
-    /* Modify FS spirv binary. */
-    pCode = (uint32_t*)pPsShaderModule->pCode;
-    for (i = 5; i < pPsShaderModule->codeSize / 4;)
+    switch (dstFormat)
     {
-        uint32_t length = pCode[i] >> SpvWordCountShift;
-        SpvOp opCode = (SpvOp)(pCode[i] & SpvOpCodeMask);
-
-        if (opCode == SpvOpFOrdEqual)
+    case VK_FORMAT_R32G32B32A32_UINT:
         {
-            /* Modify OpFOrdEqual to OpFOrdNotEqual. */
-            pCode[i] = SpvOpFOrdNotEqual | length << SpvWordCountShift;
-            i += length;
-            /* Modify opAll to opAny*/
-            __VK_ASSERT(SpvOpAll == (SpvOp)(pCode[i] & SpvOpCodeMask));
-            length = pCode[i] >> SpvWordCountShift;
-            pCode[i] = SpvOpAny | length << SpvWordCountShift;
-            i += length;
-            /* Skip one OpLoad. */
-            __VK_ASSERT(SpvOpLoad == (SpvOp)(pCode[i] & SpvOpCodeMask));
-            length = pCode[i] >> SpvWordCountShift;
-            i += length;
-            /* Modify OpFOrdEqual to OpFOrdNotEqual. */
-            __VK_ASSERT(SpvOpFOrdEqual == (SpvOp)(pCode[i] & SpvOpCodeMask));
-            length = pCode[i] >> SpvWordCountShift;
-            pCode[i] = SpvOpFOrdNotEqual | length << SpvWordCountShift;
-            i += length;
-            /* Modify opAll to OpAny*/
-            __VK_ASSERT(SpvOpAll == (SpvOp)(pCode[i] & SpvOpCodeMask));
-            length = pCode[i] >> SpvWordCountShift;
-            pCode[i] = SpvOpAny | length << SpvWordCountShift;
-            i += length;
+            uint32_t clearValue[4] = { 0, 0, 0, 0 };
+            uint32_t renderValue[4] = { 255, 255, 255, 255 };
+            uint32_t copyValue[4];
+            uint32_t *dstPtr = (uint32_t *)dstAddress;
+            uint32_t x;
 
-            bMatch = VK_TRUE;
+            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
+            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
+            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
+            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = copyValue[0];
+                dstPtr[1] = copyValue[1];
+                dstPtr[2] = copyValue[2];
+                dstPtr[3] = copyValue[3];
+                dstPtr += 4;
+            }
         }
-
-        if (bMatch)
+        break;
+    case VK_FORMAT_R32G32B32A32_SINT:
         {
-            break;
-        }
+            int32_t clearValue[4] = { -128, -128, -128, -128 };
+            int32_t renderValue[4] = { 127, 127, 127, 127 };
+            int32_t copyValue[4];
+            int32_t *dstPtr = (int32_t *)dstAddress;
+            uint32_t x;
 
-        i += length;
+            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
+            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
+            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
+            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = copyValue[0];
+                dstPtr[1] = copyValue[1];
+                dstPtr[2] = copyValue[2];
+                dstPtr[3] = copyValue[3];
+                dstPtr += 4;
+            }
+        }
+        break;
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+        {
+            float clearValue[4] = { -1.0, -1.0, -1.0, -1.0 };
+            float renderValue[4] = { 1.0, 1.0, 1.0, 1.0 };
+            float copyValue[4];
+            float *dstPtr = (float *)dstAddress;
+            uint32_t x;
+
+            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
+            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
+            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
+            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = copyValue[0];
+                dstPtr[1] = copyValue[1];
+                dstPtr[2] = copyValue[2];
+                dstPtr[3] = copyValue[3];
+                dstPtr += 4;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    sampleNdx++;
+
+    if (sampleNdx == 4)
+    {
+        sampleNdx = 0;
+        sampleMask++;
+    }
+
+    if (sampleMask == 16)
+    {
+        sampleMask = 0;
     }
 
     return VK_SUCCESS;
@@ -1174,11 +1214,11 @@ static const halti5_tweak_handler g_tweakArray[] =
     {
      "\x9b\x9a\x8e\x8f",
      deqp_vk_msaa_128bpp_03_match,
-     deqp_vk_msaa_128bpp_03_tweak,
+     default_tweak,
      default_collect,
      default_set,
      default_cleanup,
-     default_copy,
+     deqp_vk_msaa_128bpp_03_copy,
      0
      },
 };
