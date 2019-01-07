@@ -1111,6 +1111,12 @@ static VkResult __vki_InitializePhysicalDevice(
                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
+    /*report 32MB heap size for vulkan cts*/
+    if (phyDev->pInst->patchID == gcvPATCH_DEQP)
+    {
+        phyDev->phyDevMemProp.memoryHeaps[0].size = 0x2000000;
+    }
+
     /* Initialize VkPhysicalDeviceQueueProperties here */
 
     /* Only support general queue at this moment */
