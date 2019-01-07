@@ -29371,12 +29371,34 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                                               &rightParameters.rOperands[0],
                                               intermROperand));
         clsIOPERAND_Initialize(Compiler, intermIOperand, intermROperand->dataType, intermROperand->u.reg.regIndex);
-        /* Generate the assign code */
-        gcmONERROR(clGenAssignCode(Compiler,
-                       BinaryExpr->exprBase.base.lineNo,
-                       BinaryExpr->exprBase.base.stringNo,
-                       leftParameters.lOperands,
-                       intermROperand));
+
+        if(leftParameters.hint & clvGEN_DEREF_CODE) {
+           gcmONERROR(clGenStoreCode(Compiler,
+                                     BinaryExpr->exprBase.base.lineNo,
+                                     BinaryExpr->exprBase.base.stringNo,
+                                     intermROperand,
+                                     leftParameters.lOperands,
+                                     leftParameters.dataTypes[0].def,
+                                     scaledIndex));
+            }
+        else if(leftParameters.hint & clvGEN_DEREF_STRUCT_CODE) {
+           gcmONERROR(clGenStoreCode(Compiler,
+                                         BinaryExpr->exprBase.base.lineNo,
+                                         BinaryExpr->exprBase.base.stringNo,
+                                         intermROperand,
+                                         leftParameters.lOperands,
+                                         leftParameters.dataTypes[0].def,
+                                         leftParameters.elementIndex));
+        }
+        else {
+           /* Generate the assign code */
+           gcmONERROR(clGenAssignCode(Compiler,
+                          BinaryExpr->exprBase.base.lineNo,
+                          BinaryExpr->exprBase.base.stringNo,
+                          leftParameters.lOperands,
+                          intermROperand));
+        }
+
         if (Parameters->needROperand) {
             Parameters->rOperands[0] = *intermROperand;
             if (Parameters->hasIOperand) {
