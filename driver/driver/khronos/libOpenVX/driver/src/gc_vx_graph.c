@@ -1920,6 +1920,7 @@ VX_PRIVATE_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph)
     return VX_SUCCESS;
 }
 
+#if gcdVX_OPTIMIZER || !PRE_SORT
 VX_PRIVATE_API void vxCopyNodeIndexTable(
         vx_uint32 srcNodeIndexTable[VX_MAX_NODE_COUNT], vx_uint32 srcNodeCount,
         OUT vx_uint32 destNodeIndexTable[VX_MAX_NODE_COUNT], OUT vx_uint32_ptr destNodeCountPtr)
@@ -1933,6 +1934,7 @@ VX_PRIVATE_API void vxCopyNodeIndexTable(
 
     *destNodeCountPtr = srcNodeCount;
 }
+#endif
 
 #if gcdVX_OPTIMIZER
 VX_PRIVATE_API vx_status vxoGraph_Flatten(vx_graph graph)

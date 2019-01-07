@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-#ifdef __QNXNTO__
+#if (defined(__QNXNTO__) || defined(LINUX))
 #include <ctype.h>
 #endif
 #include <gc_vx_common.h>

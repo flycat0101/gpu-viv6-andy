@@ -23,7 +23,7 @@
 #include <gc_vx_internal_node_api.h>
 #include <gc_vx_nn_util.h>
 #include "gc_hal_types.h"
-#include "anchors.h"
+/*#include "anchors.h"*/
 
 #define TP_FC_DUMP_WEIGHTS_BIASES   0
 #define TP_FC_DUMP_INPUTS           0
@@ -453,7 +453,11 @@ VX_API_ENTRY vx_uint32* VX_API_CALL vxWeightsBiasesParameterToStream(
         checkSize = (vx_uint32)((vx_uint8*)kernelBufferPtr - (vx_uint8*)base) + (vx_uint32)weights_biases_parameter->memory_size;
     }
 
-    vxmASSERT(checkSize == bufferSize);
+    if (checkSize != bufferSize)
+    {
+        vxmASSERT(0);
+    }
+
     *weights_biases_stream_size = bufferSize;
     return base;
 }
@@ -2138,7 +2142,7 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
     vx_uint32 numOfImageTileX, numOfImageTileY;
     vx_uint32 distSize;
     vx_uint32 stride;
-    vx_uint32 input_width, input_height, input_z, input_b;
+    vx_uint32 input_width, input_height, input_z;
     vx_uint32 i, j, x, y, z;
     vx_uint32 outTileX, outTileY;
     vx_uint8_ptr temp_buffer = VX_NULL;
@@ -2166,7 +2170,6 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
         input_height = TENSOR_SIZE_INDEX(inputs, 1);
         input_z = TENSOR_SIZE_INDEX(inputs, 2);
     }
-    input_b = TENSOR_SIZE_INDEX(inputs, 3);
 
     stride = brickModeOperation->stride;
 
@@ -2929,7 +2932,7 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
     gctPOINTER inputsBaseLogicalAddr = VX_NULL;
     gctPOINTER outputsBaseLogicalAddr = VX_NULL;
 
-    vx_int32 inputs_width, inputs_height, depth, outputs_width, outputs_height, out_w, out_h;
+    vx_int32 inputs_width, inputs_height, depth, outputs_width, out_w, out_h;
     vx_uint32 stride;
     vx_int32 type;
 
@@ -2940,7 +2943,6 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
     inputs_height  = TENSOR_SIZE_INDEX(inputs, 1);
     depth          = TENSOR_SIZE_INDEX(inputs, 2);
     outputs_width  = TENSOR_SIZE_INDEX(outputs, 0);
-    outputs_height = TENSOR_SIZE_INDEX(outputs, 1);
 
     switch (poolType_v)
     {
@@ -2985,7 +2987,7 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
                              outputs->tensorBuffer->fixedPointPos,
                              outputs->tensorBuffer->roundingMode,
                              (vx_type_e)outputs->tensorBuffer->dataFormat);
-    gcmASSERT((out_w == outputs_width) && (out_h == outputs_height));
+    gcmASSERT((out_w == outputs_width) && (out_h == (vx_int32)TENSOR_SIZE_INDEX(outputs, 1)));
 
     return status;
 
@@ -5849,105 +5851,6 @@ vx_status vxnneExecuteSWEltwise(struct _vxnne_operation_s *operation)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NNTensorEltwise(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-    return vxnneLayer_Execute(node->layer);
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_ValidateInput(vx_node node, vx_uint32 index)
-{
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
-{
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
-{
-   vx_status  status  = VX_SUCCESS;
-
-    vx_tensor input1   = (vx_tensor)parameters[0];
-    vx_tensor input2   = (vx_tensor)parameters[1];
-    vx_scalar scale = NULL;
-    vx_scalar overflow = (vx_scalar)parameters[2];
-    vx_scalar rounding = NULL;
-    vx_tensor output   = (vx_tensor)parameters[3];
-    vx_enum kernel     = node->kernel->enumeration;
-    vxnne_eltwise_layer eltwiseLayer = {0};
-    vxnne_eltwise_sw_operation_s * operation = VX_NULL;
-
-    if (kernel == VX_KERNEL_NN_TENSOR_MUL)
-    {
-        scale = (vx_scalar)parameters[2];
-        overflow = (vx_scalar)parameters[3];
-        rounding = (vx_scalar)parameters[4];
-        output   = (vx_tensor)parameters[5];
-    }
-
-    /* destroy the existing layer */
-    if (node->layer)
-    {
-        vxnneLayer_Free(node->layer);
-        node->layer = VX_NULL;
-    }
-
-    gcoOS_Allocate(gcvNULL, sizeof(vxnne_eltwise_layer_s), (gctPOINTER*)&eltwiseLayer);
-    if (!eltwiseLayer)
-    {
-        status = VX_ERROR_NO_MEMORY;
-        gcmPRINT("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
-        goto exit;
-    }
-
-    gcoOS_ZeroMemory(eltwiseLayer, sizeof(vxnne_eltwise_layer_s));
-
-    eltwiseLayer->base.name                  = "eltwiseLayer";
-    eltwiseLayer->base.node                  = node;
-    eltwiseLayer->base.operations            = eltwiseLayer->operations;
-
-    eltwiseLayer->base.num_temp_tensors      = 0;
-
-    eltwiseLayer->base.dump                  = VX_NULL;
-    eltwiseLayer->base.deinitialize          = vxnneLayer_Deinitialize;
-
-    operation = &eltwiseLayer->eltwise_operation;
-
-    operation->base.layer         = &eltwiseLayer->base;
-    operation->base.target        = VXNNE_OPERATION_TARGET_SW;
-    operation->base.operatorType = VXNNE_OPERATOR_ACTIVATION;
-    operation->base.execute       = vxnneExecuteSWEltwise;
-    operation->base.deinitialize  = VX_NULL;
-    operation->base.dump          = VX_NULL;
-
-    eltwiseLayer->base.num_operations    = 1;
-    eltwiseLayer->operations[0] = (vxnne_operation)&eltwiseLayer->eltwise_operation;
-
-    operation->kernel           = node->kernel->enumeration;
-    operation->input1           = input1;
-    operation->input2           = input2;
-    operation->scale            = scale;
-    operation->overflow         = overflow;
-    operation->rounding         = rounding;
-    operation->output           = output;
-
-    node->layer = &eltwiseLayer->base;
-
-exit:
-    return status;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-    if (node->layer)
-    {
-        vxnneLayer_Free(node->layer);
-    }
-    return VX_SUCCESS;
-}
-
-
 vx_status vxnneExecuteSWTensorAdd(vxnne_operation operation)
 {
     vxnne_tensor_add_operation eltwiseOperation   = (vxnne_tensor_add_operation)operation;
@@ -8704,10 +8607,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                           deconvolutionLayer->operations,
                          VX_NULL);
     {
-       int input_size[6],output_size[6],group_size;
+       int input_size[6],output_size[6];
        status |= vxQueryTensor((vx_tensor)inputs, VX_TENSOR_DIMS, input_size, sizeof(input_size));
        status |= vxQueryTensor((vx_tensor)outputs, VX_TENSOR_DIMS, output_size, sizeof(input_size));
-        group_size = group->value->u32;
        enable_gpu = (vx_bool)(input_size[0]  == 10
                     &&input_size[1]  == 8
                     &&output_size[0] == 20

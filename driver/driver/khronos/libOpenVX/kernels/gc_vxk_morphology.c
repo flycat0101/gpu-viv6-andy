@@ -1072,6 +1072,7 @@ float fast4throot(float x)
 /* merge from Wei-Lun's check in on projects_nn_vx branch, maybe it only works for AlexNet. need test for other cnn case */
 //#include <stdio.h>
 /* Input buffer and output buffer can be the same buffer. */
+#if !VX_SHADER_TP
 VX_PRIVATE_API vx_status VX_CALLBACK vxCrossChannelLRNLayer(
     vx_array inputBuffer,
     vx_array outputBuffer,
@@ -1194,7 +1195,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxCrossChannelLRNLayer(
 
     return VX_SUCCESS;
 }
-
+#endif
 vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height, vx_scalar _depth, vx_scalar batch, vx_scalar type,
                 vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar sf, vx_scalar ap, vx_scalar bt, vx_array dst)
 {

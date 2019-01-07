@@ -139,7 +139,10 @@ vx_status vxScharr3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gr
     vx_uint32 bin[4] = {0, 0, 0, 0};
     vx_uint32 width = 0, height = 0;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
-    vx_border_t bordermode = { VX_BORDER_UNDEFINED, 0 };
+    vx_border_t bordermode;
+
+    INITIALIZE_STRUCT(bordermode);
+    bordermode.mode = VX_BORDER_UNDEFINED;
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)

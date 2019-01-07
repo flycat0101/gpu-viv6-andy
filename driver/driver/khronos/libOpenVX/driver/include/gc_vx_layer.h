@@ -689,7 +689,7 @@ vxnne_tensor_rpn_operation_s, *vxnne_tensor_rpn_operation;
 typedef struct _vxnne_tensor_rpn_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[4];
+    vxnne_operation                                 operations[5];
     vxnne_tensor_rpn_operation_s                    tensorRpnSW;
     vxnne_tensor_rpn_softmax_operation_s            tensorRpnSoftmaxSW;
     vxnne_tensor_rpn_regression_operation_s         tensorRpnRegressionSW;

@@ -943,6 +943,17 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
                 }
             }
             break;
+
+        case GC_VX_CONTEXT_OBJECT_IMAGE_INPUT:
+        case GC_VX_CONTEXT_OBJECT_DISTRIBUTION:
+        case GC_VX_CONTEXT_OBJECT_REMAP:
+        case GC_VX_CONTEXT_OBJECT_LUT:
+        case GC_VX_CONTEXT_OBJECT_SCALAR:
+        case GC_VX_CONTEXT_OBJECT_ARRAY:
+           break;
+
+        default:
+            break;
         }
     }
 

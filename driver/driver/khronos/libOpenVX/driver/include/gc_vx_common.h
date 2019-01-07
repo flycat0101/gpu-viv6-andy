@@ -2149,5 +2149,9 @@ EXTERN_C_BEGIN
 
 EXTERN_C_END
 
+#define INITIALIZE_STRUCT(values) {\
+        memset((void*)&(values), 0, sizeof((values)));\
+}
+
 #endif /* __GC_VX_COMMON_H__ */
 

@@ -97,32 +97,6 @@ char VXC_HorzMax3_Evis2[] =
         VXC_HorzMax3(dst, src0, info);\\\n\
     } while (0)\n"
 };
-
-static vx_uint16 Fp32toFp16(vx_float32 in)
-{
-    vx_uint32 fp32 = *((vx_uint32 *) &in);
-    vx_uint32 t1 = (fp32 & 0x80000000u) >> 16;  /* sign bit. */
-    vx_uint32 t2 = (fp32 & 0x7F800000u) >> 13;  /* Exponent bits */
-    vx_uint32 t3 = (fp32 & 0x007FE000u) >> 13;  /* Mantissa bits, no rounding */
-    vx_uint32 fp16 = 0u;
-
-    if (t2 >= 0x023c00u)
-    {
-        fp16 = t1 | 0x7BFF;     /* Don't round to infinity. */
-    }
-    else if (t2 <= 0x01c000u)
-    {
-        fp16 = t1;
-    }
-    else
-    {
-        t2 -= 0x01c000u;
-        fp16 = t1 | t2 | t3;
-    }
-
-    return (vx_uint16) fp16;
-}
-
 /********vxcBatchNormalization****************************************************/
 vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     vx_context              context,
@@ -6403,37 +6377,6 @@ error:
     return VX_NULL;
 }
 
-
-static vx_char * LoadSources(vx_char *filename, vx_size *programSize)
-{
-    FILE *pFile = NULL;
-    vx_char *programSource = NULL;
-
-    if (!programSize) return NULL;
-
-    pFile = fopen(filename, "rb");
-
-    if (pFile)
-    {
-        vx_int32 size = 0;
-        /* obtain file size:*/
-        fseek(pFile, 0, SEEK_END);
-        *programSize = ftell(pFile);
-        rewind(pFile);
-
-        size = (int)(*programSize + 1);
-        programSource = (char*)malloc(sizeof(char)*(size));
-        if (programSource)
-        {
-            fread(programSource, sizeof(char), *programSize, pFile);
-            programSource[*programSize] = '\0';
-        }
-
-        fclose(pFile);
-    }
-
-    return programSource;
-}
 /********vxcLrn****************************************************/
 vxnne_shader_executable vxnneGetNormalizationShaderExecutable(
     vx_context              context,
@@ -7264,8 +7207,8 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_image     imgInput          = NULL;
     vx_image     imgOutput         = NULL;
     vx_int8      srcFixPointPos    = input->tensorBuffer->fixedPointPos;
-    vx_int8      dstFixPointPos    = output->tensorBuffer->fixedPointPos;
-    vx_float32   scaleOut          = 1.0f;
+    /*vx_int8      dstFixPointPos    = output->tensorBuffer->fixedPointPos;
+    vx_float32   scaleOut          = 1.0f;*/
     vx_float32   scaleIn           = 1.0f;
     vx_uint32    inputWidth        = depth / 4 * 4;
     vx_uint32    inputWidthRemain4 = depth % 4;
@@ -7291,7 +7234,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         }
     }
 
-    if (outputFormat == VX_TYPE_INT8)
+    /*if (outputFormat == VX_TYPE_INT8)
     {
         if (dstFixPointPos >= 0)
         {
@@ -7301,7 +7244,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         {
             scaleOut = 1.0f / (vx_float32) (1 << -dstFixPointPos);
         }
-    }
+    }*/
 
     borderMode->mode = VX_BORDER_REPLICATE;
     if (inputFormat == VX_TYPE_INT8)

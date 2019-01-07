@@ -26,7 +26,7 @@
 vx_status vxnneExecuteSWConcatIndefinite(struct _vxnne_operation_s *operation)
 {
     vx_tensor *input,output;
-    vx_uint32 num,axis;
+    vx_uint32 num;
 
     vx_uint32 i,j;
     vx_uint32 inputSize,outputSize,totalSize,outElementSize;
@@ -44,7 +44,6 @@ vx_status vxnneExecuteSWConcatIndefinite(struct _vxnne_operation_s *operation)
     input    = (vx_tensor *)concatOperation->inputs;
     output   = (vx_tensor)concatOperation->outputs;
     num      = (vx_uint32)concatOperation->num;
-    axis     = (vx_uint32)concatOperation->axis;
 
     vxoTensor_GetTensorViewMemory(output, &outLogical, VX_NULL);
     vxoTensor_GetTensorElementCount(output, &outputCount);

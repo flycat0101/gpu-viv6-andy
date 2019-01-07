@@ -4665,7 +4665,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxN(vx_node node, co
     vx_scalar winScalar      = VX_NULL;
     vx_image grad_x          = VX_NULL;
     vx_image grad_y          = VX_NULL;
-    vx_border_t borders      = {VX_BORDER_UNDEFINED, 0};;
+    vx_border_t borders;
+
+    INITIALIZE_STRUCT(borders);
+    borders.mode = VX_BORDER_UNDEFINED;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -4689,7 +4692,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxNF16(vx_node node,
     vx_scalar shiftScalar      = VX_NULL;
     vx_image grad_x          = VX_NULL;
     vx_image grad_y          = VX_NULL;
-    vx_border_t borders      = {VX_BORDER_UNDEFINED, 0};;
+    vx_border_t borders;
+
+    INITIALIZE_STRUCT(borders);
+    borders.mode = VX_BORDER_UNDEFINED;
 
     if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -4777,7 +4783,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node,
     vx_scalar        blocks   = VX_NULL;
     vx_scalar        shift    = VX_NULL;
     vx_image         dstImage = VX_NULL;
-    vx_border_t      borders  = {VX_BORDER_UNDEFINED, 0};
+    vx_border_t      borders;
+
+    INITIALIZE_STRUCT(borders);
+    borders.mode = VX_BORDER_UNDEFINED;
 
     if (num != 7) return VX_ERROR_INVALID_PARAMETERS;
 
