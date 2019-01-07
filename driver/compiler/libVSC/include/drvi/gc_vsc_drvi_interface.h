@@ -31,9 +31,10 @@
 /* 0.0.1.6 add imageFetch for sampler, Nov. 2, 2018 */
 /* 0.0.1.7 modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
 /* 0.0.1.8 save the UBO symbol ID for the baseAddress on 11/28/2018 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 8)
+/* 0.0.1.9 using HALTI5 trig functions for all cases (not just conformance) on 12/3/2018 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 9)
 
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 8)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 9)
 
 #define gcdSUPPORT_COMPUTE_SHADER   1
 #define gcdSUPPORT_TESS_GS_SHADER   1

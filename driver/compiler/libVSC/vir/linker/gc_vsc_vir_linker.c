@@ -674,6 +674,9 @@ _CreateIntrinsicLib(
                     __LL_LIB_LENGTH__, gcLibFMA_Func_fmaSupported);
 
             gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti5_fmaSupported);
+
+            gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
 
             gcoOS_StrCatSafe(sloBuiltinSource,
@@ -685,6 +688,25 @@ _CreateIntrinsicLib(
             {
                 gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, BuiltinLib_Reflect_fmaSupported[i]);
+            }
+        }
+        else if (pHwCfg->hwFeatureFlags.hasHalti5)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti5);
+
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti5);
+
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti5);
+
+            /* Use normal MAD to implement reflect. */
+            stringNum = sizeof(BuiltinLib_Reflect) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, BuiltinLib_Reflect[i]);
             }
         }
         else

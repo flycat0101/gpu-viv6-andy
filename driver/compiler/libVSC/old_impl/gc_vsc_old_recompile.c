@@ -14482,7 +14482,7 @@ gcSHADER_InitBuiltinLibrary(
             }
         }
 
-        if (fmaSupported && isHalti5 && isAppConformance(patchId))
+        if (fmaSupported && isHalti5)
         {
             gcoOS_StrCatSafe(*sloBuiltinSource,
                 __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
@@ -14491,7 +14491,7 @@ gcSHADER_InitBuiltinLibrary(
             gcoOS_StrCatSafe(*sloBuiltinSource,
                 __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti5_fmaSupported);
         }
-        else if (isHalti5 && isAppConformance(patchId))
+        else if (isHalti5)
         {
             gcoOS_StrCatSafe(*sloBuiltinSource,
                 __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5);

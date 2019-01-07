@@ -106,10 +106,11 @@ BEGIN_EXTERN_C()
 
 /* bump up version to 1.24 for adding output's shader mode on 10/10/2018 */
 /* bump up version to 1.25 for modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
+/* bump up version to 1.26 for using HALTI5 trig functions for all cases (not just conformance) on 12/3/2018 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 25)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 25)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 26)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 26)
 
 typedef union _gcsValue
 {
