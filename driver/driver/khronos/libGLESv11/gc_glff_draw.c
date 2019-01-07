@@ -1163,7 +1163,7 @@ gctBOOL _computeWlimitByData(
 
         /* Get Value */
 
-        if((((gcmPTR2SIZE(vertexPtTmp)) & 3) == 0))
+        if((((gcmPTR2INT(vertexPtTmp)) & 3) == 0))
         {
             for(j=0; j < component; j++)
             {
@@ -2392,7 +2392,7 @@ _PatchIndex(
     if (boundIndex)
     {
         if (boundIndex->index == gcvNULL ||
-            ((gcmPTR2SIZE(Indices) + Count * elementSize) > (gctSIZE_T)boundIndex->size))
+            ((gcmPTR2INT(Indices) + Count * elementSize) > (gctSIZE_T)boundIndex->size))
         {
             return GL_FALSE;
         }
@@ -2416,9 +2416,9 @@ _PatchIndex(
         }
 
         /* Make sure the offset must be aligned to elementSize. */
-        gcmASSERT(gcmPTR2SIZE(Indices) % elementSize == 0);
+        gcmASSERT(gcmPTR2INT(Indices) % elementSize == 0);
 
-        oddOffset = (gcmPTR2SIZE(Indices) / elementSize) % 2 ? gcvTRUE : gcvFALSE;
+        oddOffset = (gcmPTR2INT(Indices) / elementSize) % 2 ? gcvTRUE : gcvFALSE;
         targetIndex = oddOffset ? &boundIndex->listIndexOdd : &boundIndex->listIndexEven;
 
         if(targetIndex == gcvNULL)
@@ -2428,7 +2428,7 @@ _PatchIndex(
 
         if (*targetIndex)
         {
-            *patchedIndices = (GLubyte * )(3 * (gcmPTR2SIZE(Indices) - (oddOffset ? elementSize : 0)));
+            *patchedIndices = (GLubyte * )(3 * (gcmPTR2INT(Indices) - (oddOffset ? elementSize : 0)));
             *patchedMode    = GL_TRIANGLES;
             *patchedCount   = (Count - 2) * 3;
             *patchedIndex   = *targetIndex;
@@ -2523,7 +2523,7 @@ _PatchIndex(
     {
         gcoINDEX_Upload(*targetIndex, indices, triangles * 3 * elementSize);
 
-        *patchedIndices = (GLubyte*)(3 * (gcmPTR2SIZE(Indices) - (oddOffset ? elementSize : 0)));
+        *patchedIndices = (GLubyte*)(3 * (gcmPTR2INT(Indices) - (oddOffset ? elementSize : 0)));
         *patchedIndex   = *targetIndex;
 
         gcmVERIFY_OK(gcoOS_Free(Context->os, indices));

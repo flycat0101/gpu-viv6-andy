@@ -353,7 +353,7 @@ extern "C" {
             : (Value)
 
 #define vgmIS_MISSALIGNED(Pointer, Alignment) \
-    ((gcmPTR2SIZE(Pointer) & ((Alignment) - 1)) != 0)
+    ((gcmPTR2INT(Pointer) & ((Alignment) - 1)) != 0)
 
 #define vgmIS_INVALID_PTR(Pointer, Alignment) \
     (((Pointer) == gcvNULL) || vgmIS_MISSALIGNED(Pointer, Alignment))

@@ -2052,9 +2052,9 @@ VG_API_CALL void VG_API_ENTRY vgModifyPathCoords(
             break;
         }
 
-        if ((dstPath->datatype == VG_PATH_DATATYPE_S_16 && ((gcmPTR2SIZE(PathData))&1)) ||
-            (dstPath->datatype == VG_PATH_DATATYPE_S_32 && ((gcmPTR2SIZE(PathData))&3)) ||
-            (dstPath->datatype == VG_PATH_DATATYPE_F && ((gcmPTR2SIZE(PathData))&3)))
+        if ((dstPath->datatype == VG_PATH_DATATYPE_S_16 && ((gcmPTR2INT(PathData))&1)) ||
+            (dstPath->datatype == VG_PATH_DATATYPE_S_32 && ((gcmPTR2INT(PathData))&3)) ||
+            (dstPath->datatype == VG_PATH_DATATYPE_F && ((gcmPTR2INT(PathData))&3)))
         {
             vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
             break;

@@ -52,7 +52,7 @@ computeWLimit(gctFLOAT_PTR Logical,
     upLimit = WLimitCount;
     upLimit = upLimit > WCLIP_DATA_LIMIT ? WCLIP_DATA_LIMIT : upLimit;
 
-    if((((gcmPTR2SIZE(Logical)) & 3) == 0) && ((StrideInBytes & 3) == 0 ))
+    if((((gcmPTR2INT(Logical)) & 3) == 0) && ((StrideInBytes & 3) == 0 ))
     {
         /* Initialize bbox to first entry. */
         for (j = 0; j < Components; j++)
@@ -1791,7 +1791,7 @@ _findStream(
     stream = gcvNULL;
     if (VertexPtr->enable)
     {
-        gctSIZE_T attribOffset = gcmPTR2SIZE(VertexPtr->pointer);
+        gctSIZE_T attribOffset = gcmPTR2INT(VertexPtr->pointer);
 
         for (stream = Streams; stream != gcvNULL; stream = stream->next)
         {
@@ -2290,7 +2290,7 @@ gcoVERTEXARRAY_StreamBind(
                 attrPtr->linkage    = vertexPtr->linkage;
                 attrPtr->size       = vertexPtr->size;
                 attrPtr->normalized = vertexPtr->normalized;
-                attrPtr->offset     = gcmPTR2SIZE(vertexPtr->pointer);
+                attrPtr->offset     = gcmPTR2INT(vertexPtr->pointer);
                 attrPtr->enabled    = gcvTRUE;
 #if gcdUSE_WCLIP_PATCH
                 attrPtr->isPosition = vertexPtr->isPosition;

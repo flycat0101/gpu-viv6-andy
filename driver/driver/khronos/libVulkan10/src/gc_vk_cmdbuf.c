@@ -67,7 +67,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateCommandPool(
     result = __vk_CreateObject(devCtx, __VK_OBJECT_COMMAND_POOL, sizeof(__vkCommandPool), (__vkObject**)&cdp);
     if (result == VK_SUCCESS)
     {
-        cdp->threadId = (uint32_t)gcmPTR2SIZE(gcoOS_GetCurrentThreadID());
+        cdp->threadId = (uint32_t)gcmPTR2INT(gcoOS_GetCurrentThreadID());
         cdp->queueFamilyIndex = pCreateInfo->queueFamilyIndex;
         cdp->memCb = __VK_ALLOCATIONCB;
         cdp->flags = pCreateInfo->flags;
@@ -451,7 +451,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_BeginCommandBuffer(
 #if !__VK_NEW_DEVICE_QUEUE
     VkResult result = VK_SUCCESS;
 
-    cmd->threadId = (uint32_t)gcmPTR2SIZE(gcoOS_GetCurrentThreadID());;
+    cmd->threadId = (uint32_t)gcmPTR2INT(gcoOS_GetCurrentThreadID());;
 
     /* There can be different threads within a device context so set the current HW type */
     if (cmd->threadId != devCtx->threadId)

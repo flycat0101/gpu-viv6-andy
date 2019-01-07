@@ -381,7 +381,7 @@ gceSTATUS vgfObjectCacheInsert(
     objectList->head[index] = Object;
 
     /* Update the object handle tracking variables. */
-    handle = gcmPTR2SIZE(Object);
+    handle = gcmPTR2INT(Object);
 
     if (handle < objectCache->loHandle)
     {
@@ -506,7 +506,7 @@ VGboolean vgfVerifyObject(
         gctUINT32 index;
 
         /* Cast to handle. */
-        handle = gcmPTR2SIZE(Object);
+        handle = gcmPTR2INT(Object);
 
         /* Get the cache pointer. */
         objectCache = Context->objectCache;

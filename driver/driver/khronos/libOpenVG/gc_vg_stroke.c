@@ -1179,7 +1179,7 @@ OnError:
 }
 
 #define vgmGETINCREMENT(Pointer, DatatypeSize) \
-    (DatatypeSize - (gcmPTR2SIZE(Pointer) & (DatatypeSize - 1)))
+    (DatatypeSize - (gcmPTR2INT(Pointer) & (DatatypeSize - 1)))
 
 #define vgmSKIPTODATA(Pointer, DatatypeSize, SIZE) \
     /* Determine the increment value. */ \

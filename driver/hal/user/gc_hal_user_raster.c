@@ -7910,8 +7910,8 @@ gco2D_MonoBlitEx(
                 destByte = buffer;
                 for(i = 0; i < lineSize; i++)
                 {
-                    * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2SIZE(destByte) & (~3)) + (3 - (gcmPTR2SIZE(destByte) % 4))) =
-                        * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2SIZE(srcByte) & (~3)) + (3 - (gcmPTR2SIZE(srcByte) % 4)));
+                    * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2INT(destByte) & (~3)) + (3 - (gcmPTR2INT(destByte) % 4))) =
+                        * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2INT(srcByte) & (~3)) + (3 - (gcmPTR2INT(srcByte) % 4)));
 
                     destByte++;
                     srcByte++;

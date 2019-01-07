@@ -739,7 +739,7 @@ OnError:
 void viv_drm_postclose(struct drm_device *drm, struct drm_file *file)
 {
     gctINT i;
-    gctUINT32 pid = gcmPTR2SIZE(file->driver_priv);
+    gctUINT32 pid = gcmPTR2INT(file->driver_priv);
     gckGALDEVICE gal_dev = (gckGALDEVICE)drm->dev_private;
 
     for (i = 0; i < gcdMAX_GPU_COUNT; ++i)
