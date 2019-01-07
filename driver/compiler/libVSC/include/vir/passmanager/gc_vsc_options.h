@@ -944,6 +944,8 @@ typedef struct _VSC_OPTN_CPFOPTIONS
     gctUINT32   after_shader;
     gctUINT32   before_func;
     gctUINT32   after_func;
+    gctUINT32   max_instcount; /* threshold of max instruction in a function */
+    gctUINT32   max_tempcount; /* threshold of max temp variable in a shader */
 } VSC_OPTN_CPFOptions;
 
 #define VSC_OPTN_CPFOptions_GetSwitchOn(option)             VSC_OPTN_GetSwitchOn(&(option)->optnBase)
@@ -958,6 +960,10 @@ typedef struct _VSC_OPTN_CPFOPTIONS
 #define VSC_OPTN_CPFOptions_SetAfterFunc(option, a)         ((option)->after_func = (a))
 #define VSC_OPTN_CPFOptions_GetTrace(option)                VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_CPFOptions_SetTrace(option, t)             VSC_OPTN_SetTrace(&(option)->optnBase, (t))
+#define VSC_OPTN_CPFOptions_SetMaxInstCount(option, a)      ((option)->max_instcount = (a))
+#define VSC_OPTN_CPFOptions_GetMaxInstCount(option)         ((option)->max_instcount)
+#define VSC_OPTN_CPFOptions_SetMaxTempCount(option, a)      ((option)->max_tempcount = (a))
+#define VSC_OPTN_CPFOptions_GetMaxTempCount(option)         ((option)->max_tempcount)
 
 #define VSC_OPTN_CPFOptions_TRACE_INPUT                     0x1
 #define VSC_OPTN_CPFOptions_TRACE_OUTPUT                    0x2

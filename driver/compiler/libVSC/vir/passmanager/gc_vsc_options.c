@@ -2096,6 +2096,8 @@ void VSC_OPTN_CPFOptions_SetDefault(
     VSC_OPTN_CPFOptions_SetBeforeFunc(options, gcvMAXUINT32);
     VSC_OPTN_CPFOptions_SetAfterFunc(options, gcvMAXUINT32);
     VSC_OPTN_CPFOptions_SetTrace(options, 0);
+    VSC_OPTN_CPFOptions_SetMaxTempCount(options, 3072);
+    VSC_OPTN_CPFOptions_SetMaxInstCount(options, 3400);
 }
 
 void VSC_OPTN_CPFOptions_GetOptionFromString(
@@ -2169,6 +2171,30 @@ void VSC_OPTN_CPFOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             trace = vscSTR_StrToUint32(str, len);
             VSC_OPTN_CPFOptions_SetTrace(options, trace);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "maxic:", sizeof("maxic:")-1))
+        {
+            /* if instructoin count of each function > value of maxic, skip cpf */
+            gctUINT32 maxinst;
+            gctUINT32 len;
+
+            str += sizeof("maxic:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            maxinst = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_CPFOptions_SetMaxInstCount(options, maxinst);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "maxtc:", sizeof("maxtc:")-1))
+        {
+            /* if temp variable count of each shader > value of maxtc, skip cpf */
+            gctUINT32 maxtemp;
+            gctUINT32 len;
+
+            str += sizeof("maxtc:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            maxtemp = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_CPFOptions_SetMaxTempCount(options, maxtemp);
             str += len;
         }
     }

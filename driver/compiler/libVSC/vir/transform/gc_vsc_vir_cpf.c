@@ -3028,7 +3028,7 @@ _VSC_CPF_PerformOnShader(
     {
         VIR_Function    *func = func_node->function;
 
-        if (VIR_Function_GetInstCount(func) > VSC_CPF_MAX_INST_COUNT)
+        if (VIR_Function_GetInstCount(func) > VSC_OPTN_CPFOptions_GetMaxInstCount(pOptions))
         {
             continue;
         }
@@ -3065,6 +3065,7 @@ VSC_CPF_PerformOnShader(
     VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_OPTN_CPFOptions  *options = (VSC_OPTN_CPFOptions*)pPassWorker->basePassWorker.pBaseOption;
     VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
+    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
 
     VSC_CPF cpf;
 
@@ -3080,8 +3081,16 @@ VSC_CPF_PerformOnShader(
         return errCode;
     }
 
+    {
+        if (compCfg->ctx.appNameId == gcvPATCH_DEQP)
+        {
+              VSC_OPTN_CPFOptions_SetMaxTempCount(options, 1024);
+              VSC_OPTN_CPFOptions_SetMaxInstCount(options, 1024);
+        }
+    }
+
     /* too large shader, don't do CPF */
-    if (VIR_Shader_GetVirRegCount(shader) > VSC_CPF_MAX_TEMP)
+    if (VIR_Shader_GetVirRegCount(shader) > VSC_OPTN_CPFOptions_GetMaxTempCount(options))
     {
         if(VSC_OPTN_CPFOptions_GetTrace(options))
         {

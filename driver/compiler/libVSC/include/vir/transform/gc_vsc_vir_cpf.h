@@ -21,9 +21,6 @@
 
 #include "gc_vsc.h"
 
-#define     VSC_CPF_MAX_TEMP        1024
-#define     VSC_CPF_MAX_INST_COUNT  1024
-
 BEGIN_EXTERN_C()
 
 /* lattice state */
