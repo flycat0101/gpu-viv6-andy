@@ -3414,6 +3414,21 @@ void _VIR_RA_LS_RemoveLRfromActiveList(
         {
             pRemoveLR->usedColorLR->deadIntervalAvail = gcvTRUE;
             pRemoveLR->usedColorLR = gcvNULL;
+            /* if pRemoveLR allocated a used color(which is non ld-st LR), clear falseDepReg here */
+            gcmASSERT(pRemoveLR->regNoRange == 1);
+            if (!pRA->pHwCfg->hwFeatureFlags.supportPerCompDepForLS &&
+                (isLRSTDependence(pRemoveLR) ||
+                 isLRLDDependence(pRemoveLR)))
+            {
+                vscBV_ClearBit(VIR_RA_LS_GetFalseDepRegVec(pRA),
+                        _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pRemoveLR)));
+
+                if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pRemoveLR)))
+                {
+                    vscBV_ClearBit(VIR_RA_LS_GetFalseDepRegVec(pRA),
+                        _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pRemoveLR)));
+                }
+            }
         }
         else
         {
