@@ -204,6 +204,10 @@ gceSTATUS gckGALDEVICE_Stop_Threads(
     gckGALDEVICE Device
     );
 
+gceSTATUS gckGALDEVICE_QueryFrequency(
+    IN gckGALDEVICE Device
+    );
+
 gceSTATUS gckGALDEVICE_Start(
     IN gckGALDEVICE Device
     );
