@@ -2911,6 +2911,8 @@ gckVIDMEM_NODE_Export(
         {
             physical = node->VidMem.memory->physical;
             bytes = node->VidMem.bytes;
+            /* Align export size. when allocate memory from VIDMEM, the actual node size may not same with aligned size. */
+            bytes = bytes & ~(PAGE_SIZE - 1);
         }
         else
         {
