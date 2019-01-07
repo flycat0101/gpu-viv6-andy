@@ -2254,6 +2254,31 @@ static uint32_t halti5_detect_blit_kind(
             kind = HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE;
             break;
         }
+
+        if (srcParts == 2)
+        {
+            switch (srcFormat)
+            {
+                case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
+                case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
+                case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
+                    params->packFormat = __PACK_FORMAT_R32G32B32A32;
+                    break;
+                case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
+                case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
+                case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
+                    params->packFormat = __PACK_FORMAT_R16G16B16A16;
+                    break;
+                case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
+                case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
+                case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
+                    params->packFormat = __PACK_FORMAT_R32G32;
+                    break;
+                default:
+                    __VK_ASSERT(!"invalid downsample format!");
+                    break;
+            }
+        }
     }
     else if (srcParts != dstParts)
     {

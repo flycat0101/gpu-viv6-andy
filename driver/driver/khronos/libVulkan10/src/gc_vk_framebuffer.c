@@ -155,6 +155,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
             case VK_FORMAT_R16G16B16A16_UINT:
                 residentFormat = __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT;
                 break;
+            case VK_FORMAT_R32G32_SFLOAT:
+                residentFormat = __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT;
+                break;
+            case VK_FORMAT_R32G32_SINT:
+                residentFormat = __VK_FORMAT_R32G32_SINT_2_R32_SINT;
+                break;
+            case VK_FORMAT_R32G32_UINT:
+                residentFormat = __VK_FORMAT_R32G32_UINT_2_R32_UINT;
+                break;
             default:
                 break;
             }
