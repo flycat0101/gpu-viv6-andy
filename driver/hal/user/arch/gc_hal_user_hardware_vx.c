@@ -17660,9 +17660,11 @@ static gceSTATUS _convertdepth(
         {
         case 0x6:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         case 0x7:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -17675,6 +17677,7 @@ static gceSTATUS _convertdepth(
         {
         case 0x3:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -17687,6 +17690,7 @@ static gceSTATUS _convertdepth(
         {
         case 0x7:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -27051,9 +27055,11 @@ static gceSTATUS _convertdepth_halfevis(
         {
         case 0x6:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         case 0x7:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -27066,6 +27072,7 @@ static gceSTATUS _convertdepth_halfevis(
         {
         case 0x3:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -27078,6 +27085,7 @@ static gceSTATUS _convertdepth_halfevis(
         {
         case 0x7:
             /*TO DO*/
+            status = gcvSTATUS_NOT_SUPPORTED;
             break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
