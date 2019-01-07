@@ -18539,7 +18539,8 @@ _InsertLDARR(
         sym = VIR_Symbol_GetVregVariable(sym);
         if (sym)
         {
-            symType = VIR_Symbol_GetType(sym);
+            symType = VIR_Shader_GetTypeFromId(Shader,
+                                               VIR_Operand_GetTypeId(Opnd));
             typeId     = VIR_Type_GetBaseTypeId(symType);
         }
     }
