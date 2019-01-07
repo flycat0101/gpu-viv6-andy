@@ -18326,7 +18326,7 @@ gckHARDWARE_EnterQueryClock(
     OUT gctUINT64 *ShStart
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINT64 mcStart, shStart;
 
     gcmkONERROR(gckOS_GetTime(&mcStart));
@@ -18358,7 +18358,7 @@ gckHARDWARE_ExitQueryClock(
     OUT gctUINT32 *ShClk
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINT64 mcEnd, shEnd;
     gctUINT32 mcCycle, shCycle;
     gctUINT64 mcFreq, shFreq = 0;
@@ -18399,6 +18399,76 @@ gckHARDWARE_ExitQueryClock(
     *ShClk = (gctUINT32)shFreq;
 
 OnError:
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gckHARDWARE_QueryFrequency
+**
+**  Query current hardware frequency.
+**
+**  INPUT:
+**
+**      gckHARDWARE Hardware
+**          Pointer to an gckHARDWARE object.
+**
+*/
+gceSTATUS
+gckHARDWARE_QueryFrequency(
+    IN gckHARDWARE Hardware
+    )
+{
+    gctUINT64 mcStart, shStart;
+    gctUINT32 mcClk, shClk;
+    gceSTATUS status;
+
+    gcmkHEADER_ARG("Hardware=0x%p", Hardware);
+
+    gcmkVERIFY_ARGUMENT(Hardware != NULL);
+
+    mcStart = shStart = 0;
+    mcClk   = shClk   = 0;
+
+    if (Hardware->options.powerManagement)
+    {
+        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+            Hardware, gcvFALSE
+            ));
+    }
+
+    gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        Hardware, gcvPOWER_ON_AUTO
+        ));
+
+    gckHARDWARE_EnterQueryClock(Hardware, &mcStart, &shStart);
+
+    gcmkONERROR(gckOS_Delay(Hardware->os, 50));
+
+    if (mcStart)
+    {
+        gckHARDWARE_ExitQueryClock(Hardware,
+                                   mcStart, shStart,
+                                   &mcClk, &shClk);
+
+        Hardware->mcClk = mcClk;
+        Hardware->shClk = shClk;
+    }
+
+    if (Hardware->options.powerManagement)
+    {
+        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+            Hardware, gcvTRUE
+            ));
+    }
+
+    gcmkFOOTER_NO();
+
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmkFOOTER();
+
     return status;
 }
 
