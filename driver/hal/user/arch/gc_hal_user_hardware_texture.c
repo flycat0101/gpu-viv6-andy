@@ -1029,7 +1029,7 @@ gcoHARDWARE_QueryTexture(
     if (Tiling == gcvLINEAR)
     {
         /* Is HW support linear texture? */
-        if (!Hardware->features[gcvFEATURE_TEXTURE_LINEAR])
+        if (!Hardware->features[gcvFEATURE_TEXTURE_LINEAR] && (Format != gcvSURF_L8_RAW) && (Format != gcvSURF_A8L8_RAW) )
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
