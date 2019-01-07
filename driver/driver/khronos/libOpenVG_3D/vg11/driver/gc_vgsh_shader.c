@@ -21,7 +21,6 @@ ColorType
 3.0 l_pre
 */
 
-
 void _VGProgramCtor(gcoOS os, _VGProgram *program)
 {
     gcmHEADER_ARG("os=0x%x program=0x%x", os, program);

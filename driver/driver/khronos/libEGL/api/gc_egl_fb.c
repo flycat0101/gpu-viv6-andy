@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-
 #include "gc_egl_fb.h"
 
 static struct eglFbPlatform* fbBackend = gcvNULL;

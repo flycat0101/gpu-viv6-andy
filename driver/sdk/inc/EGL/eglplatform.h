@@ -88,12 +88,6 @@ typedef struct wl_display *   EGLNativeDisplayType;
 typedef struct wl_egl_window *EGLNativeWindowType;
 typedef struct wl_egl_pixmap *EGLNativePixmapType;
 
-#elif defined(__GBM__) /* GBM */
-
-typedef struct gbm_device *EGLNativeDisplayType;
-typedef struct gbm_bo     *EGLNativePixmapType;
-typedef void              *EGLNativeWindowType;
-
 #elif defined(__ANDROID__) || defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 26
 #    include <system/window.h>
@@ -154,6 +148,12 @@ typedef Window   EGLNativeWindowType;
 typedef Pixmap   EGLNativePixmapType;
 
 #endif
+
+#elif defined(__GBM__) /* GBM */
+
+typedef struct gbm_device *EGLNativeDisplayType;
+typedef struct gbm_bo     *EGLNativePixmapType;
+typedef void              *EGLNativeWindowType;
 
 #else
 #error "Platform not recognized"

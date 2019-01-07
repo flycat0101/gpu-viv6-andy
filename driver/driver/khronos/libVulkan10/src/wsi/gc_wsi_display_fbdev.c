@@ -525,7 +525,8 @@ static VkResult __SetFbdevDisplayPlaneImageCount(
 
     if (plane->imageCount != imageCount)
     {
-        /* result = VK_ERROR_OUT_OF_DATE_KHR; */
+        /* Failed to set image count. */
+        result = VK_ERROR_OUT_OF_DATE_KHR;
     }
 
     return result;
@@ -795,9 +796,6 @@ static VkResult __WrapFbdevBufferMemory(
 
     size_t bufferSize;
     uint32_t bufferOffset;
-
-    if (plane->imageCount == 1)
-        bufferIndex = 0;
 
     bufferSize      = plane->fixInfo.line_length * plane->alignedHeight;
     bufferOffset    = bufferSize * bufferIndex;

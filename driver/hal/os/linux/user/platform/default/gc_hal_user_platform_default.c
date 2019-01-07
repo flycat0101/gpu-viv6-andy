@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-
 #include "gc_hal_user_linux.h"
 #include "gc_hal_user_platform.h"
 
