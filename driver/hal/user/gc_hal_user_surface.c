@@ -1807,7 +1807,7 @@ _AllocateSurface(
     }
     else
     {
-            Surface->cacheMode  = gcvCACHE_256;
+        Surface->cacheMode  = gcvCACHE_256;
     }
 
     /* Set aligned surface size. */

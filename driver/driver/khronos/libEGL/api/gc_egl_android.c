@@ -1280,6 +1280,7 @@ _CreateVivanteDrmBufferSurface(
     struct gralloc_vivante_bo_t * Bo,
     EGLint RenderMode,
     gceSURF_FORMAT Format,
+    EGLBoolean hwFramebuffer,
     gcoSURF * Surface
     )
 {
@@ -1323,7 +1324,13 @@ _CreateVivanteDrmBufferSurface(
 
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
-    type |= gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
+    type |= gcvSURF_DMABUF_EXPORTABLE;
+
+    /* Just set gcvSURF_CACHE_MODE_128 for hwFramebuffer to improve performance. */
+    if(hwFramebuffer)
+    {
+        type |= gcvSURF_CACHE_MODE_128;
+    }
 
     /* Append no-vidmem hint to type. */
     type |= gcvSURF_NO_VIDMEM;
@@ -1430,6 +1437,7 @@ _CreateGenericDrmBufferSurface(
     android_native_buffer_t * Buffer,
     EGLint RenderMode,
     gceSURF_FORMAT Format,
+    EGLBoolean hwFramebuffer,
     gcoSURF * Surface
     )
 {
@@ -1496,7 +1504,13 @@ _CreateGenericDrmBufferSurface(
 
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
-    type |= gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
+    type |= gcvSURF_DMABUF_EXPORTABLE;
+
+    /* Just set gcvSURF_CACHE_MODE_128 for hwFramebuffer to improve performance. */
+    if(hwFramebuffer)
+    {
+        type |= gcvSURF_CACHE_MODE_128;
+    }
 
     /* TODO: Attach tile status from generic drm buffer. */
     status = gcoSURF_WrapUserMemory(gcvNULL,
@@ -1531,6 +1545,7 @@ static EGLBoolean
 _GetANativeBufferSurface(
     android_native_buffer_t * Buffer,
     EGLint RenderMode,
+    EGLBoolean hwFramebuffer,
     gcoSURF * Surface
     )
 {
@@ -1565,13 +1580,13 @@ _GetANativeBufferSurface(
     {
         /* Create drm buffer by vivante drm interface. */
         success = _CreateVivanteDrmBufferSurface(
-                        Buffer, bo, RenderMode, format, &surface);
+                        Buffer, bo, RenderMode, format, hwFramebuffer, &surface);
     }
     else
     {
         /* Create drm buffer by generic drm interface. */
         success = _CreateGenericDrmBufferSurface(
-                        Buffer, RenderMode, format, &surface);
+                        Buffer, RenderMode, format, hwFramebuffer, &surface);
     }
 
     *Surface = surface;
@@ -1701,6 +1716,7 @@ static EGLBoolean
 _GetANativeBufferSurface(
     android_native_buffer_t * Buffer,
     EGLint RenderMode,
+    EGLBoolean hwFramebuffer,
     gcoSURF * Surface
     )
 {
@@ -1823,6 +1839,7 @@ _UpdateBufferCache(
     LOGV("%s: win=%p cache handle[%d]=%p", __func__, EglSurface->hwnd, i, handle);
     if (!_GetANativeBufferSurface(Buffer,
                                   EglSurface->renderMode,
+                                  info->hwFramebuffer,
                                   &surface))
     {
         return EGL_FALSE;
@@ -3798,7 +3815,7 @@ _CreateImageFromANativeBuffer(
     }
 
     /* Cast surface object. */
-    if (!_GetANativeBufferSurface(Buffer, -1, &surface))
+    if (!_GetANativeBufferSurface(Buffer, -1, gcvFALSE, &surface))
     {
         return EGL_BAD_PARAMETER;
     }
