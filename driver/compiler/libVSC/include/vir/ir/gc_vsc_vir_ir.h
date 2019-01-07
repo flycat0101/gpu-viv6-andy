@@ -860,6 +860,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_IsFS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_FRAGMENT)
 
 #define VIR_Shader_IsGraphics(S)     (VIR_Shader_IsGPipe(S) || VIR_Shader_IsFS(S))
+#define VIR_Shader_IsVulkan(S)       ((S)->clientApiVersion == gcvAPI_OPENVK)
 
 #define VIR_Shader_IsCL(S)           (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) == _cldLanguageType))
 #define VIR_Shader_IsGlCompute(S)    (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) != _cldLanguageType))

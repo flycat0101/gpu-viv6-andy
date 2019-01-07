@@ -329,7 +329,7 @@ _RemoveRedundantLabelForFunctions(
     VIR_Function*      func;
 
     /* Temporary enable it for VK. */
-    if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+    if (!VIR_Shader_IsVulkan(pShader))
     {
         return errCode;
     }

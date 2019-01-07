@@ -1577,7 +1577,7 @@ VSC_ErrCode vscVIR_PreCleanup(
 #if __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__
             /* Only support OCL now. */
             if (VIR_Shader_IsCL(pShader) &&
-                VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
+                !VIR_Shader_IsVulkan(pShader) &&
                 VIR_Shader_GetPrivateMemorySize(pShader) > 0)
             {
                 errCode = _CalculateIndexForPrivateMemory(pShader, func, inst);
@@ -1588,7 +1588,7 @@ VSC_ErrCode vscVIR_PreCleanup(
 #if __ENABLE_OPTIMIZE_FOR_SHARE_MEMORY__
             /* Only support OCL now. */
             if (VIR_Shader_IsCL(pShader) &&
-                VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
+                !VIR_Shader_IsVulkan(pShader) &&
                 VIR_Shader_GetShareMemorySize(pShader) > 0)
             {
                 errCode = _CalculateIndexForLocalMemory(pShader, func, inst);

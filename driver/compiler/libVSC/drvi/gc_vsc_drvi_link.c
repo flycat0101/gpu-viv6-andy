@@ -850,7 +850,7 @@ static gctBOOL  _NeedCheckInterpolation(VIR_Shader* pShader)
     gctBOOL                    bCheckInterpolation = gcvTRUE;
 
     /* According to vulkan spec, interpolation decorations are not required to match. */
-    if (VIR_Shader_GetClientApiVersion(pShader) == gcvAPI_OPENVK)
+    if (VIR_Shader_IsVulkan(pShader))
     {
         bCheckInterpolation = gcvFALSE;
     }

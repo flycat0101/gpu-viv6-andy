@@ -2123,8 +2123,7 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
 
 
     /* currently only PS is dual16-able */
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT &&
-        VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT && !VIR_Shader_IsVulkan(pShader))
     {
         VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
         for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -3003,8 +3002,7 @@ static VSC_ErrCode _PrecisionUpdate(VIR_Shader* pShader, VIR_Dumper* dumper)
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
 
-    if(!VIR_Shader_IsFS(pShader) ||
-        VIR_Shader_GetClientApiVersion(pShader) == gcvAPI_OPENVK)
+    if(!VIR_Shader_IsFS(pShader) || VIR_Shader_IsVulkan(pShader))
     {
         return errCode;
     }
@@ -4201,7 +4199,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
        TO-DO: since vulkan needs this, we enable it for vulkan only for now.
        Need better solution.
     */
-    if (VIR_Shader_GetClientApiVersion(pShader) == gcvAPI_OPENVK)
+    if (VIR_Shader_IsVulkan(pShader))
     {
         errCode = _MergeConstantOffset(pShader);
         ON_ERROR(errCode, "Merge constant offset");
@@ -4594,7 +4592,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     */
     if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
         (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
-        VIR_Shader_GetClientApiVersion(Shader) == gcvAPI_OPENVK   ||
+        VIR_Shader_IsVulkan(Shader)                               ||
         VIR_Shader_IsOpenVG(Shader)                               ||
         VIR_Shader_Has32BitModulus(Shader)                        || /* gcsl expand the integer mod and div using 32bit way
                                                                         (_gcConvert32BitModulus) */

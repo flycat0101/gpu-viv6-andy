@@ -10819,7 +10819,7 @@ VIR_Inst_GetExpectedResultPrecision(
     VIR_OpCode opcode = VIR_Inst_GetOpcode(Inst);
 
     VIR_Shader *pShader = VIR_Inst_GetShader(Inst);
-    if (pShader->clientApiVersion == gcvAPI_OPENVK)
+    if (VIR_Shader_IsVulkan(pShader))
     {
         return result;
     }

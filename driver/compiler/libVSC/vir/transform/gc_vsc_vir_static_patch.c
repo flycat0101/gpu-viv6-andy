@@ -639,7 +639,7 @@ VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
         ** be up-bottom, so we need revert it.
         ** And Vulkan has different coordinate system from OES, so this patch is for OES only.
         */
-        if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+        if (!VIR_Shader_IsVulkan(pShader))
         {
             errCode = _DoPointCoordYDirectionPatch(pShader);
             ON_ERROR(errCode, "Do point coord Y direction patch");

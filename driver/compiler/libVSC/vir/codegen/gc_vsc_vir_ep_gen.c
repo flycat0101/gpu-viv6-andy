@@ -1965,7 +1965,7 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
     if (pShader->shaderKind == VIR_SHADER_COMPUTE)
     {
         /* Private memory set, only support OCL now. */
-        if (VIR_Shader_IsCL(pShader) && VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+        if (VIR_Shader_IsCL(pShader) && !VIR_Shader_IsVulkan(pShader))
         {
             pOutSEP->exeHints.nativeHints.prvStates.gps.privMemSizePerThreadInByte = VIR_Shader_GetPrivateMemorySize(pShader);
             pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum = VIR_Shader_GetCurrWorkThreadNum(pShader);
@@ -1999,7 +1999,7 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
         pOutSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy = UNIFIED_RF_ALLOC_STRATEGY_FIXED_ADDR_OFFSET;
     }
 
-    if (VIR_Shader_GetClientApiVersion(pShader) == gcvAPI_OPENVK)
+    if (VIR_Shader_IsVulkan(pShader))
     {
         /* For Vulkan, there is a pipeline layout compability requirement, so we need make sure
            each shader has fixed address offset */
@@ -2303,7 +2303,7 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                                                                                         pVirUniform->u.samplerOrImageAttr.parentSamplerSymId)) + i;
 
                     /* For vulkan, it will be processed when collecting info for resource layouts in pep */
-                    if (pShader->clientApiVersion == gcvAPI_OPENVK)
+                    if (VIR_Shader_IsVulkan(pShader))
                     {
                         pPrivUavEntry->commonPrivm.pPrivateData = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
                     }
@@ -2403,7 +2403,7 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                                                                                                        pVirUniform->u.samplerOrImageAttr.parentSamplerSymId));
 
                 /* For vulkan, it will be processed when collecting info for resource layouts in pep */
-                if (pShader->clientApiVersion == gcvAPI_OPENVK)
+                if (VIR_Shader_IsVulkan(pShader))
                 {
                     pPrivCnstEntry->commonPrivm.pPrivateData = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
                 }
@@ -2557,7 +2557,7 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
                 pPrivOutputEntry->commonPrivm.privmFlagIndex = VIR_Symbol_GetFirstSlot(pVirIoSym);
 
                 /* For vulkan, set private data to master output's location */
-                if (pShader->clientApiVersion == gcvAPI_OPENVK)
+                if (VIR_Shader_IsVulkan(pShader))
                 {
                     gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivOutputEntry->commonPrivm.pPrivateData);
                     *(gctUINT*)pPrivOutputEntry->commonPrivm.pPrivateData = VIR_Symbol_GetMasterLocation(pVirIoSym);
@@ -2597,7 +2597,7 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
                 pPrivSamplerEntry->commonPrivm.pPrivateData = gcvNULL;
 
                 /* For vulkan, it will be processed when collecting info for resource layouts in pep */
-                if (pShader->clientApiVersion == gcvAPI_OPENVK)
+                if (VIR_Shader_IsVulkan(pShader))
                 {
                     pPrivSamplerEntry->commonPrivm.pPrivateData = pVirUniformSym;
                 }

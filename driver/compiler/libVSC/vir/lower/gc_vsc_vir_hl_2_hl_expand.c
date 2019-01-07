@@ -4797,7 +4797,7 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
     VSC_MM                      *pmm = pPassWorker->basePassWorker.pMM;
 
     /* So far only enable this for VK. */
-    if (VIR_Shader_GetClientApiVersion(shader) != gcvAPI_OPENVK)
+    if (!VIR_Shader_IsVulkan(shader))
     {
         return errCode;
     }

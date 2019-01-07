@@ -458,7 +458,7 @@ _VSC_CPF_InitFunction(
     VIR_CFG         *pCfg       = VIR_Function_GetCFG(pFunc);
     gctUINT         tempCount   = VIR_Shader_GetVirRegCount(pShader);
 
-    if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+    if (!VIR_Shader_IsVulkan(pShader))
     {
         gcmASSERT(tempCount > 256);
         tempCount = tempCount - 256;
@@ -947,8 +947,7 @@ _VSC_CPF_GetVRegNo(
     {
         return VIR_INVALID_ID;
     }
-    else if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
-             opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
+    else if (!VIR_Shader_IsVulkan(pShader) && opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
     {
         return (opndInfo.u1.virRegInfo.virReg - 256);
     }
