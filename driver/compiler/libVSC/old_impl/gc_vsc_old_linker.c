@@ -4190,6 +4190,34 @@ _AddDependencies(
                 /* Process dependencies of temporary register. */
                 _AddDependencies(Tree,
                                  Tree->tempArray[List->index].dependencies);
+
+                /* If this temp register is indexing, mark all array temp registers as used. */
+                if (Tree->tempArray[List->index].isIndexing &&
+                    Tree->tempArray[List->index].variable != gcvNULL)
+                {
+                    gcVARIABLE variable = Tree->tempArray[List->index].variable;
+
+                    gctUINT startIndex, endIndex, j;
+                    gcmASSERT(isVariableNormal(variable));
+                    gcSHADER_GetVariableIndexingRange(Tree->shader, variable, gcvFALSE,
+                                                      &startIndex, &endIndex);
+                    gcmASSERT(startIndex == variable->tempIndex);
+
+                    /* Source is a temporary register array. */
+                    for (j = startIndex; j < endIndex; j++)
+                    {
+                        gcLINKTREE_TEMP tempA = &Tree->tempArray[j];
+
+                        if (!tempA->inUse)
+                        {
+                            /* Mark the temporary register as used. */
+                            tempA->inUse = gcvTRUE;
+
+                            /* Process all dependencies. */
+                            _AddDependencies(Tree, tempA->dependencies);
+                        }
+                    }
+                }
             }
             break;
 
@@ -4418,8 +4446,35 @@ gcLINKTREE_AddDependencyForCode(
             Tree->tempArray[index].inUse = gcvTRUE;
 
             /* Process all dependencies. */
-            _AddDependencies(Tree,
-                                Tree->tempArray[index].dependencies);
+            _AddDependencies(Tree, Tree->tempArray[index].dependencies);
+
+            /* If this temp register is indexing, mark all array temp registers as used. */
+            if (Tree->tempArray[index].isIndexing &&
+                Tree->tempArray[index].variable != gcvNULL)
+            {
+                gcVARIABLE variable = Tree->tempArray[index].variable;
+
+                gctUINT startIndex, endIndex, j;
+                gcmASSERT(isVariableNormal(variable));
+                gcSHADER_GetVariableIndexingRange(Tree->shader, variable, gcvFALSE,
+                                                  &startIndex, &endIndex);
+                gcmASSERT(startIndex == variable->tempIndex);
+
+                /* Source is a temporary register array. */
+                for (j = startIndex; j < endIndex; j++)
+                {
+                    gcLINKTREE_TEMP tempA = &Tree->tempArray[j];
+
+                    if (!tempA->inUse)
+                    {
+                        /* Mark the temporary register as used. */
+                        tempA->inUse = gcvTRUE;
+
+                        /* Process all dependencies. */
+                        _AddDependencies(Tree, tempA->dependencies);
+                    }
+                }
+            }
         }
         break;
 
@@ -4488,8 +4543,35 @@ gcLINKTREE_AddDependencyForCode(
             Tree->tempArray[index].inUse = gcvTRUE;
 
             /* Process all dependencies. */
-            _AddDependencies(Tree,
-                                Tree->tempArray[index].dependencies);
+            _AddDependencies(Tree, Tree->tempArray[index].dependencies);
+
+            /* If this temp register is indexing, mark all array temp registers as used. */
+            if (Tree->tempArray[index].isIndexing &&
+                Tree->tempArray[index].variable != gcvNULL)
+            {
+                gcVARIABLE variable = Tree->tempArray[index].variable;
+
+                gctUINT startIndex, endIndex, j;
+                gcmASSERT(isVariableNormal(variable));
+                gcSHADER_GetVariableIndexingRange(Tree->shader, variable, gcvFALSE,
+                                                  &startIndex, &endIndex);
+                gcmASSERT(startIndex == variable->tempIndex);
+
+                /* Source is a temporary register array. */
+                for (j = startIndex; j < endIndex; j++)
+                {
+                    gcLINKTREE_TEMP tempA = &Tree->tempArray[j];
+
+                    if (!tempA->inUse)
+                    {
+                        /* Mark the temporary register as used. */
+                        tempA->inUse = gcvTRUE;
+
+                        /* Process all dependencies. */
+                        _AddDependencies(Tree, tempA->dependencies);
+                    }
+                }
+            }
         }
         break;
 
