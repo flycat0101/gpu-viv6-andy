@@ -712,6 +712,7 @@ static void _VSC_IS_InstSched_InitBubble(
     gctUINT32 cacheld_latency = hw_uarch_caps->cacheLdCycles;
     gctUINT32 cachest_latency = hw_uarch_caps->cacheStCycles;
     gctUINT32 texld_bubble, memld_bubble, memst_bubble, cache_ld_bubble, cache_st_bubble, texld_bandwidth, memld_bandwidth;
+    gctUINT32 memld_bubble_valuefromhc; /* value compute from hw config */
 
     if(VSC_OPTN_ISOptions_GetRegCount(options))
     {
@@ -777,8 +778,11 @@ static void _VSC_IS_InstSched_InitBubble(
     /* reduce the value of memld_bubble to 6 if hw feature supportPerCompDepForLS is false,
      * which may help to avoid too many load instructions are sheduled together and
      * decrease the register allocation pressure */
-    memld_bubble = (hw_cfg->hwFeatureFlags.supportPerCompDepForLS)  ? (memld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
-                   (memld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1)) : 6;
+    memld_bubble_valuefromhc = memld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
+                   (memld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
+    memld_bubble = (hw_cfg->hwFeatureFlags.supportPerCompDepForLS) ?
+                   memld_bubble_valuefromhc : (memld_bubble_valuefromhc > 6) ? 6 : memld_bubble_valuefromhc;
+
     memst_bubble = memst_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (memst_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
     cache_ld_bubble = cacheld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
