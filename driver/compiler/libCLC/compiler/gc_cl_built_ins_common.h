@@ -624,8 +624,8 @@ static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "shuffle2#1",               T_F_GENTYPE,       3, {T_FLOAT8,   T_FLOAT8,   T_U_GENTYPE}, {1,1,0}, {0}, 0, 0, 0},
     {clvEXTENSION_NONE,     "shuffle2#1",               T_F_GENTYPE,       3, {T_FLOAT16,  T_FLOAT16,  T_U_GENTYPE}, {1,1,0}, {0}, 0, 0, 0},
 
-    {clvEXTENSION_NONE,        "select",          T_GENTYPE,      3, {T_GENTYPE, T_GENTYPE, T_I_GENTYPE}, {0}, {0}, 1},
-    {clvEXTENSION_NONE,        "select",          T_GENTYPE,      3, {T_GENTYPE, T_GENTYPE, T_U_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,        "select",          T_GENTYPE,      3, {T_GENTYPE, T_GENTYPE, T_I_GENTYPE}, {0}, {1, 1, 1}, 1},
+    {clvEXTENSION_NONE,        "select",          T_GENTYPE,      3, {T_GENTYPE, T_GENTYPE, T_U_GENTYPE}, {0}, {1, 1, 1}, 1},
 
     {clvEXTENSION_NONE,        "bitselect",      T_GENTYPE,      3, {T_GENTYPE, T_GENTYPE, T_GENTYPE}, {0}, {0}, 1},
 
