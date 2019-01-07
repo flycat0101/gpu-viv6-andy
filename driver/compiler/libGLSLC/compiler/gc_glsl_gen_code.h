@@ -1265,6 +1265,7 @@ typedef struct _slsGEN_CODE_PARAMETERS
     gcSHADER_TYPE *    dataTypes;
     slsLOPERAND *      lOperands;
     slsROPERAND *      rOperands;
+    slsVEC2ARRAY *     vec2Array;
     slsNAME            *constantVariable;
     gctBOOL            treatFloatAsInt;
     gctBOOL            genTexldU;
@@ -1283,6 +1284,7 @@ slsGEN_CODE_PARAMETERS;
         (parameters)->dataTypes           = gcvNULL; \
         (parameters)->lOperands           = gcvNULL; \
         (parameters)->rOperands           = gcvNULL; \
+        (parameters)->vec2Array           = gcvNULL; \
         (parameters)->constantVariable    = gcvNULL; \
         (parameters)->treatFloatAsInt     = gcvFALSE; \
         (parameters)->genTexldU           = gcvFALSE; \
@@ -1317,10 +1319,11 @@ slsGEN_CODE_PARAMETERS;
 #define slsGEN_CODE_PARAMETERS_MoveOperands(parameters0, parameters1) \
     do \
     { \
-        *(parameters0)                = *(parameters1); \
+        *(parameters0)              = *(parameters1); \
         (parameters1)->dataTypes    = gcvNULL; \
         (parameters1)->lOperands    = gcvNULL; \
         (parameters1)->rOperands    = gcvNULL; \
+        (parameters1)->vec2Array    = gcvNULL; \
     } \
     while (gcvFALSE)
 

@@ -23145,16 +23145,19 @@ _GetNonConstantSubscriptCode(
             {
                 gctPOINTER                  pointer = gcvNULL;
 
-                status = sloCOMPILER_Allocate(
-                                            Compiler,
-                                            (gctSIZE_T)sizeof(slsVEC2ARRAY),
-                                            &pointer);
+                status = sloCOMPILER_Allocate(Compiler,
+                                              (gctSIZE_T)sizeof(slsVEC2ARRAY),
+                                              &pointer);
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
                 BinaryExpr->u.vec2Array = pointer;
 
                 BinaryExpr->u.vec2Array->scalarArrayName = scalarArrayName;
                 BinaryExpr->u.vec2Array->vecOperand = LeftParameters->lOperands[0];
+
+                gcmASSERT(Parameters->vec2Array == gcvNULL);
+
+                Parameters->vec2Array = (slsVEC2ARRAY *)pointer;
             }
         }
     }
@@ -23294,6 +23297,10 @@ _GetNonConstantSubscriptCode(
 
                 BinaryExpr->u.mat2Array->scalarArrayName = scalarArrayName;
                 BinaryExpr->u.mat2Array->vecOperand = LeftParameters->lOperands[0];
+
+                gcmASSERT(Parameters->vec2Array == gcvNULL);
+
+                Parameters->vec2Array = (slsVEC2ARRAY *)pointer;
             }
 
             gcmFOOTER();
@@ -26280,6 +26287,7 @@ sloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
                 operandsParameters[i].constant = gcvNULL;
                 operandsParameters[i].dataTypes = gcvNULL;
                 operandsParameters[i].lOperands = gcvNULL;
+                operandsParameters[i].vec2Array = gcvNULL;
                 operandsParameters[i].constantVariable = gcvNULL;
 
                 /* Free logical registers. */
@@ -26292,6 +26300,7 @@ sloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
                 operandsParameters[i].dataTypes = gcvNULL;
                 operandsParameters[i].rOperands = gcvNULL;
                 operandsParameters[i].lOperands = gcvNULL;
+                operandsParameters[i].vec2Array = gcvNULL;
                 operandsParameters[i].constantVariable = gcvNULL;
                 break;
             }
@@ -27715,6 +27724,15 @@ sloIR_POLYNARY_EXPR_GenFuncCallCode(
                                          operandsParameters[i].lOperands + j,
                                          &rOperand);
 
+                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            }
+
+            if(operandsParameters[i].vec2Array)
+            {
+                status = _ConvertAuxiScalarArrayToVec(Compiler,
+                                                      CodeGenerator,
+                                                      operandsParameters[i].vec2Array->scalarArrayName,
+                                                      &operandsParameters[i].vec2Array->vecOperand);
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
             }
 
