@@ -252,6 +252,20 @@ bind_wl_viv(struct wl_client *client,
     wl_resource_set_implementation(resource, &wl_viv_implementation, data, NULL);
 }
 
+#if defined(__linux__) && defined(EGL_API_FB) && !defined(__APPLE__)
+
+extern void fbdev_SetServerTag(VEGLDisplay Display);
+extern void fbdev_UnSetServerTag(VEGLDisplay Display);
+
+#else
+void fbdev_SetServerTag(VEGLDisplay Display)
+{
+}
+void fbdev_UnSetServerTag(VEGLDisplay Display)
+{
+}
+#endif
+
 EGLBoolean
 veglBindWaylandDisplay(
     VEGLDisplay Display,
@@ -267,6 +281,9 @@ veglBindWaylandDisplay(
 
         Display->wl_global = wl_global;
     }
+    /* If not fbdev backend, ignore this */
+    /* Tag backend fbdev which is used at wayland server side*/
+    fbdev_SetServerTag(Display);
 
     return EGL_TRUE;
 }
@@ -282,6 +299,9 @@ veglUnbindWaylandDisplay(
         wl_global_destroy((struct wl_global *) Display->wl_global);
         Display->wl_global = NULL;
     }
+
+    /* If not fbdev backend, ignore this */
+    fbdev_UnSetServerTag(Display);
 
     return EGL_TRUE;
 }

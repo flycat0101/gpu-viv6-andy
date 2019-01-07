@@ -80,6 +80,7 @@ struct _FBDisplay
     gctBOOL                 panVsync;
 
     struct _FBDisplay *     next;
+    gctBOOL                 serverSide;
 };
 
 /* Structure that defines a window. */
@@ -303,6 +304,7 @@ fbdev_GetDisplayByIndex(
         display->memory   = gcvNULL;
         display->file     = -1;
         display->tiling   = gcvLINEAR;
+        display->serverSide = gcvFALSE;
 
         p = getenv("FB_MULTI_BUFFER");
         if (p == NULL)
@@ -1955,6 +1957,14 @@ fbdev_SynchronousFlip(
     IN PlatformDisplayType Display
     )
 {
+    struct _FBDisplay * display;
+    display = (struct _FBDisplay*) Display;
+
+    if (display)
+    {
+        if (display->serverSide)
+            return gcvTRUE;
+    }
     return gcvFALSE;
 }
 gceSTATUS
@@ -4212,6 +4222,35 @@ fbdev_GetFbdevPlatform(
 {
     return &fbdevPlatform;
 }
+
+void fbdev_SetServerTag(VEGLDisplay Display)
+{
+    struct _FBDisplay *fbdisplay = gcvNULL;
+
+    if (Display == gcvNULL) return;
+
+    if (Display->platform->platform != EGL_PLATFORM_FB_VIV) return;
+
+    if (Display->hdc == gcvNULL) return;
+
+    fbdisplay=(struct _FBDisplay *)Display->hdc;
+    fbdisplay->serverSide = gcvTRUE;
+}
+
+void fbdev_UnSetServerTag(VEGLDisplay Display)
+{
+    struct _FBDisplay *fbdisplay = gcvNULL;
+
+    if (Display == gcvNULL) return;
+
+    if (Display->platform->platform != EGL_PLATFORM_FB_VIV) return;
+
+    if (Display->hdc == gcvNULL) return;
+
+    fbdisplay=(struct _FBDisplay *)Display->hdc;
+    fbdisplay->serverSide = gcvFALSE;
+}
+
 
 static struct eglFbPlatform fbdevBackend =
 {
