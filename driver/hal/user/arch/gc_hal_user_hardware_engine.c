@@ -4744,7 +4744,7 @@ gcoHARDWARE_FlushViewport(
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvTRUE, 0x02A1, 8192 << 16);
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvTRUE, 0x02A1, 128 << 16);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
