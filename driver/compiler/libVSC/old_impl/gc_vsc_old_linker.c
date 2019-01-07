@@ -15924,6 +15924,12 @@ _gcConvert32BitModulus(
     gctUINT lastInst = Shader->lastInstruction;
     gctBOOL changed = gcvFALSE;
 
+    if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
+    {
+        /* VIR pass (lower to machine level) has the same handling, delay it to ll to mc lowering */
+        return status;
+    }
+
     if(!gcHWCaps.hwFeatureFlags.hasHalti0)
     {
         return status;
