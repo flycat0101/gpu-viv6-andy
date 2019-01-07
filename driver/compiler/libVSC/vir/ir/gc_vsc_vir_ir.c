@@ -4526,13 +4526,12 @@ VIR_Shader_UpdateCallParmAssignment(
                 /* Check in/inout parameter. */
                 if (VIR_Symbol_isInParam(parmSym) && bCheckInParm)
                 {
-                    newInst = VIR_Shader_FindParmInst(pCalleeFunc, pInInstIter, gcvTRUE, parmVregSym);
+                    newInst = VIR_Shader_FindParmInst(pCalleeFunc, pInInstIter, gcvTRUE, parmVregSym, &pOpnd);
                     if (newInst == gcvNULL)
                     {
                         break;
                     }
 
-                    pOpnd = VIR_Inst_GetDest(newInst);
                     if (bMapTemp)
                     {
                         gcmASSERT(pTempSet);
@@ -4566,13 +4565,12 @@ VIR_Shader_UpdateCallParmAssignment(
                 /* Check out/inout parameter. */
                 if (VIR_Symbol_isOutParam(parmSym) && bCheckOutParm)
                 {
-                    newInst = VIR_Shader_FindParmInst(pCalleeFunc, pOutInstIter, gcvFALSE, parmVregSym);
+                    newInst = VIR_Shader_FindParmInst(pCalleeFunc, pOutInstIter, gcvFALSE, parmVregSym, &pOpnd);
                     if (newInst == gcvNULL)
                     {
                         break;
                     }
 
-                    pOpnd = VIR_Inst_GetSource(newInst, 0);
                     if (bMapTemp)
                     {
                         gcmASSERT(pTempSet);
@@ -10358,6 +10356,32 @@ VIR_Inst_FreeDest(
     return VIR_Function_FreeOperand(function, operand);
 }
 
+static gctBOOL
+_CheckIsTheParamOpndSym(
+    IN VIR_Symbol      *pParmRegSym,
+    IN VIR_Operand     *pOpnd
+    )
+{
+    gctBOOL             bMatch = gcvFALSE;
+    VIR_Symbol         *pSym = gcvNULL;
+
+    if (VIR_Operand_isVirReg(pOpnd) || VIR_Operand_isSymbol(pOpnd) || (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SAMPLER_INDEXING))
+    {
+        pSym = VIR_Operand_GetSymbol(pOpnd);
+
+        if (pSym == pParmRegSym)
+        {
+            bMatch = gcvTRUE;
+        }
+        else if (VIR_Symbol_isVariable(pSym) && pSym == VIR_Symbol_GetVregVariable(pParmRegSym))
+        {
+            bMatch = gcvTRUE;
+        }
+    }
+
+    return bMatch;
+}
+
 /*
 ** We can't use variable symbol to find the parmInst because a variable symbol can have more than one vreg symbol,
 ** we need to use vreg symbol to find the parmInst.
@@ -10367,12 +10391,13 @@ VIR_Shader_FindParmInst(
     IN VIR_Function    *pCalleeFunc,
     IN VIR_Instruction *pCallInst,
     IN gctBOOL          bForward,
-    IN VIR_Symbol      *parmRegSym
+    IN VIR_Symbol      *parmRegSym,
+    INOUT VIR_Operand  **ppOpnd
     )
 {
     VIR_Instruction *pInst = pCallInst;
-    VIR_Symbol      *pSym = gcvNULL;
     VIR_Operand     *pOpnd;
+    gctUINT32       i, j;
 
     gcmASSERT(VIR_Symbol_isVreg(parmRegSym));
 
@@ -10384,26 +10409,20 @@ VIR_Shader_FindParmInst(
             if (pInst == gcvNULL ||
                 (VIR_Inst_GetOpcode(pInst) == VIR_OP_CALL && VIR_Operand_GetFunction(VIR_Inst_GetDest(pInst)) == pCalleeFunc))
             {
-                pInst = gcvNULL;
-                break;
+                return gcvNULL;
             }
 
             if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)))
             {
                 pOpnd = VIR_Inst_GetDest(pInst);
 
-                if (VIR_Operand_isVirReg(pOpnd) || VIR_Operand_isSymbol(pOpnd) || (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SAMPLER_INDEXING))
+                if (_CheckIsTheParamOpndSym(parmRegSym, pOpnd))
                 {
-                    pSym = VIR_Operand_GetSymbol(pOpnd);
-
-                    if (pSym == parmRegSym)
+                    if (ppOpnd)
                     {
-                        break;
+                        *ppOpnd = pOpnd;
                     }
-                    else if (VIR_Symbol_isVariable(pSym) && pSym == VIR_Symbol_GetVregVariable(parmRegSym))
-                    {
-                        break;
-                    }
+                    return pInst;
                 }
             }
         }
@@ -10413,32 +10432,44 @@ VIR_Shader_FindParmInst(
             if (pInst == gcvNULL ||
                 (VIR_Inst_GetOpcode(pInst) == VIR_OP_CALL && VIR_Operand_GetFunction(VIR_Inst_GetDest(pInst)) == pCalleeFunc))
             {
-                pInst = gcvNULL;
-                break;
+                return gcvNULL;
             }
 
-            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_MOV)
+            for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
             {
-                pOpnd = VIR_Inst_GetSource(pInst, 0);
+                pOpnd = VIR_Inst_GetSource(pInst, i);
 
-                if (VIR_Operand_isVirReg(pOpnd) || VIR_Operand_isSymbol(pOpnd) || (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SAMPLER_INDEXING))
+                if (VIR_Operand_isParameters(pOpnd))
                 {
-                    pSym = VIR_Operand_GetSymbol(pOpnd);
+                    VIR_ParmPassing *pParm = VIR_Operand_GetParameters(pOpnd);
 
-                    if (pSym == parmRegSym)
+                    for (j = 0; j < pParm->argNum; j++)
                     {
-                        break;
+                        if (_CheckIsTheParamOpndSym(parmRegSym, pParm->args[j]))
+                        {
+                            if (ppOpnd)
+                            {
+                                *ppOpnd = pParm->args[j];
+                            }
+                            return pInst;
+                        }
                     }
-                    else if (VIR_Symbol_isVariable(pSym) && pSym == VIR_Symbol_GetVregVariable(parmRegSym))
+                }
+                else if (_CheckIsTheParamOpndSym(parmRegSym, pOpnd))
+                {
+                    if (ppOpnd)
                     {
-                        break;
+                        *ppOpnd = pOpnd;
                     }
+                    return pInst;
                 }
             }
         }
     }
 
-    gcmASSERT(pInst != gcvNULL);
+    /* pInst may be NULL if the parameter is not used or be optimized (by copy
+     * propagation or DCE, etc.)
+     */
 
     return pInst;
 }
