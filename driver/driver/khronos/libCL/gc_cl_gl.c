@@ -1512,6 +1512,7 @@ clEnqueueAcquireGLObjects(
                            CL_MEM_OBJECT_ALLOCATION_FAILURE);
             #endif
                 buffer->u.buffer.allocatedSize = (gctUINT) size;
+                buffer->u.buffer.size = bufferSize;
 
                 /* GLES3 */
                 /*glUnmapBuffer( GL_ARRAY_BUFFER );*/
