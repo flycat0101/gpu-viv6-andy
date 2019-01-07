@@ -8154,7 +8154,7 @@ _VIR_RA_LS_SpillAddrComputation(
     /* src0 - base */
     VIR_Operand_SetOpKind(atomicAddInst->src[VIR_Operand_Src0], VIR_OPND_SYMBOL);
     VIR_Operand_SetSym(atomicAddInst->src[VIR_Operand_Src0], uSymSpillMemAddr);
-    VIR_Operand_SetSwizzle(atomicAddInst->src[VIR_Operand_Src0], VIR_SWIZZLE_XXXX);
+    VIR_Operand_SetSwizzle(atomicAddInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_XXXX);
 
     /* src1 - 0 */
     VIR_Operand_SetImmediateUint(atomicAddInst->src[VIR_Operand_Src1], 0);

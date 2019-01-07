@@ -1410,6 +1410,15 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
         return VSC_ERR_NONE;
     }
 
+    for(i = 0; i < VIR_IdList_Count(&pShader->uniforms); ++i)
+    {
+        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Symbol *sym = VIR_Shader_GetSymFromId(pShader, id);
+
+        errCode = VIR_Shader_ChangeAddressUniformTypeToFatPointer(pShader, sym);
+        ON_ERROR0(errCode);
+    }
+
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
@@ -1482,21 +1491,11 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
             if (VIR_Symbol_isImage(pSymForMemBaseUniform))
             {
-                VIR_Operand *offsetOpnd = VIR_Inst_GetSource(inst, 1);
-                /* if the image atomic operation has offset 0, then we don't need to insert bounds */
-                gcmASSERT(VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)));
-                if (VIR_Operand_isImm(offsetOpnd) &&
-                    VIR_Operand_GetImmediateInt(offsetOpnd) == 0)
-                {
-                    bNeedInsertMov = gcvFALSE;
-                }
-                else
-                {
-                    /* otherwise assume the image atomic address calculation is done bounds check,
-                     * so the bounds can be extended to full range, we can set the instruction not
-                     * to do bounds check if HW support per-inst bound check flag in future */
-                    bFullRange = gcvTRUE;
-                }
+                /* assume the image atomic address calculation is done bounds check,
+                    * so the bounds can be extended to full range, we can set the instruction not
+                    * to do bounds check if HW support per-inst bound check flag in future */
+                bNeedInsertMov = gcvTRUE;
+                bFullRange = gcvTRUE;
             }
             else
             {
@@ -1718,7 +1717,6 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
             }
             /* Change the swizzle of src0 to XYZ */
             VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYZZ);
-
         }
     }
 
