@@ -438,6 +438,9 @@ soc_board     := $(lastword  $(subst -, ,$(SOC_PLATFORM)))
 CFLAGS              += -DVIVANTE_PROFILER=1
 CFLAGS              += -DVIVANTE_PROFILER_CONTEXT=1
 
+ifeq ($(USE_FILE_OFFSET_BITS_64),1)
+  CFLAGS            += -D_FILE_OFFSET_BITS=64
+endif
 
 ################################################################################
 #
