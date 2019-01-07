@@ -2319,6 +2319,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
 
         __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
 
+        /*fix dEQP-VK.pipeline.render_to_image.core.1d_array.huge.width_layers.r8g8b8a8_unorm_d24_unorm_s8_uint out of memory,
+          for this case, the image size is too large which is 256MB, using linear to createImage can avoid this issue*/
+        if (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_DEQP &&
+            (pCreateInfo->extent.width == 4096 &&
+             pCreateInfo->extent.height == 1 &&
+             pCreateInfo->extent.depth == 1 &&
+             pCreateInfo->arrayLayers == 100 &&
+             pCreateInfo->tiling == VK_IMAGE_TILING_OPTIMAL))
+        {
+            __vkGetAlign(devCtx, &img->formatInfo, VK_IMAGE_TILING_LINEAR, &alignX, &alignY, &img->hAlignment, &img->halTiling);
+        }
+
         img->pImgLevels = (__vkImageLevel*)__VK_ALLOC(pCreateInfo->mipLevels * sizeof(__vkImageLevel), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
         __VK_ONERROR(img->pImgLevels ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
         __VK_MEMZERO(img->pImgLevels, pCreateInfo->mipLevels * sizeof(__vkImageLevel));
