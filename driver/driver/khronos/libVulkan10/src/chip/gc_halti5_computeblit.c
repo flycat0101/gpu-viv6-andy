@@ -1908,6 +1908,13 @@ static uint32_t halti5_detect_blit_kind(
         srcBitsPerPixel = pSrcImg->formatInfo.bitsPerBlock;
         srcMsaa = (pSrcImg->sampleInfo.product > 1);
         srcAspect = srcRes->u.img.subRes.aspectMask;
+
+        if ((pSrcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            ((pSrcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (pSrcImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+        {
+            srcFormat = pSrcImg->createInfo.format;
+        }
     }
     else
     {
@@ -1945,6 +1952,13 @@ static uint32_t halti5_detect_blit_kind(
         dstBitsPerPixel = pDstImg->formatInfo.bitsPerBlock;
         dstMsaa = (pDstImg->sampleInfo.product > 1);
         dstType = pDstImg->createInfo.imageType;
+
+        if ((pDstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            ((pDstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (pDstImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+        {
+            dstFormat = pDstImg->createInfo.format;
+        }
     }
     else
     {

@@ -502,6 +502,16 @@ VkResult __vkComputeClearVal(
         pClearVals[1] = pClearVals[0];
         break;
 
+    case VK_FORMAT_R8G8B8A8_SRGB:
+        pClearVals[0]
+            = (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[R], 8))
+            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[G], 8) <<  8)
+            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[B], 8) <<  16)
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[3], 8) << 24);
+
+        pClearVals[1] = pClearVals[0];
+        break;
+
     case VK_FORMAT_R8_SNORM:
         pClearVals[0] = __vkConvertSFLOAT(gcvVALUE_FLAG_SIGNED_DENORM, vkClearValue->color.float32[R], 8);
         pClearVals[0] |= (pClearVals[0] << 8);
@@ -2567,9 +2577,11 @@ VkResult halti5_clearImage(
         }
     }
 
-    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (img->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+        ((img->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+        (img->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
     {
-        img->formatInfo.residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        img->formatInfo.residentImgFormat = img->createInfo.format;
     }
 
     while (partIndex < pLevel->partCount)
@@ -3281,9 +3293,11 @@ VkResult halti5_copyImage(
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
 
-        if ((srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        if ((srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            ((srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM)||
+            (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
         {
-            srcFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            srcFormat = srcImg->createInfo.format;
         }
 
         srcParts = pSrcLevel->partCount;
@@ -3400,9 +3414,11 @@ VkResult halti5_copyImage(
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
 
-        if ((dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        if ((dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            ((dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
         {
-            dstFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            dstFormat = dstImg->createInfo.format;
         }
 
         dstParts = pDstLevel->partCount;
@@ -6164,9 +6180,10 @@ VkResult halti5_helper_convertHwTxDesc(
         __VK_ASSERT(!bufv);
 
         if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+            ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
         {
-            tmpResidentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            tmpResidentImgFormat = imgv->createInfo.format;
         }
 
         if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
@@ -6881,9 +6898,10 @@ VkResult halti5_helper_convertHwImgDesc(
         }
 
         if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+            ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
         {
-            tmpResidentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            tmpResidentImgFormat = imgv->createInfo.format;
         }
 
         width = userSize ? userSize->width : baseLevel->requestW;
@@ -7687,6 +7705,7 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
@@ -10368,9 +10387,10 @@ VkResult halti5_createImageView(
     __VK_MEMZERO(chipImgv, sizeof(halti5_imageView));
 
     if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-        (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
+        ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+        (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
     {
-        residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        residentImgFormat = imgv->createInfo.format;
     }
 
     if ((img->createInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT)
