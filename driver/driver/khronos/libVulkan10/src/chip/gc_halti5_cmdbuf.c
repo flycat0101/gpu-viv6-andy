@@ -8802,7 +8802,7 @@ VkResult halti5_setMultiGpuSync(
  29:28) - (0 ?
  29:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)))
-                     | hasBltEngine ?
+                     | (hasBltEngine ?
                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ?
  12:8) + 1) == 32) ?
@@ -8822,7 +8822,7 @@ VkResult halti5_setMultiGpuSync(
  12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
  12:8) - (0 ?
  12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))));
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stallDestination);
 
