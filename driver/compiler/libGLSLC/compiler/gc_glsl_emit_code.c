@@ -6115,7 +6115,7 @@ _EmitScalarFloatOrIntToBoolCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* Make sure that source0 and source1 have the same data type. */
-    if (Source->dataType == gcSHADER_FLOAT_X1)
+    if (Source->dataType == gcSHADER_FLOAT_X1 || Source->dataType == gcSHADER_FLOAT64_X1)
     {
         gcsSOURCE_InitializeFloatConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
     }
@@ -6179,22 +6179,33 @@ _EmitFloatOrIntToBoolCode(
     )
 {
     gceSTATUS    status;
-    gctUINT        i;
+    gctUINT      i;
     gcsTARGET    componentTarget;
     gcsSOURCE    componentSource;
+    gcsSOURCE    constSource0;
 
     gcmHEADER();
 
     gcmASSERT(Target);
     gcmASSERT(Source);
 
-    /* mov target, source */
+    /* mov target, false */
+#if TREAT_ES20_INTEGER_AS_FLOAT
+    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
+       gcsSOURCE_InitializeBoolConstant(&constSource0, gcSHADER_PRECISION_MEDIUM, gcvFALSE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
+    }
+    else {
+       gcsSOURCE_InitializeFloatConstant(&constSource0, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
+    }
+#endif
     status = _EmitCode(Compiler,
                LineNo,
                StringNo,
                gcSL_MOV,
                Target,
-               Source,
+               &constSource0,
                gcvNULL);
 
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
