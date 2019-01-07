@@ -25182,6 +25182,8 @@ cloIR_UNARY_EXPR_GenCode(
                 status = cloIR_CAST_EXPR_Evaluate(Compiler,
                                                   &UnaryExpr->exprBase.decl,
                                                   operandParameters.constant);
+                if (gcmIS_ERROR(status)) return status;
+                Parameters->constant = operandParameters.constant;
             }
             else
             {
@@ -25191,8 +25193,8 @@ cloIR_UNARY_EXPR_GenCode(
                                                    UnaryExpr->u.fieldName,
                                                    &UnaryExpr->u.componentSelection,
                                                    &Parameters->constant);
+                if (gcmIS_ERROR(status)) return status;
             }
-            if (gcmIS_ERROR(status)) return status;
 
             operandParameters.constant = gcvNULL;
         }
