@@ -436,6 +436,8 @@
                                      ((opcode) == SpvOpSpecConstantTrue) || \
                                      ((opcode) == SpvOpSpecConstantOp))
 
+#define SPV_IS_FP_CONV_OP(opcode)   ((opcode) == SpvOpFConvert)
+
 #define SPV_IS_EMPTY_STRING(str) ((str == gcvNULL) || (gcoOS_MemCmp(str, "", 1) == gcvSTATUS_OK))
 
 #define VIR_OPINFO(OPCODE, OPNDNUM, FLAGS, WRITE2DEST, LEVEL)    {VIR_OP_##OPCODE, OPNDNUM, WRITE2DEST, LEVEL, FLAGS}
@@ -3091,6 +3093,66 @@ static VIR_LayoutQual __SpvConvDecoratorToSymLayout(SpvConvDecorationData *Decor
     return layout;
 }
 
+static VIR_RoundMode __SpvConvDecoratorToRoundingMode(SpvConvDecorationData *DecorationData)
+{
+    VIR_RoundMode roundingMode = VIR_ROUND_DEFAULT;
+
+    switch (DecorationData->fpRoundingMode)
+    {
+    case SpvFPRoundingModeRTE:
+        roundingMode = VIR_ROUND_RTE;
+        break;
+
+    case SpvFPRoundingModeRTZ:
+        roundingMode = VIR_ROUND_RTZ;
+        break;
+
+    case SpvFPRoundingModeRTP:
+        roundingMode = VIR_ROUND_RTP;
+        break;
+
+    case SpvFPRoundingModeRTN:
+        roundingMode = VIR_ROUND_RTN;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return roundingMode;
+}
+
+static VSC_ErrCode __SpvUpdateRoundingMode(gcSPV spv, VIR_Instruction* virInst)
+{
+    VSC_ErrCode         virErrCode = VSC_ERR_NONE;
+
+    /*
+    ** Since a rounding mode is only associated to a floating-point conversion instruction,
+    ** we only need to check those instrucitons.
+    */
+    if (SPV_IS_FP_CONV_OP(spv->opCode))
+    {
+        /* Get the FP rounding mode from the decorator list. */
+        SpvCovDecorator        *dec = spv->decorationList;
+
+        /* Find the decoration by target and member index. */
+        SPV_GET_DECORATOR(dec, spv->resultId, -1);
+
+        if (dec != gcvNULL)
+        {
+            VIR_RoundMode roundingMode = __SpvConvDecoratorToRoundingMode(&dec->decorationData);
+
+            if (roundingMode != VIR_ROUND_DEFAULT)
+            {
+                VIR_Operand_SetRoundMode(VIR_Inst_GetDest(virInst), roundingMode);
+            }
+        }
+    }
+
+    return virErrCode;
+}
+
 static VSC_ErrCode __SpvIDCopy(gcSPV spv, VIR_Shader * virShader, SpvId from, SpvId to)
 {
     VSC_ErrCode         virErrCode = VSC_ERR_NONE;
@@ -5124,6 +5186,9 @@ static VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
     case SpvOpConvertSToF:
     case SpvOpConvertFToU:
     case SpvOpConvertUToF:
+    case SpvOpSConvert:
+    case SpvOpFConvert:
+    case SpvOpUConvert:
     case SpvOpBitcast:
     case SpvOpFNegate:
     case SpvOpFDiv:
@@ -5153,9 +5218,6 @@ static VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
         __SpvEmitAccessChain(spv, virShader);
         break;
 
-    case SpvOpSConvert:
-    case SpvOpFConvert:
-    case SpvOpUConvert:
     case SpvOpConvertPtrToU:
     case SpvOpConvertUToPtr:
     case SpvOpGenericCastToPtr:
@@ -10286,6 +10348,9 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetImmediateUint(VIR_Inst_GetSource(selectInst, 1), 1);
         VIR_Operand_SetImmediateUint(VIR_Inst_GetSource(selectInst, 2), 0);
     }
+
+    /* Update the rounding mode for some special instructions. */
+    __SpvUpdateRoundingMode(spv, virInst);
 
     return virErrCode;
 }
