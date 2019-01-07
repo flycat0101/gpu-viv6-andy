@@ -15,6 +15,7 @@
 #define __gc_spirv_h_
 
 #define VIV_SPIRV_CONVERTER         1         /* flag to specify headers below are included for spirv converter */
+#define VIV_TREAT_8BIT_16BIT_PUSH_CONSTANT_AS_BUFFER    1
 #include "utils/gc_vsc_utils_base.h"
 #include "utils/gc_vsc_err.h"
 #include "utils/gc_vsc_utils_list.h"
@@ -339,6 +340,8 @@ typedef struct
     gctBOOL isSampledImage;
     gctBOOL isPerVertex;
     gctBOOL isPerPatch;
+    gctBOOL isPushConstUBO;
+
     /* For inputAttachment. */
     Spv_AttachmentFlag attachmentFlag;
 

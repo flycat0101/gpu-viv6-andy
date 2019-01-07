@@ -3751,6 +3751,7 @@ typedef enum _VIR_IB_FLAG
     VIR_IB_FOR_SHARED_VARIABLE      = 0x0002,
     VIR_IB_WITH_INSTANCE_NAME       = 0x0004,
     VIR_IB_WITH_CUBO                = 0x0008,
+    VIR_IB_FOR_PUSH_CONST           = 0x0010,
 } VIR_IB_FLAG;
 
 /* Structure that defines a uniform block for a shader. */

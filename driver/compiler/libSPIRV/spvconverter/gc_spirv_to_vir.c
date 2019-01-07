@@ -158,6 +158,7 @@
 #define SPV_ID_SYM_PARAM_TO_FUNC(id) (spv->idDescriptor[id].u.sym.paramToFunc)
 #define SPV_ID_SYM_PER_PATCH(id) (spv->idDescriptor[id].u.sym.isPerPatch)
 #define SPV_ID_SYM_PER_VERTEX(id) (spv->idDescriptor[id].u.sym.isPerVertex)
+#define SPV_ID_SYM_IS_PUSH_CONST_UBO(id) (spv->idDescriptor[id].u.sym.isPushConstUBO)
 #define SPV_ID_SYM_ATTACHMENT_FLAG(id) (spv->idDescriptor[id].u.sym.attachmentFlag)
 #define SPV_ID_SYM_STORAGE_CLASS(id) (spv->idDescriptor[id].u.sym.storageClass)
 
@@ -1757,7 +1758,7 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     case SpvStorageClassUniform:
     case SpvStorageClassAtomicCounter:
     case SpvStorageClassImage:
-        if (symSpv->spvStorage == SpvStorageClassPushConstant)
+        if (symSpv->spvStorage == SpvStorageClassPushConstant && !SPV_ID_SYM_IS_PUSH_CONST_UBO(spv->resultId))
         {
             symSpv->u1.uniformKind = VIR_UNIFORM_PUSH_CONSTANT;
         }
@@ -2162,6 +2163,11 @@ static VIR_IB_FLAG __SpvGetIBFlag(
     if (SPV_ID_TYPE_HAS_UNSIZEDARRAY(targetTypeId))
     {
         virIBFlag |= VIR_IB_UNSIZED;
+    }
+
+    if (SPV_ID_SYM_IS_PUSH_CONST_UBO(targetId))
+    {
+        virIBFlag |= VIR_IB_FOR_PUSH_CONST;
     }
 
     return virIBFlag;
@@ -4694,26 +4700,26 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
         baseTypeId = SPV_ID_TYPE_ARRAY_BASE_TYPE_ID(baseTypeId);
     }
 
-    if ((storage == SpvStorageClassUniform ||
-        storage == SpvStorageClassUniformConstant ||
-        storage == SpvStorageClassInput ||
-        storage == SpvStorageClassOutput) &&
-        SPV_ID_TYPE_IS_STRUCT(baseTypeId) &&
-        SPV_ID_TYPE_IS_BLOCK(baseTypeId))
-    {
-        isBlock = gcvTRUE;
-    }
-
     /* Initialize SpvVIRSymbolInternal */
     SYMSPV_Initialize(&symSpv);
-    symSpv.spvStorage = storage;
-    SPV_ID_SYM_STORAGE_CLASS(spv->resultId) = storage;
 
     switch(storage)
     {
     case SpvStorageClassUniformConstant:
     case SpvStorageClassPushConstant:
         SPV_ID_INITIALIZED(spv->resultId) = gcvTRUE;
+        symSpv.virStorageClass = VIR_STORAGE_GLOBAL;
+
+#if VIV_TREAT_8BIT_16BIT_PUSH_CONSTANT_AS_BUFFER
+        if (storage == SpvStorageClassPushConstant &&
+            (SPV_ID_TYPE_HAS_8BIT_TYPE(baseTypeId) || SPV_ID_TYPE_HAS_16BIT_TYPE(baseTypeId)))
+        {
+            SPV_ID_SYM_IS_PUSH_CONST_UBO(spv->resultId) = gcvTRUE;
+            symSpv.virSymbolKind = VIR_SYM_UBO;
+            break;
+        }
+#endif
+
         if (SPV_ID_TYPE_IS_SAMPLER(baseTypeId))
         {
             symSpv.virSymbolKind = VIR_SYM_SAMPLER;
@@ -4726,7 +4732,6 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
         {
             symSpv.virSymbolKind = VIR_SYM_UNIFORM;
         }
-        symSpv.virStorageClass = VIR_STORAGE_GLOBAL;
         break;
 
     case SpvStorageClassUniform:
@@ -4767,6 +4772,24 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
     default:
         symSpv.virSymbolKind = VIR_SYM_VARIABLE;
         symSpv.virStorageClass = VIR_STORAGE_GLOBAL;
+        break;
+    }
+
+    symSpv.spvStorage = storage;
+    SPV_ID_SYM_STORAGE_CLASS(spv->resultId) = storage;
+
+    /* Check if it is a block.*/
+    if ((storage == SpvStorageClassUniform          ||
+         storage == SpvStorageClassUniformConstant  ||
+         storage == SpvStorageClassInput            ||
+         storage == SpvStorageClassOutput           ||
+         storage == SpvStorageClassStorageBuffer    ||
+         (storage == SpvStorageClassPushConstant && SPV_ID_SYM_IS_PUSH_CONST_UBO(spv->resultId)))
+        &&
+        SPV_ID_TYPE_IS_STRUCT(baseTypeId) &&
+        SPV_ID_TYPE_IS_BLOCK(baseTypeId))
+    {
+        isBlock = gcvTRUE;
     }
 
     /* decorator and storage need these symSpv info, so put at last.
