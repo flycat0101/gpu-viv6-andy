@@ -1177,32 +1177,32 @@
     /* SpvOpUConvert = 113 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConvert,
-        gcvNULL,
+        __SpvEmitInstructions,
         1,
         { OperandId, },
-        { "'Unsigned Value'", },
+        { "'Unsigned Value Convert'", },
         { gcvNULL },
-        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpSConvert = 114 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConvert,
-        gcvNULL,
+        __SpvEmitInstructions,
         1,
         { OperandId, },
-        { "'Signed Value'", },
+        { "'Signed Value Convert'", },
         { gcvNULL },
-        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpFConvert = 115 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConvert,
-        gcvNULL,
+        __SpvEmitIntrisicCall,
         1,
         { OperandId, },
-        { "'Float Value'", },
+        { "'Float Value Convert'", },
         { gcvNULL },
         VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },

@@ -2149,6 +2149,7 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* umul extended */
     gcvNULL, /* imul extended */
 
+    gcvNULL, /* F32ToF16 */
     gcvNULL, /* quantizeToF16 */
 
     gcvNULL, /* image fetch */

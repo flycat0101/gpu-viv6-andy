@@ -204,6 +204,7 @@ _CreateIntrinsicLib(
         gcLibLDEXP_Func,
         gcLibPack_Func,
         gcLibUnpack_Func,
+        gcLibConvF32ToF16_Funcs,
         gcLibQuantizeToF16_Funcs,
         gcLibUaddCarry_Func_VK_hati4,
         gcLibUsubBorrow_Func_VK,
@@ -654,6 +655,7 @@ _CreateIntrinsicLib(
         }
 
         /* add the header source */
+        gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_MathMacros);
         gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_TextureBufferSize_For_VK);
         gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_BuiltinHeader);
 

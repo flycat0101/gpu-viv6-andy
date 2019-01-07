@@ -108,7 +108,9 @@ typedef struct _SpvTypeDescriptor
         gctUINT isFunction              : 1;
         gctUINT isMeta                  : 1;
         gctUINT isBlock                 : 1;
-        gctUINT reserved                : 14;
+        gctUINT has8BitType             : 1;
+        gctUINT has16BitType            : 1;
+        gctUINT reserved                : 12;
     }typeFlags;
 
     union

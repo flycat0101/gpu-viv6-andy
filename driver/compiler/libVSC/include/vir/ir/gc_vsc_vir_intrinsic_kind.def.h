@@ -240,6 +240,7 @@
     VIR_INTRINSIC_INFO(umulExtended),
     VIR_INTRINSIC_INFO(imulExtended),
 
+    VIR_INTRINSIC_INFO(convF32ToF16),
     VIR_INTRINSIC_INFO(quantizeToF16),
 
     VIR_INTRINSIC_INFO(image_fetch), /*

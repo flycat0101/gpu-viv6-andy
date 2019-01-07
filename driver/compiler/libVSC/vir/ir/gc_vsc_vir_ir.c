@@ -277,6 +277,7 @@ static VIR_IntrinsicsKind INTERNAL_INTRINSIC[] =
     VIR_IK_usubBorrow,
     VIR_IK_umulExtended,
     VIR_IK_imulExtended,
+    VIR_IK_convF32ToF16,
     VIR_IK_quantizeToF16,
     VIR_IK_image_fetch,
     VIR_IK_image_fetch_for_sampler,

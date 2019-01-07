@@ -124,6 +124,8 @@
 #define SPV_ID_TYPE_IS_FUNCTION(id) (spv->idDescriptor[id].u.type.typeFlags.isFunction)
 #define SPV_ID_TYPE_IS_META(id) (spv->idDescriptor[id].u.type.typeFlags.isMeta)
 #define SPV_ID_TYPE_IS_BLOCK(id) (spv->idDescriptor[id].u.type.typeFlags.isBlock)
+#define SPV_ID_TYPE_HAS_8BIT_TYPE(id) (spv->idDescriptor[id].u.type.typeFlags.has8BitType)
+#define SPV_ID_TYPE_HAS_16BIT_TYPE(id) (spv->idDescriptor[id].u.type.typeFlags.has16BitType)
 
 #define SPV_ID_VIR_SYM_ID(id) (spv->idDescriptor[id].u.sym.descriptorHeader.virSymId)
 #define SPV_ID_SYM_SPV_TYPE(id) (spv->idDescriptor[id].u.sym.spvTypeId)
@@ -714,7 +716,11 @@ static void __SpvCheckFlag(gcSPV spv, VIR_Shader * virShader, SpvId * spvIds, gc
 
 static gctUINT __GetMagicOffsetByTypeId(VIR_TypeId TypeId)
 {
+    /*
+    ** So far this is used to index the array "virVector".
+    */
     gctUINT     magicOffset = 0;
+
     switch (TypeId)
     {
         case VIR_TYPE_FLOAT32:      magicOffset = 0;    break;
@@ -725,6 +731,7 @@ static gctUINT __GetMagicOffsetByTypeId(VIR_TypeId TypeId)
         case VIR_TYPE_UINT8:        magicOffset = 35;   break;
         case VIR_TYPE_UINT16:       magicOffset = 42;   break;
         case VIR_TYPE_BOOLEAN:      magicOffset = 49;   break;
+        case VIR_TYPE_FLOAT16:      magicOffset = 56;   break;
         default:
             gcmASSERT(gcvFALSE);
             break;
@@ -3769,6 +3776,13 @@ static const VIR_TypeId virVector[] =
     VIR_TYPE_BOOLEAN_X8,
     VIR_TYPE_BOOLEAN_X16,
     VIR_TYPE_BOOLEAN_X32,
+    VIR_TYPE_FLOAT16,
+    VIR_TYPE_FLOAT16_X2,
+    VIR_TYPE_FLOAT16_X3,
+    VIR_TYPE_FLOAT16_X4,
+    VIR_TYPE_FLOAT16_X8,
+    VIR_TYPE_FLOAT16_X16,
+    VIR_TYPE_FLOAT16_X32,
 };
 
 static const VIR_TypeId virMat[] =
@@ -4184,13 +4198,37 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
             SPV_ID_TYPE_IS_UNSIGNEDINTEGER(spv->resultId) = gcvTRUE;
         }
 
+        if (SPV_ID_TYPE_INT_WIDTH(spv->resultId) == 16)
+        {
+            SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = gcvTRUE;
+        }
+        else if (SPV_ID_TYPE_INT_WIDTH(spv->resultId) == 8)
+        {
+            SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = gcvTRUE;
+        }
+
         SPV_ID_TYPE_IS_INTEGER(spv->resultId) = gcvTRUE;
         SPV_ID_TYPE_IS_SCALAR(spv->resultId) = gcvTRUE;
         break;
 
     case SpvOpTypeFloat:
         SPV_ID_TYPE_FLOAT_WIDTH(spv->resultId) = spv->operands[0];
-        virTypeId = VIR_TYPE_FLOAT32;
+        switch (spv->operands[0])
+        {
+        case 32:
+            virTypeId = VIR_TYPE_FLOAT32;
+            break;
+
+        case 16:
+            virTypeId = VIR_TYPE_FLOAT16;
+            SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = gcvTRUE;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            virTypeId = VIR_TYPE_FLOAT32;
+            break;
+        }
         SPV_ID_TYPE_IS_FLOAT(spv->resultId) = gcvTRUE;
         SPV_ID_TYPE_IS_SCALAR(spv->resultId) = gcvTRUE;
         break;
@@ -4204,6 +4242,9 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
         virTypeId = virVector[spvVecMagicBase[SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId)] + magicOffset];
 
         SPV_ID_TYPE_IS_VECTOR(spv->resultId) = gcvTRUE;
+
+        SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[0]);
+        SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[0]);
         break;
 
     case SpvOpTypeMatrix:
@@ -4214,6 +4255,9 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                         + SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_MAT_COL_TYPE(spv->resultId)) - 2];
 
         SPV_ID_TYPE_IS_MATRIX(spv->resultId) = gcvTRUE;
+
+        SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[0]);
+        SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[0]);
         break;
 
     case SpvOpTypeStruct:
@@ -4319,6 +4363,9 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                 {
                     SPV_ID_TYPE_HAS_UNSIZEDARRAY(spv->resultId) = gcvTRUE;
                 }
+
+                SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) |= SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[i]);
+                SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) |= SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[i]);
             }
 
             SPV_ID_TYPE_IS_STRUCT(spv->resultId) = gcvTRUE;
@@ -4400,6 +4447,8 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                 SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(spv->resultId) = samplerTypeId;
             }
 
+            SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[0]);
+            SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[0]);
             break;
         }
 
@@ -5980,6 +6029,27 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
 
                 /* after handle the image fetch, we can finish the call */
                 break;
+            }
+            /* Handle the last parameter if it is special. */
+            else if (i == argCount + 1)
+            {
+                if (SPV_IS_FP_CONV_OP(spv->opCode))
+                {
+                    /* Get the FP rounding mode from the decorator list. */
+                    SpvCovDecorator         *dec = spv->decorationList;
+                    VIR_RoundMode           roundingMode = VIR_ROUND_DEFAULT;
+
+                    /* Find the decoration by target and member index. */
+                    SPV_GET_DECORATOR(dec, spv->resultId, -1);
+
+                    if (dec != gcvNULL)
+                    {
+                        roundingMode = __SpvConvDecoratorToRoundingMode(&dec->decorationData);
+                    }
+                    VIR_Operand_SetImmediateUint(srcOpnd, (gctUINT)roundingMode);
+
+                    break;
+                }
             }
 
             virSwizzle = __SpvID2Swizzle(spv, spv->operands[i]);
@@ -7803,6 +7873,23 @@ static VSC_ErrCode __SpvOpcode2Intrisic(
         instid = VIR_INTRINSIC_INTERNAL_SMULEXTENDED;
         break;
 
+    case SpvOpFConvert:
+        {
+            VIR_TypeId dstCompTypeId = VIR_GetTypeComponentType(SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId));
+            VIR_TypeId srcCompTypeId = VIR_GetTypeComponentType(SPV_ID_VIR_TYPE_ID(spv->operands[0]));
+
+            /* Only handle F32 to F16. */
+            if ((VIR_GetTypeSize(dstCompTypeId) == 2 && VIR_GetTypeSize(srcCompTypeId) == 4))
+            {
+                instid = VIR_INTRINSIC_INTERNAL_CONV_F32_TO_F16;
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            break;
+        }
+
     case SpvOpQuantizeToF16:
         instid = VIR_INTRINSIC_INTERNAL_QUANTIZE_TO_F16;
         break;
@@ -8012,6 +8099,22 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
         spv->opCode = SpvOpImageSampleImplicitLod;
         virErrCode = __SpvEmitImageSample(spv, virShader);
         return virErrCode;
+    }
+    /* Do some special settings for FConvert. */
+    else if (spv->opCode == SpvOpFConvert)
+    {
+        VIR_TypeId dstCompTypeId = VIR_GetTypeComponentType(SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId));
+        VIR_TypeId srcCompTypeId = VIR_GetTypeComponentType(SPV_ID_VIR_TYPE_ID(spv->operands[0]));
+
+        /* Only handle F32 to F16. */
+        if (!(VIR_GetTypeSize(dstCompTypeId) == 2 && VIR_GetTypeSize(srcCompTypeId) == 4))
+        {
+            virErrCode = __SpvEmitInstructions(spv, virShader);
+            return virErrCode;
+        }
+
+        /* Add a extra parameter for the rounding mode. */
+        spv->operandSize++;
     }
 
     /* Copy operands to begin at 2 */
