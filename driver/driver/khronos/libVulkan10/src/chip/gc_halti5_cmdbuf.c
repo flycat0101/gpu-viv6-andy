@@ -5869,9 +5869,7 @@ static VkResult halti5_helper_setDescSetInputAttach(
 
             if (hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR)
             {
-                /* Use the real used HW reg size. */
-                arraySize = __VK_MIN(descriptorBinding->std.descriptorCount,
-                                     hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo);
+                arraySize = descriptorBinding->std.descriptorCount;
             }
             else
             {
