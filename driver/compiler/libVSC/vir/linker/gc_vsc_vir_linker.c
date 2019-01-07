@@ -2198,6 +2198,7 @@ OnError:
 
 VSC_ErrCode
 _VIR_LinkIntrinsicLib_CopyOpnd(
+    IN VSC_MM                   *pMM,
     IN VIR_Shader               *pShader,
     IN VIR_Shader               *pLibShader,
     IN VIR_Function             *pFunc,
@@ -2335,6 +2336,43 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                 {
                     VIR_Shader_SetBaseSamplerId(pShader, newVarId);
                 }
+
+                /* If this is a initialized uniform, copy the initializer. */
+                if (isSymUniformCompiletimeInitialized(libSym))
+                {
+                    VIR_Uniform*        pNewUniform = VIR_Symbol_GetUniform(newVarSym);
+                    VIR_Uniform*        pLibUniform = VIR_Symbol_GetUniform(libSym);
+                    VIR_Type*           pLibSymType = VIR_Symbol_GetType(libSym);
+                    VIR_Const*          pConstVal;
+                    VIR_ConstId         constId = VIR_INVALID_ID;
+
+                    VIR_Symbol_SetFlags(newVarSym, VIR_Symbol_GetFlag(libSym));
+
+                    if (VIR_Type_isArray(pLibSymType))
+                    {
+                        VIR_ConstId*    pInitializerPtr;
+                        VIR_ConstId*    pLibInitializerPtr = VIR_Uniform_GetInitializerPtr(pLibUniform);
+                        gctUINT         i, arrayLength = VIR_Type_GetArrayLength(pLibSymType);
+
+                        /* Allocate the initializer pointer. */
+                        pInitializerPtr = (VIR_ConstId *)vscMM_Alloc(pMM, sizeof(VIR_ConstId) * arrayLength);
+                        VIR_Uniform_SetInitializerPtr(pNewUniform, pInitializerPtr);
+
+                        /* Copy the initializer pointer. */
+                        for (i = 0; i < arrayLength; i++)
+                        {
+                            pConstVal = VIR_Shader_GetConstFromId(pLibShader, *(pLibInitializerPtr + i));
+                            VIR_Shader_AddConstant(pShader, pConstVal->type, &pConstVal->value, (pInitializerPtr + i));
+                        }
+                    }
+                    else
+                    {
+                        pConstVal = VIR_Shader_GetConstFromId(pLibShader,
+                                                              VIR_Uniform_GetInitializer(pLibUniform));
+                        VIR_Shader_AddConstant(pShader, pConstVal->type, &pConstVal->value, &constId);
+                        VIR_Uniform_SetInitializer(pNewUniform, constId);
+                    }
+                }
             }
             VIR_Operand_SetSymbol(pOpnd, pFunc, VIR_Symbol_GetIndex(newVarSym));
         }
@@ -2403,7 +2441,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         if (VIR_Operand_hasBiasFlag(libTexldOperand))
         {
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2419,7 +2458,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         if (VIR_Operand_hasLodFlag(libTexldOperand))
         {
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2435,7 +2475,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         if (VIR_Operand_hasOffsetFlag(libTexldOperand))
         {
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2451,7 +2492,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         if (VIR_Operand_hasGradFlag(libTexldOperand))
         {
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2464,7 +2506,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             VIR_Operand_SetTexldGradientDx(pOpnd, newOperand);
 
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2482,32 +2525,34 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             if (VIR_Operand_GetTexldGather_comp(libTexldOperand))
             {
                 VIR_Function_NewOperand(pFunc, &newOperand);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
-                    pLibShader,
-                    pFunc,
-                    libFunc,
-                    libInst,
-                    VIR_Operand_GetTexldGather_comp(libTexldOperand),
-                    pInst,
-                    newOperand,
-                    pTempSet,
-                    tempIndexStart);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                         pShader,
+                                                         pLibShader,
+                                                         pFunc,
+                                                         libFunc,
+                                                         libInst,
+                                                         VIR_Operand_GetTexldGather_comp(libTexldOperand),
+                                                         pInst,
+                                                         newOperand,
+                                                         pTempSet,
+                                                         tempIndexStart);
                 VIR_Operand_SetTexldGatherComp(pOpnd, newOperand);
             }
 
             if (VIR_Operand_GetTexldGather_refz(libTexldOperand))
             {
                 VIR_Function_NewOperand(pFunc, &newOperand);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
-                    pLibShader,
-                    pFunc,
-                    libFunc,
-                    libInst,
-                    VIR_Operand_GetTexldGather_refz(libTexldOperand),
-                    pInst,
-                    newOperand,
-                    pTempSet,
-                    tempIndexStart);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                         pShader,
+                                                         pLibShader,
+                                                         pFunc,
+                                                         libFunc,
+                                                         libInst,
+                                                         VIR_Operand_GetTexldGather_refz(libTexldOperand),
+                                                         pInst,
+                                                         newOperand,
+                                                         pTempSet,
+                                                         tempIndexStart);
                 VIR_Operand_SetTexldGatherRefZ(pOpnd, newOperand);
             }
         }
@@ -2515,7 +2560,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         if (VIR_Operand_hasFetchMSFlag(libTexldOperand))
         {
             VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                     pShader,
                                                      pLibShader,
                                                      pFunc,
                                                      libFunc,
@@ -2554,7 +2600,8 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             for (i = 0; i < libParm->argNum; i++)
             {
                 VIR_Function_NewOperand(pFunc, &newOperand);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM,
+                                                         pShader,
                                                          pLibShader,
                                                          pFunc,
                                                          libFunc,
@@ -2758,8 +2805,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
             for (i = 0; i < srcNum; i++)
             {
                 origSrc = VIR_Inst_GetSource(libInst, i);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
-                                                          origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM, pShader, pLibShader, pFunc, libFunc, libInst,
+                                                         origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
             }
 
             break;
@@ -2776,8 +2823,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
             if (VIR_OPCODE_hasDest(libOpcode))
             {
                 origDest = VIR_Inst_GetDest(libInst);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
-                                                          origDest, newInst, VIR_Inst_GetDest(newInst), pTempSet, tempIndexStart);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM, pShader, pLibShader, pFunc, libFunc, libInst,
+                                                         origDest, newInst, VIR_Inst_GetDest(newInst), pTempSet, tempIndexStart);
 
                 VIR_Inst_SetInstType(newInst, VIR_Operand_GetTypeId(VIR_Inst_GetDest(newInst)));
             }
@@ -2786,8 +2833,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
             for (i = 0; i < srcNum; i++)
             {
                 origSrc = VIR_Inst_GetSource(libInst, i);
-                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
-                                                          origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pMM, pShader, pLibShader, pFunc, libFunc, libInst,
+                                                         origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
             }
         }
         break;
