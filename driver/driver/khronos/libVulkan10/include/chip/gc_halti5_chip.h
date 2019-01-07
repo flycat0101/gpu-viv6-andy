@@ -483,7 +483,7 @@ VkResult halti5_tweak_detect(
     __vkDevContext *devCtx
     );
 
-#define HALTI5_INIT_CMD_SIZE_INUINT 10
+#define HALTI5_INIT_CMD_SIZE_INUINT 12
 
 typedef struct
 {

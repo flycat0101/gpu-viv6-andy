@@ -593,12 +593,10 @@ VkResult halti2_clearImageWithRS(
 {
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image);
     __vkImageLevel *pLevel = &img->pImgLevels[subResource->mipLevel];
-    uint32_t address;
     uint32_t clearVals[2] = {0}, clearMasks[2] = {0};
     uint32_t hwConfig, hwDstStride;
     uint32_t dstStride, dstTiling, dstSuperTile;
-    uint32_t *states = gcvNULL;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     uint32_t partIndex = 0;
     uint32_t hwFormat;
     uint32_t ditherTable[2] = { ~0U, ~0U };
@@ -607,8 +605,9 @@ VkResult halti2_clearImageWithRS(
     uint32_t dstTileMode = 0;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkDevContext *devCtx = cmd->devCtx;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
-    __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
+    __VK_ASSERT(devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
 
     if ((rect->offset.x & 0x3)     || (rect->offset.y & 0x3) ||
         (rect->extent.width & 0xF) || (rect->extent.height & 0x3))
@@ -665,9 +664,14 @@ VkResult halti2_clearImageWithRS(
 
     rsConfigTiling(img, &dstTiling, &dstSuperTile);
 
+    __VK_ASSERT(cmd->curScrachBufIndex == 0);
+    pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
+
     while (partIndex < pLevel->partCount)
     {
-        __VK_ONERROR(__vkComputeClearVal(img,
+        uint32_t address;
+
+        __VK_ERR_BREAK(__vkComputeClearVal(img,
             subResource->aspectMask,
             clearValue,
             partIndex,
@@ -829,21 +833,20 @@ VkResult halti2_clearImageWithRS(
             + pLevel->offset
             + subResource->arrayLayer * pLevel->sliceSize);
 
-        __vk_CmdAquireBuffer(commandBuffer, 10 * 2 + 8, &states);
 
-        __vkCmdLoadSingleHWState(&states, 0x0581, VK_FALSE, hwConfig);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0581, VK_FALSE, hwConfig);
 
-        __vkCmdLoadBatchHWStates(&states, 0x058C, VK_FALSE, 2, ditherTable);
+        __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x058C, VK_FALSE, 2, ditherTable);
 
-        __vkCmdLoadSingleHWState(&states, 0x0585, VK_FALSE, hwDstStride);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0585, VK_FALSE, hwDstStride);
 
-        __vkCmdLoadSingleHWState(&states, 0x0583, VK_FALSE, hwSrcStride);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0583, VK_FALSE, hwSrcStride);
 
-        __vkCmdLoadBatchHWStates(&states, 0x0590, VK_FALSE, 2, clearVals);
+        __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x0590, VK_FALSE, 2, clearVals);
 
-        __vkCmdLoadSingleHWState(&states, 0x058F, VK_FALSE, hwControl);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x058F, VK_FALSE, hwControl);
 
-        __vkCmdLoadSingleHWState(&states, 0x05A8, VK_FALSE,
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05A8, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:20) - (0 ?
  20:20) + 1) == 32) ?
@@ -855,15 +858,49 @@ VkResult halti2_clearImageWithRS(
  20:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20))));
 
-        __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->database->RS_NEW_BASEADDR);
+        __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
 
-        __vkCmdLoadSingleHWState(&states, 0x05B8, VK_FALSE, address);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, address);
+        if (devCtx->database->ROBUSTNESS)
+        {
+            if (!devCtx->database->SH_ROBUSTNESS_FIX)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+            }
+            else
+            {
+                uint32_t endAddr = address + (uint32_t)pLevel->sliceSize - 1;
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x06B9, VK_FALSE, endAddr);
+            }
+        }
 
-        __vkCmdLoadSingleHWState(&states, 0x0588, VK_FALSE, hwWindowSize);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0588, VK_FALSE, hwWindowSize);
 
-        __vkCmdLoadSingleHWState(&states, 0x05C0, VK_FALSE, hwOffset);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05C0, VK_FALSE, hwOffset);
 
-        __vkCmdLoadSingleHWState(&states, 0x05AE, VK_FALSE,
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05AE, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -875,15 +912,24 @@ VkResult halti2_clearImageWithRS(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
-        __vkCmdLoadSingleHWState(&states, 0x0580, VK_FALSE, 0xBADABEEB);
-
-        __vk_CmdReleaseBuffer(commandBuffer, 10 * 2 + 8);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
         partIndex++;
-
     }
-    return VK_SUCCESS;
-OnError:
+
+    if (__VK_IS_SUCCESS(result))
+    {
+        uint32_t *states = gcvNULL;
+
+        cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+        __vk_CmdAquireBuffer(commandBuffer, cmd->curScrachBufIndex, &states);
+        __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+        __vk_CmdReleaseBuffer(commandBuffer, cmd->curScrachBufIndex);
+        cmd->curScrachBufIndex = 0;
+    }
+
     return result;
 }
 
@@ -896,8 +942,8 @@ VkResult halti2_copyImageWithRS(
 {
     HwRsDesc srcRsDesc = {0}, dstRsDesc = {0};
     uint32_t srcAddress, dstAddress;
+    uint32_t srcEndAddr, dstEndAddr;
     uint32_t srcSuperTile, srcTiling, dstSuperTile, dstTiling;
-    uint32_t *states = gcvNULL;
     gcsSAMPLES srcSampleInfo = {0}, dstSampleInfo = {0};
     uint32_t srcStride = 0, dstStride = 0;
     uint32_t srcFormat, dstFormat;
@@ -912,6 +958,7 @@ VkResult halti2_copyImageWithRS(
     uint32_t srcTileMode = 0, dstTileMode = 0;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkDevContext *devCtx = cmd->devCtx;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -935,6 +982,7 @@ VkResult halti2_copyImageWithRS(
         srcAddress = srcImg->memory->devAddr;
         srcAddress += (uint32_t)(srcImg->memOffset + pSrcLevel->offset +
                                  srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
+        srcEndAddr = srcAddress + (uint32_t)pSrcLevel->sliceSize - 1;
         srcMsaa = (srcImg->sampleInfo.product > 1);
         rsConfigTiling(srcImg, &srcTiling, &srcSuperTile);
 
@@ -962,6 +1010,7 @@ VkResult halti2_copyImageWithRS(
 
         srcAddress = srcBuf->memory->devAddr;
         srcAddress += (uint32_t)(srcBuf->memOffset + srcRes->u.buf.offset);
+        srcEndAddr = srcAddress + (uint32_t)srcBuf->memReq.size - 1;
         srcTiling    = 0x0;
         srcSuperTile = 0x0;
         srcMsaa      = VK_FALSE;
@@ -989,6 +1038,7 @@ VkResult halti2_copyImageWithRS(
         dstAddress = dstImg->memory->devAddr;
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
+        dstEndAddr = dstAddress + (uint32_t)pDstLevel->sliceSize - 1;
         dstMsaa = (dstImg->sampleInfo.product > 1);
         rsConfigTiling(dstImg, &dstTiling, &dstSuperTile);
 
@@ -1016,6 +1066,7 @@ VkResult halti2_copyImageWithRS(
 
         dstAddress = dstBuf->memory->devAddr;
         dstAddress += (uint32_t)(dstBuf->memOffset + dstRes->u.buf.offset);
+        dstEndAddr = dstAddress + (uint32_t)dstBuf->memReq.size - 1;
         dstTiling    = 0x0;
         dstSuperTile = 0x0;
         dstMsaa      = VK_FALSE;
@@ -1357,16 +1408,17 @@ VkResult halti2_copyImageWithRS(
         __VK_ASSERT((srcAddress & 0x3F) == 0);
     }
 
-    __vk_CmdAquireBuffer(commandBuffer, 11*2 + 4, &states);
+    __VK_ASSERT(cmd->curScrachBufIndex == 0);
+    pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
 
-    __vkCmdLoadSingleHWState(&states, 0x0581, VK_FALSE, hwConfig);
-    __vkCmdLoadSingleHWState(&states, 0x0583, VK_FALSE, hwSrcStride);
-    __vkCmdLoadSingleHWState(&states, 0x0585, VK_FALSE, hwDstStride);
-    __vkCmdLoadBatchHWStates(&states, 0x058C, VK_FALSE, 2, ditherTable);
-    __vkCmdLoadSingleHWState(&states, 0x058F, VK_FALSE, 0);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0581, VK_FALSE, hwConfig);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0583, VK_FALSE, hwSrcStride);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0585, VK_FALSE, hwDstStride);
+    __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x058C, VK_FALSE, 2, ditherTable);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x058F, VK_FALSE, 0);
 
-    __vkCmdLoadSingleHWState(&states, 0x05A8, VK_FALSE,
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05A8, VK_FALSE,
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1407,16 +1459,50 @@ VkResult halti2_copyImageWithRS(
  9:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ? 9:8))));
 
-    __VK_ASSERT(((__vkCommandBuffer *)commandBuffer)->devCtx->database->RS_NEW_BASEADDR);
+    __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B0, VK_FALSE, srcAddress);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, dstAddress);
 
-    __vkCmdLoadSingleHWState(&states, 0x05B0, VK_FALSE, srcAddress);
-    __vkCmdLoadSingleHWState(&states, 0x05B8, VK_FALSE, dstAddress);
+    if (devCtx->database->ROBUSTNESS)
+    {
+        if (!devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
+        else
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x069A, VK_FALSE, srcEndAddr);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x06B9, VK_FALSE, dstEndAddr);
+        }
+    }
 
-    __vkCmdLoadSingleHWState(&states, 0x0588, VK_FALSE, hwWindowSize);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0588, VK_FALSE, hwWindowSize);
 
-    __vkCmdLoadSingleHWState(&states, 0x05C0, VK_FALSE, hwOffset);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05C0, VK_FALSE, hwOffset);
 
-    __vkCmdLoadSingleHWState(&states, 0x05AE, VK_FALSE,
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05AE, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -1428,9 +1514,21 @@ VkResult halti2_copyImageWithRS(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
-    __vkCmdLoadSingleHWState(&states, 0x0580, VK_FALSE, 0xBADABEEB);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
-    __vk_CmdReleaseBuffer(commandBuffer, 11 * 2 + 4);
+
+    cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+    __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    if (cmd->curScrachBufIndex > 0)
+    {
+        uint32_t *states = gcvNULL;
+
+        __vk_CmdAquireBuffer(commandBuffer, cmd->curScrachBufIndex, &states);
+        __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+        __vk_CmdReleaseBuffer(commandBuffer, cmd->curScrachBufIndex);
+        cmd->curScrachBufIndex = 0;
+    }
 
     return result;
 }

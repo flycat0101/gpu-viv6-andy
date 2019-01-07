@@ -5315,6 +5315,11 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
+    if (devCtx->database->ROBUSTNESS)
+    {
+        vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+    }
+
     linkEntryNum += (bTriangle && pip->frontFace != VK_FRONT_FACE_CLOCKWISE) ? 1 : 0;
     linkEntryNum += (!bTriangle) ? 1 : 0;
 
@@ -5818,6 +5823,11 @@ static VkResult halti5_pip_build_computeshader(
     vscLinkParams.pPgResourceLayout = chipPipeline->vscResLayout;
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
+
+    if (devCtx->database->ROBUSTNESS)
+    {
+        vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+    }
 
     __VK_ONERROR((gcvSTATUS_OK == vscLinkProgram(&vscLinkParams, &masterInstance->pep, &masterInstance->hwStates))
         ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
@@ -6340,6 +6350,11 @@ VkResult halti5_patch_pipeline(
                                      | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                      | VSC_COMPILER_FLAG_RECOMPILER
                                      | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
+
+            if (devCtx->database->ROBUSTNESS)
+            {
+                vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+            }
 
             vscLinkParams.cfg.optFlags =  (pip->flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT) ? 0 : VSC_COMPILER_OPT_FULL;
             vscLinkParams.pGlApiCfg = &devCtx->pPhyDevice->shaderCaps;

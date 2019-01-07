@@ -1238,6 +1238,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 
         __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
 
+        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __VK_MEMZERO(dvm->hostAddr, dvm->size);
+        }
 #else
         gcmERR_BREAK(gcsSURF_NODE_Construct(&dvm->node, dvm->size, dvm->align, gcvSURF_TYPE_UNKNOWN,
                                             gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
@@ -1988,7 +1992,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBuffer(
         /* Initialize __vkBuffer specific data fields here */
         buf->devCtx = devCtx;
         buf->memCb = __VK_ALLOCATIONCB;
-        buf->memReq.size = pCreateInfo->size;
+        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            buf->memReq.size = (gctSIZE_T)pCreateInfo->size + 16;
+        }
+        else
+        {
+            buf->memReq.size = (gctSIZE_T)pCreateInfo->size;
+        }
         buf->memReq.alignment = align;
         buf->memReq.memoryTypeBits = 0x1;
 
