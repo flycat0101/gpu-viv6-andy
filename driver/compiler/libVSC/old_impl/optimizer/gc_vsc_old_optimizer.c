@@ -7557,15 +7557,14 @@ _EvaluateChecking(
     LTCValue value0, value1;
     gctBOOL results[4] = {gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE};
     gcSL_CONDITION condition = gcmSL_TARGET_GET(inst->temp, Condition);
-    gctUINT enableCount[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
     gctINT i;
 
     format0 = (gcSL_FORMAT) gcmSL_SOURCE_GET(inst->source0, Format);
     type0 = gcmSL_SOURCE_GET(inst->source0, Type);
-    if (enableCount[gcSL_ConvertSwizzle2Enable(gcmSL_SOURCE_GET(inst->source0, SwizzleX),
-                                               gcmSL_SOURCE_GET(inst->source0, SwizzleY),
-                                               gcmSL_SOURCE_GET(inst->source0, SwizzleZ),
-                                               gcmSL_SOURCE_GET(inst->source0, SwizzleW))] != 1)
+    if (gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(gcmSL_SOURCE_GET(inst->source0, SwizzleX),
+                                                         gcmSL_SOURCE_GET(inst->source0, SwizzleY),
+                                                         gcmSL_SOURCE_GET(inst->source0, SwizzleZ),
+                                                         gcmSL_SOURCE_GET(inst->source0, SwizzleW))) != 1)
     {
         return gcvFALSE;
     }
@@ -7589,10 +7588,10 @@ _EvaluateChecking(
 
     format1 = (gcSL_FORMAT) gcmSL_SOURCE_GET(inst->source1, Format);
     type1 = gcmSL_SOURCE_GET(inst->source1, Type);
-    if (enableCount[gcSL_ConvertSwizzle2Enable(gcmSL_SOURCE_GET(inst->source1, SwizzleX),
-                                               gcmSL_SOURCE_GET(inst->source1, SwizzleY),
-                                               gcmSL_SOURCE_GET(inst->source1, SwizzleZ),
-                                               gcmSL_SOURCE_GET(inst->source1, SwizzleW))] != 1)
+    if (gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(gcmSL_SOURCE_GET(inst->source1, SwizzleX),
+                                                         gcmSL_SOURCE_GET(inst->source1, SwizzleY),
+                                                         gcmSL_SOURCE_GET(inst->source1, SwizzleZ),
+                                                         gcmSL_SOURCE_GET(inst->source1, SwizzleW))) != 1)
     {
         return gcvFALSE;
     }
@@ -7614,7 +7613,7 @@ _EvaluateChecking(
         return gcvFALSE;
     }
 
-    gcmASSERT(enableCount[value0.enable] == enableCount[value1.enable]);
+    gcmASSERT(gcmEnableChannelCount(value0.enable) == gcmEnableChannelCount(value1.enable));
 
     for (i = 0; i < 4; i++)
     {
@@ -9781,7 +9780,6 @@ _GetComponentSwizzleAndCount(
     gctINT *ComponentCount
     )
 {
-    gctUINT enableCount[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
     gctINT i, j;
     gcSL_SWIZZLE swizzle;
     gctINT count[2];
@@ -9794,16 +9792,16 @@ _GetComponentSwizzleAndCount(
         {
             ComponentSwizzle[i][j] = gcmExtractSwizzle(swizzle, j);
         }
-        count[0] = enableCount[gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][0], ComponentSwizzle[i][1],
-                                                          ComponentSwizzle[i][2], ComponentSwizzle[i][3])];
+        count[0] = gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][0], ComponentSwizzle[i][1],
+                                                                    ComponentSwizzle[i][2], ComponentSwizzle[i][3]));
 
         swizzle = gcmSL_SOURCE_GET(MergedCode[i]->instruction.source1, Swizzle);
         for (j = 4; j < 8; j++)
         {
             ComponentSwizzle[i][j] = gcmExtractSwizzle(swizzle, (j - 4));
         }
-        count[1] = enableCount[gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][4], ComponentSwizzle[i][5],
-                                                          ComponentSwizzle[i][6], ComponentSwizzle[i][7])];
+        count[1] = gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][4], ComponentSwizzle[i][5],
+                                                                    ComponentSwizzle[i][6], ComponentSwizzle[i][7]));
         ComponentCount[i] = count[0] > count[1] ? count[0] : count[1];
         componentSum += ComponentCount[i];
     }

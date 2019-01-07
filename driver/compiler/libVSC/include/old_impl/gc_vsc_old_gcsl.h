@@ -513,6 +513,9 @@ typedef enum _gcSL_ENABLE
 }
 gcSL_ENABLE;
 
+#define gcmEnableChannelCount(enable)          \
+    (((enable) & 0x1) + (((enable) & 0x2) >> 1) + (((enable) & 0x4) >> 2) + (((enable) & 0x8) >> 3))
+
 /* Possible indices. */
 typedef enum _gcSL_INDEXED
 {

@@ -15672,6 +15672,132 @@ OnError:
     return status;
 }
 
+static gctBOOL
+_IsInstNeedToBeScalar(
+    IN gcSHADER Shader,
+    IN gcSL_INSTRUCTION Code
+    )
+{
+    gctBOOL                 bNeedToBeScalar = gcvFALSE;
+    gcSL_OPCODE             opCode = (gcSL_OPCODE)gcmSL_OPCODE_GET(Code->opcode, Opcode);
+
+    /* Make sure that all those instructions are component-wise. */
+    if (opCode == gcSL_MOD)
+    {
+        bNeedToBeScalar = gcvTRUE;
+    }
+
+    return bNeedToBeScalar;
+}
+
+static gceSTATUS
+_gcScalarInstructionForOldCG(
+    IN gcSHADER Shader,
+    IN gctBOOL  Dump
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctBOOL                 bChanged = gcvFALSE;
+    gctINT                  i;
+
+    /* Enable for old CG only. */
+    if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
+    {
+        return status;
+    }
+
+    for (i = (gctINT)Shader->lastInstruction - 1; i >= 0; i--)
+    {
+        gcSL_INSTRUCTION    code = &Shader->code[i], newCode;
+        gcSL_ENABLE         enable = (gcSL_ENABLE)gcmSL_TARGET_GET(code->temp, Enable);
+        gctINT              firstEnabledChannel = -1, channelIndex;
+        gcSL_ENABLE         newEnable;
+        gcSL_SWIZZLE        newSwizzle;
+
+        if (!_IsInstNeedToBeScalar(Shader, code))
+        {
+            continue;
+        }
+
+        if (gcmEnableChannelCount(enable) <= 1)
+        {
+            continue;
+        }
+
+        /* Scalar all channels expect for the first enabled channel. */
+        for (channelIndex = 0; channelIndex < CHANNEL_NUM; channelIndex++)
+        {
+            if (!(enable & (gcSL_ENABLE_X << channelIndex)))
+            {
+                continue;
+            }
+
+            if (firstEnabledChannel == -1)
+            {
+                firstEnabledChannel = channelIndex;
+                continue;
+            }
+
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i + 1, 1, gcvFALSE, gcvTRUE));
+            code = &Shader->code[i];
+            newCode = &Shader->code[i + 1];
+            gcoOS_MemCopy(newCode, code, gcmSIZEOF(struct _gcSL_INSTRUCTION));
+
+            /* Change the enable. */
+            newEnable = (gcSL_ENABLE)(gcSL_ENABLE_X << channelIndex);
+            newCode->temp = gcmSL_TARGET_SET(newCode->temp, Enable, newEnable);
+
+            /* Change the swizzle. */
+            if (gcmSL_SOURCE_GET(newCode->source0, Type) != gcSL_CONSTANT)
+            {
+                newSwizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(newCode->source0, Swizzle);
+                newSwizzle = (gcSL_SWIZZLE)gcmExtractSwizzle(newSwizzle, channelIndex);
+                newSwizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(newSwizzle, newSwizzle, newSwizzle, newSwizzle);
+                newCode->source0 = gcmSL_SOURCE_SET(newCode->source0, Swizzle, newSwizzle);
+            }
+            if (gcmSL_SOURCE_GET(newCode->source1, Type) != gcSL_CONSTANT)
+            {
+                newSwizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(newCode->source1, Swizzle);
+                newSwizzle = (gcSL_SWIZZLE)gcmExtractSwizzle(newSwizzle, channelIndex);
+                newSwizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(newSwizzle, newSwizzle, newSwizzle, newSwizzle);
+                newCode->source1 = gcmSL_SOURCE_SET(newCode->source1, Swizzle, newSwizzle);
+            }
+        }
+
+        /* Change the enable/swizzle for the first enabled channel. */
+        gcmASSERT(firstEnabledChannel != -1);
+
+        /* Change the enable. */
+        newEnable = (gcSL_ENABLE)(gcSL_ENABLE_X << firstEnabledChannel);
+        code->temp = gcmSL_TARGET_SET(code->temp, Enable, newEnable);
+
+        /* Change the swizzle. */
+        if (gcmSL_SOURCE_GET(code->source0, Type) != gcSL_CONSTANT)
+        {
+            newSwizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(code->source0, Swizzle);
+            newSwizzle = (gcSL_SWIZZLE)gcmExtractSwizzle(newSwizzle, firstEnabledChannel);
+            newSwizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(newSwizzle, newSwizzle, newSwizzle, newSwizzle);
+            code->source0 = gcmSL_SOURCE_SET(code->source0, Swizzle, newSwizzle);
+        }
+        if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_CONSTANT)
+        {
+            newSwizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(code->source1, Swizzle);
+            newSwizzle = (gcSL_SWIZZLE)gcmExtractSwizzle(newSwizzle, firstEnabledChannel);
+            newSwizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(newSwizzle, newSwizzle, newSwizzle, newSwizzle);
+            code->source1 = gcmSL_SOURCE_SET(code->source1, Swizzle, newSwizzle);
+        }
+    }
+
+    /* Dump if changed. */
+    if (Dump && bChanged)
+    {
+        gcOpt_Dump(gcvNULL, "After scalar instructions for shader.", gcvNULL, Shader);
+    }
+
+OnError:
+    return status;
+}
+
 #if !DX_SHADER
 static gceSTATUS
 _Implement32BitModulus(
@@ -15689,7 +15815,8 @@ _Implement32BitModulus(
     gctINT constZero = 0, constOne = 1;
     gctUINT constFour = 0xf0000004 /* (32<<23) + 4 */;
     gcSL_FORMAT targetType = IsInt32 ? gcSL_INTEGER : gcSL_UINT32;
-    gcSHADER_PRECISION precision = gcmSL_SOURCE_GET(Code->source0, Precision) ? gcSHADER_PRECISION_HIGH : gcSHADER_PRECISION_MEDIUM;
+    /* Always use HIGHP for this conversion. */
+    gcSHADER_PRECISION precision = gcSHADER_PRECISION_HIGH;
     gcSL_INSTRUCTION code;
     gctUINT32 srcLoc;
 
@@ -16171,7 +16298,6 @@ _packingArugmentsForSingleFunction(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT enableCount[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
     gctUINT32 i;
     gctINT argCount = 0;
     gctINT *vec1Arg = gcvNULL, *vec2Arg = gcvNULL, *vec3Arg = gcvNULL;
@@ -16235,7 +16361,7 @@ _packingArugmentsForSingleFunction(
         if (!argumentPacking[i].needPacked)
             continue;
 
-        switch(enableCount[argumentPacking[i].argument.enable])
+        switch(gcmEnableChannelCount(argumentPacking[i].argument.enable))
         {
         case 1:
             vec1Arg[vec1Count++] = i;
@@ -16440,7 +16566,7 @@ _packingArugmentsForSingleFunction(
                 if (variable)
                 {
                     newType = gcGetShaderTypeFromFormatAndComponentCount(format,
-                                                                         enableCount[argumentPacking[i].argument.enable],
+                                                                         gcmEnableChannelCount(argumentPacking[i].argument.enable),
                                                                          1);
                     SetVariableType(variable, newType);
                 }
@@ -17140,11 +17266,13 @@ gcLinkShaders(
 
         if (VertexShader)
         {
+            gcmERR_BREAK(_gcScalarInstructionForOldCG(VertexShader, dumpVertCGV));
             gcmERR_BREAK(_gcConvert32BitModulus(VertexShader, dumpVertCGV));
         }
 
         if (FragmentShader)
         {
+            gcmERR_BREAK(_gcScalarInstructionForOldCG(FragmentShader, dumpFragCGV));
             gcmERR_BREAK(_gcConvert32BitModulus(FragmentShader, dumpFragCGV));
         }
 
@@ -17812,6 +17940,9 @@ _gcLinkFullGraphicsShaders(
     {
         if (Shaders[i])
         {
+            /* Scalar instructions. */
+            gcmONERROR(_gcScalarInstructionForOldCG(Shaders[i], dumpCGV[i]));
+
             gcmONERROR(_gcConvert32BitModulus(Shaders[i], dumpCGV[i]));
 
             /* Build the vertex shader tree. */
@@ -18698,6 +18829,9 @@ _gcLinkComputeShader(
         /* Compact the compute shader. */
         gcmONERROR(CompactShader(gcvNULL, ComputeShader));
     }
+
+    /* Scalar instructions. */
+    gcmONERROR(_gcScalarInstructionForOldCG(ComputeShader, dumpCGVerbose));
 
     /* Convert 32bit mod. */
     gcmONERROR(_gcConvert32BitModulus(ComputeShader, dumpCGVerbose));
