@@ -1189,8 +1189,15 @@ _isRAEnabled_src0_uniform_src1_float(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst)
 {
+    VIR_Operand         *pOpnd = VIR_Inst_GetSource(Inst, 0);
+
+    if (pOpnd == gcvNULL || !VIR_Operand_isSymbol(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
     return (VIR_Shader_isRAEnabled(Context->shader) &&
-            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(VIR_Inst_GetSource(Inst, 0))) &&
+            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pOpnd)) &&
             (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 1))) & VIR_TYFLAG_ISFLOAT));
 }
 
@@ -1199,8 +1206,15 @@ _isRAEnabled_src0_uniform(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst)
 {
+    VIR_Operand         *pOpnd = VIR_Inst_GetSource(Inst, 0);
+
+    if (pOpnd == gcvNULL || !VIR_Operand_isSymbol(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
     return (VIR_Shader_isRAEnabled(Context->shader) &&
-            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(VIR_Inst_GetSource(Inst, 0))));
+            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pOpnd)));
 }
 
 static gctBOOL
@@ -1208,8 +1222,15 @@ _isRAEnabled_src1_uniform(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst)
 {
+    VIR_Operand         *pOpnd = VIR_Inst_GetSource(Inst, 1);
+
+    if (pOpnd == gcvNULL || !VIR_Operand_isSymbol(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
     return (VIR_Shader_isRAEnabled(Context->shader) &&
-            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(VIR_Inst_GetSource(Inst, 1))));
+            VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pOpnd)));
 }
 
 /* sampler index should always be integer */

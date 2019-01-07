@@ -2847,6 +2847,12 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
             continue;
         }
 
+        /* Do not vectorize those inputs with the prefix "gl_in." */
+        if (gcoOS_StrStr(VIR_Shader_GetSymNameString(pLowerShader, pAttrSym), "gl_in.", gcvNULL))
+        {
+            continue;
+        }
+
         /* For each output of upper-shader */
         for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
         {

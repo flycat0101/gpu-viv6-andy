@@ -100,6 +100,22 @@ _EvaluateLocation(
     return location;
 }
 
+typedef struct _SPV_BUILTIN_NAME
+{
+    gctSTRING inputName;
+    gctSTRING outputName;
+}
+SPV_BUILTIN_NAME;
+
+static SPV_BUILTIN_NAME _DefinedBlockMemberBuiltinNames[] =
+{
+    {"gl_in.gl_Position", "gl_Position"},
+    {"gl_in.gl_PointSize", "gl_PointSize"},
+    {"gl_in.gl_ClipDistance", "gl_ClipDistance"},
+    {"gl_in.gl_CullDistance", "gl_CullDistance"},
+};
+#define __DefinedBuiltinNameCount (gcmSIZEOF(_DefinedBlockMemberBuiltinNames) / gcmSIZEOF(SPV_BUILTIN_NAME))
+
 static VSC_ErrCode
 _AddGeneralVariable(
     IN  VIR_Shader              *Shader,
@@ -153,32 +169,32 @@ _AddGeneralVariable(
         /*
         ** If a shader is generated from a SPIR-V assembly, then the builtin names could be hidden by a non-builtin block name,
         ** so we may need to ignore the block name.
-        ** TODO: We need to move those checks to SPIR-V converter.
         */
-        else if (!gcmIS_SUCCESS(gcoOS_StrNCmp(Name, "gl_", 3))
-                 &&
-                 gcoOS_StrStr(Name, "gl_Position", &name))
+        else if (!gcmIS_SUCCESS(gcoOS_StrNCmp(Name, "gl_", 3)))
         {
-            if (StorageClass == VIR_STORAGE_INPUT)
+            for (i = 0; i < __DefinedBuiltinNameCount; i++)
             {
-                name = "gl_in.gl_Position";
+                if (gcoOS_StrStr(Name, _DefinedBlockMemberBuiltinNames[i].outputName, &name))
+                {
+                    if (StorageClass == VIR_STORAGE_INPUT)
+                    {
+                        name = _DefinedBlockMemberBuiltinNames[i].inputName;
+                    }
+                    break;
+                }
             }
-            gcmASSERT(name != gcvNULL);
-        }
-        else if (!gcmIS_SUCCESS(gcoOS_StrNCmp(Name, "gl_", 3))
-                 &&
-                 gcoOS_StrStr(Name, "gl_PointSize", &name))
-        {
-            if (StorageClass == VIR_STORAGE_INPUT)
+
+            if (name == gcvNULL)
             {
-                name = "gl_in.gl_PointSize";
+                name = Name;
             }
-            gcmASSERT(name != gcvNULL);
         }
         else
         {
             name = Name;
         }
+
+        gcmASSERT(name != gcvNULL);
 
         if (func)
         {
