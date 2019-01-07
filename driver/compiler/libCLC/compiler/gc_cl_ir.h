@@ -2209,7 +2209,6 @@ struct _cloIR_BINARY_EXPR
     cleBINARY_EXPR_TYPE    type;
     cloIR_EXPR             leftOperand;
     cloIR_EXPR             rightOperand;
-    gctBOOL integerPromoted : 2;          /* expression had gone through integer promotion */
 };
 
 typedef struct _cloIR_BINARY_EXPR *cloIR_BINARY_EXPR;

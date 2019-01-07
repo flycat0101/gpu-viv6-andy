@@ -10489,7 +10489,6 @@ OUT cloIR_BINARY_EXPR *BinaryExpr
     binaryExpr->type = Type;
     binaryExpr->leftOperand    = LeftOperand;
     binaryExpr->rightOperand = RightOperand;
-    binaryExpr->integerPromoted = gcvFALSE;
 
     /* Do the implicit type conversion. */
     status = cloIR_BINARY_EXPR_ImplicitTypeConv(Compiler,
@@ -10681,8 +10680,6 @@ _NeedImplicitTypeConv(
     if (!(binaryExpr->type == clvBINARY_ADD  ||
           binaryExpr->type == clvBINARY_SUB  ||
           binaryExpr->type == clvBINARY_MUL  ||
-          binaryExpr->type == clvBINARY_DIV  ||
-          binaryExpr->type == clvBINARY_MOD  ||
           binaryExpr->type == clvBINARY_AND  ||
           binaryExpr->type == clvBINARY_OR   ||
           binaryExpr->type == clvBINARY_XOR))
@@ -10717,8 +10714,6 @@ cloIR_BINARY_EXPR_ImplicitTypeConv(
     )
 {
     gceSTATUS       status = gcvSTATUS_OK;
-    clsDATA_TYPE    *leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
-    clsDATA_TYPE    *rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
     clsDATA_TYPE    *newRightExprDataType = gcvNULL;
 
     if (!_NeedImplicitTypeConv(BinaryExpr))
@@ -10729,15 +10724,13 @@ cloIR_BINARY_EXPR_ImplicitTypeConv(
     switch (BinaryExpr->type)
     {
     case clvBINARY_ASSIGN:
+        if (_checkNeedImplicitTypeConvForAssignment(Compiler,
+                                                    BinaryExpr->leftOperand->decl.dataType,
+                                                    BinaryExpr->rightOperand->decl.dataType,
+                                                    &newRightExprDataType))
         {
-            if (_checkNeedImplicitTypeConvForAssignment(Compiler,
-                                                        leftExprDataType,
-                                                        rightExprDataType,
-                                                        &newRightExprDataType))
-            {
-                /* Update the dataType. */
-                BinaryExpr->rightOperand->decl.dataType = newRightExprDataType;
-            }
+            /* Update the dataType. */
+            BinaryExpr->rightOperand->decl.dataType = newRightExprDataType;
         }
         break;
 
@@ -10747,51 +10740,24 @@ cloIR_BINARY_EXPR_ImplicitTypeConv(
        {
            clsDECL decl[1];
            clsDATA_TYPE dataType[1];
-           gctBOOL promoted = gcvFALSE;
+           clsDATA_TYPE    *leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
+           clsDATA_TYPE    *rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
 
            *dataType = *leftExprDataType;
            clmDECL_Initialize(decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
            dataType->type = T_INT;
            dataType->elementType = clvTYPE_INT;
 
-           if(cloIR_OBJECT_GetType(&BinaryExpr->leftOperand->base) == clvIR_BINARY_EXPR &&
-              ((cloIR_BINARY_EXPR)(&BinaryExpr->leftOperand->base))->integerPromoted)
+           if((!clmDECL_IsPointerType(&BinaryExpr->leftOperand->decl) && leftExprDataType->elementType < clvTYPE_INT) &&
+              (!clmDECL_IsPointerType(&BinaryExpr->rightOperand->decl) && rightExprDataType->elementType < clvTYPE_INT))
            {
                status = cloCOMPILER_CloneDecl(Compiler,
-                                              BinaryExpr->leftOperand->decl.dataType->accessQualifier,
-                                              BinaryExpr->leftOperand->decl.dataType->addrSpaceQualifier,
+                                              BinaryExpr->exprBase.decl.dataType->accessQualifier,
+                                              BinaryExpr->exprBase.decl.dataType->addrSpaceQualifier,
                                               decl,
-                                              &BinaryExpr->leftOperand->decl);
+                                              &BinaryExpr->exprBase.decl);
                if (gcmIS_ERROR(status)) return status;
-               promoted = gcvTRUE;
            }
-
-           if(cloIR_OBJECT_GetType(&BinaryExpr->rightOperand->base) == clvIR_BINARY_EXPR &&
-              ((cloIR_BINARY_EXPR)(&BinaryExpr->rightOperand->base))->integerPromoted)
-           {
-               status = cloCOMPILER_CloneDecl(Compiler,
-                                              BinaryExpr->rightOperand->decl.dataType->accessQualifier,
-                                              BinaryExpr->rightOperand->decl.dataType->addrSpaceQualifier,
-                                              decl,
-                                              &BinaryExpr->rightOperand->decl);
-               if (gcmIS_ERROR(status)) return status;
-               promoted = gcvTRUE;
-           }
-
-           if(!promoted &&
-              leftExprDataType->elementType < clvTYPE_INT &&
-              rightExprDataType->elementType < clvTYPE_INT)
-           {
-               status = cloIR_CAST_EXPR_Construct(Compiler,
-                                                  BinaryExpr->leftOperand->base.lineNo,
-                                                  BinaryExpr->leftOperand->base.stringNo,
-                                                  decl,
-                                                  BinaryExpr->leftOperand,
-                                                  &BinaryExpr->leftOperand);
-               if (gcmIS_ERROR(status)) return status;
-               promoted = gcvTRUE;
-            }
-            BinaryExpr->integerPromoted = promoted;
         }
         break;
     }
