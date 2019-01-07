@@ -9186,6 +9186,11 @@ VIR_Function_DupFullOperand(
         VIR_ParmPassing *srcParm = VIR_Operand_GetParameters(Src);
         VIR_ParmPassing *dupParm = VIR_Operand_GetParameters(*Dup);
 
+        gcmASSERT(srcParm->argNum != 0);
+
+        VIR_Function_NewParameters(Function, srcParm->argNum, &dupParm);
+        VIR_Operand_SetParams(*Dup, dupParm);
+
         for (i = 0; i < srcParm->argNum; i++)
         {
             if (srcParm->args[i])
