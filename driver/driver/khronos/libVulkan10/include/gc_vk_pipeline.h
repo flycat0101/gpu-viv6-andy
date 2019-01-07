@@ -179,7 +179,7 @@ typedef struct __vkDynamicLineWidthStateRec
 }__vkDynamicLineWidthState;
 
 
-#define __VK_PIPELINE_CMDBUFFER_MAXSIZE     256
+#define __VK_PIPELINE_CMDBUFFER_MAXSIZE     512
 #define __VK_MAX_VERTEX_BUFFER_BINDINGS     32
 
 enum

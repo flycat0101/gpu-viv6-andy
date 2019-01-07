@@ -901,7 +901,6 @@ VkResult halti2_copyImageWithRS(
     gcsSAMPLES srcSampleInfo = {0}, dstSampleInfo = {0};
     uint32_t srcStride = 0, dstStride = 0;
     uint32_t srcFormat, dstFormat;
-    VkBool32 srcFmtFaked = VK_FALSE, dstFmtFaked = VK_FALSE;
     uint32_t srcParts, dstParts;
     VkOffset3D srcOffset, dstOffset;
     VkExtent3D srcExtent, dstExtent;
@@ -932,7 +931,6 @@ VkResult halti2_copyImageWithRS(
         srcStride = (uint32_t)pSrcLevel->stride;
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
-        srcFmtFaked = (srcFormat != (uint32_t)srcImg->createInfo.format);
         srcParts = srcImg->formatInfo.partCount;
         srcAddress = srcImg->memory->devAddr;
         srcAddress += (uint32_t)(srcImg->memOffset + pSrcLevel->offset +
@@ -987,7 +985,6 @@ VkResult halti2_copyImageWithRS(
         dstStride = (uint32_t)pDstLevel->stride;
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
-        dstFmtFaked = (dstFormat != (uint32_t)dstImg->createInfo.format);
         dstParts = dstImg->formatInfo.partCount;
         dstAddress = dstImg->memory->devAddr;
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
@@ -1031,9 +1028,9 @@ VkResult halti2_copyImageWithRS(
         dstSampleInfo = srcImg->sampleInfo;
     }
 
-    if (rawCopy && !srcFmtFaked && !dstFmtFaked)
+    if (rawCopy)
     {
-        /* Change srcFormat to be same as dstFormat for CmdCopyImage() */
+        /* Change srcFormat to be same as dstFormat for rawCopy */
         srcFormat = dstFormat;
     }
 
@@ -1097,8 +1094,7 @@ VkResult halti2_copyImageWithRS(
                 useComputeBlit = VK_TRUE;
             }
             /* Fake format only works when same format */
-            else if ((srcRsDesc.fakeFormat || dstRsDesc.fakeFormat) &&
-                     (srcRsDesc.hwFormat != dstRsDesc.hwFormat))
+            else if ((srcRsDesc.fakeFormat || dstRsDesc.fakeFormat) && (srcFormat != dstFormat))
             {
                 useComputeBlit = VK_TRUE;
             }
@@ -1123,7 +1119,7 @@ VkResult halti2_copyImageWithRS(
 
     if (useComputeBlit)
     {
-        return (halti5_computeBlit(commandBuffer, srcRes, dstRes, gcvNULL, VK_FILTER_NEAREST));
+        return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, VK_FILTER_NEAREST));
     }
 
     __VK_ASSERT(srcSampleInfo.product >= dstSampleInfo.product);
@@ -2678,7 +2674,7 @@ VkResult halti2_program_blit_src_tex(
              && (txType != 0x3)
              && !txSRGB;
 
-    hwMapping = &blitProg->srcTexEntry->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
+    hwMapping = &blitProg->srcTexEntry[0]->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
     hwSamplerNo = hwMapping->hwSamplerSlot + pHints->samplerBaseOffset[VSC_SHADER_STAGE_CS];
 
     __vkCmdLoadSingleHWState(states, 0x022D + hwSamplerNo, VK_FALSE,

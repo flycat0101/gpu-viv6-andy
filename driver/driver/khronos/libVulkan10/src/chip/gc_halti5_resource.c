@@ -165,7 +165,7 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
 
         {VK_FORMAT_D16_UNORM, TX_FORMAT(0x10, 0, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_ZERO, SWZL_USE_ZERO, SWZL_USE_ONE)},
         {VK_FORMAT_D32_SFLOAT, TX_FORMAT(0, 0x0A, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_ZERO, SWZL_USE_ZERO, SWZL_USE_ONE)},
 
@@ -3071,7 +3071,6 @@ VkResult halti5_copyImage(
     gcsSAMPLES srcSampleInfo = {0}, dstSampleInfo = {0};
     uint32_t srcStride = 0, dstStride = 0;
     uint32_t srcFormat, dstFormat;
-    VkBool32 srcFmtFaked = VK_FALSE, dstFmtFaked = VK_FALSE;
     VkImageAspectFlags srcAspect;
     __VK_DEBUG_ONLY(VkImageAspectFlags dstAspect;)
     uint32_t srcParts, dstParts;
@@ -3120,12 +3119,10 @@ VkResult halti5_copyImage(
         srcStride = (uint32_t)pSrcLevel->stride;
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
-        srcFmtFaked = (srcFormat != (uint32_t)srcImg->createInfo.format);
 
         if ((srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
         {
             srcFormat = VK_FORMAT_R8G8B8A8_UNORM;
-            srcFmtFaked = VK_FALSE;
         }
 
         srcParts = pSrcLevel->partCount;
@@ -3241,12 +3238,10 @@ VkResult halti5_copyImage(
         dstStride = (uint32_t)pDstLevel->stride;
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
-        dstFmtFaked = (dstFormat != (uint32_t)dstImg->createInfo.format);
 
         if ((dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) && (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM))
         {
             dstFormat = VK_FORMAT_R8G8B8A8_UNORM;
-            dstFmtFaked = VK_FALSE;
         }
 
         dstParts = pDstLevel->partCount;
@@ -3350,21 +3345,25 @@ VkResult halti5_copyImage(
         dstSampleInfo = srcImg->sampleInfo;
     }
 
-    if (rawCopy && !srcFmtFaked && !dstFmtFaked)
+    if (rawCopy)
     {
         /* Change srcFormat to be same as dstFormat for CmdCopyImage() */
         srcFormat = dstFormat;
 
-        __VK_ASSERT(g_vkFormatInfoTable[dstFormat].partCount == 1);
-
-        /* Fake 128 bpp as double widthed 64bpp */
-        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128)
+        /* Fake 1 layer 128 bpp format as double widthed 64bpp */
+        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 1)
         {
             srcFormat = dstFormat = VK_FORMAT_R16G16B16A16_UINT;
             srcOffset.x *= 2;
             dstOffset.x *= 2;
             srcExtent.width  *= 2;
             dstExtent.width  *= 2;
+        }
+
+        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock >= 64 &&
+            srcMsaa != dstMsaa)
+        {
+            useComputeBlit = VK_TRUE;
         }
     }
 
@@ -3617,7 +3616,7 @@ VkResult halti5_copyImage(
 
     if (useComputeBlit)
     {
-        return (halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvNULL, VK_FILTER_NEAREST));
+        return (halti5_computeBlit(cmdBuf, srcRes, dstRes, rawCopy, gcvNULL, VK_FILTER_NEAREST));
     }
 
     /* 128BTILE feature, we need program the tilemode,the supertile is same with xmajor */
@@ -5399,7 +5398,7 @@ OnError:
 }
 
 uint32_t halti5_helper_convertHwTxSwizzle(
-    __vkFormatInfo * residentFormatInfo,
+    const __vkFormatInfo * residentFormatInfo,
     VkComponentSwizzle swizzle,
     uint32_t currentSwizzle,
     const uint32_t hwComponentSwizzle[]

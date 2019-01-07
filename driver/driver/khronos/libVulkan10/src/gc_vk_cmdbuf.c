@@ -1312,7 +1312,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
             else
                 clearAttachment.colorAttachment = 0;
 
-            clearRect.baseArrayLayer = fb->imageViews[i]->createInfo.subresourceRange.baseArrayLayer;
+            clearRect.baseArrayLayer = 0;
             clearRect.layerCount = fb->layers;
             clearRect.rect = pRenderPassBegin->renderArea;
 
@@ -1492,10 +1492,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
         {
             VkImageSubresource subResource;
             uint32_t il;
+            uint32_t baseArrayLayer;
 
             subResource.aspectMask = pAttachments[ia].aspectMask;
             subResource.mipLevel = fb->imageViews[imgViewIndex]->createInfo.subresourceRange.baseMipLevel;
-            for (il = pRects[ir].baseArrayLayer; il < (pRects[ir].baseArrayLayer + pRects[ir].layerCount); il++)
+            baseArrayLayer = pRects[ir].baseArrayLayer + fb->imageViews[imgViewIndex]->createInfo.subresourceRange.baseArrayLayer;
+
+            for (il = baseArrayLayer; il < (baseArrayLayer + pRects[ir].layerCount); il++)
             {
                 subResource.arrayLayer = il;
                 __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
@@ -2024,8 +2027,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
     __vkImage *pDstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, dstImage);
     uint32_t srcFormat = (uint32_t)pSrcImage->createInfo.format;
     uint32_t dstFormat = (uint32_t)pDstImage->createInfo.format;
-    VkBool32 srcFaked = pSrcImage->formatInfo.residentImgFormat != srcFormat;
-    VkBool32 dstFaked = pDstImage->formatInfo.residentImgFormat != dstFormat;
+    VkBool32 srcConvert = (pSrcImage->formatInfo.partCount == 1) && (pSrcImage->formatInfo.residentImgFormat != srcFormat);
+    VkBool32 dstConvert = (pDstImage->formatInfo.partCount == 1) && (pDstImage->formatInfo.residentImgFormat != dstFormat);
     VkResult result = VK_SUCCESS;
 
     for (ir = 0; ir < regionCount; ir++)
@@ -2074,6 +2077,26 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 
         for (il = 0; il < srcLayers; ++il)
         {
+            VkImageMemoryBarrier tmpImgBarrier =
+            {
+                VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType          sType;
+                gcvNULL, // const void*              pNext;
+                VK_ACCESS_TRANSFER_WRITE_BIT, // VkAccessFlags            srcAccessMask;
+                VK_ACCESS_TRANSFER_READ_BIT, // VkAccessFlags            dstAccessMask;
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, // VkImageLayout            oldLayout;
+                VK_IMAGE_LAYOUT_GENERAL, // VkImageLayout            newLayout;
+                VK_QUEUE_FAMILY_IGNORED, // deUint32                 srcQueueFamilyIndex;
+                VK_QUEUE_FAMILY_IGNORED, // deUint32                 dstQueueFamilyIndex;
+                VK_NULL_HANDLE, // VkImage                  image;
+                {                                           // VkImageSubresourceRange  subresourceRange;
+                    VK_IMAGE_ASPECT_COLOR_BIT, // VkImageAspectFlags   aspectMask;
+                    0u, // deUint32             baseMipLevel;
+                    1u, // deUint32             mipLevels;
+                    0u, // deUint32             baseArraySlice;
+                    1u                                          // deUint32             arraySize;
+                }
+            };
+
             __vkBlitRes *pSrcRes = &srcRes;
             __vkBlitRes *pDstRes = &dstRes;
             VkImage srcTmpImg = VK_NULL_HANDLE;
@@ -2088,7 +2111,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                     __vkScratchMem *pScratchMem = gcvNULL;
                     VkImageCreateInfo imgCreateInfo;
 
-                    if (srcFaked)
+                    if (srcConvert)
                     {
                         static __vkBlitRes srcTmpRes;
                         __vkImage *pSrcTmpImg = gcvNULL;
@@ -2122,10 +2145,21 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 #if __VK_RESOURCE_INFO
                         __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &srcTmpRes);
 #endif
+
+                        tmpImgBarrier.image = srcTmpImg;
+                        __vk_CmdPipelineBarrier(commandBuffer,
+                                                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                (VkDependencyFlags)0,
+                                                0, (const VkMemoryBarrier*)gcvNULL,
+                                                0, (const VkBufferMemoryBarrier*)gcvNULL,
+                                                1, &tmpImgBarrier
+                                               );
+
                         pSrcRes = &srcTmpRes;
                     }
 
-                    if (dstFaked)
+                    if (dstConvert)
                     {
                         static __vkBlitRes dstTmpRes;
                         __vkImage *pDstTmpImg = gcvNULL;
@@ -2169,6 +2203,16 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 
                 if (pDstRes != &dstRes)
                 {
+                    tmpImgBarrier.image = dstTmpImg;
+                    __vk_CmdPipelineBarrier(commandBuffer,
+                                            VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                            VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                            (VkDependencyFlags)0,
+                                            0, (const VkMemoryBarrier*)gcvNULL,
+                                            0, (const VkBufferMemoryBarrier*)gcvNULL,
+                                            1, &tmpImgBarrier
+                                           );
+
                     __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
                         commandBuffer,
                         pDstRes,
@@ -2230,14 +2274,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
     {
         uint32_t il;
         VkBool32 scale = VK_FALSE;
+        VkBool32 computeBlit = VK_FALSE;
         VkBool3D reverse = {VK_FALSE, VK_FALSE, VK_FALSE};
         __vkBlitRes srcRes, dstRes;
+        uint32_t srcFormat, dstFormat;
 
         srcRes.isImage = VK_TRUE;
         srcRes.u.img.pImage = pSrcImage;
         srcRes.u.img.subRes.aspectMask = pRegions[ir].srcSubresource.aspectMask;
         srcRes.u.img.subRes.mipLevel   = pRegions[ir].srcSubresource.mipLevel;
         srcRes.u.img.subRes.arrayLayer = pRegions[ir].srcSubresource.baseArrayLayer;
+        srcFormat = pSrcImage->formatInfo.residentImgFormat;
         if (pRegions[ir].srcOffsets[1].x > pRegions[ir].srcOffsets[0].x)
         {
             srcRes.u.img.offset.x      = pRegions[ir].srcOffsets[0].x;
@@ -2278,6 +2325,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
         dstRes.u.img.subRes.aspectMask = pRegions[ir].dstSubresource.aspectMask;
         dstRes.u.img.subRes.mipLevel   = pRegions[ir].dstSubresource.mipLevel;
         dstRes.u.img.subRes.arrayLayer = pRegions[ir].dstSubresource.baseArrayLayer;
+        dstFormat = pDstImage->formatInfo.residentImgFormat;
         if (pRegions[ir].dstOffsets[1].x > pRegions[ir].dstOffsets[0].x)
         {
             dstRes.u.img.offset.x      = pRegions[ir].dstOffsets[0].x;
@@ -2317,7 +2365,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
             scale = VK_TRUE;
         }
 
-        if (!scale && !reverse.x && !reverse.y && !reverse.z)
+        if ((srcFormat != VK_FORMAT_R16G16B16A16_SINT && dstFormat == VK_FORMAT_R16G16B16A16_SINT) ||
+            (srcFormat == VK_FORMAT_R16G16B16A16_SINT && dstFormat != VK_FORMAT_R16G16B16A16_SINT))
+        {
+            computeBlit = VK_TRUE;
+        }
+
+        if (!scale && !reverse.x && !reverse.y && !reverse.z && !computeBlit)
         {
             uint32_t srcLayers;
             __VK_DEBUG_ONLY(uint32_t dstLayers);
@@ -2380,6 +2434,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
                     commandBuffer,
                     &srcRes,
                     &dstRes,
+                    VK_FALSE,
                     &reverse,
                     filter
                     ));
@@ -2453,6 +2508,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyBufferToImage
         srcWidth  = (pRegions[ir].bufferRowLength != 0)   ? pRegions[ir].bufferRowLength   : pRegions[ir].imageExtent.width;
         srcHeight = (pRegions[ir].bufferImageHeight != 0) ? pRegions[ir].bufferImageHeight : pRegions[ir].imageExtent.height;
         srcSliceBytes = ((srcWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8) * (srcHeight / fmtInfo->blockSize.height);
+
+        if (dstRes.u.img.subRes.aspectMask == VK_IMAGE_ASPECT_STENCIL_BIT)
+        {
+            /*for stencil copy, the bitsPerBlock should be 8*/
+            __VK_ASSERT(pDstImg->createInfo.format == VK_FORMAT_S8_UINT || pDstImg->createInfo.format == VK_FORMAT_D24_UNORM_S8_UINT);
+            srcSliceBytes = ((srcWidth / fmtInfo->blockSize.width) * 8 / 8) * (srcHeight / fmtInfo->blockSize.height);
+        }
 
         for (il = 0; il < dstLayers; il++)
         {
@@ -2530,6 +2592,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
         dstWidth  = (pRegions[ir].bufferRowLength != 0)   ? pRegions[ir].bufferRowLength   : pRegions[ir].imageExtent.width;
         dstHeight = (pRegions[ir].bufferImageHeight != 0) ? pRegions[ir].bufferImageHeight : pRegions[ir].imageExtent.height;
         dstSliceBytes = ((dstWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8) * (dstHeight / fmtInfo->blockSize.height);
+
+        if (srcRes.u.img.subRes.aspectMask == VK_IMAGE_ASPECT_STENCIL_BIT)
+        {
+            /*for stencil copy, the bitsPerBlock should be 8*/
+            __VK_ASSERT(pSrcImg->createInfo.format == VK_FORMAT_S8_UINT || pSrcImg->createInfo.format == VK_FORMAT_D24_UNORM_S8_UINT);
+            dstSliceBytes = ((dstWidth / fmtInfo->blockSize.width) * 8 / 8) * (dstHeight / fmtInfo->blockSize.height);
+        }
 
         for (il = 0; il < srcLayers; il++)
         {
