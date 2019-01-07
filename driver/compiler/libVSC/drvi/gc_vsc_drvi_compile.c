@@ -961,6 +961,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
                 CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &bCheckAlwaysInlineOnly);
 
                 /* Do some postprocess works for inline. */
+                CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
                 CALL_SH_PASS(vscVIR_PostprocessMLPostShader, 0, gcvNULL);
 
                 externalLinkPassData.bNeedToInvalidCFG = gcvTRUE;
