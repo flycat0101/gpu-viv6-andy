@@ -212,6 +212,11 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RG_EXT, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
 
     { GL_BGRA_EXT, GL_BGRA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
+
+    /* required by EXT_color_buffer_half_float extension */
+    { GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 8, GL_TRUE },
+    { GL_RGB, GL_RGB, GL_HALF_FLOAT_OES, 6, GL_TRUE },
+
 };
 
 
