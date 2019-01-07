@@ -253,6 +253,13 @@ typedef struct
 typedef struct
 {
     uint32_t imageInfo[4];
+
+    /* Needed if texelFetch need to be implemented using texelLoad
+    for 128 bpp texelbuffer use img to do*/
+    uint32_t baseWidth;
+    uint32_t baseHeight;
+    uint32_t baseDepth;
+    uint32_t baseSlice;
 } HwImgDesc;
 
 
