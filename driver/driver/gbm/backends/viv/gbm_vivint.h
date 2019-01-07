@@ -100,6 +100,8 @@ _gGBMFormatTable[] =
     {GBM_FORMAT_RGB565,   gcvSURF_R5G6B5  },
     {GBM_FORMAT_BGR565,   gcvSURF_B5G6R5  },
 
+    {GBM_FORMAT_R8,       gcvSURF_R8    },
+    {GBM_FORMAT_GR88,     gcvSURF_G8R8  },
     /* {GBM_FORMAT_RGB888,   gcvSURF_R8G8B8  }, */
     /* {GBM_FORMAT_BGR888,   gcvSURF_B8G8R8  }, */
 
