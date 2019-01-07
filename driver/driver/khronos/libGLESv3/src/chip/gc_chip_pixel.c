@@ -355,6 +355,11 @@ __glChipReadPixels(
     */
     srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
+    if(srcView.surf == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
+    }
+
     /* When commands such as ReadPixels read from a layered framebuffer,
     ** the image at layer zero of the selected attachment is always used to obtain pixel values
     */
