@@ -23769,8 +23769,8 @@ OnError:
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, stateBuffer));
     }
 
-    /* Free up the hints structure. */
-    if (hints != gcvNULL)
+    /* When in error condition, only free the hints which is newly created. */
+    if (hints && (ProgramState->hints == gcvNULL))
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, hints));
     }
