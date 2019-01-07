@@ -820,10 +820,6 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_CASE0;
         }
-        else if ((mipmap->formatInfo->drvFormat == __GL_FMT_LA8) && chipCtx->patchId != gcvPATCH_WESTON)
-        {
-            patchCase = __GL_CHIP_FMT_PATCH_A8L8;
-        }
 
         formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, patchCase);
 

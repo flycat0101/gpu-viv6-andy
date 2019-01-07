@@ -129,9 +129,6 @@ typedef enum {
     /* Force ALPHA8 to RGBA8 */
     __GL_CHIP_FMT_PATCH_ALPHA8,
 
-    /* Force A8L8 to use gcvSURF_A8L8_1_A8R8G8B so we could handle copy texture from ARGB8 render target */
-    __GL_CHIP_FMT_PATCH_A8L8,
-
 } __GLchipFmtPatch;
 
 typedef struct __GLchipFmtMapInfoRec

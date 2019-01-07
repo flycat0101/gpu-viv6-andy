@@ -285,7 +285,6 @@ gcChipInitFormatMapInfo(
     GLuint patchD32FCount            = 0;
     GLuint patchAstcCount            = 0;
     GLuint patchAlpha8Count          = 0;
-    GLuint patchA8L8Count            = 0;
     GLuint patchFmtMapInfoCount      = 0;
     static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
@@ -352,11 +351,6 @@ gcChipInitFormatMapInfo(
     __GLChipPatchFmt patchAlpha8Formats[] =
     {
         {gcvSURF_A8, gcvSURF_A8_1_A8R8G8B8, gcvSURF_UNKNOWN, -1},
-    };
-
-    __GLChipPatchFmt patchA8L8Formats[] =
-    {
-        {gcvSURF_A8L8, gcvSURF_A8L8_1_A8R8G8B8, gcvSURF_UNKNOWN, -1},
     };
 
     GLuint halfFloatTableSize = 0;
@@ -461,17 +455,6 @@ gcChipInitFormatMapInfo(
             }
         }
 
-        if (!chipCtx->chipFeature.hwFeature.hasBlitEngine)
-        {
-            for (j = 0; j < gcmCOUNTOF(patchA8L8Formats); ++j)
-            {
-                if (patchA8L8Formats[j].requestFormat == __glChipFmtMapInfo[i].requestFormat)
-                {
-                    patchA8L8Formats[j].entry = i;
-                    patchA8L8Count++;
-                }
-            }
-        }
     }
 
     /* case0 */
@@ -500,9 +483,6 @@ gcChipInitFormatMapInfo(
 
     /* case8 : ALPHA8*/
     patchFmtMapInfoCount += patchAlpha8Count;
-
-    /* case9 : A8L8*/
-    patchFmtMapInfoCount += patchA8L8Count;
 
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
@@ -668,27 +648,6 @@ gcChipInitFormatMapInfo(
                 gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
             }
             index++;
-        }
-
-        if (patchA8L8Count)
-        {
-            for (i = 0; i < gcmCOUNTOF(patchA8L8Formats); ++i)
-            {
-                GLint entry = patchA8L8Formats[i].entry;
-
-                GL_ASSERT(entry != -1);
-                if ((entry != -1) && (index < __GL_CHIP_PATCH_FMT_MAX))
-                {
-                    __glChipFmtMapInfo_patch[index].requestFormat = patchA8L8Formats[i].requestFormat;
-                    __glChipFmtMapInfo_patch[index].readFormat = patchA8L8Formats[i].readFormat;
-                    __glChipFmtMapInfo_patch[index].writeFormat = __glChipFmtMapInfo[entry].writeFormat;
-                    __glChipFmtMapInfo_patch[index].patchCase = __GL_CHIP_FMT_PATCH_A8L8;
-                    __glChipFmtMapInfo_patch[index].flags = 0;
-
-                    gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
-                }
-                index++;
-            }
         }
 
         GL_ASSERT(index <= patchFmtMapInfoCount);

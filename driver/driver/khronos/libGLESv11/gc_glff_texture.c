@@ -4969,14 +4969,7 @@ static GLboolean _getFormat(
             break;
 
         case GL_LUMINANCE_ALPHA:
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE) == gcvSTATUS_FALSE)
-            {
-                *HalFormat = gcvSURF_A8L8_1_A8R8G8B8;
-            }
-            else
-            {
-                *HalFormat = gcvSURF_A8L8;
-            }
+            *HalFormat = gcvSURF_A8L8;
             break;
 
         case GL_BGRA_EXT:
