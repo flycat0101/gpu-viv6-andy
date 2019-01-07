@@ -918,7 +918,7 @@ bool galStretchBlit( void         *drv,
             }
             else if (vdrv->src_rotation == gcvSURF_90_DEGREE) {
                 src_rect.left   = srect->y;
-                src_rect.top    = vdrv->src_width - srect->x - srect->w + 1;
+                src_rect.top    = vdrv->src_aligned_width - srect->x - srect->w;
                 src_rect.right  = src_rect.left + srect->h;
                 src_rect.bottom = src_rect.top + srect->w;
             }
@@ -936,7 +936,7 @@ bool galStretchBlit( void         *drv,
             }
             else if (vdrv->dst_rotation == gcvSURF_90_DEGREE) {
                 dst_rect.left   = drect->y;
-                dst_rect.top    = vdrv->dst_width - drect->x - drect->w + 1;
+                dst_rect.top    = vdrv->dst_aligned_width - drect->x - drect->w;
                 dst_rect.right  = dst_rect.left + drect->h;
                 dst_rect.bottom = dst_rect.top + drect->w;
             }
@@ -2279,8 +2279,8 @@ galBlit( void         *drv,
             else if (vdrv->dst_rotation == gcvSURF_90_DEGREE) {
                 D_DEBUG_AT( Gal_2D,"vdrv->dst_aligned_width=%d,width=%d,aligned_height=%d height=%d\n",
                     vdrv->dst_aligned_width,vdrv->dst_width,vdrv->dst_aligned_height,vdrv->dst_height);
-                dst_rect.left   = dy + (vdrv->dst_aligned_height - vdrv->dst_height);
-                dst_rect.top    = vdrv->dst_width - dx - rect->h;
+                dst_rect.left   = dy;
+                dst_rect.top    = vdrv->dst_aligned_width- dx - rect->h;
                 dst_rect.right  = dst_rect.left + rect->w;
                 dst_rect.bottom = dst_rect.top + rect->h;
             }
@@ -2423,7 +2423,7 @@ galBlit2( void         *drv,
 #if (DIRECTFB_MAJOR_VERSION >= 1) && (DIRECTFB_MINOR_VERSION >= 4)
             else if (vdrv->src_rotation == gcvSURF_90_DEGREE) {
                 src_rect.left   = rect->y;
-                src_rect.top    = vdrv->src_width - rect->x - rect->w + 1;
+                src_rect.top    = vdrv->src_aligned_width- rect->x - rect->w;
                 src_rect.right  = src_rect.left + rect->h;
                 src_rect.bottom = src_rect.top + rect->w;
 
@@ -2449,7 +2449,7 @@ galBlit2( void         *drv,
 #if (DIRECTFB_MAJOR_VERSION >= 1) && (DIRECTFB_MINOR_VERSION >= 4)
             else if (vdrv->dst_rotation == gcvSURF_90_DEGREE) {
                 dst_rect.left   = dy;
-                dst_rect.top    = vdrv->dst_width - dx - rect->h + 1;
+                dst_rect.top    = vdrv->dst_aligned_width- dx - rect->h;
                 dst_rect.right  = dst_rect.left + rect->w;
                 dst_rect.bottom = dst_rect.top + rect->h;
             }
