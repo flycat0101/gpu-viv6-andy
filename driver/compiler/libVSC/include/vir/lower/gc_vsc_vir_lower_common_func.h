@@ -296,6 +296,12 @@ VIR_Lower_IsDstUnsigned(
     );
 
 gctBOOL
+VIR_Lower_IsDstMediumpOrLowp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstInt16(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -458,6 +464,13 @@ VIR_Lower_SetEnableBaseOnSrc0(
 
 gctBOOL
 VIR_Lower_SetEnableBaseOnSrc1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetHighp(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd

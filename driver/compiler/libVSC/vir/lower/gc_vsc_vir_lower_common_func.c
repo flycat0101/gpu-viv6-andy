@@ -662,6 +662,22 @@ VIR_Lower_IsDstUnsigned(
 }
 
 gctBOOL
+VIR_Lower_IsDstMediumpOrLowp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Precision destPrecision = VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst));
+
+    if (destPrecision != VIR_PRECISION_HIGH)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
 VIR_Lower_IsFloatOpcode(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -1037,6 +1053,17 @@ VIR_Lower_SetEnableBaseOnSrc1(
 {
     _SetEnableBaseOnSrc(Context, Inst, VIR_Inst_GetSource(Inst, 1), Opnd);
 
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetHighp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
     return gcvTRUE;
 }
 
