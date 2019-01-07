@@ -8858,6 +8858,11 @@ _LoadPerVertexMember(
             gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
             if (vertexSource->u.sourceConstant.u.intConstant > _GetInputArraySizeByPrimitiveType(inLayout.gsPrimitive))
             {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                Compiler->context.currentLineNo,
+                                                Compiler->context.currentStringNo,
+                                                slvREPORT_ERROR,
+                                                "incorrect array index"));
                 gcmFOOTER_NO();
                 return gcvSTATUS_INVALID_ARGUMENT;
             }
@@ -22099,7 +22104,8 @@ _GetConstantSubscriptCode(
 {
     gceSTATUS       status = gcvSTATUS_OK;
     gctINT32        index;
-    gctUINT         offset, i;
+    gctINT32        offset;
+    gctUINT32       i;
 
     gcmHEADER();
 
@@ -22170,8 +22176,7 @@ _GetConstantSubscriptCode(
     {
         gcmASSERT(slsDATA_TYPE_IsArray(BinaryExpr->leftOperand->dataType));
 
-        gcmASSERT((Parameters->operandCount * index) < LeftParameters->operandCount ||
-                  slsDATA_TYPE_IsInheritFromUnsizedDataType(BinaryExpr->leftOperand->dataType));
+/* Comment out as index may be negative and not be for unsized or implicitly sized array */
 
         if (slsDATA_TYPE_IsInheritFromUnsizedDataType(BinaryExpr->leftOperand->dataType))
         {
@@ -22231,6 +22236,15 @@ _GetConstantSubscriptCode(
         else
         {
             offset = Parameters->operandCount * index;
+            if(offset < 0 || offset >= (gctINT32)LeftParameters->operandCount)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                BinaryExpr->exprBase.base.lineNo,
+                                                BinaryExpr->exprBase.base.stringNo,
+                                                slvREPORT_WARN,
+                                                "array index %d out of bound, clamped to 0", index));
+                offset = 0;
+            }
 
             if (Parameters->needLOperand)
             {
