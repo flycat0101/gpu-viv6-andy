@@ -201,6 +201,8 @@ static int import_page_map(struct um_desc *um,
         goto error;
     }
 
+    dma_sync_sg_for_cpu(galcore_device, um->sgt.sgl, um->sgt.nents, DMA_FROM_DEVICE);
+
     um->type = UM_PAGE_MAP;
     um->pages = pages;
 

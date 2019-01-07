@@ -370,7 +370,7 @@ _GFPAlloc(
 
         mdlPriv->dma_addr = dma_map_page(galcore_device,
                 mdlPriv->contiguousPages, 0, NumPages * PAGE_SIZE,
-                DMA_TO_DEVICE);
+                DMA_FROM_DEVICE);
 
         if (!mdlPriv->dma_addr)
         {
@@ -427,7 +427,7 @@ _GFPAlloc(
         }
 
         result = dma_map_sg(galcore_device,
-                    mdlPriv->sgt.sgl, mdlPriv->sgt.nents, DMA_TO_DEVICE);
+                    mdlPriv->sgt.sgl, mdlPriv->sgt.nents, DMA_FROM_DEVICE);
 
         if (result != mdlPriv->sgt.nents)
         {
