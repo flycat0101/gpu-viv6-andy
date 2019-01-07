@@ -105,10 +105,11 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.23 for saving transform feedback information on 8/28/2018 */
 
 /* bump up version to 1.24 for adding output's shader mode on 10/10/2018 */
+/* bump up version to 1.25 for modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 24)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 24)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 25)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 25)
 
 typedef union _gcsValue
 {
@@ -3693,7 +3694,7 @@ struct _gcsFUNCTION
 #define IsFunctionHasSamplerIndexing(f)             (((f)->flags & gcvFUNC_HAS_SAMPLER_INDEXINED) != 0)
 #define IsFunctionParamAsImgSource0(f)              (((f)->flags & gcvFUNC_PARAM_AS_IMG_SOURCE0) != 0)
 #define IsFunctionUsingSamplerVirtual(f)            (((f)->flags & gcvFUNC_USING_SAMPLER_VIRTUAL) != 0)
-#define IsFunctionHasBigGapInTempReg(f)               (((f)->flags & gcvFUNC_HAS_TEMPREG_BIGGAP) != 0)
+#define IsFunctionHasBigGapInTempReg(f)             (((f)->flags & gcvFUNC_HAS_TEMPREG_BIGGAP) != 0)
 
 #define SetFunctionRecompiler(f)                    if (f != gcvNULL) { (f)->flags |= gcvFUNC_RECOMPILER; }
 #define SetFunctionRecompilerStub(f)                if (f != gcvNULL) { (f)->flags |= gcvFUNC_RECOMPILER_STUB; }
