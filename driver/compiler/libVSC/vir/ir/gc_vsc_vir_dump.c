@@ -1686,6 +1686,11 @@ _DumpOperand(
         errCode = _DumpIndexed(Dumper, Operand, func);
         CHECK_ERROR(errCode, "DumpOperand");
         break;
+    case VIR_OPND_NAME:
+        VERIFY_OK(
+            VIR_LOG(Dumper, "%s",
+            VIR_Shader_GetStringFromId(Dumper->Shader,VIR_Operand_GetNameId(Operand))));
+        break;
     case VIR_OPND_INTRINSIC:
         VERIFY_OK(
             VIR_LOG(Dumper, "%s",
@@ -1817,7 +1822,8 @@ _DumpOperand(
         VIR_Operand_GetOpKind(Operand) != VIR_OPND_FUNCTION &&
         VIR_Operand_GetOpKind(Operand) != VIR_OPND_LABEL &&
         VIR_Operand_GetOpKind(Operand) != VIR_OPND_TEXLDPARM &&
-        VIR_Operand_GetOpKind(Operand) != VIR_OPND_SAMPLER_INDEXING
+        VIR_Operand_GetOpKind(Operand) != VIR_OPND_SAMPLER_INDEXING &&
+        VIR_Operand_GetOpKind(Operand) != VIR_OPND_NAME
         )
     {
         /* dump precision info, mediump is default */

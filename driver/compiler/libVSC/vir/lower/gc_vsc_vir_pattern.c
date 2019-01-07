@@ -389,6 +389,8 @@ _Pattern_CmpOperand(
 
             return sym0 == sym1;
         }
+    case VIR_OPND_NAME:
+        return VIR_Operand_GetNameId(Opnd0) == VIR_Operand_GetNameId(Opnd1);
     case VIR_OPND_CONST:
     case VIR_OPND_PARAMETERS:
     case VIR_OPND_FUNCTION:

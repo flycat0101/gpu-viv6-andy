@@ -38,7 +38,10 @@ typedef struct _VIR_LINKER_CALL_INST_NODE         VIR_LINKER_CALL_INST_NODE;
 struct _VIR_LINKER_CALL_INST_NODE
 {
     VIR_Instruction             *inst;
-    VIR_IntrinsicsKind          intrinsicKind;
+    union {
+        VIR_IntrinsicsKind       intrinsicKind;  /* intrinsic kind for VIR_OP_INTRINSIC */
+        VIR_NameId               extFuncName;    /* extern function name for EXTCALL */
+    } u;
 };
 
 void VIR_LIB_WorkListQueue(
@@ -186,7 +189,7 @@ struct _VIR_LinkLib_CONTEXT
 {
     VIR_Shader                          *shader;
     VIR_Shader                          *libShader;
-        VSC_HASH_TABLE                      *pTempHashTable;
+    VSC_HASH_TABLE                      *pTempHashTable;
     VIR_ShaderKind                      shaderKind;
     VSC_LIB_LINK_POINT                  *linkPoint;
     gctUINT                             libSpecializationConstantCount;
@@ -218,6 +221,7 @@ VIR_GetIntrinsicLib(
     IN gctBOOL                  forOCL,
     IN gctBOOL                  forGraphics,
     IN gctBOOL                  DumpShader,
+    IN gctBOOL                  hasExtcallAtomic,
     OUT VIR_Shader              **pOutLib
     );
 

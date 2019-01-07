@@ -602,6 +602,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_GetLabelId_(Opnd)       VIR_Symbol_GetIndex((Opnd)->u.n.u1.label)
 
 #define VIR_Operand_GetParameters(Opnd)     ((Opnd)->u.n.u1.argList)
+#define VIR_Operand_GetNameId(Opnd)         ((Opnd)->u.n.u1.name)
 #define VIR_Operand_GetIntrinsicKind(Opnd)  ((Opnd)->u.n.u1.intrinsic)
 #define VIR_Operand_GetFieldBase(Opnd)      ((Opnd)->u.n.u1.base)
 #define VIR_Operand_GetFieldId(Opnd)        ((Opnd)->u.n.u2.fieldId)
@@ -662,6 +663,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_SetTypeId(Opnd, TypeId)       do { (Opnd)->u.n._opndType = (TypeId); } while (0)
 #define VIR_Operand_SetSym(Opnd, Val)           do { (Opnd)->u.n.u1.sym = (Val); } while (0)
 #define VIR_Operand_SetFunc(Opnd, Val)          do { (Opnd)->u.n.u1.func = (Val); } while (0)
+#define VIR_Operand_SetNameId(Opnd, Val)        do { (Opnd)->u.n.u1.name = (Val); } while (0)
 #define VIR_Operand_SetIntrinsicKind(Opnd, Val) do { (Opnd)->u.n.u1.intrinsic = (Val); } while (0)
 #define VIR_Operand_SetFieldBase(Opnd, Val)     do { (Opnd)->u.n.u1.base = (Val); } while (0)
 #define VIR_Operand_SetFieldId(Opnd, Val)       do { (Opnd)->u.n.u2.fieldId = (Val); } while (0)
@@ -3109,6 +3111,7 @@ typedef enum _VIR_OPERANDKIND
     VIR_OPND_OFFSETOF, /* 18, field offset */
     VIR_OPND_PHI, /* 19, phi node */
     VIR_OPND_VEC_INDEXING, /* 20, dynamic indexing to vector component */
+    VIR_OPND_NAME, /* 21, name id, such as ext function name */
     /* max 31, need to enlarge operand kind field width when exceeding 31 */
 } VIR_OperandKind;
 
@@ -3470,6 +3473,8 @@ struct _VIR_OPERAND
                 VIR_ConstId         constId;    /* vector constant */
                 VIR_Label *         label;      /* label operand, branch target */
                 VIR_Function *      func;       /* callee, call target */
+                VIR_NameId          name;       /* name id, for EXTCALL, it's call target
+                                                 * name for extern function */
                 VIR_IntrinsicsKind  intrinsic;
                 VIR_Operand *       base;       /* base expression for array indexing
                                                  * or field access */
@@ -4137,6 +4142,9 @@ typedef enum _VIR_SHADERFLAGS
     VIR_SHFLAG_PATCH_LIB                        = 0x20000000, /* this is a patch lib shader. */
 
     VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE              = 0x40000000, /* APP sets the aliased attribute for this shader. */
+
+    VIR_SHFLAG_HAS_EXTCALL_ATOM                 = 0x80000000, /* if shader has this flag, need to run VIR_LinkInternalLibFunc */
+
 } VIR_ShaderFlags;
 
 #define VIR_Shader_GetFlags(Shader)                 (Shader)->flags)
@@ -4166,6 +4174,7 @@ typedef enum _VIR_SHADERFLAGS
 #define VIR_Shader_HasVivVxExtension(Shader)        (((Shader)->flags & VIR_SHFLAG_HAS_VIV_VX_EXTENSION) != 0)
 #define VIR_Shader_IsPatchLib(Shader)               (((Shader)->flags & VIR_SHFLAG_PATCH_LIB) != 0)
 #define VIR_Shader_HasAliasedAttribute(Shader)      (((Shader)->flags & VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE) != 0)
+#define VIR_Shader_HasExtcallAtomic(Shader)         (((Shader)->flags & VIR_SHFLAG_HAS_EXTCALL_ATOM) != 0)
 
 /* let the client make sure the shaderKind is right.
    Otherwise, it is wrong when the flag is used in !flag case. */
@@ -6108,6 +6117,12 @@ void
 VIR_Operand_SetFunction(
     IN OUT VIR_Operand * Operand,
     IN  VIR_Function *   Function
+    );
+
+void
+VIR_Operand_SetName(
+    IN OUT VIR_Operand *    Operand,
+    IN  VIR_NameId          Name
     );
 
 void

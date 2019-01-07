@@ -1925,6 +1925,10 @@ _VIR_LoopInfo_CollectDefs(
                 VIR_Function *calleeFunc = VIR_Inst_GetCallee(inst);
                 gctUINT i;
 
+                if(gcoOS_StrNCmp("_atom", VIR_Function_GetNameString(calleeFunc), 5) == gcvSTATUS_OK)
+                {
+                    VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasStore);
+                }
                 for(i = 0; i < VIR_IdList_Count(&calleeFunc->paramters); ++i)
                 {
                     VIR_Id id = VIR_IdList_GetId(&calleeFunc->paramters, i);

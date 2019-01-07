@@ -293,6 +293,8 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.hasLODQFix             = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix  = IS_HW_SUPPORT(gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX);
 
+    pVscHwCfg->hwFeatureFlags.hasUSCAtomicFix2       = IS_HW_SUPPORT(gcvFEATURE_USC_ATOMIC_FIX2);
+
 OnError:
     gcmFOOTER();
     return status;

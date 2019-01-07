@@ -1620,6 +1620,7 @@ _ConvVirOperand2Target(
     case VIR_OPND_IMMEDIATE:
     case VIR_OPND_CONST:
     case VIR_OPND_PARAMETERS:
+    case VIR_OPND_NAME:
     case VIR_OPND_INTRINSIC:
     case VIR_OPND_FIELD:
     case VIR_OPND_ARRAY:
@@ -1816,6 +1817,7 @@ _ConvVirOperand2Source(
     case VIR_OPND_LABEL:
     case VIR_OPND_FUNCTION:
     case VIR_OPND_PARAMETERS:
+    case VIR_OPND_NAME:
     case VIR_OPND_INTRINSIC:
     case VIR_OPND_FIELD:
     case VIR_OPND_ARRAY:
