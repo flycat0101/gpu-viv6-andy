@@ -18434,6 +18434,8 @@ gckHARDWARE_QueryFrequency(
     gctUINT32 mcClk, shClk;
     gceSTATUS status;
     gctUINT32 powerManagement = 0;
+    gctBOOL globalAcquired = gcvFALSE;
+    gceCHIPPOWERSTATE statesStored, state;
 
     gcmkHEADER_ARG("Hardware=0x%p", Hardware);
 
@@ -18451,9 +18453,20 @@ gckHARDWARE_QueryFrequency(
             ));
     }
 
+    gcmkONERROR(gckHARDWARE_QueryPowerManagementState(
+        Hardware, &statesStored
+        ));
+
     gcmkONERROR(gckHARDWARE_SetPowerManagementState(
         Hardware, gcvPOWER_ON_AUTO
         ));
+
+    /* Grab the global semaphore. */
+    gcmkONERROR(gckOS_AcquireSemaphore(
+        Hardware->os, Hardware->globalSemaphore
+        ));
+
+    globalAcquired = gcvTRUE;
 
     gckHARDWARE_EnterQueryClock(Hardware, &mcStart, &shStart);
 
@@ -18461,23 +18474,38 @@ gckHARDWARE_QueryFrequency(
 
     if (mcStart)
     {
-        if (powerManagement)
-        {
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
-                Hardware, gcvFALSE
-                ));
-        }
-
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
-            Hardware, gcvPOWER_ON_AUTO
-            ));
-
         gckHARDWARE_ExitQueryClock(Hardware,
                                    mcStart, shStart,
                                    &mcClk, &shClk);
 
         Hardware->mcClk = mcClk;
         Hardware->shClk = shClk;
+    }
+
+    /* Release the global semaphore. */
+    gcmkONERROR(gckOS_ReleaseSemaphore(
+        Hardware->os, Hardware->globalSemaphore
+        ));
+
+    globalAcquired = gcvFALSE;
+
+    switch(statesStored)
+    {
+    case gcvPOWER_OFF:
+        state = gcvPOWER_OFF_BROADCAST;
+        break;
+    case gcvPOWER_IDLE:
+        state = gcvPOWER_IDLE_BROADCAST;
+        break;
+    case gcvPOWER_SUSPEND:
+        state = gcvPOWER_SUSPEND_BROADCAST;
+        break;
+    case gcvPOWER_ON:
+        state = gcvPOWER_ON_AUTO;
+        break;
+    default:
+        state = statesStored;
+        break;
     }
 
     if (powerManagement)
@@ -18487,11 +18515,23 @@ gckHARDWARE_QueryFrequency(
             ));
     }
 
+    gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        Hardware, state
+        ));
+
     gcmkFOOTER_NO();
 
     return gcvSTATUS_OK;
 
 OnError:
+    if (globalAcquired)
+    {
+        /* Release the global semaphore. */
+        gcmkVERIFY_OK(gckOS_ReleaseSemaphore(
+            Hardware->os, Hardware->globalSemaphore
+            ));
+    }
+
     gcmkFOOTER();
 
     return status;
