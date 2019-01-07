@@ -8377,6 +8377,7 @@ gcoHARDWARE_3DBlitMipMap(
     gctUINT32   color64 = 0;
     gctBOOL bSrcFake, bDstFake;
     gctBOOL forceSGPU = gcvTRUE;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
 
@@ -8390,6 +8391,13 @@ gcoHARDWARE_3DBlitMipMap(
     gcmONERROR(_ConvertBlitFormat(gcvFALSE, dstSurf->format, &destFormat, &destSwizzle, gcvNULL, &bDstFake));
     srcSRGB = (srcSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE;
     dstSRGB = (dstSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE;
+
+    /* For gcvSURF_A8_SRGB8 format, seems 3DBlitMipMap have precision issue */
+    gcoHARDWARE_GetPatchID(gcvNULL, &patchId);
+    if (patchId == gcvPATCH_SKIA_SKQP && gcvSURF_A8_SRGB8 == srcSurf->format)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
 
     if (bSrcFake || bDstFake)
     {
