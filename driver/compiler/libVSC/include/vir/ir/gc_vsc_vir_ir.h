@@ -563,6 +563,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_isConst(Opnd)           (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_CONST)
 #define VIR_Operand_isTexldParm(Opnd)       (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_TEXLDPARM)
 #define VIR_Operand_isParameters(Opnd)      (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_PARAMETERS)
+#define VIR_Operand_isArray(Opnd)           (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_ARRAY)
 #define VIR_Operand_isIntrinsic(Opnd)       (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_INTRINSIC)
 #define VIR_Operand_isPhi(Opnd)             (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_PHI)
 #define VIR_Operand_isEvisModifier(Opnd)    (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_EVIS_MODIFIER)
@@ -3657,11 +3658,34 @@ struct _VIR_INSTRUCTION
     gctINT32                mcInstPC;
 };
 
+typedef enum _VIR_SRCOPERAND_ITER_EXPANDFLAG
+{
+    VIR_SRCOPERAND_FLAG_NONE                             = 0x00,
+
+    /* Expand an array operand. */
+    VIR_SRCOPERAND_FLAG_EXPAND_ARRAY_NODE                = 0x01,
+
+    /* Expand a texld parameter operand. */
+    VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE           = 0x02,
+
+    /* Expand a parameter operand. */
+    VIR_SRCOPERAND_FLAG_EXPAND_PARAM_NODE                = 0x04,
+
+    /* Default flags. */
+    VIR_SRCOPERAND_FLAG_DEFAULT                          = VIR_SRCOPERAND_FLAG_EXPAND_ARRAY_NODE
+                                                         | VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE,
+
+    /* Expand all special nodes. */
+    VIR_SRCOPERAND_FLAG_EXPAND_ALL_NODE                  = VIR_SRCOPERAND_FLAG_EXPAND_ARRAY_NODE
+                                                         | VIR_SRCOPERAND_FLAG_EXPAND_TEXLD_PARM_NODE
+                                                         | VIR_SRCOPERAND_FLAG_EXPAND_PARAM_NODE,
+} VIR_SrcOperand_Iter_ExpandFlag;
+
 /* inst source operand iterator */
 typedef struct _VIR_SRCOPERAND_ITERATOR
 {
     VIR_Instruction *       inst;
-    gctUINT                 expandSpecialNode : 1;
+    VIR_SrcOperand_Iter_ExpandFlag expandNodeFlag;
     gctUINT                 specialNode : 1;    /* the node need special handling */
     gctUINT                 useOpndList : 1;    /* the special node use operand list */
     gctUINT                 curSrcNo;
@@ -3682,11 +3706,11 @@ typedef struct _VIR_OPERAND_ITERATOR
 } VIR_Operand_Iterator;
 
 void VIR_SrcOperand_Iterator_Init(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter);
-void VIR_SrcOperand_Iterator_Init1(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter, gctBOOL ExpandSpecialNode, gctBOOL SkipUndef);
+void VIR_SrcOperand_Iterator_Init1(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter, VIR_SrcOperand_Iter_ExpandFlag ExpandFlag, gctBOOL SkipUndef);
 VIR_Operand * VIR_SrcOperand_Iterator_First(VIR_SrcOperand_Iterator *Iter);
 VIR_Operand * VIR_SrcOperand_Iterator_Next(VIR_SrcOperand_Iterator *Iter);
 
-void          VIR_Operand_Iterator_Init(VIR_Instruction *Inst, VIR_Operand_Iterator *Iter, gctBOOL ExpandSpecialNode, gctBOOL SkipUndef);
+void          VIR_Operand_Iterator_Init(VIR_Instruction *Inst, VIR_Operand_Iterator *Iter, VIR_SrcOperand_Iter_ExpandFlag ExpandFlag, gctBOOL SkipUndef);
 VIR_Operand * VIR_Operand_Iterator_First(VIR_Operand_Iterator *Iter);
 VIR_Operand * VIR_Operand_Iterator_Next(VIR_Operand_Iterator *Iter);
 

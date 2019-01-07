@@ -2308,7 +2308,7 @@ static VIR_PatternReplaceInst _texldRepInst1[] = {
 };
 
 static VIR_Pattern _texldPattern[] = {
-    { VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE, CODEPATTERN(_texld, 0) },
+    { VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE, CODEPATTERN(_texld, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_texld, 1) },
     { VIR_PATN_FLAG_NONE }
 };
@@ -2340,7 +2340,7 @@ static VIR_PatternReplaceInst _texldprojRepInst1[] = {
 };
 
 static VIR_Pattern _texldprojPattern[] = {
-    { VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE, CODEPATTERN(_texldproj, 0) },
+    { VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE, CODEPATTERN(_texldproj, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldproj, 1) },
     { VIR_PATN_FLAG_NONE }
 };
@@ -2372,7 +2372,7 @@ static VIR_PatternReplaceInst _texldpcfRepInst1[] = {
 };
 
 static VIR_Pattern _texldpcfPattern[] = {
-    { VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE, CODEPATTERN(_texldpcf, 0) },
+    { VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE, CODEPATTERN(_texldpcf, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldpcf, 1) },
     { VIR_PATN_FLAG_NONE }
 };

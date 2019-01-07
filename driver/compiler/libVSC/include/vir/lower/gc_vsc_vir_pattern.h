@@ -183,14 +183,19 @@ typedef enum _VIR_PATN_FLAG
     VIR_PATN_FLAG_COPY_ROUNDING_MODE                = 0x800,
 
    /*
-    ** Don't expand special node.
+    ** Don't expand a texld parameter operand.
     */
-    VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE           = 0x1000,
+    VIR_PATN_FLAG_NOT_EXPAND_TEXLD_PARM_NODE        = 0x1000,
+
+   /*
+    ** Don't expand a parameter operand.
+    */
+    VIR_PATN_FLAG_NOT_EXPAND_PARAM_NODE             = 0x2000,
 
    /*
     ** Pattern already matched and replaced
     */
-    VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED      = 0x2000,
+    VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED      = 0x4000,
 
 } VIR_PatnFlag;
 

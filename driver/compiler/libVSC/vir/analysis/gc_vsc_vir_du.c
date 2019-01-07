@@ -2715,7 +2715,8 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
         {
             pTempDef = GET_DEF_BY_IDX(pDefTable, defIdx);
 
-            if (pTempDef->webIdx != VIR_INVALID_WEB_INDEX && pTempDef->webIdx != newWebIdx)
+            if (pTempDef->webIdx != VIR_INVALID_WEB_INDEX && pTempDef->webIdx != newWebIdx &&
+                !VIR_IS_IMPLICIT_DEF_INST(pTempDef->defKey.pDefInst))
             {
                 if (VIR_Inst_GetDual16ExpandSeq(pTempDef->defKey.pDefInst) ==
                     VIR_Inst_GetDual16ExpandSeq(pDef->defKey.pDefInst))
