@@ -280,7 +280,6 @@ static VIR_IntrinsicsKind INTERNAL_INTRINSIC[] =
     VIR_IK_convF32ToF16,
     VIR_IK_quantizeToF16,
     VIR_IK_image_fetch,
-    VIR_IK_image_fetch_for_sampler,
     VIR_IK_image_addr,
     VIR_IK_image_query_format,
     VIR_IK_image_query_order,
@@ -289,6 +288,8 @@ static VIR_IntrinsicsKind INTERNAL_INTRINSIC[] =
     VIR_IK_image_query_lod,
     VIR_IK_image_query_levels,
     VIR_IK_image_query_samples,
+    /* Make sure add a new intrinsic kind from here. */
+    VIR_IK_image_fetch_for_sampler,
     VIR_IK_texld,
     VIR_IK_texldpcf,
     VIR_IK_texld_proj,
