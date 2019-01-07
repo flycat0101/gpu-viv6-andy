@@ -132,6 +132,10 @@ static pthread_mutex_t __wl_egl_surface_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_once_t __once_control = PTHREAD_ONCE_INIT;
 
+static void
+__wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer);
+
+
 static void __wl_swapworkers_done(struct wl_egl_window *window)
 {
     VEGLDisplay dpy = NULL;
@@ -426,6 +430,15 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
                     ret = __wl_egl_dispatch_queue(display->wl_dpy, egl_surface->commit_queue, 100);
                 }
                 pthread_mutex_unlock(&egl_surface->commit_mutex);
+            }
+        }
+
+        {
+            int i = 0;
+            for (i = 0; i < egl_surface->nr_buffers; i++)
+            {
+                __WLEGLBuffer buffer = &egl_surface->buffers[i];
+                __wl_egl_buffer_destroy(egl_surface, buffer);
             }
         }
 
@@ -855,7 +868,7 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     }
 
 
-    if (display)
+    if (display && egl_surface->commit_queue && egl_surface->wl_queue)
     {
         __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
         __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->wl_queue);
