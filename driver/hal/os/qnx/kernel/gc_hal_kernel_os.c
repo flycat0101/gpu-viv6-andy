@@ -6148,6 +6148,28 @@ gckOS_SetGPUFrequency(
 }
 
 gceSTATUS
+gckOS_CreateKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctSIZE_T Offset,
+    IN gctSIZE_T Bytes,
+    OUT gctPOINTER * Logical
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gckOS_DestroyKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctPOINTER Logical
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 gckOS_CreateKernelVirtualMapping(
     IN gckOS Os,
     IN gctPHYS_ADDR Physical,

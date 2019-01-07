@@ -552,7 +552,6 @@ static int viv_ioctl_gem_attach_aux(struct drm_device *drm, void *data,
         gcsHAL_INTERFACE iface;
         gctBOOL is2BitPerTile = gckHARDWARE_IsFeatureAvailable(kernel->hardware , gcvFEATURE_TILE_STATUS_2BITS);
         gctBOOL isCompressionDEC400 = gckHARDWARE_IsFeatureAvailable(kernel->hardware , gcvFEATURE_COMPRESSION_DEC400);
-        gckVIDMEM_NODE tsObjNode = gcvNULL;
         gctPOINTER entry = gcvNULL;
         gctUINT32 tileStatusFiller = (isCompressionDEC400 || ((kernel->hardware->identity.chipModel == gcv500) && (kernel->hardware->identity.chipRevision > 2)))
                                   ? 0xFFFFFFFF
@@ -578,10 +577,9 @@ static int viv_ioctl_gem_attach_aux(struct drm_device *drm, void *data,
         gcmkONERROR(gckDEVICE_Dispatch(gal_dev->device, &iface));
 
         /* Fill tile status node with tileStatusFiller. */
-        gcmkONERROR(gckVIDMEM_HANDLE_LookupAndReference(kernel, viv_ts_obj->node_handle, &tsObjNode));
-        gcmkONERROR(gckOS_MapPhysicalToKernelSpace(kernel->os, tsObjNode, &entry));
-        gcmkONERROR(gckVIDMEM_NODE_Dereference(kernel,tsObjNode));
+        gcmkONERROR(gckVIDMEM_NODE_LockCPU(kernel, viv_ts_obj->node_handle, &entry));
         memset(entry , tileStatusFiller , (__u64)gem_ts_obj->size);
+        gcmkONERROR(gckVIDMEM_NODE_UnlockCPU(kernel, viv_ts_obj->node_handle, entry));
 
         /* UnLock tile status node. */
         memset(&iface, 0, sizeof(iface));

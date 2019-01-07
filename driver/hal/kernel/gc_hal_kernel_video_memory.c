@@ -1255,6 +1255,97 @@ OnError:
     return status;
 }
 
+/*map to kernel space*/
+gceSTATUS
+gckVIDMEM_NODE_LockCPU(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Handle,
+    OUT gctPOINTER * Logical
+    )
+{
+    gceSTATUS status = gcvSTATUS_FALSE;
+    gckVIDMEM_NODE ObjNode = gcvNULL;
+    gcuVIDMEM_NODE_PTR node = gcvNULL;
+    gctPOINTER logical = gcvNULL;
+    gctBOOL acquired = gcvFALSE;
+    gckOS os = Kernel->os;
+
+    gcmkONERROR(gckVIDMEM_HANDLE_LookupAndReference(Kernel, Handle, &ObjNode));
+    node = ObjNode->node;
+    gcmkONERROR(gckOS_AcquireMutex(os, ObjNode->mutex, gcvINFINITE));
+    acquired = gcvTRUE;
+    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM){
+        gcmkONERROR(
+                    gckOS_CreateKernelMapping(os,
+                                              node->VidMem.memory->physical,
+                                              node->VidMem.offset,
+                                              node->VidMem.bytes,
+                                              &logical));
+    }else{
+        gcmkONERROR(
+                    gckOS_CreateKernelMapping(os,
+                                              node->Virtual.physical,
+                                              0,
+                                              node->Virtual.bytes,
+                                              &logical));
+    }
+    *Logical = logical;
+    gcmkONERROR(gckVIDMEM_NODE_Dereference(Kernel, ObjNode));
+    gcmkVERIFY_OK(gckOS_ReleaseMutex(os, ObjNode->mutex));
+    return gcvSTATUS_OK;
+OnError:
+    if (acquired)
+    {
+        /* Release the mutex. */
+        gcmkVERIFY_OK(gckOS_ReleaseMutex(os, ObjNode->mutex));
+    }
+
+    /* Return the status. */
+    return status;
+}
+
+gceSTATUS
+gckVIDMEM_NODE_UnlockCPU(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Handle,
+    OUT gctPOINTER Logical
+    )
+{
+    gceSTATUS status = gcvSTATUS_FALSE;
+    gckVIDMEM_NODE ObjNode = gcvNULL;
+    gcuVIDMEM_NODE_PTR node = gcvNULL;
+    gctBOOL acquired = gcvFALSE;
+    gckOS os = Kernel->os;
+
+    gcmkONERROR(gckVIDMEM_HANDLE_LookupAndReference(Kernel, Handle, &ObjNode));
+    node = ObjNode->node;
+    gcmkONERROR(gckOS_AcquireMutex(os, ObjNode->mutex, gcvINFINITE));
+    acquired = gcvTRUE;
+    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM){
+        gcmkONERROR(
+                    gckOS_DestroyKernelMapping(os,
+                                              node->VidMem.memory->physical,
+                                              Logical));
+    }else{
+        gcmkONERROR(
+                    gckOS_DestroyKernelMapping(os,
+                                              node->Virtual.physical,
+                                              Logical));
+    }
+    gcmkONERROR(gckVIDMEM_NODE_Dereference(Kernel, ObjNode));
+    gcmkVERIFY_OK(gckOS_ReleaseMutex(os, ObjNode->mutex));
+    return gcvSTATUS_OK;
+OnError:
+    if (acquired)
+    {
+        /* Release the mutex. */
+        gcmkVERIFY_OK(gckOS_ReleaseMutex(os, ObjNode->mutex));
+    }
+    /* Return the status. */
+    return status;
+}
+
+
 #if !gcdPROCESS_ADDRESS_SPACE
 /*******************************************************************************
 **

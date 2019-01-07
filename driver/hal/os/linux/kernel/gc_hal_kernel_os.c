@@ -686,6 +686,62 @@ gckOS_Destroy(
 }
 
 gceSTATUS
+gckOS_CreateKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctSIZE_T Offset,
+    IN gctSIZE_T Bytes,
+    OUT gctPOINTER * Logical
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    PLINUX_MDL mdl = (PLINUX_MDL)Physical;
+    gckALLOCATOR allocator = mdl->allocator;
+
+    gcmkHEADER_ARG("Os=%p Physical=%p Offset=0x%zx Bytes=0x%zx",
+                   Os, Physical, Offset, Bytes);
+
+    if (mdl->addr)
+    {
+        /* Already mapped whole memory. */
+        *Logical = (gctUINT8_PTR)mdl->addr + Offset;
+    }
+    else
+    {
+        gcmkONERROR(allocator->ops->MapKernel(allocator, mdl, Logical));
+    }
+
+OnError:
+    gcmkFOOTER_ARG("*Logical=%p", gcmOPT_POINTER(Logical));
+    return status;
+}
+
+gceSTATUS
+gckOS_DestroyKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctPOINTER Logical
+    )
+{
+    PLINUX_MDL mdl = (PLINUX_MDL)Physical;
+    gckALLOCATOR allocator = mdl->allocator;
+
+    gcmkHEADER_ARG("Os=%p Physical=%p Logical=%p", Os, Physical, Logical);
+
+    if (mdl->addr)
+    {
+        /* Nothing to do. */
+    }
+    else
+    {
+        allocator->ops->UnmapKernel(allocator, mdl, Logical);
+    }
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 gckOS_CreateKernelVirtualMapping(
     IN gckOS Os,
     IN gctPHYS_ADDR Physical,
@@ -2087,74 +2143,6 @@ _ConvertLogical2Physical(
 
     return status;
 }
-/*******************************************************************************
-**
-**  gckOS_MapPhysicalToKernelSpace
-**
-**  Map a physical address into kernel space.
-*/
-gceSTATUS
-gckOS_MapPhysicalToKernelSpace(
-    IN gckOS Os,
-    IN gckVIDMEM_NODE NodeObject,
-    OUT gctPOINTER * Logical
-    )
-{
-    gceSTATUS status;
-    gctBOOL acquired = gcvFALSE;
-    gcuVIDMEM_NODE_PTR node = gcvNULL;
-    PLINUX_MDL mdl = gcvNULL;
-    gckALLOCATOR allocator = gcvNULL;
-    gckOS os = Os;
-
-
-    node = NodeObject->node;
-    /* Grab the mutex. */
-    gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));
-    acquired = gcvTRUE;
-
-    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
-    {
-        mdl = (PLINUX_MDL)node->VidMem.memory->physical;
-        allocator = mdl->allocator;
-
-        if (mdl->addr)
-        {
-            *Logical = (gctUINT8_PTR)mdl->addr + node->VidMem.offset;
-        }
-        else
-        {
-            gcmkONERROR(allocator->ops->MapKernel(allocator, mdl, Logical));
-        }
-    }
-    else
-    {
-        mdl = (PLINUX_MDL)(gctPHYS_ADDR)node->Virtual.physical;
-        allocator = mdl->allocator;
-
-        if (mdl->addr)
-        {
-           *Logical = (gctUINT8_PTR)mdl->addr;
-        }
-        else
-        {
-            gcmkONERROR(allocator->ops->MapKernel(allocator, mdl, Logical));
-        }
-
-    }
-    gcmkVERIFY_OK(gckOS_ReleaseMutex(os, NodeObject->mutex));
-    return gcvSTATUS_OK;
-OnError:
-    if (acquired)
-    {
-        /* Release the mutex. */
-        gcmkVERIFY_OK(gckOS_ReleaseMutex(os, NodeObject->mutex));
-    }
-    /* Return the status. */
-    /*gcmkFOOTER();*/
-    return status;
-}
-
 
 /*******************************************************************************
 **

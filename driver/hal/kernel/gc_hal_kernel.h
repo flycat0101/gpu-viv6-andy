@@ -1251,6 +1251,20 @@ gckVIDMEM_NODE_Allocate(
     );
 
 gceSTATUS
+gckVIDMEM_NODE_LockCPU(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Handle,
+    OUT gctPOINTER * Logical
+    );
+
+gceSTATUS
+gckVIDMEM_NODE_UnlockCPU(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Handle,
+    OUT gctPOINTER Logical
+    );
+
+gceSTATUS
 gckVIDMEM_Node_Lock(
     IN gckKERNEL Kernel,
     IN gckVIDMEM_NODE Node,
@@ -1441,6 +1455,21 @@ typedef struct _gcsASYNC_COMMAND
 }
 gcsASYNC_COMMAND;
 
+gceSTATUS
+gckOS_CreateKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctSIZE_T Offset,
+    IN gctSIZE_T Bytes,
+    OUT gctPOINTER * Logical
+    );
+
+gceSTATUS
+gckOS_DestroyKernelMapping(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctPOINTER Logical
+    );
 
 gceSTATUS
 gckOS_CreateKernelVirtualMapping(
