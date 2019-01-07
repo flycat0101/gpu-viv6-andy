@@ -1771,21 +1771,26 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateInput(vx_node node, vx_ui
     if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    if (objData.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_SUCCESS;
+    if (objData.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_PARAMETERS;
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
-    vx_object_data_s objData;
+    vx_object_data_s objDataSrc, objDataDst;
 
     if (index != 1) return VX_ERROR_INVALID_PARAMETERS;
 
-    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objDataSrc) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_U8, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objDataDst) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    if (objDataDst.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_PARAMETERS;
+
+    vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_U8, objDataSrc.u.imageInfo.width, objDataSrc.u.imageInfo.height, 0);
 
     return VX_SUCCESS;
 }
