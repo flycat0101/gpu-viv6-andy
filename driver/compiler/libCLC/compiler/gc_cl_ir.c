@@ -4196,16 +4196,6 @@ IN slsSLINK_LIST *PtrDscr
                                      "invalid global address space qualifier specified for variable type"));
      return gcvSTATUS_INVALID_ARGUMENT;
 
-   case clvQUALIFIER_CONSTANT:
-     if(!(Decl->storageQualifier & clvSTORAGE_QUALIFIER_EXTERN)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        LineNo,
-                                        StringNo,
-                                        clvREPORT_ERROR,
-                                        "invalid constant address space qualifier specified for variable type"));
-        return gcvSTATUS_INVALID_ARGUMENT;
-     }
-
    default:
      break;
    }
