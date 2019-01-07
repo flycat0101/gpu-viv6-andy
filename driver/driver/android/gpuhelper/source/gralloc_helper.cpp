@@ -100,7 +100,7 @@ int graphic_buffer_alloc(int width, int height, int format, int usage,
 
     hnd->stride = stride;
     hnd->usage  = usage;
-    hnd->vidmem = gcmPTR2INT(bufNode);
+    hnd->vidmem = gcmPTR2SIZE(bufNode);
 
     hnd->phys = physAddr;
     hnd->base = gcmPTR_TO_UINT64(virtAddr);
@@ -110,7 +110,7 @@ int graphic_buffer_alloc(int width, int height, int format, int usage,
     gc_gralloc_wrap(hnd, width, height, format, stride, hnd->phys, (void *)hnd->base);
 
     /* Naming video memory node. */
-    gcmVERIFY_OK(gcoHAL_NameVideoMemory(gcmPTR2INT(bufNode), (gctUINT32*)&hnd->node));
+    gcmVERIFY_OK(gcoHAL_NameVideoMemory(gcmPTR2SIZE(bufNode), (gctUINT32*)&hnd->node));
 
     *handle = hnd;
     return 0;

@@ -4196,7 +4196,7 @@ clEnqueueMapBuffer(
     mapBuffer->offset               = Offset;
     mapBuffer->cb                   = Cb;
 
-    mappedPtr = gcmINT2PTR((gcmPTR2INT(Buffer->u.buffer.logical) + Offset));
+    mappedPtr = gcmINT2PTR((gcmPTR2SIZE(Buffer->u.buffer.logical) + Offset));
     mapBuffer->mappedPtr = mappedPtr;
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingMap),
@@ -4214,7 +4214,7 @@ clEnqueueMapBuffer(
     if ((Buffer->flags & CL_MEM_USE_HOST_PTR) &&
         (Buffer->host != gcvNULL))
     {
-        mappedPtr = gcmINT2PTR((gcmPTR2INT(Buffer->host) + Offset));
+        mappedPtr = gcmINT2PTR((gcmPTR2SIZE(Buffer->host) + Offset));
     }
 
     return mappedPtr;
@@ -4488,7 +4488,7 @@ clEnqueueMapImage(
         hostOffset                      = Origin[2] * Image->u.image.slicePitch +
                                           Origin[1] * Image->u.image.rowPitch +
                                           Origin[0] * elementSize;
-        mappedPtr = gcmINT2PTR(gcmPTR2INT(Image->host) + hostOffset);
+        mappedPtr = gcmINT2PTR(gcmPTR2SIZE(Image->host) + hostOffset);
         stride = Image->u.image.rowPitch;
         slicePitch = Image->u.image.slicePitch;
     }

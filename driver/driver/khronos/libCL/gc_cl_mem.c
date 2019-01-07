@@ -101,13 +101,13 @@ clfSyncHostMemory(
     gctSIZE_T   j, k;
 
     /* Get starting location in the host memory. */
-    targetHost = gcmPTR2INT(HostPtr) +
+    targetHost = gcmPTR2SIZE(HostPtr) +
         HostOrig[2] * HostSlice +
         HostOrig[1] * HostStride +
         HostOrig[0] * DataSize;
 
     /* Get starting location in the device memory. */
-    targetDevice = gcmPTR2INT(DevicePtr) +
+    targetDevice = gcmPTR2SIZE(DevicePtr) +
         DeviceOrigin[2] * DeviceSlice +
         DeviceOrigin[1] * DeviceStride +
         DeviceOrigin[0] * DataSize;
@@ -135,8 +135,8 @@ clfSyncHostMemory(
     if (Area[1] <= 0)   Area[1] = 1;
     if (Area[2] <= 0)   Area[2] = 1;
     lineSize = DataSize * Area[0];
-    readBaseSlice   = gcmPTR2INT(toRead);
-    writeBaseSlice  = gcmPTR2INT(toWrite);
+    readBaseSlice   = gcmPTR2SIZE(toRead);
+    writeBaseSlice  = gcmPTR2SIZE(toWrite);
 
     for (k = 0; k < Area[2]; k++)
     {
@@ -147,8 +147,8 @@ clfSyncHostMemory(
         {
             gcoOS_MemCopy(toWrite, toRead, lineSize);
 
-            toRead = gcmINT2PTR(gcmPTR2INT(toRead) + readStride);
-            toWrite = gcmINT2PTR(gcmPTR2INT(toWrite) + writeStride);
+            toRead = gcmINT2PTR(gcmPTR2SIZE(toRead) + readStride);
+            toWrite = gcmINT2PTR(gcmPTR2SIZE(toWrite) + writeStride);
         }
 
         readBaseSlice += readSlice;
@@ -356,7 +356,7 @@ clfExecuteHWCopy(
                 size = readBuffer->cb;
 
                 /* src address */
-                srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + readBuffer->offset;
+                srcPhysical = gcmPTR2SIZE(srcBuffer->u.buffer.physical) + readBuffer->offset;
                 gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
 
                 /* flush and invalid user ptr cache */
@@ -427,13 +427,13 @@ clfExecuteHWCopy(
 
                 gcmDUMP_BUFFER(gcvNULL,
                                "memory",
-                               gcmPTR2INT(srcPhysical),
+                               gcmPTR2SIZE(srcPhysical),
                                (gctPOINTER)writeBuffer->ptr,
                                0,
                                writeBuffer->cb);
 
                 /* dst address */
-                dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + writeBuffer->offset;
+                dstPhysical = gcmPTR2SIZE(dstBuffer->u.buffer.physical) + writeBuffer->offset;
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine);
                 EVENT_SET_GPU_RUNNING(Command, engine);
 
@@ -453,8 +453,8 @@ clfExecuteHWCopy(
                 srcBuffer   = copyBuffer->srcBuffer;
                 dstBuffer   = copyBuffer->dstBuffer;
                 size = copyBuffer->cb;
-                srcPhysical = gcmPTR2INT(srcBuffer->u.buffer.physical) + copyBuffer->srcOffset;
-                dstPhysical = gcmPTR2INT(dstBuffer->u.buffer.physical) + copyBuffer->dstOffset;
+                srcPhysical = gcmPTR2SIZE(srcBuffer->u.buffer.physical) + copyBuffer->srcOffset;
+                dstPhysical = gcmPTR2SIZE(dstBuffer->u.buffer.physical) + copyBuffer->dstOffset;
 
                 gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine1);
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine2);
@@ -522,7 +522,7 @@ clfExecuteCommandReadBuffer(
     {
         EVENT_SET_CPU_RUNNING(Command);
 
-        src = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + readBuffer->offset);
+        src = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + readBuffer->offset);
 
         /* CPU to wait fence back*/
         if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
@@ -539,12 +539,12 @@ clfExecuteCommandReadBuffer(
 
         gcmDUMP(gcvNULL,
                 "@[memory.read 0x%08X 0x%08X]",
-                gcmPTR2INT(buffer->u.buffer.physical) + readBuffer->offset,
+                gcmPTR2SIZE(buffer->u.buffer.physical) + readBuffer->offset,
                 readBuffer->cb);
 
         gcmDUMP_BUFFER(gcvNULL,
                        "verify",
-                       gcmPTR2INT(buffer->u.buffer.physical) + readBuffer->offset,
+                       gcmPTR2SIZE(buffer->u.buffer.physical) + readBuffer->offset,
                        src,
                        0,
                        readBuffer->cb);
@@ -610,12 +610,12 @@ clfExecuteCommandReadBufferRect(
     hostSlicePitch  = readBufferRect->hostSlicePitch;
     ptr             = readBufferRect->ptr;
 
-    srcFirstByte = gcmPTR2INT(buffer->u.buffer.logical) +
+    srcFirstByte = gcmPTR2SIZE(buffer->u.buffer.logical) +
                    bufferOrigin[0] +
                    bufferOrigin[1] * bufferRowPitch +
                    bufferOrigin[2] * bufferSlicePitch;
 
-    dstFirstByte = gcmPTR2INT(ptr) +
+    dstFirstByte = gcmPTR2SIZE(ptr) +
                    hostOrigin[0] +
                    hostOrigin[1] * hostRowPitch +
                    hostOrigin[2] * hostSlicePitch;
@@ -633,7 +633,7 @@ clfExecuteCommandReadBufferRect(
 
             gcmDUMP(gcvNULL,
                     "@[memory.read 0x%08X 0x%08X]",
-                    gcmPTR2INT( buffer->u.buffer.physical) + (src - gcmPTR2INT( buffer->u.buffer.logical)),
+                    gcmPTR2SIZE( buffer->u.buffer.physical) + (src - gcmPTR2SIZE( buffer->u.buffer.logical)),
                     region[0]);
         }
     }
@@ -710,7 +710,7 @@ clfExecuteCommandWriteBuffer(
         cb          = writeBuffer->cb;
         ptr         = writeBuffer->ptr;
         offset      = writeBuffer->offset;
-        logicalAddress = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + offset);
+        logicalAddress = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + offset);
 
         gcoOS_MemCopy(logicalAddress, ptr, cb);
 
@@ -718,7 +718,7 @@ clfExecuteCommandWriteBuffer(
 
         gcmDUMP_BUFFER(gcvNULL,
                        "memory",
-                       gcmPTR2INT( buffer->u.buffer.physical),
+                       gcmPTR2SIZE( buffer->u.buffer.physical),
                        buffer->u.buffer.logical,
                        0,
                        cb);
@@ -775,7 +775,7 @@ clfExecuteCommandFillBuffer(
     offset       = fillBuffer->offset;
     pattern_size = fillBuffer->pattern_size;
 
-    logicalAddress = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + offset);
+    logicalAddress = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + offset);
     operAddress = (gctSIZE_T)logicalAddress;
 
     for ( i = 0; i < size; i+=pattern_size )
@@ -788,7 +788,7 @@ clfExecuteCommandFillBuffer(
 
     gcmDUMP_BUFFER(gcvNULL,
                    "memory",
-                   gcmPTR2INT( buffer->u.buffer.physical),
+                   gcmPTR2SIZE( buffer->u.buffer.physical),
                    buffer->u.buffer.logical,
                    0,
                    buffer->u.buffer.allocatedSize);
@@ -844,12 +844,12 @@ clfExecuteCommandWriteBufferRect(
     hostSlicePitch  = writeBufferRect->hostSlicePitch;
     ptr             = writeBufferRect->ptr;
 
-    srcFirstByte = gcmPTR2INT(ptr) +
+    srcFirstByte = gcmPTR2SIZE(ptr) +
                    hostOrigin[0] +
                    hostOrigin[1] * hostRowPitch +
                    hostOrigin[2] * hostSlicePitch;
 
-    dstFirstByte = gcmPTR2INT(buffer->u.buffer.logical) +
+    dstFirstByte = gcmPTR2SIZE(buffer->u.buffer.logical) +
                    bufferOrigin[0] +
                    bufferOrigin[1] * bufferRowPitch +
                    bufferOrigin[2] * bufferSlicePitch;
@@ -865,9 +865,9 @@ clfExecuteCommandWriteBufferRect(
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
-                           gcmPTR2INT( buffer->u.buffer.physical),
+                           gcmPTR2SIZE( buffer->u.buffer.physical),
                            buffer->u.buffer.logical,
-                           dst - gcmPTR2INT(buffer->u.buffer.logical),
+                           dst - gcmPTR2SIZE(buffer->u.buffer.logical),
                            region[0]);
         }
     }
@@ -935,8 +935,8 @@ clfExecuteCommandCopyBuffer(
         dstOffset   = copyBuffer->dstOffset;
         cb          = copyBuffer->cb;
 
-        src = gcmPTR2INT(srcBuffer->u.buffer.logical) + srcOffset;
-        dst = gcmPTR2INT(dstBuffer->u.buffer.logical) + dstOffset;
+        src = gcmPTR2SIZE(srcBuffer->u.buffer.logical) + srcOffset;
+        dst = gcmPTR2SIZE(dstBuffer->u.buffer.logical) + dstOffset;
 
         gcoCL_InvalidateMemoryCache(srcBuffer->u.buffer.node, srcBuffer->u.buffer.logical, srcBuffer->u.buffer.allocatedSize);
 
@@ -946,7 +946,7 @@ clfExecuteCommandCopyBuffer(
 
         gcmDUMP_BUFFER(gcvNULL,
                        "memory",
-                       gcmPTR2INT( dstBuffer->u.buffer.physical),
+                       gcmPTR2SIZE( dstBuffer->u.buffer.physical),
                        dstBuffer->u.buffer.logical,
                        0,
                        cb);
@@ -1011,12 +1011,12 @@ clfExecuteCommandCopyBufferRect(
     dstRowPitch     = copyBufferRect->dstRowPitch;
     dstSlicePitch   = copyBufferRect->dstSlicePitch;
 
-    srcFirstByte = gcmPTR2INT(srcBuffer->u.buffer.logical) +
+    srcFirstByte = gcmPTR2SIZE(srcBuffer->u.buffer.logical) +
                    srcOrigin[0] +
                    srcOrigin[1] * srcRowPitch +
                    srcOrigin[2] * srcSlicePitch;
 
-    dstFirstByte = gcmPTR2INT(dstBuffer->u.buffer.logical) +
+    dstFirstByte = gcmPTR2SIZE(dstBuffer->u.buffer.logical) +
                    dstOrigin[0] +
                    dstOrigin[1] * dstRowPitch +
                    dstOrigin[2] * dstSlicePitch;
@@ -1034,9 +1034,9 @@ clfExecuteCommandCopyBufferRect(
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
-                           gcmPTR2INT( dstBuffer->u.buffer.physical),
+                           gcmPTR2SIZE( dstBuffer->u.buffer.physical),
                            dstBuffer->u.buffer.logical,
-                           dst - gcmPTR2INT(dstBuffer->u.buffer.logical),
+                           dst - gcmPTR2SIZE(dstBuffer->u.buffer.logical),
                            region[0]);
         }
     }
@@ -1204,9 +1204,9 @@ clfWriteImage(
             gcoOS_MemCopy(dstLine, srcLine, lineSize);
             gcmDUMP_BUFFER(gcvNULL,
                             "texture",
-                            gcmPTR2INT(image->u.image.texturePhysical),
+                            gcmPTR2SIZE(image->u.image.texturePhysical),
                             image->u.image.textureLogical,
-                            gcmPTR2INT(dstLine) - gcmPTR2INT(image->u.image.textureLogical),
+                            gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(image->u.image.textureLogical),
                             lineSize);
 
             srcLine += srcRowPitch;
@@ -1306,9 +1306,9 @@ clfExecuteCommandFillImage(
 
                 gcmDUMP_BUFFER(gcvNULL,
                                "texture",
-                               gcmPTR2INT( image->u.image.texturePhysical),
+                               gcmPTR2SIZE( image->u.image.texturePhysical),
                                image->u.image.textureLogical,
-                               gcmPTR2INT(line) - gcmPTR2INT(image->u.image.textureLogical),
+                               gcmPTR2SIZE(line) - gcmPTR2SIZE(image->u.image.textureLogical),
                                elementSize);
                 line += elementSize;
             }
@@ -1507,9 +1507,9 @@ clfExecuteCommandCopyImageToBuffer(
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
-                           gcmPTR2INT(dstBuffer->u.buffer.physical),
+                           gcmPTR2SIZE(dstBuffer->u.buffer.physical),
                            dstBuffer->u.buffer.logical,
-                           gcmPTR2INT(dstLine) - gcmPTR2INT(dstBuffer->u.buffer.logical),
+                           gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(dstBuffer->u.buffer.logical),
                            lineSize);
 
             srcLine += srcStride;
@@ -1608,9 +1608,9 @@ clfExecuteCommandCopyBufferToImage(
 
             gcmDUMP_BUFFER(gcvNULL,
                            "texture",
-                           gcmPTR2INT( dstImage->u.image.texturePhysical),
+                           gcmPTR2SIZE( dstImage->u.image.texturePhysical),
                            dstImage->u.image.textureLogical,
-                           gcmPTR2INT(dstLine) - gcmPTR2INT(dstImage->u.image.textureLogical),
+                           gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(dstImage->u.image.textureLogical),
                            lineSize);
 
             srcLine += lineSize;
@@ -1758,11 +1758,11 @@ clfExecuteCommandMapBuffer(
     {
         gctPOINTER src;
 
-        src = (gctPOINTER) (gcmPTR2INT(buffer->u.buffer.logical) + mapBuffer->offset);
+        src = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + mapBuffer->offset);
 
         gcmDUMP_BUFFER(gcvNULL,
                         "verify",
-                        gcmPTR2INT(buffer->u.buffer.physical) + mapBuffer->offset,
+                        gcmPTR2SIZE(buffer->u.buffer.physical) + mapBuffer->offset,
                         src,
                         0,
                         mapBuffer->cb);
@@ -1959,7 +1959,7 @@ clfExecuteCommandUnmapMemObject(
 #if gcdDUMP
             gcmDUMP_BUFFER(gcvNULL,
                             "memory",
-                            gcmPTR2INT( memObj->u.buffer.physical),
+                            gcmPTR2SIZE( memObj->u.buffer.physical),
                             memObj->u.buffer.logical,
                             0,
                             memObj->u.buffer.size);
@@ -3057,7 +3057,7 @@ clCreateBuffer(
                     (chipModel == gcv3000 && (chipRevision != 0x5514 && chipRevision != 0x5451));
 
     if ((Flags & CL_MEM_USE_HOST_PTR)
-         && !(gcmPTR2INT(HostPtr) & 0x3F)
+         && !(gcmPTR2SIZE(HostPtr) & 0x3F)
          && !(Size & 0x3F)
          && !disableByChip)
     {
@@ -3117,7 +3117,7 @@ clCreateBuffer(
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
-                           gcmPTR2INT(buffer->u.buffer.physical),
+                           gcmPTR2SIZE(buffer->u.buffer.physical),
                            buffer->u.buffer.logical,
                            0,
                            buffer->u.buffer.size);
@@ -3237,7 +3237,7 @@ clCreateSubBuffer(
                CL_OUT_OF_HOST_MEMORY);
 
     /* Mem info. */
-    buffer->host  = Buffer->host ? (gctPOINTER)(gcmPTR2INT(Buffer->host) + origin) : gcvNULL;
+    buffer->host  = Buffer->host ? (gctPOINTER)(gcmPTR2SIZE(Buffer->host) + origin) : gcvNULL;
     buffer->flags = Flags ? Flags : Buffer->flags /* default - inherit from parent */;
 
     /* Buffer specific info. */
@@ -3246,9 +3246,9 @@ clCreateSubBuffer(
     buffer->u.buffer.parentBuffer  = Buffer;
     buffer->u.buffer.createType    = CL_BUFFER_CREATE_TYPE_REGION;
     buffer->u.buffer.logical       = Buffer->u.buffer.logical ?
-        (gctPOINTER)(gcmPTR2INT(Buffer->u.buffer.logical) + origin) : gcvNULL;
+        (gctPOINTER)(gcmPTR2SIZE(Buffer->u.buffer.logical) + origin) : gcvNULL;
     buffer->u.buffer.physical      = Buffer->u.buffer.physical ?
-        (gctPOINTER)(gcmPTR2INT(Buffer->u.buffer.physical) + origin) : gcvNULL;
+        (gctPOINTER)(gcmPTR2SIZE(Buffer->u.buffer.physical) + origin) : gcvNULL;
 
     buffer->u.buffer.bufferCreateInfo.origin    = origin;
     buffer->u.buffer.bufferCreateInfo.size      = size;
@@ -3645,7 +3645,7 @@ clCreateImage(
     /*endianHint = clfEndianHint(internalformat, type);*/
 
 #if MAP_TO_DEVICE
-    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F))
+    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2SIZE(HostPtr) & 0x3F))
     {
         if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
         {
@@ -3889,8 +3889,8 @@ clCreateImage2D(
     chipModel = Context->devices[0]->deviceInfo.chipModel;
 
     if((Flags & CL_MEM_USE_HOST_PTR)
-        && !(gcmPTR2INT(HostPtr) & 0x3F)
-        && !(gcmPTR2INT(HostPtr) & 0x3F)
+        && !(gcmPTR2SIZE(HostPtr) & 0x3F)
+        && !(gcmPTR2SIZE(HostPtr) & 0x3F)
         && !(chipModel == gcv3000 || chipModel == gcv5000))
     {
         if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
@@ -4150,7 +4150,7 @@ clCreateImage3D(
     imageHeader = (clsImageHeader_PTR) image->u.image.logical;
 
 #if MAP_TO_DEVICE
-    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(HostPtr) & 0x3F))
+    if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2SIZE(HostPtr) & 0x3F))
     {
         if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
         {

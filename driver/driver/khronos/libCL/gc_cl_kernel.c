@@ -1227,7 +1227,7 @@ clfLoadKernelArgValues(
 
         gcmDUMP_BUFFER(gcvNULL,
                        "memory",
-                       gcmPTR2INT(memAllocInfo->physical),
+                       gcmPTR2SIZE(memAllocInfo->physical),
                        memAllocInfo->logical,
                        0,
                        Kernel->constantMemSize);

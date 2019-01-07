@@ -635,7 +635,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
     /* Get Value */
     for(i = 0; i< 3; i++)
     {
-        if((((gcmPTR2INT(vertexPtrs[i])) & 3) == 0))
+        if((((gcmPTR2SIZE(vertexPtrs[i])) & 3) == 0))
         {
             for(j = 0; j < attrib->size; j++)
             {
@@ -869,7 +869,7 @@ gcChipComputeWlimitByVertex(
 
 
         /* Get Value */
-        if((((gcmPTR2INT(vertexPtr)) & 3) == 0))
+        if((((gcmPTR2SIZE(vertexPtr)) & 3) == 0))
         {
             for(j=0 ; j < attrib->size; j++)
             {
@@ -1195,7 +1195,7 @@ gcChipPatchLineStripIndexed(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -1434,7 +1434,7 @@ gcChipPatchLineLoopIndexed(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -1929,7 +1929,7 @@ gcChipPatchTriangleStripIndexed(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -2185,7 +2185,7 @@ gcChipPatchTriangleFanIndexed(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -2449,7 +2449,7 @@ gcChipPatchIndexedPR(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -2703,7 +2703,7 @@ gcChipPatch32BitIndices(
     {
         gctPOINTER indexBase = gcvNULL;
         gcmONERROR(gcoBUFOBJ_Lock(instantDraw->indexBuffer, gcvNULL, &indexBase));
-        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2INT(indexMemory);
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
         indexLocked = gcvTRUE;
     }
 
@@ -2805,7 +2805,7 @@ gcChipPatchConvertVertAttrib(
         {
             stream = bufInfo->bufObj;
             gcmONERROR(gcoBUFOBJ_Lock(stream, gcvNULL, (gctPOINTER*)&baseSrc));
-            baseSrc += gcmPTR2INT(AttrPtr->pointer);
+            baseSrc += gcmPTR2SIZE(AttrPtr->pointer);
             srcLocked = GL_TRUE;
         }
         /* This is a client side array */
@@ -2827,7 +2827,7 @@ gcChipPatchConvertVertAttrib(
                     gctUINT8_PTR indexAddress = gcvNULL;
                     /* This is a server side buffer */
                     gcmONERROR(gcoBUFOBJ_Lock(instantDraw->indexBuffer, gcvNULL, (gctPOINTER*)&indexAddress));
-                    pSrcIndices = (GLubyte*)indexAddress + gcmPTR2INT(instantDraw->indexMemory);
+                    pSrcIndices = (GLubyte*)indexAddress + gcmPTR2SIZE(instantDraw->indexMemory);
                 }
                 else
                 {
@@ -5244,7 +5244,7 @@ __GLchipInstantDraw* instantDraw
 
 
         /* Get Value */
-        if ((((gcmPTR2INT(vertexPtr)) & 3) == 0))
+        if ((((gcmPTR2SIZE(vertexPtr)) & 3) == 0))
         {
             for (j = 0; j < attrib->size; j++)
             {

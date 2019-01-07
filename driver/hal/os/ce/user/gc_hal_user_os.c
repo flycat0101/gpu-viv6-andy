@@ -369,7 +369,7 @@ _MapMemory(
     /* Call kernel API to unmap the memory. */
     iface.ignoreTLS            = gcvFALSE;
     iface.command              = gcvHAL_MAP_MEMORY;
-    iface.u.MapMemory.physical = gcmPTR2INT(Physical);
+    iface.u.MapMemory.physical = gcmPTR2SIZE(Physical);
     iface.u.MapMemory.bytes    = NumberOfBytes;
 
     gcmONERROR(gcoOS_DeviceControl(
@@ -412,7 +412,7 @@ _UnmapMemory(
     /* Call kernel API to unmap the memory. */
     iface.ignoreTLS              = gcvFALSE;
     iface.command                = gcvHAL_UNMAP_MEMORY;
-    iface.u.UnmapMemory.physical = gcmPTR2INT(Physical);
+    iface.u.UnmapMemory.physical = gcmPTR2SIZE(Physical);
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
     iface.u.UnmapMemory.logical  = gcmPTR_TO_UINT64(Logical);
 
@@ -2141,7 +2141,7 @@ gcoOS_FreeNonPagedMemory(
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_NON_PAGED_MEMORY;
     iface.u.FreeNonPagedMemory.bytes    = Bytes;
-    iface.u.FreeNonPagedMemory.physical = gcmPTR2INT(Physical);
+    iface.u.FreeNonPagedMemory.physical = gcmPTR2SIZE(Physical);
     iface.u.FreeNonPagedMemory.logical  = gcmPTR_TO_UINT64(Logical);
 
     /* Call kernel driver. */
@@ -2200,7 +2200,7 @@ gcoOS_FreeContiguous(
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
     iface.u.FreeContiguousMemory.bytes    = Bytes;
-    iface.u.FreeContiguousMemory.physical = gcmPTR2INT(Physical);
+    iface.u.FreeContiguousMemory.physical = gcmPTR2SIZE(Physical);
     iface.u.FreeContiguousMemory.logical  = gcmPTR_TO_UINT64(Logical);
 
     /* Call kernel driver. */

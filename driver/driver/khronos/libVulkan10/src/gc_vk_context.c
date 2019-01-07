@@ -321,7 +321,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     devCtx->sType = __VK_OBJECT_TYPE_DEV_CONTEXT;
     devCtx->pPhyDevice = phyDev;
     devCtx->memCb = __VK_ALLOCATIONCB;
-    devCtx->threadId = (uint32_t)gcmPTR2INT(gcoOS_GetCurrentThreadID());
+    devCtx->threadId = (uint32_t)gcmPTR2SIZE(gcoOS_GetCurrentThreadID());
     devCtx->option = &phyDev->pInst->drvOption;
     devCtx->chipInfo = &phyDev->pInst->chipInfo;
     devCtx->database = phyDev->phyDevConfig.database;
