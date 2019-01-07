@@ -293,15 +293,50 @@ _hasSIGN_FLOOR_CEIL(
 }
 
 static gctBOOL
-_hasSIGN_FLOOR_CEIL_and_constSrc1(
+_hasSIGN_FLOOR_CEIL_and_constSrc1_or_initializedUniform(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
     IN gcSL_INSTRUCTION Instruction,
     IN OUT gctUINT32_PTR States
     )
 {
-    return CodeGen->hasSIGN_FLOOR_CEIL &&
-           (gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_CONSTANT);
+    gcSL_TYPE       src1Type = (gcSL_TYPE)gcmSL_SOURCE_GET(Instruction->source1, Type);
+    gcSL_SWIZZLE    src1Swizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(Instruction->source1, Swizzle);
+    gcSL_FORMAT     src1Format = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source1, Format);
+    gctUINT32       uniformIndex = gcmSL_INDEX_GET(Instruction->source1Index, Index);
+    gcUNIFORM       src1Uniform;
+
+    if (!CodeGen->hasSIGN_FLOOR_CEIL)
+    {
+        return gcvFALSE;
+    }
+
+    if (src1Type == gcSL_CONSTANT)
+    {
+        return gcvTRUE;
+    }
+    else if (src1Type == gcSL_UNIFORM)
+    {
+        if (uniformIndex > Tree->shader->uniformCount)
+        {
+            return gcvFALSE;
+        }
+        src1Uniform = Tree->shader->uniforms[uniformIndex];
+
+        if ((isUniformCompiletimeInitialized(src1Uniform) && isUniformCompilerGen(src1Uniform))
+            &&
+            (src1Swizzle == gcSL_SWIZZLE_XXXX || src1Swizzle == gcSL_SWIZZLE_X ||
+             src1Swizzle == gcSL_SWIZZLE_YYYY || src1Swizzle == gcSL_SWIZZLE_Y ||
+             src1Swizzle == gcSL_SWIZZLE_ZZZZ || src1Swizzle == gcSL_SWIZZLE_Z ||
+             src1Swizzle == gcSL_SWIZZLE_WWWW || src1Swizzle == gcSL_SWIZZLE_W)
+            &&
+            (src1Format == gcSL_FLOAT))
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
 }
 
 static gctBOOL
@@ -15828,11 +15863,25 @@ set_RCP_value(
 {
     gcsConstantValue constValue;
     gcSL_FORMAT      format = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source1, Format);
+    gcSL_TYPE        src1Type = (gcSL_TYPE)gcmSL_SOURCE_GET(Instruction->source1, Type);
+    gcSL_SWIZZLE     src1Swizzle = (gcSL_SWIZZLE)gcmSL_SOURCE_GET(Instruction->source1, Swizzle);
 
-    if(format == gcSL_FLOAT)
+    if (format == gcSL_FLOAT)
     {
         constValue.ty = gcSL_FLOAT;
-        constValue.value.u = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
+
+        /* It should be a initialized uniform here. */
+        if (src1Type == gcSL_UNIFORM)
+        {
+            gcUNIFORM    src1Uniform = Tree->shader->uniforms[gcmSL_INDEX_GET(Instruction->source1Index, Index)];
+            gcmASSERT(isUniformCompiletimeInitialized(src1Uniform) && isUniformCompilerGen(src1Uniform));
+            constValue.value.u = GetUniformInitializer(src1Uniform).i32_v4[gcmExtractSwizzle(src1Swizzle, 0)];
+        }
+        else
+        {
+            constValue.value.u = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
+        }
+
         constValue.value.f = 1.0f / constValue.value.f;
         if ((CodeGen->generateImmediate || CodeGen->forceGenImmediate) &&
             ValueFit20Bits(format, constValue.value.u))
@@ -18737,7 +18786,7 @@ const gcsSL_PATTERN patterns_MOD[] =
         { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
 
         /* Has new FLOOR but no DIV */
-    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasSIGN_FLOOR_CEIL_and_constSrc1 },
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasSIGN_FLOOR_CEIL_and_constSrc1_or_initializedUniform },
         { -3, 0x03, gcSL_CG_TEMP1, 2, 3, 0, 0, set_RCP_value },
         { -2, 0x25, gcSL_CG_TEMP1, 0, 0, gcSL_CG_TEMP1 },
         { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
