@@ -1185,6 +1185,7 @@ __GLdlist * __glAllocateDlist(__GLcontext *gc, GLuint segsize, GLuint freeCount,
         dlist->freefunc = (GLubyte *)(*gc->imports.calloc)(gc, 1, memsize );
         if (dlist->freefunc == NULL)
         {
+            (*gc->imports.free)(gc, dlist);
             __glSetError( gc, GL_OUT_OF_MEMORY);
             return (NULL);
         }
