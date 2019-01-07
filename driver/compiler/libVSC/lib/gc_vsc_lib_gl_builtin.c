@@ -250,12 +250,12 @@ gctSTRING gcLibATAN_Funcs =
 ;
 
 /* CL spec:
- * atan2pi (±0, -0 ) = ±1.
- * atan2pi (±0, +0 ) = ± 0.
- * atan2pi (±0, x ) returns ± 1 for x < 0.
- * atan2pi (±0, x ) returns ± 0 for x > 0.
- * atan2pi (y, ±0 ) returns -0.5 for y < 0.
- * atan2pi (y, ±0 ) returns 0.5 for y > 0.
+ * atan2pi (+/-0, -0 ) = +/-1.
+ * atan2pi (+/-0, +0 ) = +/- 0.
+ * atan2pi (+/-0, x ) returns +/- 1 for x < 0.
+ * atan2pi (+/-0, x ) returns +/- 0 for x > 0.
+ * atan2pi (y, +/-0 ) returns -0.5 for y < 0.
+ * atan2pi (y, +/-0 ) returns 0.5 for y > 0.
 */
 gctSTRING gcLibATAN2_Funcs =
 "float _viv_atan2_float(float y, float x)\n"
@@ -265,15 +265,15 @@ gctSTRING gcLibATAN2_Funcs =
 "    {\n"
 "         if (y == 0.0)  return  3.14159265358979323846f;\n"
 "         if (y == -0.0) return -3.14159265358979323846f;\n"
-"         if (y < 0.0)   return -0.5f;\n"
-"         return 0.5f;\n"
+"         if (y < 0.0)   return -1.5707963267948966f;\n"
+"         return 1.5707963267948966ff;\n"
 "    }\n"
 "    else if (x == 0.0)\n"
 "    {\n"
 "         if (y == 0.0)  return  0.0;\n"
 "         if (y == -0.0) return -0.0;\n"
-"         if (y < 0.0)   return -0.5f;\n"
-"         return 0.5f;\n"
+"         if (y < 0.0)   return -1.5707963267948966f;\n"
+"         return 1.5707963267948966f;\n"
 "    }\n"
 "    \n"
 "    _viv_asm(ATAN, result, y / x);\n"
