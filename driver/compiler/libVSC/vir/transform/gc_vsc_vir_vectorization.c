@@ -3626,6 +3626,7 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
     {
         VIR_Operand * dest = VIR_Inst_GetDest(pInst);
         if (VIR_Inst_isComponentwise(pInst) &&
+            (VIR_Inst_GetOpcode(pInst) != VIR_OP_MOD) &&         /* MOD may be expanded to use SW implementation which only workds for scalar */
             VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)) &&
             VIR_Operand_GetEnable(dest) != VIR_ENABLE_XYZW &&  /* only look for INSTs not fully enabled */
             (VIR_TypeId_isPrimitive(VIR_Operand_GetTypeId(dest)) &&  /* cannot hanlde packed type yet */
