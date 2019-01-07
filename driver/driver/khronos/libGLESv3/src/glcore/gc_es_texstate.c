@@ -329,19 +329,50 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
         return GL_FALSE;
     }
 
-    if (GL_UNSIGNED_INT == baseFmtInfo->category || GL_INT == baseFmtInfo->category ||
-        /* ES30 dis-allows linear filter for "TEXTURE_COMPARE_MODE=NONE" depth texture */
-        (gc->apiVersion >= __GL_API_VERSION_ES30 && GL_NONE == compareMode &&
-        /* Acoording to spec, here should be a sized internal depth or depth and stencil format */
-        (GL_DEPTH_COMPONENT16 == interalFormat || GL_DEPTH_COMPONENT24 == interalFormat || GL_DEPTH_COMPONENT32F == interalFormat ||
-         GL_DEPTH24_STENCIL8 == interalFormat || GL_DEPTH32F_STENCIL8 == interalFormat))
-       )
+    /* According to the ES3.2 spec, a texture is complete unless:
+    ** Any of:
+    **    -The effective internal format specified for the texture arrays is a sized internal color format
+    **     that is not texture-filterable.
+    **    -The effective internal format specified for the texture arrays is a sized internal depth or
+    **     depth and stencil format, and the value of TEXTURE_COMPARE_MODE is NONE.
+    **    -The internal format of the texture is DEPTH_STENCIL, and the value of DEPTH_STENCIL_TEXTURE_MODE
+    **     for the texture is STENCIL_INDEX.
+    **    -The internal format is STENCIL_INDEX.
+    ** and either the magnification filter is not NEAREST, or the minification filter is neither NEAREST
+    ** nor NEAREST_MIPMAP_NEAREST.
+    */
+    if(gc->apiVersion >= __GL_API_VERSION_ES30 &&
+       (magFilter != GL_NEAREST || (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)))
     {
-        if (magFilter != GL_NEAREST)
+        if(texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX &&
+           (GL_UNSIGNED_INT == baseFmtInfo->category ||
+            GL_INT == baseFmtInfo->category ||
+            GL_R32F == interalFormat ||
+            GL_RG32F == interalFormat ||
+            GL_RGB32F == interalFormat ||
+            GL_RGBA32F == interalFormat))
         {
             return GL_FALSE;
         }
-        if (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)
+
+        if(texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX &&
+           (GL_NONE == compareMode &&
+           (GL_DEPTH_COMPONENT16 == interalFormat ||
+            GL_DEPTH_COMPONENT24 == interalFormat ||
+            GL_DEPTH_COMPONENT32F == interalFormat ||
+            GL_DEPTH24_STENCIL8 == interalFormat ||
+            GL_DEPTH32F_STENCIL8 == interalFormat)))
+        {
+            return GL_FALSE;
+        }
+
+        if(baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
+           texObj->params.depthStTexMode == GL_STENCIL_INDEX)
+        {
+            return GL_FALSE;
+        }
+
+        if(baseFmtInfo->glFormat == GL_STENCIL_INDEX)
         {
             return GL_FALSE;
         }
@@ -351,15 +382,6 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     if (maxLevelUsed < baseLevel)
     {
         return GL_FALSE;
-    }
-
-    if (baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
-        texObj->params.depthStTexMode == GL_STENCIL_INDEX)
-    {
-        if (magFilter != GL_NEAREST || minFilter != GL_NEAREST)
-        {
-            return GL_FALSE;
-        }
     }
 
 
