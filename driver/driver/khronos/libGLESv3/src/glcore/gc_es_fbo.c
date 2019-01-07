@@ -1711,6 +1711,15 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
         }
     }
 
+    /* According to the ES2.0 spec, if the value of FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is NONE,
+    then querying any other pname will generate INVALID_ENUM */
+    if((2 == gc->constants.majorVersion) &&
+       (GL_NONE == attachPoint->object) &&
+       (GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE != pname))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
+
     /*
     ** If no object is bound on this point, only TYPE and NAME can be queried.
     */
