@@ -15233,7 +15233,7 @@ OnError:
     {
         gcoOS_Close(os, filp);
     }
-    gcmONERROR(_ThreadUnLockLibFile());
+    gcmVERIFY_OK(_ThreadUnLockLibFile());
     return status;
 }
 
@@ -15368,7 +15368,7 @@ OnError:
         gcoOS_Close(os, filp);
     }
 
-    _ThreadUnLockLibFile();
+    gcmVERIFY_OK(_ThreadUnLockLibFile());
 
     return status;
 }
