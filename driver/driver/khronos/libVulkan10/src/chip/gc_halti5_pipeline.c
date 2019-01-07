@@ -1224,10 +1224,9 @@ static VkResult halti5_pip_emit_msaa(
 
     if (database->MSAA_SHADING || database->REG_GeometryShader)
     {
-        uint32_t raControlEx = 0;
         if(sampleShading)
         {
-            raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            chipGfxPipeline->raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1240,7 +1239,7 @@ static VkResult halti5_pip_emit_msaa(
         }
         else
         {
-            raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            chipGfxPipeline->raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1251,7 +1250,7 @@ static VkResult halti5_pip_emit_msaa(
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
         }
-        raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        chipGfxPipeline->raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1262,7 +1261,7 @@ static VkResult halti5_pip_emit_msaa(
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)));
 
-        raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        chipGfxPipeline->raControlEx |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:4) - (0 ?
  4:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1273,8 +1272,6 @@ static VkResult halti5_pip_emit_msaa(
  4:4) - (0 ?
  4:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4)));
-
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, raControlEx);
     }
 
     if (msaaEnable)
@@ -2385,12 +2382,12 @@ static VkResult halti5_pip_emit_rt(
 
     depthOnly = (subPass->colorCount == 0);
     /* ps shader is not necessary to be excuted */
-    depthOnly &= !(hints->hasKill
+    depthOnly &= (!(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
         || (hints->rtArrayComponent != -1)
         || (hints->sampleMaskLoc != -1)
-        || msaaFragmentOp);
+        || msaaFragmentOp)) || (!(hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT));
 
     chipGfxPipeline->depthOnly = depthOnly;
 
@@ -2436,6 +2433,21 @@ static VkResult halti5_pip_emit_rt(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))));
     }
+
+    chipGfxPipeline->raControlEx &=
+        ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (!(chipGfxPipeline->depthOnly)) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4)));
+
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, chipGfxPipeline->raControlEx);
+
     /* step 2: rt programming */
     for (i = 0; i < subPass->colorCount; i++)
     {

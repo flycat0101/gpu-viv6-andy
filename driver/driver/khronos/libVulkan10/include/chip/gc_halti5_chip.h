@@ -708,6 +708,7 @@ typedef struct
     VkCompareOp depthCompareOp;
     VkBool32 destinationRead;
     VkBool32 singlePEpipe;
+    uint32_t raControlEx;
     enum HwCacheMode hwCacheMode;
 
     uint32_t regDepthConfig;
