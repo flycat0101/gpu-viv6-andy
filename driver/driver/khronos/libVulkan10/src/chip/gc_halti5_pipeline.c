@@ -5297,10 +5297,13 @@ static VkResult halti5_pip_build_gfxshaders(
                 __VK_MEMZERO(decodeInfo->renderpassInfo, sizeof(SpvRenderPassInfo));
                 decodeInfo->renderpassInfo->attachmentCount = rdp->attachmentCount;
 
-                decodeInfo->renderpassInfo->attachments =
-                    (SpvAttachmentDesc *)__VK_ALLOC(sizeof(SpvAttachmentDesc) * rdp->attachmentCount, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-                __VK_ONERROR((decodeInfo->renderpassInfo->attachments ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
-                __VK_MEMZERO(decodeInfo->renderpassInfo->attachments, sizeof(SpvAttachmentDesc) * rdp->attachmentCount);
+                if (rdp->attachmentCount > 0)
+                {
+                    decodeInfo->renderpassInfo->attachments =
+                        (SpvAttachmentDesc *)__VK_ALLOC(sizeof(SpvAttachmentDesc) * rdp->attachmentCount, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    __VK_ONERROR((decodeInfo->renderpassInfo->attachments ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+                    __VK_MEMZERO(decodeInfo->renderpassInfo->attachments, sizeof(SpvAttachmentDesc) * rdp->attachmentCount);
+                }
 
                 for (j = 0; j < rdp->attachmentCount; j++)
                 {
@@ -5590,8 +5593,11 @@ static VkResult halti5_pip_build_gfxshaders(
     {
         if (decodeInfo->renderpassInfo)
         {
-            __VK_FREE(decodeInfo->renderpassInfo->attachments);
-            decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            if (decodeInfo->renderpassInfo->attachments)
+            {
+                __VK_FREE(decodeInfo->renderpassInfo->attachments);
+                decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            }
             __VK_FREE(decodeInfo->renderpassInfo->subPassInfo);
             decodeInfo->renderpassInfo->subPassInfo = VK_NULL_HANDLE;
             __VK_FREE(decodeInfo->renderpassInfo);
@@ -5664,8 +5670,11 @@ OnError:
     {
         if (decodeInfo->renderpassInfo)
         {
-            __VK_FREE(decodeInfo->renderpassInfo->attachments);
-            decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            if (decodeInfo->renderpassInfo->attachments)
+            {
+                __VK_FREE(decodeInfo->renderpassInfo->attachments);
+                decodeInfo->renderpassInfo->attachments = VK_NULL_HANDLE;
+            }
             __VK_FREE(decodeInfo->renderpassInfo->subPassInfo);
             decodeInfo->renderpassInfo->subPassInfo = VK_NULL_HANDLE;
             __VK_FREE(decodeInfo->renderpassInfo);
