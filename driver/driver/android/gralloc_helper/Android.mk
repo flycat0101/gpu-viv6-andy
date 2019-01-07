@@ -23,6 +23,7 @@ LOCAL_SRC_FILES := \
     gralloc_helper_drm.c
 
 LOCAL_CFLAGS := \
+    $(CFLAGS) \
     -DDRM_GRALLOC=1 \
     -DLOG_TAG=\"gralloc-helper\"
 
