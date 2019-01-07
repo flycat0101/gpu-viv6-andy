@@ -2801,7 +2801,10 @@ static void _VIR_RA_LS_ExtendLRofMOVASrc0(
     gctBOOL                  needExtendLR = gcvTRUE;
     VIR_Enable               enable = VIR_Operand_GetEnable(pInst->dest);
     VIR_RA_LS_Liverange     *pDestLR = gcvNULL;
-
+    if (VIR_Operand_isImm(pSrc0) || VIR_Operand_isConst(pSrc0))
+    {
+        return;
+    }
     endPoint = gcvMAXUINT32;
     defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
     if (defIdx != VIR_INVALID_DEF_INDEX)
@@ -7710,11 +7713,8 @@ _VIR_RA_LS_InsertSpillOffset(
         }
         else
         {
-            /* TODO::we cann't handle vectorized MOVA + STARR now
-             * check MOVA src0 is single channel if usage of dest is STARR
-             */
-            VIR_Operand *movasrc0 = VIR_Inst_GetSource(pDef->defKey.pDefInst, VIR_Operand_Src0);
-            if (!_VSC_RA_EnableSingleChannel(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(movasrc0))))
+            /* TODO::we cann't handle base reg of starr is multi-components now */
+            if (!_VSC_RA_EnableSingleChannel(enable_channel))
             {
                 gcmASSERT(gcvFALSE);
             }

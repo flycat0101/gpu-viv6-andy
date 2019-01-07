@@ -1548,6 +1548,24 @@ static gctBOOL _IsDstHasNoSwizzleFlag(
     return gcvFALSE;
 }
 
+/* if there's another MOVA between pSeedInst and pInst, return false */
+static gctBOOL _IsAdjacentMovaToSeed(VIR_Instruction *pSeedInst,
+                                     VIR_Instruction *pInst)
+{
+    /* if VectorizeToSeedInst is true, */
+    VIR_Instruction *inst = VIR_Inst_GetPrev(pInst);
+
+    gcmASSERT(VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA);
+    while (inst && (inst != pSeedInst))
+    {
+        if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOVA)
+        {
+            return gcvFALSE;
+        }
+        inst = VIR_Inst_GetPrev(inst);
+    }
+    return gcvTRUE;
+}
 
 static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                            VIR_Shader* pShader,
@@ -1628,6 +1646,15 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         return gcvFALSE;
     }
 
+    /* special case for MOVA, could not do vectorization if there's another MOVA
+     * between pSeedInst and pInst, which may increase allocation pressure of a0
+     */
+    if ((VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA) &&
+        (!_IsAdjacentMovaToSeed(pSeedInst, pInst)))
+    {
+        return gcvFALSE;
+    }
+
     /* if pSeedInst and pInst use same symbol and enable bits in dest operands, like following case
         SUB               hp temp(4121).hp.x, hp  temp(4286).hp.x, hp  temp(4287).hp.x   <- pSeedInst
         CMP.lt            hp temp(4118).hp.x, hp  temp(4121).abs.hp.x, 0.050000[3d4ccccd], 1.000000[3f800000] <=  only usage instr
@@ -1649,7 +1676,8 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         dstOfSeedInst = VIR_Inst_GetDest(pSeedInst);
         dstofpInst = VIR_Inst_GetDest(pInst);
 
-        if (VIR_Operand_isSymbol(dstOfSeedInst) && VIR_Operand_isSymbol(dstofpInst) &&
+        if (VIR_Inst_GetOpcode(pInst) != VIR_OP_MOVA &&  /* skip mova case for register allocation issue */
+            VIR_Operand_isSymbol(dstOfSeedInst) && VIR_Operand_isSymbol(dstofpInst) &&
             (VIR_Operand_GetSymbol(dstOfSeedInst) == VIR_Operand_GetSymbol(dstofpInst)) &&
             (VIR_Operand_GetEnable(dstOfSeedInst) == VIR_Operand_GetEnable(dstofpInst)) &&
             vscVIR_DoesDefInstHaveUniqueUsageInst(pDuInfo, pSeedInst, gcvTRUE, &pUsageInst, &pUsageOper, &bIsIndexingRegUsage) &&  /* only one usage instr */
