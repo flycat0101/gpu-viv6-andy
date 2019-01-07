@@ -2879,6 +2879,10 @@ VkResult halti5_computeBlit(
         __VK_ONERROR(VK_NOT_READY);
     }
 
+    blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
+
+    scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
+
     if (blitKind >= HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE &&
         blitKind <= HALTI5_BLIT_2D_UINT_DOWNSAMPLE)
     {
@@ -2917,10 +2921,6 @@ VkResult halti5_computeBlit(
 ;
 
     }
-
-    blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
-
-    scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
