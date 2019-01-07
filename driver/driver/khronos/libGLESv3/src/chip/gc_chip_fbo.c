@@ -2395,6 +2395,7 @@ __glChipEglImageTargetRenderbufferStorageOES(
     switch (format)
     {
     case gcvSURF_R5G6B5:
+    case gcvSURF_B8G8R8:
     case gcvSURF_A4R4G4B4:
     case gcvSURF_A1R5G5B5:
     case gcvSURF_A8R8G8B8:
