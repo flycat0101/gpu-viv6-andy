@@ -2311,7 +2311,7 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
                 {
                     if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
                     {
-                        gctBOOL setDefRecursively = (opcode == VIR_OP_FRAC) || (opcode == VIR_OP_MOD);
+                        gctBOOL setDefRecursively = (opcode == VIR_OP_MOD);
                         _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, setDefRecursively, pDuInfo);
                     }
                 }
