@@ -90,8 +90,16 @@ msg_buf_add_msg(struct buf_msg *buf_msg, const char *fmt, ...)
         buf_msg->buf = calloc(1, buf_msg->allocated * sizeof(char));
     } else if (buf_msg->pos + size >= buf_msg->allocated) {
         buf_msg->allocated *= 2;
+
+    /*
+    *  We can't be sure that twice the buffer will actually be sufficient,
+    *  so we overwrite it with that value.
+    */
+    if (buf_msg->allocated < buf_msg->pos + size) {
+        buf_msg->allocated = buf_msg->pos + size;
+    }
         buf_msg->buf = realloc(buf_msg->buf,
-                       buf_msg->allocated * sizeof(char));
+        buf_msg->allocated * sizeof(char));
     }
 
     if (buf_msg->buf == NULL) {
