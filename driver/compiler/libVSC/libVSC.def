@@ -392,6 +392,7 @@ EXPORTS
 	vscCreatePrivateData
 	vscDestroyPrivateData
     vscGetShaderKindFromShaderHandle
+    vscGetTemporaryDir
 
 	vscPMP_Intialize
 	vscPMP_Finalize

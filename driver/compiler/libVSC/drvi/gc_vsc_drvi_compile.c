@@ -1396,3 +1396,95 @@ gcSHADER_KIND vscGetShaderKindFromShaderHandle(
     return shaderKind;
 }
 
+#define _cldFILENAME_MAX 1024
+gceSTATUS vscGetTemporaryDir(
+    OUT gctSTRING gcTmpDir
+    )
+{
+    gctSTRING TmpDir = gcvNULL;
+    gceSTATUS   status          = gcvSTATUS_OK;
+
+#if defined(UNDER_CE)
+    char cwdpath[MAX_PATH];
+#elif defined(ANDROID)
+    char path[_cldFILENAME_MAX];
+#endif
+
+    gcoOS_GetEnv(gcvNULL,
+        "TMPDIR",
+        &TmpDir);
+    if (!TmpDir) {
+        gcoOS_GetEnv(gcvNULL,
+            "TEMP",
+            &TmpDir);
+    }
+    if (!TmpDir) {
+        gcoOS_GetEnv(gcvNULL,
+            "TMP",
+            &TmpDir);
+    }
+    if (!TmpDir) {
+        gcoOS_GetEnv(gcvNULL,
+                    "TEMPDIR",
+                    &TmpDir);
+    }
+#if defined(LINUX) && !defined(ANDROID)
+    if (!TmpDir) {
+        FILE *fp = fopen("/tmp", "r+");
+        if (fp != gcvNULL)
+        {
+            /* /tmp is exist, readable and writable, use it as temp directory */
+            TmpDir = "/tmp";
+            fclose(fp);
+        }
+    }
+#endif
+    if (!TmpDir)
+    {
+#if defined(UNDER_CE)
+        /* Wince has no relative path */
+        gcoOS_GetCwd(gcvNULL, MAX_PATH, cwdpath);
+        TmpDir = cwdpath;
+#elif defined(ANDROID)
+        gctSIZE_T len=0;
+        gctFILE filp=gcvNULL;
+        gctINT i=0;
+        static const char prefix[] = "/data/data/";
+
+        /* Could these fail? */
+        gcoOS_Open(gcvNULL, "/proc/self/cmdline", gcvFILE_READ, &filp);
+        gcoOS_Read(gcvNULL, filp, _cldFILENAME_MAX - 1, path, &len);
+        gcoOS_Close(gcvNULL, filp);
+
+        /* Add terminator. */
+        path[len] = '\0';
+
+        if (strchr(path, '/')) {
+            /* Like a relative path or abs path. */
+            TmpDir = ".";
+        }
+        else if (strchr(path, '.') && len < _cldFILENAME_MAX - sizeof (prefix)) {
+            /* Like an android apk. */
+            for (i = len; i >= 0; i--) {
+                path[i + sizeof (prefix) - 1] = path[i];
+            }
+
+            gcoOS_MemCopy(path, prefix, sizeof (prefix) - 1);
+            gcoOS_StrCatSafe(path, _cldFILENAME_MAX, "/cache/");
+
+            TmpDir = path;
+        }
+        else {
+            TmpDir = ".";
+        }
+#else
+        TmpDir = (gctSTRING) ".";
+#endif
+    }
+
+    gcmONERROR(gcoOS_StrCopySafe(gcTmpDir, _cldFILENAME_MAX,TmpDir));
+
+OnError:
+    return status;
+}
+
