@@ -1036,7 +1036,7 @@ __SpvID2Swizzle (
 {
     VIR_Swizzle virSwizzle = VIR_SWIZZLE_XYZW;
     SpvIDType idType = SPV_ID_TYPE(id);
-
+    SpvId     sampler = 0;
     if (id >= spv->idDescSize)
     {
         return virSwizzle;
@@ -1044,7 +1044,9 @@ __SpvID2Swizzle (
 
     switch (idType)
     {
-    case SPV_ID_TYPE_SYMBOL:        idType = SPV_ID_SYM_SPV_TYPE(id); break;
+    case SPV_ID_TYPE_SYMBOL:        idType = SPV_ID_SYM_SPV_TYPE(id);
+                                    sampler = SPV_ID_SYM_SAMPLEDIMAGE_SAMPLER(id);
+                                    break;
     case SPV_ID_TYPE_CONST:         idType = SPV_ID_CST_SPV_TYPE(id); break;
     case SPV_ID_TYPE_FUNC_DEFINE:   idType = SPV_ID_FUNC_TYPE_ID(id); break;
     case SPV_ID_TYPE_TYPE:          idType = id; break;
@@ -1056,6 +1058,11 @@ __SpvID2Swizzle (
         if (SPV_ID_TYPE_IS_VECTOR(idType))
         {
             virSwizzle = virSwizzleCompact[SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(idType))];
+        }
+        else if (sampler != 0)
+        {
+            /* the accessed symbol is sampler, use VIR_SWIZZLE_XYZW */
+            virSwizzle = VIR_SWIZZLE_XYZW;
         }
         else
         {
