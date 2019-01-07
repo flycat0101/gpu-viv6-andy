@@ -239,6 +239,9 @@ struct eglThreadData
 
     /* Hardware specific: Security feature. */
     gctBOOL                     security;
+
+    /* A signal associated with a pending Android Native fence, for gbm only */
+    gctSIGNAL                     pendingSignal;
 };
 
 struct eglImageRef

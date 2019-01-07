@@ -215,17 +215,25 @@ veglCreateSync(
 
         veglSyncNative(thread, dpy);
 
-        /* Submit the sync point. */
-        iface.command            = gcvHAL_SIGNAL;
-        iface.engine             = gcvENGINE_RENDER;
-        iface.u.Signal.signal    = gcmPTR_TO_UINT64(sync->signal);
-        iface.u.Signal.auxSignal = 0;
-        iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);
-        iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+        if (dpy->platform->platform == EGL_PLATFORM_GBM_VIV)
+        {
+            thread->pendingSignal = sync->signal;
+        }
+        else
+        {
+            /* Submit the sync point. */
+            iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
+            iface.u.Signal.signal    = gcmPTR_TO_UINT64(sync->signal);
+            iface.u.Signal.auxSignal = 0;
+            iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);
+            iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
 
-        /* Send event. */
-        gcoHAL_ScheduleEvent(gcvNULL, &iface);
-        gcoHAL_Commit(gcvNULL, gcvFALSE);
+            /* Send event. */
+            gcoHAL_ScheduleEvent(gcvNULL, &iface);
+            gcoHAL_Commit(gcvNULL, gcvFALSE);
+        }
+
         break;
 
 #endif

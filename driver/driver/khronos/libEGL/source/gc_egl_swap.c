@@ -1918,7 +1918,6 @@ _SwapBuffersRegion(
             {
                 /* Flush the pipe. */
                 _Flush(thread);
-
                 /* Resolve path. */
                 if (!_ResolveRects(draw->renderTarget,
                                    backBuffer.surface,
@@ -2029,7 +2028,33 @@ _SwapBuffersRegion(
             }
         }
 #else
-        if(platform->platform == EGL_PLATFORM_GBM_VIV && (!synchronous))
+        if ((platform->platform == EGL_PLATFORM_GBM_VIV) && thread->pendingSignal)
+        {
+            gcsHAL_INTERFACE iface;
+            /* Submit the sync point. */
+            iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
+            iface.u.Signal.signal    = gcmPTR_TO_UINT64(thread->pendingSignal);
+            iface.u.Signal.auxSignal = 0;
+            iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);
+            iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
+            /* Send event. */
+            gcoHAL_ScheduleEvent(gcvNULL, &iface);
+            /* Commit-stall. */
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+            /* Post back buffer. */
+            if (!platform->postWindowBackBuffer(dpy, draw,
+                                                &backBuffer,
+                                                &draw->clipRegion,
+                                                &draw->damageHint))
+            {
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+                break;
+            }
+            thread->pendingSignal = gcvNULL;
+        }
+        else if ((platform->platform == EGL_PLATFORM_GBM_VIV) && (!synchronous))
         {
             /* Using android native fence sync. */
             if (!platform->postWindowBackBufferFence(dpy, draw,
