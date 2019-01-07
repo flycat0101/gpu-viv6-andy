@@ -1225,11 +1225,11 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_CONST_BORDER_VALUE:
         case VIR_UNIFORM_SAMPLED_IMAGE:
         case VIR_UNIFORM_EXTRA_LAYER:
+        case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         case VIR_UNIFORM_PUSH_CONSTANT:
         case VIR_UNIFORM_BASE_INSTANCE:
         case VIR_UNIFORM_TRANSFORM_FEEDBACK_BUFFER:
         case VIR_UNIFORM_TRANSFORM_FEEDBACK_STATE:
-
             if (isSymUniformMovedToAUBO(pSym))
             {
                 retValue = gcvFALSE;
@@ -2177,20 +2177,42 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
             case VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER:
             {
-                /* sampler allocation */
-                retValue = _VIR_CG_MapSamplerUniforms(pShader,
-                    pHwConfig,
-                    pUniform,
-                    &uniformColorMap,
-                    codeGenUniformBase,
-                    handleDefaultUBO,
-                    unblockUniformBlock,
-                    allocateSamplerReverse,
-                    gcvTRUE, /* always allocate */
-                    maxSampler,
-                    pMM,
-                    &sampler);
-                ON_ERROR(retValue, "Failed to Allocate Uniform");
+                if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
+                {
+                    retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        gcvFALSE,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        gcvTRUE, /* treat sampler as const */
+                        gcvTRUE, /* single uniform */
+                        gcvTRUE, /* always allocate */
+                        pMM,
+                        gcvNULL);
+
+                    pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
+                }
+                else
+                {
+                    /* sampler allocation */
+                    retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        allocateSamplerReverse,
+                        gcvTRUE, /* always allocate */
+                        maxSampler,
+                        pMM,
+                        &sampler);
+                    ON_ERROR(retValue, "Failed to Allocate Uniform");
+                }
+
 
                 pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                 pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
@@ -2384,6 +2406,22 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         }
 
         VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_INACTIVE);
+
+        /* If this is an image that related to a texelBuffer, just use copy the texelBuffer. */
+        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_TEXELBUFFER_TO_IMAGE)
+        {
+            VIR_Symbol*     pParentSamplerSym;
+            VIR_Uniform*    pParentUniform;
+
+            pParentSamplerSym = VIR_Shader_GetSymFromId(pShader, symUniform->u.samplerOrImageAttr.parentSamplerSymId);
+            pParentUniform = VIR_Symbol_GetSampler(pParentSamplerSym);;
+
+            symUniform->swizzle  = pParentUniform->swizzle;
+            symUniform->physical = pParentUniform->physical;
+            symUniform->address  = pParentUniform->address;
+
+            continue;
+        }
 
         if (isSymCompilerGen(sym))
         {

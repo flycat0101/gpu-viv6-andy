@@ -3121,6 +3121,7 @@ _UpdateOperandParameterForIntrinsicCall(
                 extraLayer = VIR_Symbol_GetImage(extraLayerSym);
                 extraLayer->u.samplerOrImageAttr.parentSamplerSymId = image->sym;
                 extraLayer->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+                extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
             }
 
             /* New a operand with this extra image layer.  */
@@ -4689,6 +4690,7 @@ _AddExtraSampler(
         extraLayer = VIR_Symbol_GetSampler(extraLayerSym);
         extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
         extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+        extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
     }
 
     /* New a operand with this extra image layer.  */
@@ -5333,81 +5335,124 @@ OnError:
     return errCode;
 };
 
+static VSC_ErrCode
+_AddTexelBufferToImage(
+    IN VIR_Shader       *pShader,
+    IN VIR_Function     *pFunc,
+    IN VIR_Symbol       *pSamplerSym,
+    IN VIR_Uniform      *pSamplerUniform,
+    IN gctUINT          arrayIndex
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_SymId           texelBufferToImageSymId = pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId;
+    VIR_Symbol          *pTexelBufferToImageSym = gcvNULL;
+    VIR_Uniform         *pTexelBufferToImage = gcvNULL;
+
+    if (texelBufferToImageSymId == NOT_ASSIGNED)
+    {
+        VIR_NameId      nameId;
+        gctCHAR         name[128] = "#";
+        VIR_TypeId      imageType = VIR_TypeId_ConvertSamplerTypeToImageType(pShader, VIR_Symbol_GetTypeId(pSamplerSym));
+
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, pSamplerSym));
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$TexelBufferToImage");
+        errCode = VIR_Shader_AddString(pShader,
+                                       name,
+                                       &nameId);
+        ON_ERROR(errCode, "VIR_Shader_AddString");
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_IMAGE,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, imageType),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &texelBufferToImageSymId);
+
+        ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+
+        pTexelBufferToImageSym = VIR_Shader_GetSymFromId(pShader, texelBufferToImageSymId);
+        pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId = texelBufferToImageSymId;
+        VIR_Symbol_SetFlag(pTexelBufferToImageSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(pTexelBufferToImageSym, VIR_Symbol_GetPrecision(pSamplerSym));
+        VIR_Symbol_SetUniformKind(pTexelBufferToImageSym, VIR_UNIFORM_TEXELBUFFER_TO_IMAGE);
+        VIR_Symbol_SetAddrSpace(pTexelBufferToImageSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(pTexelBufferToImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
+        pTexelBufferToImageSym->layout = pSamplerSym->layout;
+
+        pTexelBufferToImage = VIR_Symbol_GetImage(pTexelBufferToImageSym);
+        pTexelBufferToImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
+        pTexelBufferToImage->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+    }
+
+    VIR_Uniform_SetFlag(pSamplerUniform, VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG);
+
+OnError:
+    return errCode;
+}
+
 /* vec4 _texld_with_imgld_R32G32B32A32SFLOAT(int coord, samplerBuffer sampledTexelBuffer) */
 static VSC_ErrCode
 _InsertCallTexldImg(
-IN VIR_LinkLibContext     *Context,
-IN void                   *Transpoint,
-IN VIR_Function           *LibFunc
-)
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *Transpoint,
+    IN VIR_Function           *LibFunc
+    )
 {
     VSC_ErrCode                      errCode = VSC_ERR_NONE;
     VIR_Shader                       *pShader = Context->shader;
     VIR_Instruction                  *texldInst = (VIR_Instruction *)Transpoint;
     VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
-    VIR_Instruction                  *newInst = gcvNULL, *callInst = gcvNULL;
+    VIR_Instruction                  *newInst = gcvNULL;
 
-    VIR_Operand                      *texldSrc = gcvNULL;
+    VIR_Symbol                       *pSamplerSym = gcvNULL;
+    VIR_Uniform                      *pSamplerUniform = gcvNULL;
     gctUINT                          argIdx = 0;
-
-    VIR_SymId               parmSymId, parmVregId;
-    VIR_Symbol              *parmSym, *parmVregSym;
-    VIR_TypeId              symTy;
 
     gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
 
-    /* insert the MOV to pass arguement
-    MOV arg1, sampler
-    MOV arg2, coord */
-    for (argIdx = 0; argIdx < 2; argIdx++)
-    {
-        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
-        ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
+    /* Get the sampler uniform. */
+    gcmASSERT(VIR_Operand_isSymbol(VIR_Inst_GetSource(texldInst, 0)));
+    pSamplerSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(texldInst, 0));
 
-        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
+    gcmASSERT(VIR_Symbol_isSampler(pSamplerSym));
+    pSamplerUniform = VIR_Symbol_GetSampler(pSamplerSym);
 
-        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
-    }
+    /* Add the texelBuffer to image uniform. */
+    errCode = _AddTexelBufferToImage(pShader,
+                                     pFunc,
+                                     pSamplerSym,
+                                     pSamplerUniform,
+                                     Context->linkPoint->u.resource.arrayIndex);
+    ON_ERROR(errCode, "_InsertCallTexldImg");
 
-    /* insert a call instruction */
-    errCode = VIR_Function_AddInstructionBefore(pFunc,
-        VIR_OP_CALL,
-        VIR_TYPE_UNKNOWN,
-        texldInst,
-        gcvTRUE,
-        &callInst);
-    ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
-    VIR_Operand_SetFunction(callInst->dest, LibFunc);
+    /* insert the MOV to pass arguement */
+    /* MOV arg1, sampler */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldImg");
+    VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 0));
 
-    /* insert the MOV to get the return value to set texld coordinate
-    MOV coordinate, arg[2] */
-    errCode = VIR_Function_AddInstructionAfter(pFunc,
-        VIR_OP_MOV,
-        VIR_TYPE_UNKNOWN,
-        callInst,
-        gcvTRUE,
-        &newInst);
-    ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
+    /* MOV arg2, TexelBufferToImage2D */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldImg");
+    gcmASSERT(pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId != NOT_ASSIGNED);
+    VIR_Operand_SetSymbol(VIR_Inst_GetSource(newInst, 0),
+                          pFunc,
+                          pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId);
+    VIR_Operand_SetSwizzle(VIR_Inst_GetSource(newInst, 0), VIR_SWIZZLE_XYZW);
 
-    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, argIdx);
-    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
-    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
-        VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
-    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
-    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
-    symTy = VIR_Symbol_GetTypeId(parmSym);
+    /* MOV arg3, coord */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldImg");
+    VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 1));
 
-    VIR_Operand_SetTempRegister(newInst->src[0],
-        pFunc,
-        VIR_Symbol_GetIndex(parmVregSym),
-        symTy);
+    /* insert the MOV to get the return value
+       MOV destination, arg4 */
+    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
 
-    VIR_Operand_SetSwizzle(newInst->src[0],
-        VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(symTy)));
-
-    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), (VIR_Inst_GetSource(texldInst, 1)));
-
-    VIR_Operand_Change2Dest(VIR_Inst_GetDest(newInst));
+     /* change texldInst to the call instruction */
+    _ChangeTexldToCall(texldInst, LibFunc);
 
 OnError:
     return errCode;

@@ -318,6 +318,9 @@ _GetStorageClassString(
         return "addr_reg ";
     case VIR_UNIFORM_EXTRA_LAYER:
         return "";
+
+    case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
+        return "";
     default:
         gcmASSERT(0);
         return "";
@@ -403,6 +406,8 @@ _GetUniformKindString(
         return "extra_layer";
     case VIR_UNIFORM_BASE_INSTANCE:
         return "base_instance";
+    case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
+        return "texelBufferToImage";
     default:
         gcmASSERT(0);
         return "";

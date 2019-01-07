@@ -7571,6 +7571,84 @@ VIR_TypeId_GetSamplerCoordComponentCount(
     }
 }
 
+VIR_TypeId
+VIR_TypeId_ConvertSamplerTypeToImageType(
+    IN VIR_Shader *     Shader,
+    IN VIR_TypeId       SamplerType
+    )
+{
+    VIR_TypeId          imageType = VIR_TYPE_IMAGE_2D;
+
+    switch (SamplerType)
+    {
+    /* Floating point. */
+    case VIR_TYPE_SAMPLER_1D:
+        imageType = VIR_TYPE_IMAGE_1D;
+        break;
+    case VIR_TYPE_SAMPLER_1D_ARRAY:
+        imageType = VIR_TYPE_IMAGE_1D_ARRAY;
+        break;
+    case VIR_TYPE_SAMPLER_2D:
+        imageType = VIR_TYPE_IMAGE_2D;
+        break;
+    case VIR_TYPE_SAMPLER_2D_ARRAY:
+        imageType = VIR_TYPE_IMAGE_2D_ARRAY;
+        break;
+    case VIR_TYPE_SAMPLER_3D:
+        imageType = VIR_TYPE_IMAGE_3D;
+        break;
+    case VIR_TYPE_SAMPLER_BUFFER:
+        imageType = VIR_TYPE_IMAGE_2D;
+        break;
+
+    /* Signed integer. */
+    case VIR_TYPE_ISAMPLER_1D:
+        imageType = VIR_TYPE_IIMAGE_1D;
+        break;
+    case VIR_TYPE_ISAMPLER_1D_ARRAY:
+        imageType = VIR_TYPE_IIMAGE_1D_ARRAY;
+        break;
+    case VIR_TYPE_ISAMPLER_2D:
+        imageType = VIR_TYPE_IIMAGE_2D;
+        break;
+    case VIR_TYPE_ISAMPLER_2D_ARRAY:
+        imageType = VIR_TYPE_IIMAGE_2D_ARRAY;
+        break;
+    case VIR_TYPE_ISAMPLER_3D:
+        imageType = VIR_TYPE_IIMAGE_3D;
+        break;
+    case VIR_TYPE_ISAMPLER_BUFFER:
+        imageType = VIR_TYPE_IIMAGE_2D;
+        break;
+
+    /* Unsigned integer. */
+    case VIR_TYPE_USAMPLER_1D:
+        imageType = VIR_TYPE_UIMAGE_1D;
+        break;
+    case VIR_TYPE_USAMPLER_1D_ARRAY:
+        imageType = VIR_TYPE_UIMAGE_1D_ARRAY;
+        break;
+    case VIR_TYPE_USAMPLER_2D:
+        imageType = VIR_TYPE_UIMAGE_2D;
+        break;
+    case VIR_TYPE_USAMPLER_2D_ARRAY:
+        imageType = VIR_TYPE_UIMAGE_2D_ARRAY;
+        break;
+    case VIR_TYPE_USAMPLER_3D:
+        imageType = VIR_TYPE_UIMAGE_3D;
+        break;
+    case VIR_TYPE_USAMPLER_BUFFER:
+        imageType = VIR_TYPE_UIMAGE_2D;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return imageType;
+}
+
 /* symbol tables */
 /* find the symbol by nameId or constId and its kind, kind should not be field,
 * virtual register, return NULL if symbol is not found */
@@ -7840,15 +7918,17 @@ VIR_Shader_AddSymbolContents(
                 VIR_Symbol_SetUniform(Sym, uniform);
                 uniform->sym    = Sym->index;
                 uniform->gcslIndex = -1;
+                uniform->flags = VIR_UNIFORMFLAG_NONE;
                 uniform->blockIndex = -1;
                 uniform->offset = -1;
                 uniform->lastIndexingIndex = -1;
                 uniform->realUseArraySize = -1;
                 uniform->physical = -1;
-                uniform->u.samplerOrImageAttr.lodMinMax = VIR_INVALID_ID;
-                uniform->u.samplerOrImageAttr.levelBaseSize = VIR_INVALID_ID;
-                uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
-                uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
+                uniform->u.samplerOrImageAttr.lodMinMax                 = VIR_INVALID_ID;
+                uniform->u.samplerOrImageAttr.levelBaseSize             = VIR_INVALID_ID;
+                uniform->u.samplerOrImageAttr.levelsSamples             = VIR_INVALID_ID;
+                uniform->u.samplerOrImageAttr.extraImageLayer           = VIR_INVALID_ID;
+                uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = NOT_ASSIGNED;
                 uniform->auxAddrSymId = VIR_INVALID_ID;
                 if (PresetId == VIR_INVALID_ID)
                 {
