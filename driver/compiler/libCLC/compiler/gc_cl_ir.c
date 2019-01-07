@@ -10671,7 +10671,9 @@ _NeedImplicitTypeConv(
         }
         binaryExpr = (cloIR_BINARY_EXPR) &BinaryExpr->rightOperand->base;
     }
-    else if(!(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
+    else if(clmDECL_IsPointerType(&BinaryExpr->leftOperand->decl) ||
+            clmDECL_IsPointerType(&BinaryExpr->rightOperand->decl) ||
+            !(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
               clmDECL_IsScalarInteger(&BinaryExpr->rightOperand->decl))) /*for integer promotion */
     {
         return gcvFALSE;
