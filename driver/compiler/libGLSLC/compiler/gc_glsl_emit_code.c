@@ -13,7 +13,6 @@
 
 #include "gc_glsl_emit_code.h"
 #define _USE_F2I_OPCODE  1
-#define _GEN_MOD_IN_BACKEND 1
 
 gceSTATUS
 sloCODE_EMITTER_NewBasicBlock(
