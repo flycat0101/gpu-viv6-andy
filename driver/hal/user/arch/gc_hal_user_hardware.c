@@ -2841,7 +2841,7 @@ _DetermineSuperTileModeByDatabase(
                                            || (Config->chipRevision == 0x5039)
                                            || (Config->chipRevision >= 0x5040)))
     || ((Config->chipModel == gcv800) && (Config->chipRevision == 0x4612))
-    || ((Config->chipModel == gcv600) && (Config->chipRevision >= 0x4650))
+    || ((Config->chipModel == gcv600) && (Config->chipRevision >= 0x4633))
     || ((Config->chipModel == gcv860) && (Config->chipRevision == 0x4647))
     || ((Config->chipModel == gcv400) && (Config->chipRevision >= 0x4633)))
     {
