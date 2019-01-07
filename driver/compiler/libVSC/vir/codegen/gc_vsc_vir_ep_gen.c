@@ -4138,7 +4138,6 @@ static VSC_ErrCode _AddVkPushCnstEntryToPushCnstTableOfPEP(PROG_VK_PUSH_CONSTANT
         /* Fill direct mem base addr constant reg */
         pHwDirectAddrBase->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
         pHwDirectAddrBase->hwLoc.hwRegNo = pPushCnstAllocEntry->hwRegNo;
-        gcmASSERT(pHwDirectAddrBase->hwLoc.constReg.hwRegRange);
         for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
         {
             hwChannel = (((pPushCnstAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
@@ -4150,7 +4149,6 @@ static VSC_ErrCode _AddVkPushCnstEntryToPushCnstTableOfPEP(PROG_VK_PUSH_CONSTANT
         pPushCnstEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
 
         pPushCnstEntry->hwMappings[stageIdx].hwLoc.hwRegNo = pPushCnstAllocEntry->hwRegNo;
-        gcmASSERT(pPushCnstEntry->hwMappings[stageIdx].hwLoc.constReg.hwRegRange);
         for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
         {
             hwChannel = (((pPushCnstAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);

@@ -2753,11 +2753,11 @@ struct _VIR_SYMBOL
     gctUINT             _precision      : 3;
     gctUINT             _currPrecision  : 3;  /* symbol's current updated precision,
                                                * can be used for future precision update */
-    gctUINT             _qualifier      : 2;
+    gctUINT             _qualifier      : 9;
     gctUINT             _linkage        : 2;  /* 0: no-linkage, 1: import, 2: export */
     gctUINT             _componentShift : 2;  /* SPIRV component decoration */
     gctUINT             _cannotShift    : 1;  /* the symbol must allocated start from channel 0 */
-    gctUINT             _reserved1      : 6;  /* unused bits */
+    gctUINT             _reserved1      : 31; /* unused bits */
 
     VIR_HwRegId         _hwRegId      : 10;   /* allocated HW register for the temp or attribute */
     gctUINT             _hwShift      : 2;    /* shift for HW register */
