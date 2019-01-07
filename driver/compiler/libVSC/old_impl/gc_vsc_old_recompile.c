@@ -15167,6 +15167,7 @@ static gceSTATUS gcSHADER_GetTempFileName(IN  gctSTRING libname,
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
+    gcePATCH_ID patchId = gcPatchId;
 
     gcmONERROR(gcSHADER_GetTemporaryDir(gcTmpFileName));
 #if _WIN32
@@ -15178,6 +15179,12 @@ static gceSTATUS gcSHADER_GetTempFileName(IN  gctSTRING libname,
         _cldFILENAME_MAX,
         "/"));
 #endif
+
+    if (isAppConformance(patchId))
+    {
+        gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName, _cldFILENAME_MAX, "cts_"));
+    }
+
     gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName, _cldFILENAME_MAX, libname));
 
     gcmONERROR(gcoOS_StrCopySafe(nameBuffer, nameBufferSize,gcTmpFileName));
