@@ -7816,11 +7816,7 @@ __glChipDrawEnd(
                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
                 gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
     }
-        g_dbgDumpImagePerDraw = 0x00010001;
-        gcmPRINT("#[info: fID=%d, dID=%d(draw), pID=%d, ppID=%d]",
-                frameCount, drawCount,
-                gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
+
     if (g_dbgPerDrawKickOff)
     {
         gcmONERROR(gcoSURF_Flush(gcvNULL));
