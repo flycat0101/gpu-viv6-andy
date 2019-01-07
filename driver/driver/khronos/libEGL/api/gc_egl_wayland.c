@@ -1001,7 +1001,8 @@ __wl_egl_surface_set_format(__WLEGLSurface egl_surface,
         return -EINVAL;
     }
 
-    egl_surface->type   = Type | gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
+    /* Not use gcvSURF_CACHE_MODE_128 for client surface to improve wayland performance. */
+    egl_surface->type   = Type | gcvSURF_DMABUF_EXPORTABLE;
     egl_surface->format = Format;
     return 0;
 }
