@@ -2126,7 +2126,7 @@ _Inst_RequireHPSrc(
 
 DEF_QUERY_PASS_PROP(vscVIR_AdjustPrecision)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
@@ -2146,241 +2146,241 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
     /* currently only PS is dual16-able */
     if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT && !VIR_Shader_IsVulkan(pShader))
     {
-    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-    for (func_node = VIR_FuncIterator_First(&func_iter);
-            func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
-    {
-        VIR_Function    *func = func_node->function;
-        VIR_InstIterator inst_iter;
-        VIR_Instruction *inst;
-        gctUINT         i;
-        gctBOOL         forceChange = gcvFALSE, skipLowp = gcvTRUE;
-
-        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+        for (func_node = VIR_FuncIterator_First(&func_iter);
+                func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
         {
-            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+            VIR_Function    *func = func_node->function;
+            VIR_InstIterator inst_iter;
+            VIR_Instruction *inst;
+            gctUINT         i;
+            gctBOOL         forceChange = gcvFALSE, skipLowp = gcvTRUE;
 
-            /* bitwise operation: if any src is highp, the other src and dest has to be highp */
-            if (VIR_OPCODE_BITWISE(opcode))
+            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                    inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
             {
-                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
-                {
-                    if ((VIR_Operand_GetOpKind(VIR_Inst_GetSource(inst, i)) == VIR_OPND_IMMEDIATE &&
-                        !VIR_Opnd_ValueFit16Bits(VIR_Inst_GetSource(inst, i))) ||
-                        VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
-                    {
-                        forceChange = gcvTRUE;
-                        break;
-                    }
-                }
-            }
+                VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-            /* HW has restriction on select instruction - only one instruction type for comparison and type conversion
-                we may have problem when dest and src0 type is different. For example,
-                select fp32, int32, fp16, fp16,
-                we need to set it instruction type to int32, thus it will use integer conversion
-                to convert fp16 to fp32, which is wrong. Thus, we make dest and all src to be highp if
-                there is one highp source or dest */
-            if (opcode == VIR_OP_CSELECT)
-            {
-                /* cmp.uint16 t1, t2, t3
-                    select.selmsb.fp32, t1.uint16, fp16, fp16 has problem
-                    since t1 will be -1 in uint16 (0xFFFF), while select.selmsb
-                    the instruction is fp32, which will check bit31 to be one or not*/
-                if (VIR_Inst_GetConditionOp(inst) == VIR_COP_SELMSB ||
-                    VIR_Inst_GetConditionOp(inst) == VIR_COP_ALLMSB ||
-                    VIR_Inst_GetConditionOp(inst) == VIR_COP_ANYMSB)
+                /* bitwise operation: if any src is highp, the other src and dest has to be highp */
+                if (VIR_OPCODE_BITWISE(opcode))
                 {
-                    if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH &&
-                        VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 0)) != VIR_PRECISION_HIGH)
+                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
                     {
-                        forceChange = gcvTRUE;
-                    }
-                }
-                else
-                {
-                    VIR_Symbol  *destSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
-                    gctBOOL     needHighp = gcvFALSE;
-                    if (destSym)
-                    {
-                        VIR_TypeId ty0 = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(destSym));
-                        VIR_TypeId ty1 = VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0));
-
-                        if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
-                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
-                            ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
-                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
+                        if ((VIR_Operand_GetOpKind(VIR_Inst_GetSource(inst, i)) == VIR_OPND_IMMEDIATE &&
+                            !VIR_Opnd_ValueFit16Bits(VIR_Inst_GetSource(inst, i))) ||
+                            VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
                         {
-                            needHighp = gcvTRUE;
+                            forceChange = gcvTRUE;
+                            break;
                         }
+                    }
+                }
 
-                        /* it is possible that destSym is used as a different type */
-                        if (!needHighp)
+                /* HW has restriction on select instruction - only one instruction type for comparison and type conversion
+                    we may have problem when dest and src0 type is different. For example,
+                    select fp32, int32, fp16, fp16,
+                    we need to set it instruction type to int32, thus it will use integer conversion
+                    to convert fp16 to fp32, which is wrong. Thus, we make dest and all src to be highp if
+                    there is one highp source or dest */
+                if (opcode == VIR_OP_CSELECT)
+                {
+                    /* cmp.uint16 t1, t2, t3
+                        select.selmsb.fp32, t1.uint16, fp16, fp16 has problem
+                        since t1 will be -1 in uint16 (0xFFFF), while select.selmsb
+                        the instruction is fp32, which will check bit31 to be one or not*/
+                    if (VIR_Inst_GetConditionOp(inst) == VIR_COP_SELMSB ||
+                        VIR_Inst_GetConditionOp(inst) == VIR_COP_ALLMSB ||
+                        VIR_Inst_GetConditionOp(inst) == VIR_COP_ANYMSB)
+                    {
+                        if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH &&
+                            VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 0)) != VIR_PRECISION_HIGH)
                         {
-                            VIR_DEF_KEY   defKey;
-                            gctUINT       defIdx;
-                            VIR_USAGE     *pUsage = gcvNULL;
-                            VIR_DEF       *pDef = gcvNULL;
-                            VIR_OperandInfo     operandInfo;
-                            VSC_DU_ITERATOR     duIter;
-                            VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
+                            forceChange = gcvTRUE;
+                        }
+                    }
+                    else
+                    {
+                        VIR_Symbol  *destSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
+                        gctBOOL     needHighp = gcvFALSE;
+                        if (destSym)
+                        {
+                            VIR_TypeId ty0 = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(destSym));
+                            VIR_TypeId ty1 = VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0));
 
-                            VIR_Operand_GetOperandInfo(
-                                inst,
-                                VIR_Inst_GetDest(inst),
-                                &operandInfo);
-
-                            defKey.pDefInst = inst;
-                            defKey.regNo = operandInfo.u1.virRegInfo.virReg;
-                            defKey.channel = VIR_CHANNEL_ANY;
-                            defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
-
-                            while (VIR_INVALID_DEF_INDEX != defIdx)
+                            if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
+                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
+                                ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
+                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
                             {
-                                pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+                                needHighp = gcvTRUE;
+                            }
 
-                                /* go through all the uses */
-                                VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
-                                pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
-                                for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
+                            /* it is possible that destSym is used as a different type */
+                            if (!needHighp)
+                            {
+                                VIR_DEF_KEY   defKey;
+                                gctUINT       defIdx;
+                                VIR_USAGE     *pUsage = gcvNULL;
+                                VIR_DEF       *pDef = gcvNULL;
+                                VIR_OperandInfo     operandInfo;
+                                VSC_DU_ITERATOR     duIter;
+                                VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
+
+                                VIR_Operand_GetOperandInfo(
+                                    inst,
+                                    VIR_Inst_GetDest(inst),
+                                    &operandInfo);
+
+                                defKey.pDefInst = inst;
+                                defKey.regNo = operandInfo.u1.virRegInfo.virReg;
+                                defKey.channel = VIR_CHANNEL_ANY;
+                                defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+
+                                while (VIR_INVALID_DEF_INDEX != defIdx)
                                 {
-                                    pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
-                                        if (pUsage->usageKey.pUsageInst != VIR_OUTPUT_USAGE_INST)
+                                    pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+
+                                    /* go through all the uses */
+                                    VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
+                                    pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
+                                    for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
                                     {
-                                        ty0 = VIR_Operand_GetTypeId(pUsage->usageKey.pOperand);
-                                        if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
-                                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
-                                            ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
-                                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
+                                        pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
+                                            if (pUsage->usageKey.pUsageInst != VIR_OUTPUT_USAGE_INST)
                                         {
-                                            needHighp = gcvTRUE;
-                                            break;
+                                            ty0 = VIR_Operand_GetTypeId(pUsage->usageKey.pOperand);
+                                            if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
+                                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
+                                                ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
+                                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
+                                            {
+                                                needHighp = gcvTRUE;
+                                                break;
+                                            }
                                         }
                                     }
-                                }
 
-                                defIdx = pDef->nextDefIdxOfSameRegNo;
-                                if (needHighp)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-                        if (needHighp)
-                        {
-                            if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH)
-                            {
-                                forceChange = gcvTRUE;
-                            }
-                            else
-                            {
-                                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
-                                {
-                                    if (VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
+                                    defIdx = pDef->nextDefIdxOfSameRegNo;
+                                    if (needHighp)
                                     {
-                                        forceChange = gcvTRUE;
                                         break;
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-
-            if (VIR_OPCODE_isTexLd(opcode) &&
-                (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst))) & VIR_TYFLAG_ISINTEGER) &&
-                VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) != VIR_PRECISION_HIGH &&
-                !pHwCfg->hwFeatureFlags.hasHalti5)
-            {
-                forceChange = gcvTRUE;
-                skipLowp = gcvFALSE;
-            }
-
-            for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
-            {
-                if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
-                {
-                    gctBOOL setDefRecursively = (opcode == VIR_OP_FRAC) || (opcode == VIR_OP_MOD);
-                    _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, setDefRecursively, pDuInfo);
-                }
-            }
-
-            if (_Inst_RequireHPDest(inst, forceChange))
-            {
-                _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, gcvFALSE, pDuInfo);
-            }
-
-            /* HW Cvt2OutColFmt has issue with 0x2,
-                output should be high-precision, */
-            {
-                VIR_Operand* dest = VIR_Inst_GetDest(inst);
-                if(dest)
-                {
-                    if(VIR_Operand_isVirReg(dest) || VIR_Operand_isSymbol(dest))
-                    {
-                        VIR_Symbol* sym = VIR_Operand_GetSymbol(dest);
-                        if(VIR_Symbol_isVreg(sym))
-                        {
-                            VIR_Symbol* varSym = VIR_Symbol_GetVregVariable(sym);
-                            if(VIR_Symbol_isOutput(varSym))
+                            if (needHighp)
                             {
-                                if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)) ||
-                                    (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH)
                                 {
-                                    VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
-                                    VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                                    VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                    forceChange = gcvTRUE;
                                 }
-                            }
-                        }
-                        else if(VIR_Symbol_isVariable(sym))
-                        {
-                            if(VIR_Symbol_isOutput(sym))
-                            {
-                                if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)) ||
-                                    (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                else
                                 {
-                                    VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                                    VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
+                                    {
+                                        if (VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
+                                        {
+                                            forceChange = gcvTRUE;
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            /* HW has bug on conversion for flat varying, thus promote it to highp */
-            {
-                gctUINT i;
-                for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+
+                if (VIR_OPCODE_isTexLd(opcode) &&
+                    (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst))) & VIR_TYFLAG_ISINTEGER) &&
+                    VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) != VIR_PRECISION_HIGH &&
+                    !pHwCfg->hwFeatureFlags.hasHalti5)
                 {
-                    VIR_Operand* src = VIR_Inst_GetSource(inst, i);
-                    if (VIR_Operand_GetOpKind(src) == VIR_OPND_SYMBOL)
+                    forceChange = gcvTRUE;
+                    skipLowp = gcvFALSE;
+                }
+
+                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
+                {
+                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
                     {
-                        VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
-                        if(VIR_Symbol_isInput(sym) && isSymFlat(sym))
+                        gctBOOL setDefRecursively = (opcode == VIR_OP_FRAC) || (opcode == VIR_OP_MOD);
+                        _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, setDefRecursively, pDuInfo);
+                    }
+                }
+
+                if (_Inst_RequireHPDest(inst, forceChange))
+                {
+                    _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, gcvFALSE, pDuInfo);
+                }
+
+                /* HW Cvt2OutColFmt has issue with 0x2,
+                    output should be high-precision, */
+                {
+                    VIR_Operand* dest = VIR_Inst_GetDest(inst);
+                    if(dest)
+                    {
+                        if(VIR_Operand_isVirReg(dest) || VIR_Operand_isSymbol(dest))
                         {
-                            VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
-                            VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                            VIR_Symbol* sym = VIR_Operand_GetSymbol(dest);
+                            if(VIR_Symbol_isVreg(sym))
+                            {
+                                VIR_Symbol* varSym = VIR_Symbol_GetVregVariable(sym);
+                                if(VIR_Symbol_isOutput(varSym))
+                                {
+                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)) ||
+                                        (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                    {
+                                        VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
+                                        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                        VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                    }
+                                }
+                            }
+                            else if(VIR_Symbol_isVariable(sym))
+                            {
+                                if(VIR_Symbol_isOutput(sym))
+                                {
+                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)) ||
+                                        (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                    {
+                                        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                        VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                    }
+                                }
+                            }
                         }
                     }
-                    else if (VIR_Operand_GetOpKind(src) == VIR_OPND_VIRREG)
+                }
+                /* HW has bug on conversion for flat varying, thus promote it to highp */
+                {
+                    gctUINT i;
+                    for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
                     {
-                        VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
-                        VIR_Symbol * varSym = VIR_Symbol_GetVregVariable(sym);
-                        if(VIR_Symbol_isInput(varSym) && isSymFlat(varSym))
+                        VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+                        if (VIR_Operand_GetOpKind(src) == VIR_OPND_SYMBOL)
                         {
-                            VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
-                            VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                            VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
+                            VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
+                            if(VIR_Symbol_isInput(sym) && isSymFlat(sym))
+                            {
+                                VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
+                                VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                            }
+                        }
+                        else if (VIR_Operand_GetOpKind(src) == VIR_OPND_VIRREG)
+                        {
+                            VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
+                            VIR_Symbol * varSym = VIR_Symbol_GetVregVariable(sym);
+                            if(VIR_Symbol_isInput(varSym) && isSymFlat(varSym))
+                            {
+                                VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
+                                VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
+                            }
                         }
                     }
                 }
             }
         }
-    }
     }
 
     if (VirSHADER_DumpCodeGenVerbose(pShader->_id))
