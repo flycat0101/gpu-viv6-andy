@@ -126,6 +126,10 @@ extern "C" {
 
 #define DRM_FORMAT_AYUV        fourcc_code('A', 'Y', 'U', 'V') /* [31:0] A:Y:Cb:Cr 8:8:8:8 little endian */
 
+/* Luminance */
+#define DRM_FORMAT_L8          fourcc_code('L', '8', ' ', ' ')
+#define DRM_FORMAT_LA88        fourcc_code('L', 'A', '8', '8')
+
 /*
  * 2 plane RGB + A
  * index 0 = RGB plane, same format as the corresponding non _A8 format has
