@@ -321,6 +321,7 @@ typedef enum _gceSPLIT_DRAW_TYPE
     gcvSPLIT_DRAW_1,
     gcvSPLIT_DRAW_2,
     gcvSPLIT_DRAW_3,
+    gcvSPLIT_DRAW_4,
     gcvSPLIT_DRAW_XFB,
     gcvSPLIT_DRAW_INDEX_FETCH,
     gcvSPLIT_DRAW_TCS,
