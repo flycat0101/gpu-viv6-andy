@@ -1463,8 +1463,6 @@ void CheckContextParam(_VGContext *context, _VGPath* path, _VGMatrix3x3 *matrix,
     scale[0] = matrix->m[0][0] * matrix->m[0][0] + matrix->m[1][0] * matrix->m[1][0];
     scale[1] = matrix->m[0][1] * matrix->m[0][1] + matrix->m[1][1] * matrix->m[1][1];
 
-    context->tessContext.strokeScale = TESS_SQRT(gcmMAX(scale[0], scale[1]));
-
     if ((paintModes & VG_FILL_PATH) &&
         path->fillRule != context->fillRule)
     {
@@ -1530,6 +1528,7 @@ void CheckContextParam(_VGContext *context, _VGPath* path, _VGMatrix3x3 *matrix,
 #endif
         PathDirty(path, VGTessPhase_ALL);
     }
+    context->tessContext.strokeScale = TESS_SQRT(gcmMAX(path->transformScale[0], path->transformScale[1]));
 
     gcmFOOTER_NO();
 }
