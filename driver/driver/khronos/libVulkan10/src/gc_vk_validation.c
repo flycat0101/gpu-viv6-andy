@@ -438,18 +438,12 @@ vk_Exit:
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __valid_GetInstanceProcAddr(VkInstance instance, const char* pName)
 {
-    __vkInstance *inst = (__vkInstance *)instance;
     PFN_vkVoidFunction pFunc = gcvNULL;
     VkResult result = VK_SUCCESS;
 
     __VK_LOG_API("(tid=%p): vkGetInstanceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), instance, pName);
 
-    /* API validation logic that can be skipped at runtime */
-    if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
-    {
-        result = __VK_ERROR_INVALID_HANDLE;
-        goto vk_Exit;
-    }
+    /* Do not check instance, NULL instance is valid. */
     if (!pName)
     {
         result = __VK_ERROR_INVALID_POINTER;
