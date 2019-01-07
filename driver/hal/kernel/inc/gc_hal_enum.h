@@ -922,7 +922,6 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_L16,
     gcvSURF_L32,
     gcvSURF_L1,
-    gcvSURF_L8_RAW,
 
     /* Alpha/Luminance formats. */
     gcvSURF_A4L4                = 900,
@@ -933,8 +932,6 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_A16L16,
 
     gcvSURF_A8L8_1_A8R8G8B8,
-
-    gcvSURF_A8L8_RAW,
 
     /* Bump formats. */
     gcvSURF_L6V5U5              = 1000,

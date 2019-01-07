@@ -5657,18 +5657,6 @@ __glChipGetTextureAttribFromImage(
             type = GL_NONE;
             break;
 
-        case gcvSURF_L8_RAW:
-            format = GL_LUMINANCE;
-            internalFormat = GL_LUMINANCE;
-            type = GL_UNSIGNED_BYTE;
-            break;
-
-        case gcvSURF_A8L8_RAW:
-            format = GL_LUMINANCE_ALPHA;
-            internalFormat = GL_LUMINANCE_ALPHA;
-            type = GL_UNSIGNED_BYTE;
-            break;
-
         default:
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -5877,11 +5865,6 @@ __glChipEglImageTargetTexture2DOES(
                     break;
                 }
             }
-        }
-
-        if(srcFormat == gcvSURF_L8_RAW  || srcFormat == gcvSURF_A8L8_RAW)
-        {
-            texInfo->eglImage.directSample = gcvTRUE;
         }
 
         /* More checks. */
