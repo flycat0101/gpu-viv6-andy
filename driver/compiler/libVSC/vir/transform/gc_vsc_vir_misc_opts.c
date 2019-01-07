@@ -7539,6 +7539,8 @@ static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
         return errCode;
     }
 OnError:
+    if (libFuncName != gcvNULL) {gcoOS_Free(gcvNULL, libFuncName);}
+
     return errCode;
 }
 

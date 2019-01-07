@@ -13449,13 +13449,14 @@ gcLinkTreeThruVirShaders(
                                 *tcsVirShader = gcvNULL, *tesVirShader = gcvNULL, *geoVirShader = gcvNULL;
     gctUINT8 *                  stateBuffer = gcvNULL;
     gcsHINT_PTR                 hints = gcvNULL;
+    VSC_CORE_SYS_CONTEXT        coreSysCtx;
+    VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
 
     gcmHEADER_ARG("Trees=0x%x ",Trees);
     do
     {
         gcSHADER                       vsShader = gcvNULL, fsShader = gcvNULL, csShader =gcvNULL,
                                        tcsShader = gcvNULL, tesShader = gcvNULL, geoShader = gcvNULL;
-        VSC_CORE_SYS_CONTEXT           coreSysCtx;
         VSC_SYS_CONTEXT                sysCtx;
         VSC_PROGRAM_LINKER_PARAM       pgComParam;
         VSC_SHADER_COMPILER_PARAM      scParam;
@@ -13635,8 +13636,6 @@ gcLinkTreeThruVirShaders(
 
         if (ProgramState)
         {
-            VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
-
             if (clKernel)
             {
                 vscCreatePrivateData(&coreSysCtx,
@@ -13853,6 +13852,8 @@ OnError:
     if (csVirShader) {VIR_Shader_Destroy(csVirShader); gcoOS_Free(gcvNULL, csVirShader);}
     if (stateBuffer) gcmOS_SAFE_FREE(gcvNULL, stateBuffer);
     if (hints)  gcmOS_SAFE_FREE(gcvNULL, hints);
+    if (hwPgStates.pStateBuffer) {gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer); hwPgStates.stateBufferSize = 0;}
+    if (coreSysCtx.hPrivData) {VSC_PRIV_DATA* pPrivData = (VSC_PRIV_DATA*)coreSysCtx.hPrivData; vscPMP_Finalize(&pPrivData->pmp); gcoOS_Free(gcvNULL, pPrivData);}
     /* Return the status. */
     gcmFOOTER();
 

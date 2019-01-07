@@ -23768,6 +23768,12 @@ OnError:
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, stateBuffer));
     }
 
+    /* Free up the hints structure. */
+    if (hints != gcvNULL)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, hints));
+    }
+
     /* Return the status. */
     gcmFOOTER();
     return status;

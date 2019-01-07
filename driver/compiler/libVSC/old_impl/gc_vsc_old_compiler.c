@@ -6145,11 +6145,14 @@ gcSHADER_MergeKernel(
                              totalCodeCount - mergedKernel->codeCount);
             }
 
-            gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                      totalCodeCount* gcmSIZEOF(gctBOOL),
-                                      &pointer));
-            gcoOS_ZeroMemory(pointer, totalCodeCount * gcmSIZEOF(gctBOOL));
-            builtinIndex.instInKernelFuncPrep = pointer;
+            if(builtinIndex.instInKernelFuncPrep == gcvNULL)
+            {
+                gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                          totalCodeCount* gcmSIZEOF(gctBOOL),
+                                          &pointer));
+                gcoOS_ZeroMemory(pointer, totalCodeCount * gcmSIZEOF(gctBOOL));
+                builtinIndex.instInKernelFuncPrep = pointer;
+            }
 
             gcmONERROR(gcSHADER_ReallocateUniforms(mergedKernel,
                                                    totalUniformCount));
@@ -16309,7 +16312,7 @@ gcSHADER_AddUniform(
         if (gcmIS_ERROR(status))
         {
             gcoOS_Free(gcvNULL, pointer);
-
+            gcoOS_Free(gcvNULL, uniform);
             /* Error. */
             gcmFOOTER();
             return status;
