@@ -76,9 +76,9 @@ MODULE_LICENSE("Dual MIT/GPL");
 #define USE_MSI     1
 #endif
 
-static struct class* gpuClass;
+static struct class* gpuClass = NULL;
 
-static gcsPLATFORM *platform;
+static gcsPLATFORM *platform = NULL;
 
 static gckGALDEVICE galDevice;
 
@@ -870,7 +870,7 @@ int viv_drm_probe(struct device *dev);
 int viv_drm_remove(struct device *dev);
 #endif
 
-struct device *galcore_device;
+struct device *galcore_device = NULL;
 
 #if USE_LINUX_PCIE
 static int gpu_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -1030,6 +1030,8 @@ static void gpu_remove(struct pci_dev *pdev)
     gcmkFOOTER_NO();
     return;
 #else
+    galcore_device->dma_mask = NULL;
+    galcore_device = NULL;
     gcmkFOOTER_NO();
     return 0;
 #endif
