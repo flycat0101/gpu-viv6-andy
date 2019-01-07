@@ -17884,7 +17884,6 @@ gcoHARDWARE_SetColorCacheMode(
                 surfView.surf = surface;
                 surfView.firstSlice = Hardware->PEStates->colorStates.target[i].sliceIndex;
                 surfView.numSlices = Hardware->PEStates->colorStates.target[i].sliceNum;
-
                 if (surface)
                 {
                     if (mode == gcvCACHE_NONE)

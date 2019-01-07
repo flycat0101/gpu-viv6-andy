@@ -440,10 +440,6 @@ gcoSURF_AllocateTileStatus(
         Surface->vMsaa = gcvFALSE;
     }
 
-    if (Surface->cacheMode == gcvCACHE_NONE)
-    {
-        Surface->cacheMode = DEFAULT_CACHE_MODE;
-    }
 
     /* Query the linear size for the tile status buffer. */
     status = gcoHARDWARE_QueryTileStatus(gcvNULL,
@@ -1805,10 +1801,13 @@ _AllocateSurface(
                          : gcvLINEAR
                          ;
 
-    Surface->cacheMode  = gcvCACHE_NONE;
     if (Surface->hints & gcvSURF_CACHE_MODE_128)
     {
         Surface->cacheMode  = gcvCACHE_128;
+    }
+    else
+    {
+            Surface->cacheMode  = gcvCACHE_256;
     }
 
     /* Set aligned surface size. */

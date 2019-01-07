@@ -1323,6 +1323,7 @@ _CreateVivanteDrmBufferSurface(
 
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
+    type |= gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
 
     /* Append no-vidmem hint to type. */
     type |= gcvSURF_NO_VIDMEM;
@@ -1495,6 +1496,7 @@ _CreateGenericDrmBufferSurface(
 
     /* Indicate display buffer. */
     type |= gcvSURF_CREATE_AS_DISPLAYBUFFER;
+    type |= gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128;
 
     /* TODO: Attach tile status from generic drm buffer. */
     status = gcoSURF_WrapUserMemory(gcvNULL,

@@ -2501,12 +2501,6 @@ gcoHARDWARE_3DBlitBlt(
 
     if (Hardware->features[gcvFEATURE_128BTILE])
     {
-        if (srcTileStatusPhysical &&
-            srcFastClear &&
-            srcSurf->cacheMode == gcvCACHE_NONE)
-        {
-            srcSurf->cacheMode = DEFAULT_CACHE_MODE;
-        }
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
         &&  srcSurf->compressed
@@ -4486,11 +4480,6 @@ gcoHARDWARE_3DBlitClear(
 
     destFastClear = (Info->destTileStatusAddress != 0);
 
-    if (destFastClear &&
-        DstSurf->cacheMode == gcvCACHE_NONE)
-    {
-        DstSurf->cacheMode = DEFAULT_CACHE_MODE;
-    }
 
     commandInfo.dither = gcvFALSE;
 
@@ -8682,12 +8671,6 @@ gcoHARDWARE_3DBlitMipMap(
 
     if (Hardware->features[gcvFEATURE_128BTILE])
     {
-        if (srcFastClear &&
-            srcTileStatusPhysical &&
-            srcSurf->cacheMode == gcvCACHE_NONE)
-        {
-            srcSurf->cacheMode = DEFAULT_CACHE_MODE;
-        }
 
         if ((Hardware->features[gcvFEATURE_COMPRESSION_V4] || Hardware->features[gcvFEATURE_COMPRESSION_DEC400])
         &&  srcSurf->compressed

@@ -21989,10 +21989,6 @@ gcoHARDWARE_EnableTileStatus(
             Hardware->PEDirty->colorConfigDirty = gcvTRUE;
         }
 
-        if (Surface->cacheMode == gcvCACHE_NONE)
-        {
-            Surface->cacheMode = (Surface->hints & gcvSURF_CACHE_MODE_128) ? gcvCACHE_128 : DEFAULT_CACHE_MODE;
-        }
     }
 
     for (i = SurfView->firstSlice; i < (SurfView->firstSlice + SurfView->numSlices); i++)
@@ -26026,11 +26022,6 @@ gcmSETCTRLSTATE(stateDelta, reserve, memory, 0x0594, ((((gctUINT32) (0)) & ~(((g
     /*  */
     anyTsEnableForMultiSlice = gcvFALSE;
     gcmAnyTileStatusEnableForFullMultiSlice(SurfView, &anyTsEnableForMultiSlice);
-
-    if (Hardware->features[gcvFEATURE_128BTILE] && !anyTsEnableForMultiSlice)
-    {
-        Surface->cacheMode = gcvCACHE_NONE;
-    }
 
 OnError:
     if (Hardware != gcvNULL)
