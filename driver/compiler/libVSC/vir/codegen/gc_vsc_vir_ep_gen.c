@@ -4096,8 +4096,9 @@ static VSC_ErrCode _AddVkPushCnstEntryToPushCnstTableOfPEP(PROG_VK_PUSH_CONSTANT
                                                            VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY* pPushCnstAllocEntry,
                                                            gctUINT stageIdx)
 {
-    PROG_VK_PUSH_CONSTANT_TABLE_ENTRY*  pPushCnstEntry = gcvNULL;
-    gctUINT                             i, pushCnstEntryIndex, channel, hwChannel;
+    PROG_VK_PUSH_CONSTANT_TABLE_ENTRY*      pPushCnstEntry = gcvNULL;
+    gctUINT                                 i, pushCnstEntryIndex, channel, hwChannel;
+    SHADER_CONSTANT_HW_LOCATION_MAPPING*    pHwDirectAddrBase;
 
     for (i = 0; i < pPushCnstTable->countOfEntries; i ++)
     {
@@ -4118,12 +4119,43 @@ static VSC_ErrCode _AddVkPushCnstEntryToPushCnstTableOfPEP(PROG_VK_PUSH_CONSTANT
 
     pPushCnstEntry->activeStageMask |= pPushCnstAllocEntry->bUse ? (1 << stageIdx) : 0;
     pPushCnstEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
-    pPushCnstEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
-    pPushCnstEntry->hwMappings[stageIdx].hwLoc.hwRegNo = pPushCnstAllocEntry->hwRegNo;
-    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+
+    if (pPushCnstAllocEntry->bBaseAddr)
     {
-        hwChannel = (((pPushCnstAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
-        _SetValidChannelForHwConstantLoc(&pPushCnstEntry->hwMappings[stageIdx], hwChannel);
+        pPushCnstEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_MEMORY;
+        pPushCnstEntry->hwMappings[stageIdx].hwLoc.memAddr.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
+        pPushCnstEntry->hwMappings[stageIdx].validHWChannelMask = WRITEMASK_ALL;
+
+        /* Alloc direct mem addr constant reg location mapping */
+        if (gcoOS_Allocate(gcvNULL, sizeof(SHADER_CONSTANT_HW_LOCATION_MAPPING),
+                           (gctPOINTER*)&pPushCnstEntry->hwMappings[stageIdx].hwLoc.memAddr.memBase.pHwDirectAddrBase) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
+        pHwDirectAddrBase = pPushCnstEntry->hwMappings[stageIdx].hwLoc.memAddr.memBase.pHwDirectAddrBase;
+        vscInitializeCnstHwLocMapping(pHwDirectAddrBase);
+
+        /* Fill direct mem base addr constant reg */
+        pHwDirectAddrBase->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
+        pHwDirectAddrBase->hwLoc.hwRegNo = pPushCnstAllocEntry->hwRegNo;
+        gcmASSERT(pHwDirectAddrBase->hwLoc.constReg.hwRegRange);
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            hwChannel = (((pPushCnstAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
+            _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+        }
+    }
+    else
+    {
+        pPushCnstEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
+
+        pPushCnstEntry->hwMappings[stageIdx].hwLoc.hwRegNo = pPushCnstAllocEntry->hwRegNo;
+        gcmASSERT(pPushCnstEntry->hwMappings[stageIdx].hwLoc.constReg.hwRegRange);
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            hwChannel = (((pPushCnstAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
+            _SetValidChannelForHwConstantLoc(&pPushCnstEntry->hwMappings[stageIdx], hwChannel);
+        }
     }
 
     return VSC_ERR_NONE;

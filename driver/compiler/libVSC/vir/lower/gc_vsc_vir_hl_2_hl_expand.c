@@ -1858,18 +1858,27 @@ _AllocateInterfaceBlock(
         }
 
         /* Save the base address symbol ID. */
+        symbol = VIR_Shader_GetSymFromId(Shader, baseAddrSymId);
+        symUniform = VIR_Symbol_GetUniform(symbol);
+        gcmASSERT(symUniform);
+
         if (symbolKind == VIR_SYM_UBO)
         {
             VIR_UBO_SetBaseAddress(uniformBlock, baseAddrSymId);
+            if (VIR_UBO_GetFlags(uniformBlock) & VIR_IB_FOR_PUSH_CONST)
+            {
+                VIR_Uniform_SetFlag(symUniform, VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR);
+                VIR_Symbol_SetLayoutOffset(symbol, VIR_Symbol_GetLayoutOffset(IBSymbol));
+            }
+
+            symUniform->u.parentSSBOOrUBO = uniformBlock->sym;
         }
         else
         {
             gcmASSERT(symbolKind == VIR_SYM_SBO);
             VIR_SBO_SetBaseAddress(storageBlock, baseAddrSymId);
 
-            symbol = VIR_Shader_GetSymFromId(Shader, baseAddrSymId);
-            symUniform = VIR_Symbol_GetUniform(symbol);
-            symUniform->u.parentSSBO = storageBlock->sym;
+            symUniform->u.parentSSBOOrUBO = storageBlock->sym;
         }
     }
 

@@ -1789,7 +1789,11 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
            ............... a lot other thing, mess!
         */
         VIR_Symbol_SetLocation(sym,  symSpv->location);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_LOCATION);
+
         VIR_Symbol_SetBinding(sym,  symSpv->binding);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_BINDING);
+
         VIR_Symbol_SetDescriptorSet(sym, symSpv->descriptorSet);
         VIR_Symbol_SetInputAttIndex(sym, symSpv->inputAttachmentIndex);
         VIR_Symbol_SetFlag(sym, symFlag);
@@ -1832,8 +1836,15 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
 
     case SpvStorageClassWorkgroup:
         VIR_Symbol_SetPrecision(sym, symSpv->virPrecision);
-        VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_NONE);
-        VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_SHARED);
+        VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_LOCAL);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_SHARED);
+        break;
+
+    case SpvStorageClassStorageBuffer:
+        VIR_Symbol_SetBinding(sym,  symSpv->binding);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_BINDING);
+
+        VIR_Symbol_SetDescriptorSet(sym, symSpv->descriptorSet);
         break;
 
     default:
@@ -2357,11 +2368,11 @@ static VSC_ErrCode __SpvAddInterfaceBlockSymbol(
     fieldSym = VIR_Shader_GetSymFromId(virShader, fieldSymId);
     fieldInfo = VIR_Symbol_GetFieldInfo(fieldSym);
 
-    if ((spvSym->virSymbolKind == VIR_SYM_UBO || spvSym->virSymbolKind == VIR_SYM_SBO) &&
-        (VIR_FieldInfo_GetOffset(fieldInfo) == (gctUINT)-1))
+    if (spvSym->virSymbolKind == VIR_SYM_UBO || spvSym->virSymbolKind == VIR_SYM_SBO)
     {
         VIR_InterfaceBlock_CalcDataByteSize(virShader,
-                                            sym);
+                                            sym,
+                                            (VIR_FieldInfo_GetOffset(fieldInfo) == (gctUINT)-1));
     }
 
     if (spvSym->virSymbolKind == VIR_SYM_UBO)
@@ -2374,6 +2385,11 @@ static VSC_ErrCode __SpvAddInterfaceBlockSymbol(
         ubo->sym = symId;
         VIR_UBO_SetBlockIndex(ubo, (gctINT16)VIR_IdList_Count(VIR_Shader_GetUniformBlocks(virShader)) - 1);
         VIR_UBO_SetFlag(ubo, __SpvGetIBFlag(spv, virShader, id, type, spvSym));
+
+        if (SPV_ID_SYM_IS_PUSH_CONST_UBO(id))
+        {
+            VIR_Symbol_SetLayoutOffset(sym, VIR_FieldInfo_GetOffset(fieldInfo));
+        }
     }
     else if (spvSym->virSymbolKind == VIR_SYM_SBO)
     {
@@ -2385,7 +2401,6 @@ static VSC_ErrCode __SpvAddInterfaceBlockSymbol(
         sbo->sym = symId;
         VIR_SBO_SetBlockIndex(sbo, (gctINT16)VIR_IdList_Count(VIR_Shader_GetSSBlocks(virShader)) - 1);
         VIR_SBO_SetFlag(sbo, __SpvGetIBFlag(spv, virShader, id, type, spvSym));
-
     }
     else if (spvSym->virSymbolKind == VIR_SYM_IOBLOCK)
     {

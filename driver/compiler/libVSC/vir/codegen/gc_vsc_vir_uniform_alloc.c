@@ -1947,14 +1947,52 @@ VIR_Uniform* _VIR_CG_FindResUniform(
     return retUniform;
 }
 
+static gctBOOL _VIG_CG_IsUniformPushConst(
+    IN VIR_Shader           *pShader,
+    IN VIR_Symbol           *pSym,
+    IN VIR_Type             *pType,
+    OUT gctBOOL             *pIsBaseAddr
+    )
+{
+    gctBOOL                 bIsPushConst = gcvFALSE;
+    gctBOOL                 bIsBaseAddr = gcvFALSE;
+    VIR_Uniform             *pUniform = gcvNULL;
+
+    if (VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_PUSH_CONSTANT &&
+        VIR_Type_GetKind(pType) != VIR_TY_STRUCT)
+    {
+        bIsPushConst = gcvTRUE;
+    }
+    else if (VIR_Symbol_isUniform(pSym))
+    {
+        pUniform = VIR_Symbol_GetUniform(pSym);
+        gcmASSERT(pUniform);
+
+        if (VIR_Uniform_IsPushConstantBaseAddr(pUniform))
+        {
+            bIsPushConst = gcvTRUE;
+            bIsBaseAddr = gcvTRUE;
+        }
+    }
+
+    if (pIsBaseAddr)
+    {
+        *pIsBaseAddr = bIsBaseAddr;
+    }
+
+    return bIsPushConst;
+}
+
 static void _VIR_CG_FindPushConstUniform(
     IN VIR_Shader           *pShader,
     IN VSC_MM               *pMM,
     IN VSC_SHADER_PUSH_CONSTANT_RANGE *pConstRange,
     OUT gctINT              *maxAlignment,
-    OUT VSC_SIMPLE_QUEUE    *pushConstList)
+    OUT VSC_SIMPLE_QUEUE    *pushConstList,
+    OUT gctBOOL             *pushConstUBO
+    )
 {
-    VIR_Uniform     *pushCosntUniform = gcvNULL;
+    VIR_Uniform     *pushConstUniform = gcvNULL;
     gctUINT         i;
 
     for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
@@ -1962,22 +2000,55 @@ static void _VIR_CG_FindPushConstUniform(
         VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
         VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
         VIR_Type    *symType = VIR_Symbol_GetType(sym);
+        VIR_Uniform *uniform = gcvNULL;
+        gctBOOL     bIsBaseAddr = gcvFALSE;
 
-        if (VIR_Type_GetKind(symType) == VIR_TY_STRUCT ||
-            VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_PUSH_CONSTANT)
+        /* Skip non-push-const uniform. */
+        if (!_VIG_CG_IsUniformPushConst(pShader, sym, symType, &bIsBaseAddr))
         {
             continue;
         }
 
-        if (VIR_Symbol_GetLayoutOffset(sym) >= pConstRange->offset &&
-            VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) <= pConstRange->offset + pConstRange->size)
+        /* Check the range. */
+        if (bIsBaseAddr)
         {
-            pushCosntUniform = sym->u2.uniform;
-            _VIR_CG_UniformListQueue(pMM, pushConstList, pushCosntUniform);
-            /* the alignment of struct is the largest base alignment */
-            if (VIR_Type_GetAlignement(symType) > *maxAlignment)
+            VIR_Symbol          *pUboSym;
+            VIR_UniformBlock    *pUbo;
+
+            uniform = VIR_Symbol_GetUniform(sym);
+            pUboSym = VIR_Shader_GetSymFromId(pShader, uniform->u.parentSSBOOrUBO);
+            pUbo = VIR_Symbol_GetUBO(pUboSym);
+
+            if (VIR_Symbol_GetLayoutOffset(sym) == pConstRange->offset)
             {
-                *maxAlignment = VIR_Type_GetAlignement(symType);
+                if (VIR_UBO_GetBlockSize(pUbo) != pConstRange->size)
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+
+                pushConstUniform = uniform;
+                _VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform);
+
+                if (pushConstUBO)
+                {
+                    *pushConstUBO = gcvTRUE;
+                }
+
+                break;
+            }
+        }
+        else
+        {
+            if (VIR_Symbol_GetLayoutOffset(sym) >= pConstRange->offset &&
+                VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) <= pConstRange->offset + pConstRange->size)
+            {
+                pushConstUniform = VIR_Symbol_GetUniform(sym);
+                _VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform);
+                /* the alignment of struct is the largest base alignment */
+                if (VIR_Type_GetAlignement(symType) > *maxAlignment)
+                {
+                    *maxAlignment = VIR_Type_GetAlignement(symType);
+                }
             }
         }
     }
@@ -2275,7 +2346,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 if (resBinding.type == VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER ||
                     resBinding.type == VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC)
                 {
-                    VIR_Symbol* sbSym = VIR_Shader_GetSymFromId(pShader, pUniform->u.parentSSBO);
+                    VIR_Symbol* sbSym = VIR_Shader_GetSymFromId(pShader, pUniform->u.parentSSBOOrUBO);
                     VIR_StorageBlock* sb = VIR_Symbol_GetSBO(sbSym);
 
                     gcmASSERT(sb);
@@ -2348,6 +2419,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         gctINT         firstPhysical = NOT_ASSIGNED;
         gctUINT8       firstSwizzle = 0;
         gctINT         maxAlignment = 4;
+        gctBOOL        bPushConstUBO = gcvFALSE;
 
         VSC_SIMPLE_QUEUE    pushConstList;
 
@@ -2355,22 +2427,54 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
         memcpy(&pResAllocLayout->pPushCnstAllocEntries[i].pushCnstRange, &pushConst, sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
 
-        _VIR_CG_FindPushConstUniform(pShader, pMM, &pushConst, &maxAlignment, &pushConstList);
+        _VIR_CG_FindPushConstUniform(pShader, pMM, &pushConst, &maxAlignment, &pushConstList, &bPushConstUBO);
 
-        retValue = _VIR_CG_AllocatePushConst(&uniformColorMap, maxAlignment, pushConst.size, &firstPhysical, &firstSwizzle);
-        if (retValue != VSC_ERR_NONE)
+        if (bPushConstUBO)
         {
-            QUEUE_FINALIZE(&pushConstList);
-            goto OnError;
+            VIR_Uniform*    pUniform;
+
+            _VIR_CG_UniformListDequeue(pMM, &pushConstList, &pUniform);
+            retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                                                     pHwConfig,
+                                                     pUniform,
+                                                     gcvFALSE,
+                                                     &uniformColorMap,
+                                                     codeGenUniformBase,
+                                                     handleDefaultUBO,
+                                                     unblockUniformBlock,
+                                                     gcvFALSE, /* treat sampler as const */
+                                                     gcvTRUE, /* single uniform */
+                                                     gcvTRUE, /* always allocate */
+                                                     pMM,
+                                                     gcvNULL);
+            if (retValue != VSC_ERR_NONE)
+            {
+                QUEUE_FINALIZE(&pushConstList);
+                goto OnError;
+            }
+
+            pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
+            pResAllocLayout->pPushCnstAllocEntries[i].bBaseAddr = gcvTRUE;
+            pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = pUniform->physical;
+            pResAllocLayout->pPushCnstAllocEntries[i].swizzle = pUniform->swizzle;
         }
+        else
+        {
+            retValue = _VIR_CG_AllocatePushConst(&uniformColorMap, maxAlignment, pushConst.size, &firstPhysical, &firstSwizzle);
+            if (retValue != VSC_ERR_NONE)
+            {
+                QUEUE_FINALIZE(&pushConstList);
+                goto OnError;
+            }
 
-        gcmASSERT(firstPhysical != NOT_ASSIGNED);
+            gcmASSERT(firstPhysical != NOT_ASSIGNED);
 
-        pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
-        pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = firstPhysical;
-        pResAllocLayout->pPushCnstAllocEntries[i].swizzle = firstSwizzle;
+            pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
+            pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = firstPhysical;
+            pResAllocLayout->pPushCnstAllocEntries[i].swizzle = firstSwizzle;
 
-        _VIR_CG_AssignPushConstUniform(pShader, pMM, &pushConst, maxAlignment, &pushConstList, firstPhysical, firstSwizzle);
+            _VIR_CG_AssignPushConstUniform(pShader, pMM, &pushConst, maxAlignment, &pushConstList, firstPhysical, firstSwizzle);
+        }
 
         QUEUE_FINALIZE(&pushConstList);
     }

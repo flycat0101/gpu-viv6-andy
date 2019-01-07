@@ -6332,8 +6332,9 @@ VIR_Type_CalcByteOffset(
     )
 {
     VSC_ErrCode             errCode   = VSC_ERR_NONE;
-    gctINT                  componentCount = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(BaseType));
-    gctINT                  rowCount = VIR_GetTypeRows(VIR_Type_GetBaseTypeId(BaseType));
+    VIR_TypeId              baseTypeId = VIR_Type_GetBaseTypeId(BaseType);
+    gctINT                  componentCount = VIR_GetTypeComponents(baseTypeId);
+    gctINT                  rowCount = VIR_GetTypeRows(baseTypeId);
     gctUINT                 offset = 0;
     gctINT                  arrayStride = -1, matrixStride = -1, alignment = -1;
     gctBOOL                 isSTD140 = LayoutQual & VIR_LAYQUAL_STD140;
@@ -6343,7 +6344,7 @@ VIR_Type_CalcByteOffset(
     /* Check matrix. */
     if (VIR_Type_isMatrix(BaseType))
     {
-        switch (VIR_GetTypeType(VIR_Type_GetBaseTypeId(BaseType)))
+        switch (VIR_GetTypeType(baseTypeId))
         {
         case VIR_TYPE_FLOAT_2X2:
             if (isSTD140)
@@ -6550,7 +6551,7 @@ VIR_Type_CalcByteOffset(
     /* Check other types. */
     else
     {
-        switch (VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(BaseType)))
+        switch (VIR_GetTypeComponents(baseTypeId))
         {
         case 1:
             if (IsArray && isSTD140)
@@ -6560,8 +6561,8 @@ VIR_Type_CalcByteOffset(
             }
             else
             {
-                alignment = 4;
-                arrayStride = 4;
+                alignment = VIR_GetTypeAlignment(baseTypeId);
+                arrayStride = VIR_GetTypeSize(baseTypeId);
             }
             break;
 
@@ -6573,8 +6574,8 @@ VIR_Type_CalcByteOffset(
             }
             else
             {
-                alignment = 8;
-                arrayStride = 8;
+                alignment = VIR_GetTypeAlignment(baseTypeId);
+                arrayStride = VIR_GetTypeSize(baseTypeId);
             }
             break;
 
@@ -6586,14 +6587,14 @@ VIR_Type_CalcByteOffset(
             }
             else
             {
-                alignment = 16;
-                arrayStride = 12;
+                alignment = VIR_GetTypeAlignment(baseTypeId);
+                arrayStride = VIR_GetTypeSize(baseTypeId);
             }
             break;
 
         case 4:
-            alignment = 16;
-            arrayStride = 16;
+            alignment = VIR_GetTypeAlignment(baseTypeId);
+            arrayStride = VIR_GetTypeSize(baseTypeId);
             break;
 
         default:
@@ -6652,8 +6653,8 @@ _CalcOffsetForNonStructField(
     IN  VIR_Shader         *Shader,
     IN  VIR_Symbol         *Symbol,
     IN  VIR_LayoutQual      ParentLayoutQual,
-    IN  VIR_Type           *BaseType,
-    IN  gctUINT            *BaseOffset
+    IN  gctUINT            *BaseOffset,
+    IN  gctBOOL             UpdateTypeOffset
     )
 {
     VSC_ErrCode             errCode   = VSC_ERR_NONE;
@@ -6661,54 +6662,68 @@ _CalcOffsetForNonStructField(
     VIR_Type               *symType = VIR_Symbol_GetType(Symbol);
     VIR_Type               *baseType = symType;
     VIR_FieldInfo          *fieldInfo = VIR_Symbol_GetFieldInfo(Symbol);
-    gctUINT                 offset = 0, arrayLength = 1;
+    gctUINT                 offset = 0, topArrayLength = 1, totalArrayLength = 1;
     gctINT                  arrayStride = -1, matrixStride = -1, alignment = 0;
 
     /* Get the array length. */
     while (VIR_Type_isArray(baseType))
     {
-        arrayLength *= VIR_Type_GetArrayLength(baseType);
+        if (baseType == symType)
+        {
+            topArrayLength = VIR_Type_GetArrayLength(baseType);;
+        }
+        totalArrayLength *= VIR_Type_GetArrayLength(baseType);
+
         baseType = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(baseType));
     }
 
     /* Calc the offset and stride. */
     errCode = VIR_Type_CalcByteOffset(Shader,
-        baseType,
-        VIR_Type_isArray(symType),
-        mergeLayoutQual,
-        *BaseOffset,
-        &offset,
-        &arrayStride,
-        &matrixStride,
-        &alignment);
-    CHECK_ERROR(errCode, "_CalcOffsetForNonStructField failed.");
+                                      baseType,
+                                      VIR_Type_isArray(symType),
+                                      mergeLayoutQual,
+                                      *BaseOffset,
+                                      &offset,
+                                      &arrayStride,
+                                      &matrixStride,
+                                      &alignment);
+    CHECK_ERROR(errCode, "Calculate offset for non-struct field failed.");
 
     /* Update the BaseOffset. */
     *BaseOffset = offset;
-    *BaseOffset += arrayLength * arrayStride;
+    *BaseOffset += totalArrayLength * arrayStride;
+
+    /* The calculated result should be same as the decoration. */
+    if (VIR_FieldInfo_GetOffset(fieldInfo) != -1 &&
+        VIR_FieldInfo_GetOffset(fieldInfo) != offset)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetArrayStride(fieldInfo) != -1 &&
+        VIR_FieldInfo_GetArrayStride(fieldInfo) != (arrayStride * (gctINT)(totalArrayLength / topArrayLength)))
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetMatrixStride(fieldInfo) != -1 &&
+        VIR_FieldInfo_GetMatrixStride(fieldInfo) != matrixStride)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetAlignment(fieldInfo) != -1 &&
+        VIR_FieldInfo_GetAlignment(fieldInfo) != alignment)
+    {
+        gcmASSERT(gcvFALSE);
+    }
 
     /* Save the result. */
-    if (VIR_FieldInfo_GetOffset(fieldInfo) != -1)
+    if (UpdateTypeOffset)
     {
-        gcmASSERT(VIR_FieldInfo_GetOffset(fieldInfo) == offset);
-    }
-    if (VIR_FieldInfo_GetArrayStride(fieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetArrayStride(fieldInfo) == arrayStride);
-    }
-    if (VIR_FieldInfo_GetMatrixStride(fieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetMatrixStride(fieldInfo) == matrixStride);
-    }
-    if (VIR_FieldInfo_GetAlignment(fieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetAlignment(fieldInfo) == alignment);
+        VIR_FieldInfo_SetOffset(fieldInfo, offset);
+        VIR_FieldInfo_SetArrayStride(fieldInfo, arrayStride);
+        VIR_FieldInfo_SetMatrixStride(fieldInfo, matrixStride);
+        VIR_FieldInfo_SetAlignment(fieldInfo, alignment);
     }
 
-    VIR_FieldInfo_SetOffset(fieldInfo, offset);
-    VIR_FieldInfo_SetArrayStride(fieldInfo, arrayStride);
-    VIR_FieldInfo_SetMatrixStride(fieldInfo, matrixStride);
-    VIR_FieldInfo_SetAlignment(fieldInfo, alignment);
     return errCode;
 }
 
@@ -6788,7 +6803,8 @@ _CalcOffsetForStructField(
     IN  VIR_Symbol         *Symbol,
     IN  VIR_LayoutQual      ParentLayoutQual,
     IN  VIR_Type           *BaseType,
-    IN  gctUINT            *BaseOffset
+    IN  gctUINT            *BaseOffset,
+    IN  gctBOOL             UpdateTypeOffset
     )
 {
     VSC_ErrCode             errCode   = VSC_ERR_NONE;
@@ -6800,7 +6816,7 @@ _CalcOffsetForStructField(
     VIR_Symbol             *fieldSym;
     VIR_Type               *fieldType;
     VIR_Type               *baseFieldType;
-    gctUINT                 i, arrayLength = 1;
+    gctUINT                 i, totalArrayLength = 1, topArrayLength = 1;
     gctUINT                 offset = 0, structOffset = 0, structSize;
     gctINT                  arrayStride = -1, matrixStride = -1, alignment = 0;
 
@@ -6821,20 +6837,21 @@ _CalcOffsetForStructField(
         if (VIR_Type_isStruct(baseFieldType))
         {
             errCode = _CalcOffsetForStructField(Shader,
-                fieldSym,
-                mergeLayoutQual,
-                baseFieldType,
-                &structOffset);
-            CHECK_ERROR(errCode, "_CalcOffsetForStructField failed.");
+                                                fieldSym,
+                                                mergeLayoutQual,
+                                                baseFieldType,
+                                                &structOffset,
+                                                UpdateTypeOffset);
+            CHECK_ERROR(errCode, "Calculate offset for struct field failed.");
         }
         else
         {
             errCode = _CalcOffsetForNonStructField(Shader,
-                fieldSym,
-                mergeLayoutQual,
-                baseFieldType,
-                &structOffset);
-            CHECK_ERROR(errCode, "_CalcOffsetForNonStructField failed.");
+                                                   fieldSym,
+                                                   mergeLayoutQual,
+                                                   &structOffset,
+                                                   UpdateTypeOffset);
+            CHECK_ERROR(errCode, "Calculate offset for non-struct field failed.");
         }
     }
 
@@ -6844,10 +6861,10 @@ _CalcOffsetForStructField(
     ** up to the base alignment of a vec4.
     */
     errCode = _CalcBaseAlignmentForStruct(Shader,
-        Symbol,
-        mergeLayoutQual,
-        BaseType,
-        &alignment);
+                                          Symbol,
+                                          mergeLayoutQual,
+                                          BaseType,
+                                          &alignment);
     CHECK_ERROR(errCode, "_CalcBaseAlignmentForStruct failed.");
 
     if (mergeLayoutQual & VIR_LAYQUAL_STD140)
@@ -6861,37 +6878,51 @@ _CalcOffsetForStructField(
     /* Calc the offset for this struct field. */
     offset = _AlignOffset(*BaseOffset, mergeLayoutQual & VIR_LAYQUAL_PACKED, alignment);
 
-    /* Update the BaseOffset. */
+    /* Update the BaseOffset and the array stride. */
     *BaseOffset = offset;
     while (VIR_Type_isArray(symType))
     {
-        arrayLength *= VIR_Type_GetArrayLength(symType);
+        if (symType == VIR_Symbol_GetType(Symbol))
+        {
+            topArrayLength = VIR_Type_GetArrayLength(symType);
+        }
+
+        totalArrayLength *= VIR_Type_GetArrayLength(symType);
         symType = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(symType));
     }
-    *BaseOffset += arrayLength * structSize;
+    *BaseOffset += totalArrayLength * structSize;
+    arrayStride = totalArrayLength * structSize / topArrayLength;
+
+    /* The calculated result should be same as the decoration. */
+    if (VIR_FieldInfo_GetOffset(symbolFieldInfo) != -1 &&
+        VIR_FieldInfo_GetOffset(symbolFieldInfo) != offset)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetArrayStride(symbolFieldInfo) != -1 &&
+        VIR_FieldInfo_GetArrayStride(symbolFieldInfo) != arrayStride)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetMatrixStride(symbolFieldInfo) != -1 &&
+        VIR_FieldInfo_GetMatrixStride(symbolFieldInfo) != matrixStride)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+    if (VIR_FieldInfo_GetAlignment(symbolFieldInfo) != -1 &&
+        VIR_FieldInfo_GetAlignment(symbolFieldInfo) != alignment)
+    {
+        gcmASSERT(gcvFALSE);
+    }
 
     /* Save the result. */
-    if (VIR_FieldInfo_GetOffset(symbolFieldInfo) != -1)
+    if (UpdateTypeOffset)
     {
-        gcmASSERT(VIR_FieldInfo_GetOffset(symbolFieldInfo) == offset);
+        VIR_FieldInfo_SetOffset(symbolFieldInfo, offset);
+        VIR_FieldInfo_SetArrayStride(symbolFieldInfo, arrayStride);
+        VIR_FieldInfo_SetMatrixStride(symbolFieldInfo, matrixStride);
+        VIR_FieldInfo_SetAlignment(symbolFieldInfo, alignment);
     }
-    if (VIR_FieldInfo_GetArrayStride(symbolFieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetArrayStride(symbolFieldInfo) == arrayStride);
-    }
-    if (VIR_FieldInfo_GetMatrixStride(symbolFieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetMatrixStride(symbolFieldInfo) == matrixStride);
-    }
-    if (VIR_FieldInfo_GetAlignment(symbolFieldInfo) != -1)
-    {
-        gcmASSERT(VIR_FieldInfo_GetAlignment(symbolFieldInfo) == alignment);
-    }
-
-    VIR_FieldInfo_SetOffset(symbolFieldInfo, offset);
-    VIR_FieldInfo_SetArrayStride(symbolFieldInfo, arrayStride);
-    VIR_FieldInfo_SetMatrixStride(symbolFieldInfo, matrixStride);
-    VIR_FieldInfo_SetAlignment(symbolFieldInfo, alignment);
 
     return errCode;
 }
@@ -6900,7 +6931,8 @@ _CalcOffsetForStructField(
 VSC_ErrCode
 VIR_InterfaceBlock_CalcDataByteSize(
     IN  VIR_Shader         *Shader,
-    IN  VIR_Symbol         *Symbol
+    IN  VIR_Symbol         *Symbol,
+    IN  gctBOOL            UpdateTypeOffset
     )
 {
     VSC_ErrCode             errCode   = VSC_ERR_NONE;
@@ -6941,20 +6973,21 @@ VIR_InterfaceBlock_CalcDataByteSize(
         if (VIR_Type_isStruct(baseFieldType))
         {
             errCode = _CalcOffsetForStructField(Shader,
-                fieldSym,
-                layoutQual,
-                baseFieldType,
-                &offset);
-            CHECK_ERROR(errCode, "_CalcOffsetForStructField failed.");
+                                                fieldSym,
+                                                layoutQual,
+                                                baseFieldType,
+                                                &offset,
+                                                UpdateTypeOffset);
+            CHECK_ERROR(errCode, "Calculate offset for struct field failed.");
         }
         else
         {
             errCode = _CalcOffsetForNonStructField(Shader,
-                fieldSym,
-                layoutQual,
-                baseFieldType,
-                &offset);
-            CHECK_ERROR(errCode, "_CalcOffsetForNonStructField failed.");
+                                                   fieldSym,
+                                                   layoutQual,
+                                                   &offset,
+                                                   UpdateTypeOffset);
+            CHECK_ERROR(errCode, "Calculate offset for non-struct field failed.");
         }
     }
 

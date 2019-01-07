@@ -3798,10 +3798,12 @@ typedef enum VIR_UNIFORMFLAG
     VIR_UNIFORMFLAG_NONE                        = 0x00000000,
     VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED        = 0x00000001,
     VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG     = 0x00000002,
+    VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR     = 0x00000004,
 } VIR_UniformFlag;
 
 #define VIR_Uniform_IsImageCanBeSampled(u)      (((u)->flags & VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED) != 0)
 #define VIR_Uniform_IsTreatTexelBufferAsImg(u)  (((u)->flags & VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG) != 0)
+#define VIR_Uniform_IsPushConstantBaseAddr(u)   (((u)->flags & VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR) != 0)
 
 /* Structure that defines an uniform (constant register) for a shader. */
 struct _VIR_UNIFORM
@@ -3879,7 +3881,8 @@ struct _VIR_UNIFORM
             */
             gctUINT         arrayIdxInParent;
         } samplerOrImageAttr;
-        VIR_SymId          parentSSBO;     /* if the uniform is base addr of SSBO, indicating which SSBO it represents. */
+        VIR_SymId           parentSSBOOrUBO; /* if the uniform is base addr of SSBO, indicating which
+                                              * SSBO it represents. */
     } u;
 
     VIR_SymId           sym;    /* the symbol for this uniform */
@@ -4482,6 +4485,7 @@ typedef struct _VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY
     VSC_SHADER_PUSH_CONSTANT_RANGE   pushCnstRange;
 
     gctBOOL                          bUse;
+    gctBOOL                          bBaseAddr;
 
     gctUINT                          hwRegNo;
     gctUINT8                         swizzle;
@@ -5449,7 +5453,8 @@ VIR_UBO_Identical(
 VSC_ErrCode
 VIR_InterfaceBlock_CalcDataByteSize(
     IN  VIR_Shader         *Shader,
-    IN  VIR_Symbol         *Symbol
+    IN  VIR_Symbol         *Symbol,
+    IN  gctBOOL            UpdateTypeOffset
     );
 
 /* typeId-related functions. */
