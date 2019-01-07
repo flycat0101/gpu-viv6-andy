@@ -20602,6 +20602,17 @@ cloIR_ITERATION_GenDoWhileCode(
     return gcvSTATUS_OK;
 }
 
+#define SHAER_INSTCOUNT_THROSHOLDFORUNROLL 4000
+gctBOOL
+cloIR_Shader_CheckInstCountForUnroll(
+IN cloCOMPILER Compiler
+)
+{
+    gcSHADER binary;
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    return (binary->codeCount <= SHAER_INSTCOUNT_THROSHOLDFORUNROLL);
+}
+
 gceSTATUS
 cloIR_ITERATION_GenCode(
 IN cloCOMPILER Compiler,
@@ -20618,7 +20629,8 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
     clmVERIFY_IR_OBJECT(Iteration, clvIR_ITERATION);
     gcmASSERT(Parameters);
 
-    if (cloCOMPILER_OptimizationEnabled(Compiler, clvOPTIMIZATION_UNROLL_ITERATION)) {
+    if (cloCOMPILER_OptimizationEnabled(Compiler, clvOPTIMIZATION_UNROLL_ITERATION) &&
+        cloIR_Shader_CheckInstCountForUnroll(Compiler)) {
         status = cloIR_ITERATION_TryToGenUnrolledCode(Compiler,
                                 CodeGenerator,
                                 Iteration,
