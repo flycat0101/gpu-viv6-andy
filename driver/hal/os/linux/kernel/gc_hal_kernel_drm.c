@@ -579,7 +579,7 @@ static int viv_ioctl_gem_attach_aux(struct drm_device *drm, void *data,
 
         /* Fill tile status node with tileStatusFiller. */
         gcmkONERROR(gckVIDMEM_HANDLE_LookupAndReference(kernel, viv_ts_obj->node_handle, &tsObjNode));
-        gcmkONERROR(gckOS_MapPhysicalToKernelSpace(kernel->os, tsObjNode, &entry);
+        gcmkONERROR(gckOS_MapPhysicalToKernelSpace(kernel->os, tsObjNode, &entry));
         gcmkONERROR(gckVIDMEM_NODE_Dereference(kernel,tsObjNode));
         memset(entry , tileStatusFiller , (__u64)gem_ts_obj->size);
 
