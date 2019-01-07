@@ -216,9 +216,9 @@ error:
     kfree(um->sgt.sgl);
 #endif
 
-    if (um->pages)
+    if (pages)
     {
-        kfree(um->pages);
+        kfree(pages);
     }
     return result;
 }
