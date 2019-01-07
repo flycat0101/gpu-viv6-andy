@@ -144,6 +144,34 @@ gctBOOL _VSC_SIMP_ConstantConditionAllFalse(
            channelResults[3] == gcvFALSE;
 }
 
+static
+gctBOOL _VSC_SIMP_NextMulOfPreDiv(
+    IN VIR_Instruction* inst
+    )
+{
+    VIR_Instruction*    pMulInst = VIR_Inst_GetNext(inst);
+    VIR_Operand*        pDivDest = VIR_Inst_GetDest(inst);
+    VIR_Operand*        pMulSrc0;
+    VIR_Operand*        pMulSrc1;
+
+    if (pMulInst == gcvNULL || VIR_Inst_GetOpcode(pMulInst) != VIR_OP_MUL)
+    {
+        return gcvFALSE;
+    }
+
+    pMulSrc0 = VIR_Inst_GetSource(pMulInst, 0);
+    pMulSrc1 = VIR_Inst_GetSource(pMulInst, 1);
+
+    if ((!VIR_Operand_isSymbol(pMulSrc0) || (VIR_Operand_GetSymbol(pMulSrc0) != VIR_Operand_GetSymbol(pDivDest)))
+        ||
+        (!VIR_Operand_isSymbol(pMulSrc1) || (VIR_Operand_GetSymbol(pMulSrc1) != VIR_Operand_GetSymbol(pDivDest))))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 /* _VSC_SIMP_STEPS_SRC_CHECK */
 static
 gctBOOL _VSC_SIMP_ImmZero(
@@ -462,6 +490,48 @@ gctBOOL _VSC_SIMP_ImmPowerOf2(
     return gcvFALSE;
 }
 
+static
+gctBOOL _VSC_SIMP_ImmOne(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    VIR_TypeId opndTypeId = VIR_Operand_GetTypeId(opnd);
+
+    if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
+    {
+        if ((VIR_TypeId_isFloat(opndTypeId) && VIR_Operand_GetImmediateFloat(opnd) == 1.0)
+            ||
+            (VIR_TypeId_isInteger(opndTypeId) && VIR_Operand_GetImmediateInt(opnd) == 1))
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+static
+gctBOOL _VSC_SIMP_ImmNegOne(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    VIR_TypeId opndTypeId = VIR_Operand_GetTypeId(opnd);
+
+    if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
+    {
+        if ((VIR_TypeId_isFloat(opndTypeId) && VIR_Operand_GetImmediateFloat(opnd) == -1.0)
+            ||
+            (VIR_TypeId_isSignedInteger(opndTypeId) && VIR_Operand_GetImmediateInt(opnd) == -1))
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
 /* _VSC_SIMP_STEPS_TRANS */
 static
 void _VSC_SIMP_MOVDestSrc0(
@@ -577,6 +647,80 @@ void _VSC_SIMP_ChangeDIV2RShift(
     VIR_Operand_SetImmediateInt(newsrc1, log2value);
     VIR_Inst_SetOpcode(inst, VIR_OP_RSHIFT);
     VIR_Inst_SetSource(inst, 1, newsrc1);
+}
+
+static
+void _VSC_SIMP_ChangeDIV2MOV(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    gctUINT i;
+    for(i = 1; i < VIR_Inst_GetSrcNum(inst); i++)
+    {
+        VIR_Inst_FreeSource(inst, i);
+    }
+    VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(inst, 1);
+}
+
+static
+void _VSC_SIMP_ChangeDIV2MOVNEG(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    gctUINT i;
+    for(i = 1; i < VIR_Inst_GetSrcNum(inst); i++)
+    {
+        VIR_Inst_FreeSource(inst, i);
+    }
+    VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(inst, 1);
+    VIR_Operand_NegateOperand(VIR_Inst_GetShader(inst), VIR_Inst_GetSource(inst, 0));
+}
+
+static
+void _VSC_SIMP_ChangeMulToMovAndDeleteDiv(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    gctUINT i;
+    VIR_Instruction*    pMulInst = VIR_Inst_GetNext(inst);
+
+    /* Change next MUL to MOV. */
+    for(i = 1; i < VIR_Inst_GetSrcNum(pMulInst); i++)
+    {
+        VIR_Inst_FreeSource(pMulInst, i);
+    }
+    VIR_Inst_SetOpcode(pMulInst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(pMulInst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(pMulInst, 1);
+    VIR_Operand_Copy(VIR_Inst_GetSource(pMulInst, 0), VIR_Inst_GetSource(inst, 0));
+
+    VIR_Function_ChangeInstToNop(VIR_Inst_GetFunction(inst), inst);
+}
+
+static
+void _VSC_SIMP_ChangeMulToMovNegAndDeleteDiv(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    gctUINT i;
+    VIR_Instruction*    pMulInst = VIR_Inst_GetNext(inst);
+
+    /* Change next MUL to MOV.neg. */
+    for(i = 1; i < VIR_Inst_GetSrcNum(pMulInst); i++)
+    {
+        VIR_Inst_FreeSource(pMulInst, i);
+    }
+    VIR_Inst_SetOpcode(pMulInst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(pMulInst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(pMulInst, 1);
+    VIR_Operand_Copy(VIR_Inst_GetSource(pMulInst, 0), VIR_Inst_GetSource(inst, 0));
+    VIR_Operand_NegateOperand(VIR_Inst_GetShader(pMulInst), VIR_Inst_GetSource(pMulInst, 0));
+
+    VIR_Function_ChangeInstToNop(VIR_Inst_GetFunction(inst), inst);
 }
 
 static
@@ -736,9 +880,32 @@ _VSC_SIMP_Steps SWIZZLE_Steps[] = {
 };
 
 _VSC_SIMP_Steps DIV_Steps[] = {
+    /* Change DIV integer PowerOf2 to RSHIFT*/
     {_VSC_SIMP_STEPS_COUNT, {2}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmPowerOf2}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeDIV2RShift}},
+    /* Change x/1 to x. */
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeDIV2MOV}},
+    /* Change x/-1 to -x. */
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmNegOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeDIV2MOVNEG}},
+    {_VSC_SIMP_STEPS_END, {0}}
+};
+
+_VSC_SIMP_Steps PRE_DIV_Steps[] = {
+    /* Change x/1 to x. */
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDiv}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeMulToMovAndDeleteDiv}},
+    /* Change x/-1 to -x. */
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDiv}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmNegOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeMulToMovNegAndDeleteDiv}},
     {_VSC_SIMP_STEPS_END, {0}}
 };
 
@@ -778,6 +945,8 @@ _VSC_SIMP_Steps* _VSC_SIMP_GetSteps(
             return SWIZZLE_Steps;
         case VIR_OP_DIV:
             return DIV_Steps;
+        case VIR_OP_PRE_DIV:
+            return PRE_DIV_Steps;
         case VIR_OP_MOD:
             return MOD_Steps;
         default:
