@@ -5508,6 +5508,75 @@ OnError:
 }
 
 gceSTATUS
+gcChipSplitDraw4Instanced(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    __GLchipInstantDraw tmpInstantDraw;
+    gctUINT i, splitParts = 3;
+    gctFLOAT offset = gc->state.line.requestedWidth / (gctFLOAT)(gc->state.viewport.height);
+    /* faked attributes position and color*/
+    gctFLOAT attribs[] = { -0.8f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         -0.8f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+
+    gcmHEADER();
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+
+    for (i = 0; i < splitParts; i++)
+    {
+        switch (i)
+        {
+        case 0:
+            /* Draw the 1-9 lines*/
+            tmpInstantDraw.primCount = 9;
+            tmpInstantDraw.count = 18;
+            break;
+        case 1:
+            /* Draw the 11th line*/
+            tmpInstantDraw.first += 20;
+            tmpInstantDraw.primCount = 1;
+            tmpInstantDraw.count = 2;
+            break;
+        case 2:
+            /* Draw the 10th lines and split it to two triangles*/
+            tmpInstantDraw.attributes->pointer = attribs;
+            tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+            tmpInstantDraw.count = 4;
+            tmpInstantDraw.primCount = 2;
+            tmpInstantDraw.first = 0;
+            break;
+        default:
+            break;
+        }
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvFALSE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcChipSplitDraw4(
     IN gctPOINTER GC,
     IN gctPOINTER InstantDraw,
@@ -5519,6 +5588,7 @@ gcChipSplitDraw4(
     __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
     __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
     __GLchipInstantDraw tmpInstantDraw;
+    gctUINT i, splitParts = 3;
     gctFLOAT offset = gc->state.line.requestedWidth / (gctFLOAT)(gc->state.viewport.height);
     /* faked attributes position and color*/
     gctFLOAT attribs[] = { -0.8f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
@@ -5529,60 +5599,39 @@ gcChipSplitDraw4(
     gcmHEADER();
 
     __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-    tmpInstantDraw.primCount = 9;
-    tmpInstantDraw.count = 18;
 
-    /* Draw the 1-9 lines*/
-    /* Bind vertex array */
-    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+    for (i = 0; i < splitParts; i++)
+    {
+        switch (i)
+        {
+        case 0:
+            /* Draw the 1-9 lines*/
+            tmpInstantDraw.primCount = 9;
+            break;
+        case 1:
+            /* Draw the 11th line*/
+            tmpInstantDraw.first = 20;
+            tmpInstantDraw.primCount = 1;
+            break;
+        case 2:
+            /* Draw the 10th lines and split it to two triangles*/
+            tmpInstantDraw.attributes->pointer = attribs;
+            tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+            tmpInstantDraw.primCount = 2;
+            tmpInstantDraw.first = 0;
+            break;
+        default:
+            break;
+        }
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
 
-    /* Draw */
-    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                             tmpInstantDraw.primMode,
-                                             gcvFALSE,
-                                             tmpInstantDraw.first,
-                                             0,
-                                             tmpInstantDraw.primCount,
-                                             tmpInstantDraw.count,
-                                             gc->vertexArray.instanceCount));
-
-    tmpInstantDraw.first += 20;
-    tmpInstantDraw.primCount = 1;
-    tmpInstantDraw.count = 2;
-
-    /* Draw the 11th line*/
-    /* Bind vertex array */
-    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
-
-    /* Draw */
-    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                             tmpInstantDraw.primMode,
-                                             gcvFALSE,
-                                             tmpInstantDraw.first,
-                                             0,
-                                             tmpInstantDraw.primCount,
-                                             tmpInstantDraw.count,
-                                             gc->vertexArray.instanceCount));
-
-    tmpInstantDraw.attributes->pointer = attribs;
-    tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
-    tmpInstantDraw.count = 4;
-    tmpInstantDraw.primCount = 2;
-    tmpInstantDraw.first = 0;
-
-    /* Draw the 10th lines and split it to two triangles*/
-    /* Bind vertex array */
-    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
-
-    /* Draw */
-    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                             tmpInstantDraw.primMode,
-                                             gcvFALSE,
-                                             tmpInstantDraw.first,
-                                             0,
-                                             tmpInstantDraw.primCount,
-                                             tmpInstantDraw.count,
-                                             gc->vertexArray.instanceCount));
+        /* Draw */
+        gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
+                                        tmpInstantDraw.primMode,
+                                        tmpInstantDraw.first,
+                                        tmpInstantDraw.primCount));
+    }
 
 OnError:
     gcmFOOTER();
@@ -6035,6 +6084,7 @@ gcChipCollectSplitDrawArraysInfo(
     /* If gcvFEATURE_FE_START_VERTEX_SUPPORT not support, VertexId after split draw is not correct. */
     &&  chipCtx->chipFeature.hwFeature.hasFEstartVertex
     && (!chipCtx->chipFeature.hwFeature.hasPEB2BPixelFix || !chipCtx->chipFeature.hwFeature.hasV2MSAACoherencyFix)
+    && chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0
     && (
         instantDraw->primMode == gcvPRIMITIVE_POINT_LIST ||
         instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
@@ -6050,6 +6100,7 @@ gcChipCollectSplitDrawArraysInfo(
     if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
     &&  (!chipCtx->chipFeature.hwFeature.hasPEB2BPixelFix || !chipCtx->chipFeature.hwFeature.hasV2MSAACoherencyFix)
+    &&  chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
     &&  instantDraw->count == 129
     )
@@ -6068,12 +6119,20 @@ gcChipCollectSplitDrawArraysInfo(
     )
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_4;
-        splitDrawInfo->splitDrawFunc = gcChipSplitDraw4;
+        if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0)
+        {
+            splitDrawInfo->splitDrawFunc = gcChipSplitDraw4Instanced;
+        }
+        else
+        {
+            splitDrawInfo->splitDrawFunc = gcChipSplitDraw4;
+        }
         return gcvSTATUS_OK;
     }
 
     /* wide line split.*/
-    if (vsProgram->progFlags.wideLineFix)
+    if (vsProgram->progFlags.wideLineFix
+    &&  chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0)
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_WIDE_LINE;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawWideLine;
@@ -6678,19 +6737,33 @@ __glChipDrawArrays(
 
     if (instantDraw->count > 0 && instantDraw->primCount > 0)
     {
-        /* Bind the vertex array to the hardware. */
-        if (gc->vertexArray.varrayDirty            ||
-                instantDraw->indexBuffer == gcvNULL ||
-                chipCtx->patchId != gcvPATCH_REALRACING)
-        {
-            gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
-        }
+        gcsSPLIT_DRAW_INFO splitDrawInfo;
 
-        /* Draw */
-        gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
-                                        instantDraw->primMode,
-                                        instantDraw->first,
-                                        instantDraw->primCount));
+        __GL_MEMZERO(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
+
+        /* Collect split draw info.*/
+        gcChipCollectSplitDrawArraysInfo(gc, instantDraw, &splitDrawInfo);
+
+        if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
+        {
+            gcmONERROR((*splitDrawInfo.splitDrawFunc)(gc, instantDraw, &splitDrawInfo));
+        }
+        else
+        {
+            /* Bind the vertex array to the hardware. */
+            if (gc->vertexArray.varrayDirty            ||
+                    instantDraw->indexBuffer == gcvNULL ||
+                    chipCtx->patchId != gcvPATCH_REALRACING)
+            {
+                gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
+            }
+
+            /* Draw */
+            gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
+                                            instantDraw->primMode,
+                                            instantDraw->first,
+                                            instantDraw->primCount));
+        }
     }
 
     /* Intentional fall through */
