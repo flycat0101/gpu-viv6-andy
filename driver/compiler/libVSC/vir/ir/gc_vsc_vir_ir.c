@@ -1407,6 +1407,8 @@ VIR_ConditionOp_EvaluateOneChannelConstantCondition(
         case VIR_COP_LESS_ZERO:
             result = (Src0Val < 0); break;
         case VIR_COP_SELMSB:
+        case VIR_COP_ANYMSB:
+        case VIR_COP_ALLMSB:
             result = Src0Val & 0x80000000; break;
         default:
             gcmASSERT(0);
@@ -11182,6 +11184,7 @@ VIR_Inst_EvaluateConditionResult(
         }
 
         /* Do the evaluation for all channels. */
+
         for (i = 0; i < VIR_CHANNEL_COUNT; i++)
         {
             gctUINT src0Val = VIR_Operand_ExtractOneChannelConstantValue(src0, pShader, VIR_Swizzle_GetChannel(src0Swizzle, i), gcvNULL);
@@ -11201,7 +11204,7 @@ VIR_Inst_EvaluateConditionResult(
             gcoOS_MemCopy(pChannelResults, checkingResult, sizeof(checkingResult));
         }
 
-        if (branchAny)
+        if (branchAny || VIR_Inst_GetConditionOp(pInst) == VIR_COP_ANYMSB)
         {
             return checkingResult[0] | checkingResult[1] | checkingResult[2] | checkingResult[3];
         }

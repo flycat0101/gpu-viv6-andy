@@ -6571,7 +6571,7 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
         VIR_TypeId typeId;
         VIR_Swizzle srcSwizzle[2] = { VIR_SWIZZLE_X, VIR_SWIZZLE_X };
         VIR_Enable dstEnable[2] = { VIR_ENABLE_NONE, VIR_ENABLE_NONE };
-        gctUINT srcVec0CompNum = SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_SYM_SPV_TYPE(spv->operands[0]));
+        gctUINT srcVec0CompNum = SPV_ID_TYPE_VEC_COMP_NUM(resultSpvTypeId[0]);
         gctUINT src0Component[4] = { 0 };
         gctUINT src1Component[4] = { 0 };
         gctUINT componentCount[2] = {0, 0};
