@@ -763,18 +763,28 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     gctUINT val;
     gctUINT i;
 
+    /* Word 1. */
     val = VIR_Inst_GetOpcode(pInst) << 22   |
           VIR_Inst_GetId(pInst) << 2        |
           VIR_Inst_isPrecise(pInst) << 1    |
           VIR_Inst_GetPatched(pInst) ;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
-    val = VIR_Inst_GetThreadMode(pInst)         |
-          VIR_Inst_GetSrcNum(pInst) << 2        |
-          VIR_Inst_GetFlags(pInst)  << 5        |
-          VIR_Inst_GetConditionOp(pInst) << 8   |
-          VIR_Inst_GetInstType(pInst) << 13     |
-          VIR_Inst_GetResOpType(pInst) << 21;
+    /* Word 2. */
+    val = VIR_Inst_GetInstType(pInst);
+    ON_ERROR0(VIR_IO_writeUint(Buf, val));
+
+    /* Word 3. */
+    val = VIR_Inst_GetConditionOp(pInst) << 27  |
+          VIR_Inst_GetFlags(pInst) << 24        |
+          VIR_Inst_GetSrcNum(pInst) << 21       |
+          VIR_Inst_GetThreadMode(pInst) << 19   |
+          VIR_Inst_GetParentUseBB(pInst) << 18  |
+          VIR_Inst_GetResOpType(pInst) << 12    |
+          VIR_Inst_IsPatternRep(pInst) << 11    |
+          VIR_Inst_IsLoopInvariant(pInst) << 10 |
+          VIR_Inst_IsEndOfBB(pInst) << 9        |
+          VIR_Inst_IsUSCUnallocate(pInst) << 8;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
     ON_ERROR0(VIR_IO_writeUint(Buf, *(gctUINT *)&pInst->sourceLoc));
@@ -982,11 +992,17 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
 
     if (opndKind != VIR_OPND_TEXLDPARM)
     {
-        val = VIR_Operand_GetTypeId(pOperand) << 12    |
-              VIR_Operand_GetSwizzle(pOperand) << 4  |
-              VIR_Operand_GetPrecision(pOperand) << 1;
+        /* Word 1. */
+        val = VIR_Operand_GetTypeId(pOperand);
         ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
+        /* Word 2. */
+        val = VIR_Operand_GetSwizzle(pOperand) << 24    |
+              VIR_Operand_GetPrecision(pOperand) << 21  |
+              VIR_Operand_isBigEndian(pOperand) << 20;
+        ON_ERROR0(VIR_IO_writeUint(Buf, val));
+
+        /* Word 3. */
         val = VIR_Operand_GetHwShift(pOperand) << 30    |
               VIR_Operand_GetHwRegId(pOperand) << 20    |
               VIR_Operand_GetHIHwRegId(pOperand) << 10  |
@@ -2327,19 +2343,29 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     gctUINT         i;
     VIR_Operand *   opnd;
 
+    /* Word 1. */
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Inst_SetOpcode(pInst, (VIR_OpCode)((uVal >> 22) & 0x3FF));
     VIR_Inst_SetId(pInst, (uVal >> 2)&0xFFFFF);
     VIR_Inst_SetIsPrecise(pInst, (uVal >> 1) & 0x01);
     VIR_Inst_SetPatched(pInst, (uVal & 0x01)) ;
 
+    /* Word 2. */
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
-    VIR_Inst_SetThreadMode(pInst, uVal&0x03);
-    VIR_Inst_SetSrcNum(pInst, (uVal >> 2) & 0x07);
-    VIR_Inst_SetFlags(pInst, (uVal >> 5) & 0x07);
-    VIR_Inst_SetConditionOp(pInst, (uVal >> 8) & 0x1F);
-    VIR_Inst_SetInstType(pInst, (VIR_TypeId)((uVal >> 13) & 0xFF));
-    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 21) & 0x3F));
+    VIR_Inst_SetInstType(pInst, (VIR_TypeId)(uVal));
+
+    /* Word 3. */
+    ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
+    VIR_Inst_SetConditionOp(pInst, (uVal >> 27) & 0x1F);
+    VIR_Inst_SetFlags(pInst, (uVal >> 24) & 0x07);
+    VIR_Inst_SetSrcNum(pInst, (uVal >> 21) & 0x07);
+    VIR_Inst_SetThreadMode(pInst, (uVal >> 19) & 0x03);
+    VIR_Inst_SetParentUseBB(pInst, (uVal >> 18) & 0x1);
+    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 12) & 0x3F));
+    VIR_Inst_SetIsPatternRep(pInst, (uVal >> 11) & 0x1);
+    VIR_Inst_SetLoopInvariant(pInst, (uVal >> 10) & 0x1);
+    VIR_Inst_SetEndOfBB(pInst, (uVal >> 9) & 0x1);
+    VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 8) & 0x1);
 
     ON_ERROR0(VIR_IO_readUint(Buf, (gctUINT *)&pInst->sourceLoc));
 
@@ -2604,18 +2630,24 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
 
     if (opndKind != VIR_OPND_TEXLDPARM)
     {
+        /* Word 1. */
         ON_ERROR0(VIR_IO_readUint(Buf, &val));
-        VIR_Operand_SetTypeId(pOperand, (VIR_TypeId)((val >> 12)&0x0FFFFF));
+        VIR_Operand_SetTypeId(pOperand, (VIR_TypeId)(val));
+
+        /* Word 2. */
+        ON_ERROR0(VIR_IO_readUint(Buf, &val));
         if (VIR_Operand_isLvalue(pOperand))
         {
-            VIR_Operand_SetEnable(pOperand, ((val >> 4) & 0xFF));
+            VIR_Operand_SetEnable(pOperand, (VIR_Enable)((val >> 24) & 0xFF));
         }
         else
         {
-            VIR_Operand_SetSwizzle(pOperand, ((val >> 4) & 0xFF));
+            VIR_Operand_SetSwizzle(pOperand, (VIR_Swizzle)((val >> 24) & 0xFF));
         }
-        precision = (VIR_Precision)((val >> 1) & 0x07);
+        precision = (VIR_Precision)((val >> 21) & 0x07);
+        VIR_Operand_SetBigEndian(pOperand, ((val >> 20) & 0x1));
 
+        /* Word 3. */
         ON_ERROR0(VIR_IO_readUint(Buf, &val));
 
         VIR_Operand_SetHwShift(pOperand, ((val >> 30) & 0x03));

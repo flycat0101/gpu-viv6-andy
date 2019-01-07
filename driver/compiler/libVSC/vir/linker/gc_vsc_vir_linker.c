@@ -2242,7 +2242,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         else
         {
             libName = VIR_Shader_GetSymNameString(pLibShader, libSym);
-            newVarSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_VARIABLE, libName);
+            newVarSym = VIR_Shader_FindSymbolByName(pShader, libSym->_kind, libName);
 
             if (newVarSym == gcvNULL)
             {
@@ -5282,10 +5282,74 @@ IN VIR_Function           *LibFunc
 )
 {
     VSC_ErrCode                      errCode = VSC_ERR_NONE;
+    VIR_Shader                       *pShader = Context->shader;
+    VIR_Instruction                  *texldInst = (VIR_Instruction *)Transpoint;
+    VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
+    VIR_Instruction                  *newInst = gcvNULL, *callInst = gcvNULL;
 
-    /* to-do */
-    gcmASSERT(gcvFALSE);
+    VIR_Operand                      *texldSrc = gcvNULL;
+    gctUINT                          argIdx = 0;
 
+    VIR_SymId               parmSymId, parmVregId;
+    VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_TypeId              symTy;
+
+    gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
+
+    /* insert the MOV to pass arguement
+    MOV arg1, sampler
+    MOV arg2, coord */
+    for (argIdx = 0; argIdx < 2; argIdx++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
+        ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
+
+        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
+
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
+    }
+
+    /* insert a call instruction */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+        VIR_OP_CALL,
+        VIR_TYPE_UNKNOWN,
+        texldInst,
+        gcvTRUE,
+        &callInst);
+    ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
+    VIR_Operand_SetFunction(callInst->dest, LibFunc);
+
+    /* insert the MOV to get the return value to set texld coordinate
+    MOV coordinate, arg[2] */
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        callInst,
+        gcvTRUE,
+        &newInst);
+    ON_ERROR(errCode, "_texld_with_imgld_R32G32B32A32SFLOAT");
+
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, argIdx);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
+        VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    VIR_Operand_SetTempRegister(newInst->src[0],
+        pFunc,
+        VIR_Symbol_GetIndex(parmVregSym),
+        symTy);
+
+    VIR_Operand_SetSwizzle(newInst->src[0],
+        VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(symTy)));
+
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), (VIR_Inst_GetSource(texldInst, 1)));
+
+    VIR_Operand_Change2Dest(VIR_Inst_GetDest(newInst));
+
+OnError:
     return errCode;
 };
 

@@ -4976,8 +4976,7 @@ static VSC_ErrCode _InsertInitializeInst(
 
 DEF_QUERY_PASS_PROP(vscVIR_InitializeVariables)
 {
-    /* Will put it to HL when DFA can fully support on HL */
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
@@ -4990,7 +4989,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_BLOCK_TABLE*            pUsageTable = &pDuInfo->usageTable;
     VIR_USAGE*                  pUsage;
     VIR_DEF*                    pDef;
-    gctUINT                     i, usageCount, usageIdx, defIdx;
+    gctUINT                     i, j, usageCount, usageIdx, defIdx;
     VIR_OperandInfo             operandInfo, operandInfo1;
     gctUINT                     firstRegNo = 0, regNoRange = 0;
     VIR_Enable                  defEnableMask = VIR_ENABLE_NONE;
@@ -5009,6 +5008,8 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
         pUsage = GET_USAGE_BY_IDX(pUsageTable, usageIdx);
         if (IS_VALID_USAGE(pUsage))
         {
+            gctBOOL bChannelInitialized[VIR_CHANNEL_COUNT] = {gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE};
+
             /* If the usage has no def, we must initialize it */
             bNeedInitialization = (UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain) == 0);
 
@@ -5021,7 +5022,18 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 if (pUsage->usageKey.pUsageInst < VIR_OUTPUT_USAGE_INST)
                 {
+                    gctBOOL bSkipCheck = gcvFALSE;
+
                     bNeedInitialization = gcvTRUE;
+
+                    /* Only check the used channel. */
+                    for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+                    {
+                        if ((1 << i) & pUsage->realChannelMask)
+                        {
+                            bChannelInitialized[i] = gcvFALSE;
+                        }
+                    }
 
                     for (i = 0; i < UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain); i ++)
                     {
@@ -5029,16 +5041,19 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                         gcmASSERT(VIR_INVALID_DEF_INDEX != defIdx);
                         pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
 
+                        /* Skip some checks. */
                         if (pDef->defKey.pDefInst == VIR_HW_SPECIAL_DEF_INST ||
                             pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
                         {
                             bNeedInitialization = gcvFALSE;
+                            bSkipCheck = gcvTRUE;
                             break;
                         }
 
                         if (VIR_Inst_GetFunction(pDef->defKey.pDefInst) != VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst))
                         {
                             bNeedInitialization = gcvFALSE;
+                            bSkipCheck = gcvTRUE;
                             break;
                         }
 
@@ -5047,6 +5062,26 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                             if (VIR_Inst_GetId(pDef->defKey.pDefInst) < VIR_Inst_GetId(pUsage->usageKey.pUsageInst))
                             {
                                 bNeedInitialization = gcvFALSE;
+                            }
+                        }
+
+                        for (j = 0; j < VIR_CHANNEL_COUNT; j++)
+                        {
+                            if (pDef->OrgEnableMask & (VIR_ENABLE_X << j))
+                            {
+                                bChannelInitialized[j] = gcvTRUE;
+                            }
+                        }
+                    }
+
+                    /* Check if any channel is uninitialized. */
+                    if (!bNeedInitialization && !bSkipCheck)
+                    {
+                        for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+                        {
+                            if (!bChannelInitialized[i])
+                            {
+                                bNeedInitialization = gcvTRUE;
                                 break;
                             }
                         }

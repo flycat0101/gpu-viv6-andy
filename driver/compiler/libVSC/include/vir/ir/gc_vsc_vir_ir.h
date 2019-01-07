@@ -476,12 +476,17 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_GetFlags(Inst)         ((VIR_InstFlag)(Inst)->_instFlags)
 #define VIR_Inst_GetSrcNum(Inst)        ((Inst)->_srcOpndNum)
 #define VIR_Inst_GetThreadMode(Inst)    ((VIR_ThreadMode)(Inst)->_threadMode)
+#define VIR_Inst_GetParentUseBB(Inst)   ((Inst)->_parentUseBB)
+#define VIR_Inst_IsPatternRep(Inst)     ((Inst)->_isPatternRep)
 #define VIR_Inst_GetEnable(Inst)        (VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)))
 #define VIR_Inst_isPrecise(Inst)        ((Inst)->_isPrecise)
 #define VIR_Inst_GetPatched(Inst)       ((Inst)->_patched)
 #define VIR_Inst_GetDual16ExpandSeq(Inst) ((Inst)->_dual16ExpandSeq)
 #define VIR_Inst_GetResOpType(Inst)     ((Inst)->_resOpType)
 #define VIR_Inst_IsLoopInvariant(Inst)  ((Inst)->_isLoopInvariant)
+#define VIR_Inst_IsEndOfBB(Inst)        ((Inst)->_endOfBB != 0)
+#define VIR_Inst_IsUSCUnallocate(Inst)  ((Inst)->_USCUnallocate != 0)
+
 #define VIR_Inst_GetSrcLocLine(Inst)    ((Inst)->sourceLoc.lineNo)
 #define VIR_Inst_GetSrcLocCol(Inst)     ((Inst)->sourceLoc.colNo)
 
@@ -511,6 +516,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_SetConditionOp(Inst, COP)  do { (Inst)->_condOp = (gctUINT)(COP); } while (0)
 #define VIR_Inst_SetEnable(Inst, Enable)    do { VIR_Operand_SetEnable((Inst)->__DEST, (Enable)); } while (0)
 #define VIR_Inst_SetThreadMode(Inst, TMode) do { (Inst)->_threadMode = (gctUINT)(TMode); } while (0)
+#define VIR_Inst_SetParentUseBB(Inst, UseBB)do { (Inst)->_parentUseBB = (gctUINT)(UseBB); } while (0)
 #define VIR_Inst_SetDest(Inst, Dest)        do { (Inst)->__DEST = (Dest); } while (0)
 #define VIR_Inst_SetSource(Inst, SrcNo, Src) do { gcmASSERT(SrcNo < VIR_MAX_SRC_NUM); (Inst)->__SRC[(SrcNo)] = (Src); } while (0)
 #define VIR_Inst_SetSrcLocLine(Inst, Line)  do { (Inst)->sourceLoc.lineNo = Line ;} while(0)
@@ -523,6 +529,10 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_SetMCInstPC(Inst, Val)     do { (Inst)->mcInstPC = (Val) ;} while(0)
 
 #define VIR_Inst_SetLoopInvariant(Inst, Val)  do { (Inst)->_isLoopInvariant = (Val); } while (0)
+#define VIR_Inst_SetEndOfBB(Inst, Val)        do { (Inst)->_endOfBB = (Val); } while (0)
+#define VIR_Inst_SetUSCUnallocate(Inst, Val)  do { (Inst)->_USCUnallocate = (Val); } while (0)
+#define VIR_Inst_SetIsPatternRep(Inst, Val)   do { (Inst)->_isPatternRep = (Val); } while (0)
+
 #define VIR_Inst_SetPatched(Inst, Val)      do { (Inst)->_patched = (Val); } while (0)
 #define VIR_Inst_SetDual16ExpandSeq(Inst, Val)  do { (Inst)->_dual16ExpandSeq = (Val); } while (0)
 #define VIR_Inst_SetResOpType(Inst, Val)  do { (Inst)->_resOpType = (Val); } while (0)
@@ -587,10 +597,11 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Operand_GetLShift(Opnd)         ((VIR_RoundMode)(Opnd)->u.n._lshift)
 
-#define VIR_Operand_GetTypeId(Opnd)         ((Opnd)->u.n._opndType)
+#define VIR_Operand_GetTypeId(Opnd)         ((Opnd)->u.n._opndTypeId)
 #define VIR_Operand_GetEnable(Opnd)         ((VIR_Enable)(Opnd)->u.n._swizzleOrEnable)
 #define VIR_Operand_GetSwizzle(Opnd)        ((VIR_Swizzle)(Opnd)->u.n._swizzleOrEnable)
 #define VIR_Operand_GetFinalAccessType(Opnd) ((Opnd)->u.n._opndType)
+#define VIR_Operand_isBigEndian(Opnd)       ((Opnd)->u.n._bigEndian)
 
 #define VIR_Operand_GetSymbol(Opnd)         ((Opnd)->u.n.u1.sym)
 #define VIR_Operand_GetSymbolId_(Opnd)      VIR_Symbol_GetIndex(VIR_Operand_GetSymbol(Opnd))
@@ -655,12 +666,13 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_SetHIHwRegId(Opnd, Val)     do { (Opnd)->u.n._HIhwRegId = (VIR_HwRegId) (Val); } while (0)
 #define VIR_Operand_SetHIHwShift(Opnd, Val)     do { (Opnd)->u.n._HIhwShift = (gctUINT) (Val); } while (0)
 #define VIR_Operand_SetLShift(Opnd, lshift)     do { (Opnd)->u.n._lshift = (gctUINT)(lshift); } while (0)
+#define VIR_Operand_SetBigEndian(Opnd, Val)     do { (Opnd)->u.n._bigEndian = (gctUINT) (Val); } while (0)
 
 #define VIR_Operand_SetRoundMode(Opnd, Round)   do { (Opnd)->header._roundMode = (gctUINT)(Round); } while (0)
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
 #define VIR_Operand_SetTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers |= (F); } while (0)
 #define VIR_Operand_ClrTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers &= ~(F); } while (0)
-#define VIR_Operand_SetTypeId(Opnd, TypeId)       do { (Opnd)->u.n._opndType = (TypeId); } while (0)
+#define VIR_Operand_SetTypeId(Opnd, TypeId)     do { (Opnd)->u.n._opndTypeId = (TypeId); } while (0)
 #define VIR_Operand_SetSym(Opnd, Val)           do { (Opnd)->u.n.u1.sym = (Val); } while (0)
 #define VIR_Operand_SetFunc(Opnd, Val)          do { (Opnd)->u.n.u1.func = (Val); } while (0)
 #define VIR_Operand_SetNameId(Opnd, Val)        do { (Opnd)->u.n.u1.name = (Val); } while (0)
@@ -960,10 +972,15 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
                                           (Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
                                           (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
 
-#define VIR_Symbol_isParamVirReg(Sym)   ((VIR_Symbol_isVreg(Sym)) &&                      \
+#define VIR_Symbol_isInParamVirReg(Sym) ((VIR_Symbol_isVreg(Sym)) &&                      \
                                          ((Sym)->_storageClass == VIR_STORAGE_INPARM ||   \
-                                          (Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
                                           (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
+
+#define VIR_Symbol_isOutParamVirReg(Sym)((VIR_Symbol_isVreg(Sym)) &&                      \
+                                         ((Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
+                                          (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
+
+#define VIR_Symbol_isParamVirReg(Sym)   (VIR_Symbol_isInParamVirReg(Sym) || VIR_Symbol_isOutParamVirReg(Sym))
 
 #define VIR_Symbol_isSharedVariables(Sym)((VIR_Symbol_isVariable(Sym) ||       \
                                             VIR_Symbol_isField(Sym))        && \
@@ -982,6 +999,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetLinkage(Sym)      ((VIR_Linkage)(Sym)->_linkage)
 #define VIR_Symbol_GetComponentShift(Sym) ((Sym)->_componentShift)
 #define VIR_Symbol_GetCannotShift(Sym)  ((Sym)->_cannotShift)
+#define VIR_Symbol_GetBigEndian(Sym)    ((Sym)->_bigEndian)
 #define VIR_Symbol_GetHwRegId(Sym)      ((VIR_HwRegId)(Sym)->_hwRegId)
 #define VIR_Symbol_GetHwShift(Sym)      ((Sym)->_hwShift)
 #define VIR_Symbol_GetHIHwRegId(Sym)    ((VIR_HwRegId)(Sym)->_HIhwRegId)
@@ -1125,6 +1143,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_SetLinkage(Sym, Val)         do {(Sym)->_linkage   = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetComponentShift(Sym, Val)  do {(Sym)->_componentShift = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetCannotShift(Sym, Val)     do {(Sym)->_cannotShift = (gctUINT)(Val); } while (0)
+#define VIR_Symbol_SetBigEndian(Sym, Val)       do {(Sym)->_bigEndian = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetHostShader(Sym, Val)      do {(Sym)->u0.hostShader = (Val); } while (0)
 #define VIR_Symbol_SetHostFunction(Sym, Val)    do {(Sym)->u0.hostFunction = (Val); } while (0)
 #define VIR_Symbol_SetVregIndex(Sym, Val)       do {(Sym)->u1.vregIndex = (Val); } while (0)
@@ -2084,8 +2103,8 @@ typedef enum _VIR_INTRINSICSKIND
                                                      ((Kind) == VIR_IK_image_get_array_size) )
 #define VIR_Intrinsics_isImageRelated(Kind)          (VIR_Intrinsics_isImageLoad(Kind)          || \
                                                       VIR_Intrinsics_isImageStore(Kind)         || \
-                                                      VIR_Intrinsics_isImageQuery(Kind))
-
+                                                      VIR_Intrinsics_isImageQuery(Kind)         || \
+                                                      VIR_Intrinsics_isImageFetch(Kind))
 #define VIR_Intrinsics_isImageFetch(Kind)           ((Kind) == VIR_IK_image_fetch)
 
 #define VIR_Intrinsics_isTexLdRelated(Kind)         (((Kind) == VIR_IK_texld)                   || \
@@ -2100,7 +2119,6 @@ typedef enum _VIR_INTRINSICSKIND
 #define VIR_intrinsics_isInterpolateRelated(Kind)   (VIR_Intrinsics_isInterpolateAtCentroid(Kind)   || \
                                                       VIR_Intrinsics_isInterpolateAtSample(Kind)    || \
                                                       VIR_Intrinsics_isInterpolateAtOffset(Kind))
-
 
 #define VIR_OPINFO(OPCODE, OPNDNUM, FLAGS, WRITE2DEST, LEVEL)   VIR_OP_##OPCODE
 typedef enum _VIR_OPCODE
@@ -2295,7 +2313,6 @@ typedef struct _VIR_CHECK_VAR_USAGE
     gctBOOL     checkUniform;
 }VIR_CHECK_VAR_USAGE;
 
-/* TODO: create a map later to hide the detail of uniform implemenation */
 typedef enum _VIR_UNIFORMKIND
 {
     VIR_UNIFORM_NORMAL, /* normal uniform */
@@ -2834,21 +2851,23 @@ typedef union _VIR_SCALARCONSTVAL
     gctFLOAT    fValue;
     gctUINT     uValue;
     gctINT      iValue;
+    gctINT64    lValue;
+    gctUINT64   ulValue;
 } VIR_ScalarConstVal;
 
+#define VIR_CONST_MAX_CHANNEL_COUNT     16
 typedef union _VIR_VECCONSTVAL
 {
-    /* TODO: change array to pointer and use local variable or pool memory
-     *       for values
-     */
-    gctFLOAT    f32Value[16];
-    gctUINT     u32Value[16];
-    gctINT      i32Value[16];
-    gctUINT16   u16Value[16];
-    gctINT16    i16Value[16];
-    gctUINT8    u8Value[16];
-    gctINT8     i8Value[16];
-}VIR_VecConstVal;
+    gctFLOAT    f32Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctUINT     u32Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctINT      i32Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctUINT64   u64Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctINT64    i64Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctUINT16   u16Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctINT16    i16Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctUINT8    u8Value[VIR_CONST_MAX_CHANNEL_COUNT];
+    gctINT8     i8Value[VIR_CONST_MAX_CHANNEL_COUNT];
+} VIR_VecConstVal;
 
 typedef union _VIR_CONSTVAL
 {
@@ -3399,7 +3418,7 @@ typedef struct _VIR_OPERANDINFO
     gctUINT         isImage             : 1;   /* is Image specifier */
     gctUINT         isTexture           : 1;   /* is texture */
     gctUINT         isTempVar           : 1;   /* is temp variable which has no coresponding
-                                     * user defined variable */
+                                                * user defined variable */
     gctUINT         needHwSpecialDef    : 1;   /* does the the operand need hw special def? */
     gctUINT         isPerPrim           : 1;   /* does the the operand need hw special def? */
     gctUINT         isPerVtxCp          : 1;   /* does the the operand need hw special def? */
@@ -3434,15 +3453,21 @@ struct _VIR_OPERAND
     {
         struct
         {
-            VIR_TypeId              _opndType       : 20;  /* operand type, derived from
+            /* Word 1. */
+            VIR_TypeId              _opndTypeId     : 32;  /* operand type id, derived from
                                                             * tempRegister, variable, etc.
                                                             * final access type for access chain
                                                             */
+
+            /* Word 2. */
             gctUINT                 _swizzleOrEnable: 8;
             gctUINT                 _precision      : 3; /* operand precision */
-            gctUINT                 _reserved1      : 1; /* not used bits */
+            gctUINT                 _bigEndian      : 1;   /* point to big endian data, it is propagated
+                                                            * from big endian host pointer variable */
 
-            /* start new word */
+            gctUINT                 _reserved1      : 20;
+
+            /* Word 3. */
             /* hardware register info */
             gctUINT                 _hwShift      : 2;   /* the shift amount of the hwReg
                                                           *   temp(9).y shift 2 becomes r1.w
@@ -3588,6 +3613,8 @@ typedef struct _VIR_INSTHEADER
 } VIR_InstHeader;
 
 #define VIR_MAX_SRC_NUM       5
+
+/* Once add a new element in this struct, you may need to update VIR_Inst_Copy/VSC_IL_DupInstruction. */
 struct _VIR_INSTRUCTION
 {
     /* Base bi-link list node. It must be put at FIRST place!!!!! */
@@ -3598,12 +3625,16 @@ struct _VIR_INSTRUCTION
     } parent;
     VIR_SourceFileLoc       sourceLoc;
 
+    /* Word 1. */
     VIR_OpCode              _opcode     : 10;
     gctINT                  id_         : 20; /* the id of the instruction */
     gctUINT                 _isPrecise  : 1;  /* the inst is precise */
     gctUINT                 _patched    : 1;  /* some hardware opcodes have bug, we need patch to avoid the bug. */
 
-    VIR_TypeId              _instType   : 8; /* HW supported type */
+    /* Word 2. */
+    VIR_TypeId              _instType   : 32;  /* HW supported type */
+
+    /* Word 3. */
     gctUINT                 _condOp     : 5;
     VIR_InstFlag            _instFlags  : 3; /* VL concept, etc */
     gctUINT                 _srcOpndNum : 3; /* number of source operands */
@@ -3612,7 +3643,9 @@ struct _VIR_INSTRUCTION
     VIR_RES_OP_TYPE         _resOpType  : 6; /* For sampler (res) inst only, record high-level inst kind */
     gctUINT                 _isPatternRep: 1; /* instruction is replacment in a pattern match */
     gctUINT                 _isLoopInvariant: 1;
-    gctUINT                 _reserved   : 2;
+    gctUINT                 _endOfBB    : 1;  /* End Of Basic Block Bit for non-control-flow inst */
+    gctUINT                 _USCUnallocate: 1; /* USC Unallocate Bit for global memory load/store  */
+    gctUINT                 _reserved1  : 8;
 
     gctUINT                 _dual16ExpandSeq;
 
@@ -3775,9 +3808,10 @@ struct _VIR_UNIFORM
 
             VIR_SymId       parentSamplerSymId;  /* indicating this attribute uniform belongs to which sampler/image. */
             /*
+            ** VIV:TODO:
             ** If parent is an array, which array index in parent, we use this for link lib entry.
-            ** But since we create one only symbol for a sampler array, if there are more than one element in this sampler array need to be transformed,
-            ** then we can't handle it.
+            ** But since we create one only symbol for a sampler array, if there are more than one
+            ** element in this sampler array need to be transformed, then we can't handle it.
             */
             gctUINT         arrayIdxInParent;
         } samplerOrImageAttr;
@@ -4406,7 +4440,6 @@ struct _VIR_SHADER
 
     /* Frontend compiler version */
     gctUINT32           compilerVersion[2];
-
 
     /* Index of the uniform block that hold the const uniforms generated by compiler.*/
     gctINT              constUniformBlockIndex;
