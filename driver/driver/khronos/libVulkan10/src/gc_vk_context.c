@@ -267,6 +267,24 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&phyDev->pInst->memCb);
 
+    if (pCreateInfo->pEnabledFeatures)
+    {
+        for (i = 0; i < sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32); i++)
+        {
+            if (*((VkBool32*)(pCreateInfo->pEnabledFeatures) + i))
+            {
+                if (*((VkBool32*)&phyDev->phyDevFeatures + i))
+                {
+                    continue;
+                }
+                else
+                {
+                    return VK_ERROR_FEATURE_NOT_PRESENT;
+                }
+            }
+        }
+    }
+
     for (iExt = 0; iExt < pCreateInfo->enabledExtensionCount; iExt++)
     {
         VkBool32 found = VK_FALSE;
