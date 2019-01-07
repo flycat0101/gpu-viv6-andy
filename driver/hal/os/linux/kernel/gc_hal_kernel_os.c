@@ -7042,10 +7042,12 @@ OnError:
         fput(sync->file);
     }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,68)
     if (fence)
     {
         dma_fence_put(fence);
     }
+#endif
 
     if (fd > 0)
     {
