@@ -5572,6 +5572,11 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
         }
     }
 
+    if (!samplerEntry)
+    {
+        return VK_SUCCESS;
+    }
+
     __VK_ASSERT(entryIdx < progResourceSet->combinedSampTexTable.countOfEntries);
     __VK_ASSERT(samplerEntry->combTsBinding.set == descSetIndex);
     __VK_ASSERT(samplerEntry->combTsBinding.arraySize == descriptorBinding->std.descriptorCount);

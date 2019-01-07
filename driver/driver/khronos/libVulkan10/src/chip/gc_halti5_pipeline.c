@@ -4836,6 +4836,11 @@ static void halti5_pip_build_patchKeyMask(
                     {
                         uint32_t entryIdx;
                         PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY *tableEntry = VK_NULL_HANDLE;
+                        if (!resSet->combinedSampTexTable.countOfEntries)
+                        {
+                            chipPipeline->patchKeys[setIdx][keyIndex++] = 0;
+                            continue;
+                        }
                         for (entryIdx = 0; entryIdx < resSet->combinedSampTexTable.countOfEntries; entryIdx++)
                         {
                             tableEntry = &resSet->combinedSampTexTable.pCombTsEntries[entryIdx];
