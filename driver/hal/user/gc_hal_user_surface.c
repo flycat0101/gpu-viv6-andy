@@ -2048,6 +2048,23 @@ _AllocateSurface(
         }
     }
 
+    if (Surface->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+    {
+        if (Surface->alignedH & 0x3)
+        {
+            gctUINT32 alignedTileWidth = gcmALIGN(Surface->allocedW, 4);
+            gctUINT32 alignedBlockWidth = gcmALIGN(alignedTileWidth, Surface->formatInfo.blockWidth);
+            gctUINT32 extraSize = (alignedBlockWidth / Surface->formatInfo.blockWidth) * (Surface->formatInfo.blockSize / 8);
+            Surface->size += extraSize;
+        }
+        else if (Surface->alignedW & 0x3)
+        {
+            Surface->size += 16;
+        }
+
+        Surface->size = gcmALIGN(Surface->size, 64);
+    }
+
     if (!(Surface->hints & gcvSURF_NO_VIDMEM) && (Pool != gcvPOOL_USER))
     {
         gctUINT bytes = Surface->size;
@@ -2074,7 +2091,7 @@ _AllocateSurface(
         if (Surface->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
         {
             /* for ASTC format, the address should be 16 Byte aligned. */
-            alignment = 16;
+            alignment = 64;
         }
         else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE))
         {
