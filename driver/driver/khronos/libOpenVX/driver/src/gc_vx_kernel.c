@@ -2255,11 +2255,16 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
             kernel->compileWorkGroupSize[1] = propertyValues[1];
             kernel->compileWorkGroupSize[2] = propertyValues[2];
 
-            gcoOS_MemCopy(kernelBinary->shaderLayout.compute.workGroupSize,
-                propertyValues,
-                gcmSIZEOF(gctINT) * propertySize);
+            if (!(propertyValues[0] == 0 &&
+                  propertyValues[1] == 0 &&
+                  propertyValues[2] == 0))
+            {
+                gcoOS_MemCopy(kernelBinary->shaderLayout.compute.workGroupSize,
+                    propertyValues,
+                    gcmSIZEOF(gctINT) * propertySize);
 
-            kernelBinary->shaderLayout.compute.isWorkGroupSizeFixed = gcvTRUE;
+                kernelBinary->shaderLayout.compute.isWorkGroupSizeFixed = gcvTRUE;
+            }
         }
     }
 
@@ -2561,12 +2566,6 @@ gceSTATUS gcfVX_LoadShaderFromLinkedBinary(gctPOINTER linkedBinary, gctUINT32 li
             kernel->compileWorkGroupSize[0] = propertyValues[0];
             kernel->compileWorkGroupSize[1] = propertyValues[1];
             kernel->compileWorkGroupSize[2] = propertyValues[2];
-
-            gcoOS_MemCopy(kernelBinary->shaderLayout.compute.workGroupSize,
-                propertyValues,
-                gcmSIZEOF(gctINT) * propertySize);
-
-            kernelBinary->shaderLayout.compute.isWorkGroupSizeFixed = gcvTRUE;
         }
     }
 
