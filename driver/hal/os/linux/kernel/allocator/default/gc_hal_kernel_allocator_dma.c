@@ -61,6 +61,10 @@
 #include <linux/mman.h>
 #include <asm/atomic.h>
 #include <linux/dma-mapping.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0)
+#include <linux/dma-direct.h>
+#endif
+
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 
