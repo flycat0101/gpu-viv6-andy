@@ -4736,6 +4736,7 @@ _texldInstMod(
         break;
 
     /* Share with LOD. */
+    case VIR_RES_OP_TYPE_FETCH:
     case VIR_RES_OP_TYPE_FETCH_MS:
         retValue = TEXLDMOD_LOD;
         break;
