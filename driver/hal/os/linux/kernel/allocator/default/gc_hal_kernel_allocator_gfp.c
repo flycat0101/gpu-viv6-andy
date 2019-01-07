@@ -989,7 +989,7 @@ _GFPCache(
 
         break;
     case gcvCACHE_FLUSH:
-        dir = DMA_BIDIRECTIONAL;
+        dir = DMA_TO_DEVICE;
 
         if (mdlPriv->contiguous)
         {
@@ -999,6 +999,19 @@ _GFPCache(
         else
         {
             dma_sync_sg_for_device(galcore_device,
+                    mdlPriv->sgt.sgl, mdlPriv->sgt.nents, dir);
+        }
+
+        dir = DMA_FROM_DEVICE;
+
+        if (mdlPriv->contiguous)
+        {
+            dma_sync_single_for_cpu(galcore_device,
+                    mdlPriv->dma_addr, Mdl->numPages << PAGE_SHIFT, dir);
+        }
+        else
+        {
+            dma_sync_sg_for_cpu(galcore_device,
                     mdlPriv->sgt.sgl, mdlPriv->sgt.nents, dir);
         }
 
