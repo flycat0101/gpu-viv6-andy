@@ -10469,6 +10469,22 @@ slParseQualifierAsStatement(
         return gcvNULL;
 
     }
+
+    /* If there are some variables which have already been created, we need to record it. */
+    switch (Qualifier->u.qualifiers.storage)
+    {
+    case slvSTORAGE_QUALIFIER_OUT:
+        Compiler->context.applyOutputLayout.bApplyLayout = gcvTRUE;
+        break;
+
+    case slvSTORAGE_QUALIFIER_IN:
+        Compiler->context.applyInputLayout.bApplyLayout = gcvTRUE;
+        break;
+
+    default:
+        break;
+    }
+
     sloCOMPILER_SetDefaultLayout(Compiler,
                                     &Qualifier->u.qualifiers.layout,
                                     Qualifier->u.qualifiers.storage);

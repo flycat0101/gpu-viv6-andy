@@ -279,6 +279,13 @@ sloCOMPILER_SetLayout(
     IN sloCOMPILER Compiler
     );
 
+typedef struct _sloApplyLayout
+{
+    gctBOOL                     bHasVariable;
+    gctBOOL                     bApplyLayout;
+    sleSTORAGE_QUALIFIER        storageQual;
+} sloApplyLayout;
+
 /* sloCOMPILER object. */
 struct _sloCOMPILER
 {
@@ -326,8 +333,13 @@ struct _sloCOMPILER
         slsNAME_SPACE *         currentSpace;
         slsLAYOUT_QUALIFIER     uniformDefaultLayout;
         slsLAYOUT_QUALIFIER     bufferDefaultLayout;
+
         slsLAYOUT_QUALIFIER     outDefaultLayout;
+        sloApplyLayout          applyOutputLayout;
+
         slsLAYOUT_QUALIFIER     inDefaultLayout;
+        sloApplyLayout          applyInputLayout;
+
         sloIR_SET               rootSet;
         gctUINT                 tempRegCount;
         gctUINT                 labelCount;

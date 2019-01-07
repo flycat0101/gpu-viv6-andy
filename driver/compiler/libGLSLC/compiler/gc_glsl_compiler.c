@@ -289,12 +289,16 @@ sloCOMPILER_Construct(
         compiler->context.inDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
         compiler->context.inDefaultLayout.gsInvocationTime = -1;
         compiler->context.inDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
+        gcoOS_MemFill(&compiler->context.applyInputLayout, 0, gcmSIZEOF(sloApplyLayout));
+        compiler->context.applyInputLayout.storageQual = slvSTORAGE_QUALIFIER_IN;
 
         /* Init output layout. */
         compiler->context.outDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
         compiler->context.outDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
         compiler->context.outDefaultLayout.maxGSVerticesNumber = -1;
         compiler->context.outDefaultLayout.verticesNumber = -1;
+        gcoOS_MemFill(&compiler->context.applyOutputLayout, 0, gcmSIZEOF(sloApplyLayout));
+        compiler->context.applyOutputLayout.storageQual = slvSTORAGE_QUALIFIER_OUT;
 
         compiler->context.uniformLocationMaxLength = GetGLMaxUniformLocations();
         compiler->context.currentIterationCount = 1;
