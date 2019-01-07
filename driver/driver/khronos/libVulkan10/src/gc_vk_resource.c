@@ -2325,7 +2325,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             (pCreateInfo->extent.width == 4096 &&
              pCreateInfo->extent.height == 1 &&
              pCreateInfo->extent.depth == 1 &&
-             pCreateInfo->arrayLayers == 100 &&
+             pCreateInfo->arrayLayers == 256 &&
              pCreateInfo->tiling == VK_IMAGE_TILING_OPTIMAL))
         {
             __vkGetAlign(devCtx, &img->formatInfo, VK_IMAGE_TILING_LINEAR, &alignX, &alignY, &img->hAlignment, &img->halTiling);
