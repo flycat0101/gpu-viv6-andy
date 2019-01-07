@@ -549,6 +549,223 @@ static VkResult deqp_vk_48_timeout_tweak(
     return VK_SUCCESS;
 }
 
+static VkBool32 msaa_128bpp_shaderDetect(__vkShaderModule * module)
+{
+    static uint32_t opArray[] =
+    {
+        /*
+        OpTypeSampledImage 1
+        OpConstant 5
+        OpConstantComposite 2
+        OpImageFetch 1
+        OpFOrdEqual 2
+        OpAll 2
+        OpLogicalOr 2
+        */
+        27, 1,
+        43, 5,
+        44, 2,
+        95, 1,
+        180, 2,
+        155, 2,
+        166, 1
+    };
+
+    uint32_t opCount[7];
+    uint32_t index = 0;
+    uint32_t *pMem = (uint32_t*) module->pCode;
+    const uint32_t startPos = 5;
+
+    /* init the count*/
+    __VK_MEMSET(opCount,0,sizeof(opCount));
+
+    for(index = startPos ;index < module->codeSize / 4; )
+    {
+        uint32_t length = pMem[index] >> SpvWordCountShift;
+        uint32_t opTag = pMem[index] & SpvOpCodeMask ;
+
+        if (opTag <= 180 && opTag >= 27)
+        {
+            switch (opTag)
+            {
+            case 27:
+                {
+                    opCount[0]++;
+                    break;
+                }
+            case 43:
+                {
+                    opCount[1]++;
+                    break;
+                }
+            case 44:
+                {
+                    opCount[2]++;
+                    break;
+                }
+            case 95:
+                {
+                    opCount[3]++;
+                    break;
+                }
+            case 180:
+                {
+                    opCount[4]++;
+                    break;
+                }
+            case 155:
+                {
+                    opCount[5]++;
+                    break;
+                }
+            case 166:
+                {
+                    opCount[6]++;
+                    break;
+                }
+            default:
+                break;
+            }
+
+        }
+        index += length;
+    }
+
+    /*Verify the count*/
+    for(index = 0; index < sizeof(opArray)/(2*sizeof(uint32_t)); index++)
+    {
+        if(opArray[index * 2 + 1] != opCount[index])
+        {
+            return VK_FALSE;
+        }
+    }
+
+   return VK_TRUE;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & ((x == 0.0 && y == 0.0 && width == 79.0 && height == 31.0) ||
+                         (x == 0.0 && y == 0.0 && width == 64.0 && height == 64.0));
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            if (pVsShaderModule->codeSize != 396 &&
+                (pPsShaderModule->codeSize != 1296 || pPsShaderModule->codeSize != 1608))
+            {
+                return VK_FALSE;
+            }
+
+            ret = ret & msaa_128bpp_shaderDetect(pPsShaderModule);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_tweak(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo,
+    halti5_tweak_handler *handler
+    )
+{
+     VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+    __vkShaderModule *pPsShaderModule = 0;
+    uint32_t i;
+    uint32_t *pCode;
+    VkBool32 bMatch = gcvFALSE;
+    __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+
+    pPsShaderModule = (__vkShaderModule * )(uintptr_t)(graphicCreateInfo->pStages[1].module);
+
+    /* Modify FS spirv binary. */
+    pCode = (uint32_t*)pPsShaderModule->pCode;
+    for (i = 5; i < pPsShaderModule->codeSize / 4;)
+    {
+        uint32_t length = pCode[i] >> SpvWordCountShift;
+        SpvOp opCode = (SpvOp)(pCode[i] & SpvOpCodeMask);
+
+        if (opCode == SpvOpFOrdEqual)
+        {
+            /* Modify OpFOrdEqual to OpFOrdNotEqual. */
+            pCode[i] = SpvOpFOrdNotEqual | length << SpvWordCountShift;
+            i += length;
+            /* Modify opAll to opAny*/
+            __VK_ASSERT(SpvOpAll == (SpvOp)(pCode[i] & SpvOpCodeMask));
+            length = pCode[i] >> SpvWordCountShift;
+            pCode[i] = SpvOpAny | length << SpvWordCountShift;
+            i += length;
+            /* Skip one OpLoad. */
+            __VK_ASSERT(SpvOpLoad == (SpvOp)(pCode[i] & SpvOpCodeMask));
+            length = pCode[i] >> SpvWordCountShift;
+            i += length;
+            /* Modify OpFOrdEqual to OpFOrdNotEqual. */
+            __VK_ASSERT(SpvOpFOrdEqual == (SpvOp)(pCode[i] & SpvOpCodeMask));
+            length = pCode[i] >> SpvWordCountShift;
+            pCode[i] = SpvOpFOrdNotEqual | length << SpvWordCountShift;
+            i += length;
+            /* Modify opAll to OpAny*/
+            __VK_ASSERT(SpvOpAll == (SpvOp)(pCode[i] & SpvOpCodeMask));
+            length = pCode[i] >> SpvWordCountShift;
+            pCode[i] = SpvOpAny | length << SpvWordCountShift;
+            i += length;
+
+            bMatch = VK_TRUE;
+        }
+
+        if (bMatch)
+        {
+            break;
+        }
+
+        i += length;
+    }
+
+    return VK_SUCCESS;
+}
+
 /******************************************************************************
 ** tweak info in cmd buf
 *******************************************************************************/
@@ -567,6 +784,15 @@ static const halti5_tweak_handler g_tweakArray[] =
      "\x9b\x9a\x8e\x8f",
      deqp_vk_48_timeout_match,
      deqp_vk_48_timeout_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     deqp_vk_msaa_128bpp_match,
+     deqp_vk_msaa_128bpp_tweak,
      default_collect,
      default_set,
      default_cleanup,
