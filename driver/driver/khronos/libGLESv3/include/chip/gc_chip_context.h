@@ -177,6 +177,7 @@ typedef struct __GLchipFeatureRec
         GLuint                   hasTxASTCMultiSliceFix     : 1;
         GLuint                   hasMultiPixelPipes         : 1;
         GLuint                   hasSingleBuffer            : 1;
+        GLuint                   hasPaLineClipFix           : 1;
     }hwFeature;
 } __GLchipFeature;
 

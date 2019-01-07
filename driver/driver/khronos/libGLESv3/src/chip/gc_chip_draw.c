@@ -6111,7 +6111,7 @@ gcChipCollectSplitDrawArraysInfo(
     }
 
     if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
-    &&  chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3
+    &&  (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3 && !chipCtx->chipFeature.hwFeature.hasPaLineClipFix)
     &&  gc->vertexArray.instanceCount == 1
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_LIST
     &&  instantDraw->count == 22

@@ -869,6 +869,7 @@ gcChipInitChipFeature(
     chipFeature->hwFeature.hasTxASTCMultiSliceFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_ASTC_MULTISLICE_FIX);
     chipFeature->hwFeature.hasMultiPixelPipes = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTI_PIXELPIPES);
     chipFeature->hwFeature.hasSingleBuffer = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_BUFFER);
+    chipFeature->hwFeature.hasPaLineClipFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PA_LINECLIP_FIX);
 
 
     /* Get Halti support level */
