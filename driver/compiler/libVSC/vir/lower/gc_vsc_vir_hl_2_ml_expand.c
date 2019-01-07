@@ -2245,8 +2245,18 @@ static VIR_PatternReplaceInst _loadRepInst0[] = {
     { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, 1, 0, 0 }, { 0, 0, _constb_true, _constb_false } },
 };
 
+/* Since HW can't support LOAD FP16, change it to LOAD UINT16. */
+static VIR_PatternMatchInst _loadPatInst1[] = {
+    { VIR_OP_LOAD, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstFP16 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _loadRepInst1[] = {
+    { VIR_OP_LOAD, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_SetOpndUINT16 } },
+};
+
 static VIR_Pattern _loadPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_load, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_load, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 

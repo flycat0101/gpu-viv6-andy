@@ -1204,7 +1204,7 @@
         { OperandId, },
         { "'Float Value Convert'", },
         { gcvNULL },
-        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpQuantizeToF16 = 116 */
