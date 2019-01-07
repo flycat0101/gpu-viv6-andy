@@ -1376,7 +1376,6 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_ErrCode               errCode = VSC_ERR_NONE;
     VIR_Shader*               pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_DEF_USAGE_INFO*       pDuInfo = pPassWorker->pDuInfo;
-    VSC_HW_CONFIG*            pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_FuncIterator          func_iter;
     VIR_FunctionNode*         func_node;
     VIR_Function*             func;
@@ -1402,12 +1401,6 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Type *                newSymType;
 
     if (!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK))
-    {
-        return VSC_ERR_NONE;
-    }
-
-    /* If HW does not support OOB-check, just bail out */
-    if (!pHwCfg->hwFeatureFlags.supportOOBCheck)
     {
         return VSC_ERR_NONE;
     }
