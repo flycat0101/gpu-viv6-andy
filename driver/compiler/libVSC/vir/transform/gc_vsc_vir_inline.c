@@ -663,6 +663,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                 /* Update call parameter assignments. */
                 retValue = VIR_Shader_UpdateCallParmAssignment(pShader,
                                                                pCalleeFunc,
+                                                               pCalleeFunc,
                                                                pCallerFunc,
                                                                pCallSiteInst,
                                                                gcvTRUE,

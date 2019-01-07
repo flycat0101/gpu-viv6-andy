@@ -5248,6 +5248,7 @@ VSC_ErrCode
 VIR_Shader_UpdateCallParmAssignment(
     IN  VIR_Shader          *pShader,
     IN  VIR_Function        *pCalleeFunc,
+    IN  VIR_Function        *pLibCalleeFunc,
     IN  VIR_Function        *pCallerFunc,
     IN  VIR_Instruction     *pCallerInst,
     IN  gctBOOL             bMapTemp,
