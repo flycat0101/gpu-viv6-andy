@@ -154,6 +154,7 @@ VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
 static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
                                         VIR_Operand *Opnd,
                                         VSC_HW_CONFIG* pHwCfg,
+                                        gctBOOL bIsInDual16Check,
                                         VIR_ConstVal* ImmValues,
                                         VIR_TypeId* ImmTypeId)
 {
@@ -178,7 +179,7 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
         switch (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Opnd)))
         {
         case VIR_TYPE_FLOAT32:
-            if (VIR_Shader_isDual16Mode(pShader))
+            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
             {
                 return gcvTRUE;
             }
@@ -188,7 +189,7 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
             }
         case VIR_TYPE_INT32:
         case VIR_TYPE_BOOLEAN:
-            if (VIR_Shader_isDual16Mode(pShader))
+            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
             {
                 return !CAN_EXACTLY_CVT_S32_2_S16(VIR_Operand_GetImmediateInt(Opnd));
             }
@@ -198,7 +199,7 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
             }
 
         case VIR_TYPE_UINT32:
-            if (VIR_Shader_isDual16Mode(pShader))
+            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
             {
                 return !CAN_EXACTLY_CVT_U32_2_U16(VIR_Operand_GetImmediateUint(Opnd));
             }
@@ -521,7 +522,7 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                 opnd = VIR_Inst_GetSource(inst, i);
 
                 /* check whether we need put imm value to uniform */
-                if (_NeedPutImmValue2Uniform(pShader, opnd, pHwCfg, &ImmValues[i], &immTypeId[i]))
+                if (opnd && _NeedPutImmValue2Uniform(pShader, opnd, pHwCfg, gcvFALSE, &ImmValues[i], &immTypeId[i]))
                 {
                     needChange[i] = gcvTRUE;
 
@@ -4365,6 +4366,111 @@ DEF_QUERY_PASS_PROP(VIR_Shader_CheckDual16able)
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_DUAL16;
 }
 
+static gctINT
+_CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, gctBOOL bHasOneConstFix)
+{
+
+    gctINT                     addedInstCount = 0;
+    VIR_OpCode                 opCode;
+    VIR_Uniform*               pUniform;
+    VIR_Operand*               firstOpnd = gcvNULL;
+    VIR_Operand*               opnd;
+    gctUINT                    i, j, firstUniformId, thisUniformId;
+    VIR_Symbol*                pSym = gcvNULL, *firstSym = gcvNULL;
+    gctBOOL                    bFirstConstRegIndexing, bHitReadPortLimitation;
+
+    /* Only have one or zero source, just bail out. */
+    if (VIR_Inst_GetSrcNum(pInst) < 2)
+        return addedInstCount;
+
+    opCode = VIR_Inst_GetOpcode(pInst);
+
+    /* This instruction has not a uniform512 source, just bail out. */
+    if (bHasOneConstFix && VIR_OPCODE_U512_SrcNo(opCode) == 0)
+    {
+        return addedInstCount;
+    }
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(pInst) - 1; ++i)
+    {
+        firstUniformId = NOT_ASSIGNED;
+        bFirstConstRegIndexing = gcvFALSE;
+
+        for (j = 0; j < VIR_Inst_GetSrcNum(pInst); ++j)
+        {
+            opnd = VIR_Inst_GetSource(pInst, j);
+
+            pUniform = gcvNULL;
+            if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
+            {
+                pSym = VIR_Operand_GetSymbol(opnd);
+
+                if (VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
+                {
+                    pUniform = VIR_Symbol_GetUniform(pSym);
+                }
+                else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE)
+                {
+                    pUniform = VIR_Symbol_GetImage(pSym);
+                }
+                /* We need to check a sampler if it is treated as a constant register. */
+                else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_SAMPLER &&
+                            isSymUniformTreatSamplerAsConst(pSym))
+                {
+                    pUniform = VIR_Symbol_GetSampler(pSym);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (pUniform)
+            {
+                bHitReadPortLimitation = gcvFALSE;
+
+                thisUniformId = pUniform->index +
+                                    VIR_Operand_GetMatrixConstIndex(opnd) +
+                                    ((VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) ?
+                                    VIR_Operand_GetRelIndexing(opnd) : 0);
+
+                /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
+                if (firstUniformId == NOT_ASSIGNED)
+                {
+                    firstOpnd = opnd;
+                    firstSym  = pSym;
+                    firstUniformId = thisUniformId;
+                    bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
+                }
+                else
+                {
+                    if (!bFirstConstRegIndexing && VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE)
+                    {
+                        if (firstUniformId != thisUniformId)
+                        {
+                            bHitReadPortLimitation = gcvTRUE;
+                        }
+                    }
+                    else if (bFirstConstRegIndexing || VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
+                    {
+                        bHitReadPortLimitation = gcvTRUE;
+                    }
+                }
+
+                if (bHitReadPortLimitation)
+                {
+                    /* when hitting read port limitation, a MOV instruction will be inserted
+                        and if the operand to be replaced is high precision, two instructions will be added due to dual16 mode. */
+                    addedInstCount++;
+                    if (VIR_Operand_GetPrecision(opnd) == VIR_PRECISION_HIGH)
+                        addedInstCount++;
+                }
+            }
+        }
+    }
+    return addedInstCount;
+}
+
 VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode             errCode = VSC_ERR_NONE;
@@ -4377,6 +4483,8 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     gctUINT                 i = 0;
     VIR_Symbol              *pSym = gcvNULL;
     gctBOOL                 isAppConformance = (compCfg->ctx.appNameId == gcvPATCH_GTFES30 || compCfg->ctx.appNameId == gcvPATCH_DEQP);
+    VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
 
     VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
 
@@ -4493,6 +4601,9 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     VIR_Inst_Dump(dumper, pInst);
                 }
 
+                /* count the MOV instructions which may be added in vscVIR_CheckCstRegFileReadPortLimitation() */
+                runSignleTInstCount += _CheckCstRegFileReadPortLimitation(Shader, pInst, bHasOneConstFix);
+
                 /* check dest */
                 if (VIR_Inst_Dual16NotSupported(pInst)  ||
                     /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
@@ -4524,8 +4635,27 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 {
                     if (opcode == VIR_OP_JMPC || opcode == VIR_OP_JMP_ANY)
                     {
+                        gctUINT            j;
+                        VIR_Operand*       opnd;
+                        VIR_ConstVal       immValues[VIR_MAX_SRC_NUM];
+                        VIR_TypeId         immTypeId[VIR_MAX_SRC_NUM];
+
                         /* see _InsertCMPInst, cmp will be inserted before jmpc/jmp */
                         runSignleTInstCount = runSignleTInstCount + 2;
+
+                        /* see _NeedPutImmValue2Uniform(), immediate numbers may be converted to uniforms in dual16 mode.
+                           Then in vscVIR_CheckCstRegFileReadPortLimitation(), a MOV instruction may be inserted due to read port limitation.
+                           Here we count 2 more instructions for the inserted MOV.t0t1 instruction can be splited to two insructions. */
+                        for (j = 0; j < VIR_Inst_GetSrcNum(pInst); ++j)
+                        {
+                            opnd = VIR_Inst_GetSource(pInst, i);
+                            if (opnd && _NeedPutImmValue2Uniform(Shader, opnd, pHwCfg, gcvTRUE, &immValues[i], &immTypeId[i]))
+
+                            {
+                                runSignleTInstCount = runSignleTInstCount + 2;
+                                break;
+                            }
+                        }
                     }
                     else
                     {
