@@ -514,6 +514,15 @@ gckOS_UserLogicalToPhysical(
     OUT gctPHYS_ADDR_T * Address
     );
 
+
+/*  Map a physical address into kernel space.*/
+gceSTATUS
+gckOS_MapPhysicalToKernelSpace(
+    IN gckOS Os,
+    IN gckVIDMEM_NODE NodeObject,
+    OUT gctPOINTER * Logical
+    );
+
 /* Map physical memory. */
 gceSTATUS
 gckOS_MapPhysical(

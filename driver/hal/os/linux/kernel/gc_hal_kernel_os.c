@@ -2087,6 +2087,74 @@ _ConvertLogical2Physical(
 
     return status;
 }
+/*******************************************************************************
+**
+**  gckOS_MapPhysicalToKernelSpace
+**
+**  Map a physical address into kernel space.
+*/
+gceSTATUS
+gckOS_MapPhysicalToKernelSpace(
+    IN gckOS Os,
+    IN gckVIDMEM_NODE NodeObject,
+    OUT gctPOINTER * Logical
+    )
+{
+    gceSTATUS status;
+    gctBOOL acquired = gcvFALSE;
+    gcuVIDMEM_NODE_PTR node = gcvNULL;
+    PLINUX_MDL mdl = gcvNULL;
+    gckALLOCATOR allocator = gcvNULL;
+    gckOS os = Os;
+
+
+    node = NodeObject->node;
+    /* Grab the mutex. */
+    gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));
+    acquired = gcvTRUE;
+
+    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
+    {
+        mdl = (PLINUX_MDL)node->VidMem.memory->physical;
+        allocator = mdl->allocator;
+
+        if (mdl->addr)
+        {
+            *Logical = (gctUINT8_PTR)mdl->addr + node->VidMem.offset;
+        }
+        else
+        {
+            gcmkONERROR(allocator->ops->MapKernel(allocator, mdl, Logical));
+        }
+    }
+    else
+    {
+        mdl = (PLINUX_MDL)(gctPHYS_ADDR)node->Virtual.physical;
+        allocator = mdl->allocator;
+
+        if (mdl->addr)
+        {
+           *Logical = (gctUINT8_PTR)mdl->addr;
+        }
+        else
+        {
+            gcmkONERROR(allocator->ops->MapKernel(allocator, mdl, Logical));
+        }
+
+    }
+    gcmkVERIFY_OK(gckOS_ReleaseMutex(os, NodeObject->mutex));
+    return gcvSTATUS_OK;
+OnError:
+    if (acquired)
+    {
+        /* Release the mutex. */
+        gcmkVERIFY_OK(gckOS_ReleaseMutex(os, NodeObject->mutex));
+    }
+    /* Return the status. */
+    /*gcmkFOOTER();*/
+    return status;
+}
+
 
 /*******************************************************************************
 **
