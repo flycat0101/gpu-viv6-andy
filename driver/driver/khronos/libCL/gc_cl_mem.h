@@ -155,9 +155,6 @@ typedef struct _cl_mem
             gctUINT                 textureSlicePitch;  /* Texture data. */
             clsMem_PTR              buffer;
             size_t                  arraySize;
-            gctBOOL                 vxcnormalizedCoords;
-            cl_addressing_mode      vxcaddressingMode;
-            cl_filter_mode          vxcfilterMode;
         } image;
     } u;
 }

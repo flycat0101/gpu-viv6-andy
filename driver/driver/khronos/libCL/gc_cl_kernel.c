@@ -583,10 +583,7 @@ clfLoadKernelArgValues(
                     }
                     else if(Kernel->program->buildOptions != gcvNULL && strstr(Kernel->program->buildOptions, "-cl-viv-vx-extension") != gcvNULL)
                     {
-                        if(memObj->u.image.vxcaddressingMode == CL_ADDRESS_CLAMP_TO_EDGE)
-                            addressMode = 3;
-                        if(memObj->u.image.vxcaddressingMode == CL_ADDRESS_CLAMP)
-                            addressMode = 1;
+                        addressMode = 1;
                     }
 
                     tmpData[3] = shift | (addressMode<<4) | (format<<6) | (tiling<<10) | (type<<12)
@@ -1282,19 +1279,11 @@ clfLoadKernelArgValues(
     }
     else if (isUniformKernelArgSampler(Arg->uniform))
     {
-        if(Kernel->program->buildOptions == gcvNULL
-            || (Kernel->program->buildOptions != gcvNULL
-                 && strstr(Kernel->program->buildOptions, "-cl-viv-vx-extension") == gcvNULL
-                 && (Arg->uniform->address != 0)
-                )
-           )
-        {
-                gcmASSERT(length == 1);
-                clmONERROR(gcUNIFORM_SetValue(Arg->uniform,
-                                              length,
-                                              Arg->data),
-                           CL_INVALID_VALUE);
-        }
+        gcmASSERT(length == 1);
+        clmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data),
+                   CL_INVALID_VALUE);
 
     }
     else if (isUniformKernelArgLocal(Arg->uniform) ||
@@ -3958,22 +3947,7 @@ clSetKernelArg(
           (Kernel->patchNeeded == gcvFALSE))
         {
             gcKERNEL_FUNCTION   kernelFunction = gcvNULL;
-            unsigned int i = 0;
-            if(Kernel->program->buildOptions != gcvNULL && strstr(Kernel->program->buildOptions, "-cl-viv-vx-extension") != gcvNULL)
-            {
-                for(i = 0; i<Kernel->numArgs; i++)
-                {
-                    if(Kernel->args[i].uniform != gcvNULL && isUniformImage2D(Kernel->args[i].uniform))
-                    {
-                        clsMem_PTR memObj = *(clsMem_PTR *)Kernel->args[i].data;
-                        memObj->u.image.vxcaddressingMode = sampler->addressingMode;
-                        memObj->u.image.vxcfilterMode = sampler->filterMode;
-                        memObj->u.image.vxcnormalizedCoords = sampler->normalizedCoords;
-                        break;
-                    }
-                }
-            }
-            else
+
             {
                 gctUINT32           orgArgNum = 0, binarySize = 0;
                 gctPOINTER          pointer;

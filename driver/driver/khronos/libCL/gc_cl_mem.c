@@ -3629,9 +3629,6 @@ clCreateImage(
     /* TODO: need to handle 1d buffer */
     image->u.image.buffer           = ImageDesc->buffer;
     image->mapFlag                  = 0;
-    image->u.image.vxcaddressingMode = 0;
-    image->u.image.vxcfilterMode    = 0;
-    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
@@ -3873,9 +3870,6 @@ clCreateImage2D(
     image->u.image.textureLogical   = 0;
     image->u.image.surfaceMapped    =  gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
-    image->u.image.vxcaddressingMode = 0;
-    image->u.image.vxcfilterMode    = 0;
-    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
@@ -4143,9 +4137,6 @@ clCreateImage3D(
     image->u.image.textureLogical   = 0;
     image->u.image.surfaceMapped    = gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
-    image->u.image.vxcaddressingMode = 0;
-    image->u.image.vxcfilterMode    = 0;
-    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
