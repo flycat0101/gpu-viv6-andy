@@ -280,10 +280,24 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.numExtensions;
         break;
     case GL_MAJOR_VERSION:
-        *ip++ = gc->constants.majorVersion;
+        if(gc->constants.majorVersion < 3)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else
+        {
+           *ip++ = gc->constants.majorVersion;
+        }
         break;
     case GL_MINOR_VERSION:
-        *ip++ = gc->constants.minorVersion;
+        if(gc->constants.majorVersion < 3)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else
+        {
+           *ip++ = gc->constants.minorVersion;
+        }
         break;
     case GL_BLEND:
     case GL_CULL_FACE:
