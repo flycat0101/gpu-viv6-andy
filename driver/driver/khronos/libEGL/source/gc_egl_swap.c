@@ -2029,7 +2029,18 @@ _SwapBuffersRegion(
             }
         }
 #else
-        if ((dpy->workerThread == gcvNULL) || synchronous)
+        if(platform->platform == EGL_PLATFORM_GBM_VIV && (!synchronous))
+        {
+            /* Using android native fence sync. */
+            if (!platform->postWindowBackBufferFence(dpy, draw,
+                                                &backBuffer,
+                                                &draw->damageHint))
+            {
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+                break;
+            }
+        }
+        else if ((dpy->workerThread == gcvNULL) || synchronous)
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));

@@ -627,3 +627,21 @@ gbm_surface_has_free_buffers(struct gbm_surface *surf)
 {
    return surf->gbm->surface_has_free_buffers(surf);
 }
+
+GBM_EXPORT int
+gbm_surface_get_in_fence_fd(struct gbm_surface *surf)
+{
+   return surf->gbm->surface_get_in_fence_fd(surf);
+}
+
+GBM_EXPORT void
+gbm_surface_set_in_fence_fd(struct gbm_surface *surf, int fd)
+{
+   surf->gbm->surface_set_in_fence_fd(surf, fd);
+}
+
+GBM_EXPORT uint32_t
+gbm_surface_in_fence_on(struct gbm_surface *surf)
+{
+   return surf->gbm->surface_in_fence_on(surf);
+}

@@ -843,6 +843,8 @@ gbm_viv_create_buffers(
         }
     }
 
+    surf->fence_fd = -1;
+    surf->fence_on = 0;
     return gcvSTATUS_OK;
 
 OnError:
@@ -944,6 +946,11 @@ gbm_viv_surface_release_buffer(
         }
     }
 
+    if (surf->fence_fd >= 0)
+        close(surf->fence_fd);
+
+    surf->fence_fd = -1;
+    surf->fence_on = 0;
     return;
 }
 
@@ -1013,6 +1020,31 @@ gbm_viv_destroy(struct gbm_device *gbm)
     return;
 }
 
+static int
+gbm_viv_surface_get_in_fence_fd(struct gbm_surface *surface)
+{
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
+    surf->fence_on = 1;
+    return surf->fence_fd;
+}
+
+static void
+gbm_viv_surface_set_in_fence_fd(struct gbm_surface *surface, int fd)
+{
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
+
+    if (surf->fence_fd >= 0 && surf->fence_fd != fd)
+        close(surf->fence_fd);
+    surf->fence_fd = fd;
+}
+
+static uint32_t
+gbm_viv_surface_in_fence_on(struct gbm_surface *surface)
+{
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
+    return surf->fence_on;
+}
+
 static struct gbm_device *
 viv_device_create(int fd)
 {
@@ -1044,6 +1076,9 @@ viv_device_create(int fd)
     dev->base.surface_release_buffer = gbm_viv_surface_release_buffer;
     dev->base.surface_has_free_buffers = gbm_viv_surface_has_free_buffers;
     dev->base.surface_destroy = gbm_viv_surface_destroy;
+    dev->base.surface_get_in_fence_fd = gbm_viv_surface_get_in_fence_fd;
+    dev->base.surface_set_in_fence_fd = gbm_viv_surface_set_in_fence_fd;
+    dev->base.surface_in_fence_on = gbm_viv_surface_in_fence_on;
     dev->base.name = gbm_viv_backend.backend_name;
 
     return &dev->base;

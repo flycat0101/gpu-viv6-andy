@@ -66,6 +66,8 @@ struct gbm_viv_surface
     struct gbm_viv_buffer buffers[GBM_MAX_BUFFER];
 
     gctBOOL extResolve;
+    int fence_fd;
+    uint32_t fence_on;
 };
 
 struct

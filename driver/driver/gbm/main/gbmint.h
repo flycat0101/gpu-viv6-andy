@@ -107,6 +107,12 @@ struct gbm_device {
                                   struct gbm_bo *bo);
    int (*surface_has_free_buffers)(struct gbm_surface *surface);
    void (*surface_destroy)(struct gbm_surface *surface);
+
+   int (*surface_get_in_fence_fd)(struct gbm_surface *surface);
+
+   void (*surface_set_in_fence_fd)(struct gbm_surface *surface, int fd);
+
+   uint32_t (*surface_in_fence_on)(struct gbm_surface *surface);
 };
 
 /**
