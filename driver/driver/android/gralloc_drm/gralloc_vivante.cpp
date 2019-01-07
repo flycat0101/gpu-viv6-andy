@@ -382,7 +382,6 @@ void gralloc_vivante_destroy(struct gralloc_vivante_t *drv)
 int gralloc_vivante_alloc(struct gralloc_vivante_t *drv, int w, int h,
             int format, int usage, buffer_handle_t* pHandle, int* pStride)
 {
-    int err;
     buffer_handle_t handle;
     struct gralloc_vivante_bo_t *bo;
 

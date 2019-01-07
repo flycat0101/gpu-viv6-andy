@@ -1,16 +1,3 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 #include <gc_hal.h>
 #include <gc_hal_user.h>
 
@@ -465,12 +452,16 @@ static int pop_vivante_drm_buffer_status(
 static int pop_generic_drm_buffer_status(buffer_handle_t handle,
                 gcoSURF surface, uint64_t *pTimeStamp)
 {
+    uint64_t timeStamp = 0;
+
     (void)handle;
     (void)surface;
 
     if (pTimeStamp)
-        *pTimeStamp++;
-
+    {
+        timeStamp = *pTimeStamp;
+        *pTimeStamp = timeStamp++;
+    }
     return 0;
 }
 

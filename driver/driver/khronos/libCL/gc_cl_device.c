@@ -72,7 +72,6 @@ static struct _cl_device_id _device =
                                                   "cl_khr_local_int32_base_atomics "
                                                   "cl_khr_local_int32_extended_atomics ";
 
-                static char *extension_without_atomic_wo_glsharing = "cl_khr_byte_addressable_store ";
             #else
                 static char *extension_w_atomic = "cl_khr_byte_addressable_store "
                                                   "cl_khr_global_int32_base_atomics "
