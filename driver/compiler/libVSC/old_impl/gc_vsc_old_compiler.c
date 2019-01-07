@@ -6800,6 +6800,7 @@ gcSHADER_Load(
             attribute->ioBlockArrayIndex                    = binaryAttribute->ioBlockArrayIndex;
             attribute->nextSibling                          = binaryAttribute->nextSibling;
             attribute->prevSibling                          = binaryAttribute->prevSibling;
+            attribute->shaderMode                           = (gcSHADER_SHADERMODE) binaryAttribute->shaderMode;
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_TYPE_NAME_VAR_INDEX)
             {
                 attribute->typeNameVarIndex                 = -1;
@@ -7516,12 +7517,12 @@ gcSHADER_Load(
             gcoOS_MemCopy((gctPOINTER)&output->tempIndex,
                         (gctPOINTER)&binaryOutput->tempIndex,
                         sizeof(output->tempIndex));
-            output->shaderMode              = gcSHADER_SHADER_DEFAULT;
             output->layoutQualifier         = gcvLAYOUT_QUALIFIER_NONE;
             output->ioBlockIndex            = binaryOutput->ioBlockIndex;
             output->ioBlockArrayIndex       = binaryOutput->ioBlockArrayIndex;
             output->nextSibling             = binaryOutput->nextSibling;
             output->prevSibling             = binaryOutput->prevSibling;
+            output->shaderMode              = (gcSHADER_SHADERMODE) binaryOutput->shaderMode;
 
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_TYPE_NAME_VAR_INDEX)
             {
@@ -9598,6 +9599,7 @@ gcSHADER_Save(
         binary->index               = (gctINT16) attribute->index;
         binary->ioBlockIndex        = (gctINT16) attribute->ioBlockIndex;
         binary->ioBlockArrayIndex   = (gctINT16) attribute->ioBlockArrayIndex;
+        binary->shaderMode          = (gctINT16) attribute->shaderMode;
         binary->nextSibling         = attribute->nextSibling;
         binary->prevSibling         = attribute->prevSibling;
         binary->typeNameVarIndex    = attribute->typeNameVarIndex;
@@ -9814,6 +9816,7 @@ gcSHADER_Save(
         binary->nextSibling         = output->nextSibling;
         binary->prevSibling         = output->prevSibling;
         binary->typeNameVarIndex    = output->typeNameVarIndex;
+        binary->shaderMode          = (gctINT16) output->shaderMode;
 
         gcoOS_MemCopy(binary->layoutQualifier,
                       (gctPOINTER)&output->layoutQualifier,

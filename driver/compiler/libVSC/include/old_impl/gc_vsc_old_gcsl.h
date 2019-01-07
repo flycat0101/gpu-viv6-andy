@@ -104,9 +104,11 @@ BEGIN_EXTERN_C()
 
 /* bump up version to 1.23 for saving transform feedback information on 8/28/2018 */
 
+/* bump up version to 1.24 for adding output's shader mode on 10/10/2018 */
+
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 23)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 23)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 24)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 24)
 
 typedef union _gcsValue
 {
@@ -1918,6 +1920,9 @@ typedef struct _gcBINARY_ATTRIBUTE
     /* The variable index of the type name, it is only enabled for a structure member only. */
     gctINT16                      typeNameVarIndex;
 
+    /* shader mode: flat/smooth/... */
+    gctINT16                      shaderMode;
+
     /* The attribute name. */
     char                          name[1];
 }
@@ -3093,6 +3098,9 @@ typedef struct _gcBINARY_OUTPUT
 
     /* The variable index of the type name, it is only enabled for a structure member only. */
     gctINT16                        typeNameVarIndex;
+
+    /* shader mode: flat/smooth/... */
+    gctINT16                        shaderMode;
 
     /* layout qualifier */
     char                            layoutQualifier[sizeof(gceLAYOUT_QUALIFIER)];
