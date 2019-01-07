@@ -11681,9 +11681,11 @@ gckHARDWARE_QueryIdle(
     gctINT32 pendingInterrupt;
 #endif
 
+#if !gcdSECURITY
     gctUINT32 dmaLow;
     gctUINT32 opCode;
     gctUINT32 i;
+#endif
 
     gcmkHEADER_ARG("Hardware=0x%x", Hardware);
 
