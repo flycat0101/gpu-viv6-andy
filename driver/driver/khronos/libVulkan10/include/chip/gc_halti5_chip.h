@@ -487,6 +487,13 @@ typedef struct halti5_tweak_handler
         struct halti5_tweak_handler *handler
         );
 
+    VkResult (* copy)(
+        __vkDevContext *devCtx,
+        __vkPipeline *pip,
+        __vkBuffer *dstBuf,
+        struct halti5_tweak_handler *handler
+        );
+
     void *privateData;
 } halti5_tweak_handler;
 
@@ -1366,6 +1373,11 @@ VkResult halti5_flushCache(
     uint32_t **commandBuffer,
     uint32_t *sizeInUint,
     int32_t cacheMask
+    );
+
+VkBool32 halti5_tweakCopy(
+    VkCommandBuffer cmdBuf,
+    VkBuffer destBuffer
     );
 
 uint32_t halti5_computeTileStatusAddr(

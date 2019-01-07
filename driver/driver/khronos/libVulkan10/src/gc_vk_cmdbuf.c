@@ -2570,6 +2570,15 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     __vkBuffer *pDstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, dstBuffer);
     VkResult result = VK_SUCCESS;
 
+    if (pSrcImg->formatInfo.bitsPerBlock == 128 &&
+        !devCtx->database->CACHE128B256BPERLINE)
+    {
+        if (devCtx->chipFuncs->tweakCopy(commandBuffer, dstBuffer))
+        {
+            return;
+        }
+    }
+
     for (ir = 0; ir < regionCount; ir++)
     {
         const __vkFormatInfo *fmtInfo;
