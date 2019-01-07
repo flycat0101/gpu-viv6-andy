@@ -254,6 +254,12 @@ VIR_Lower_IsDstFloat(
     );
 
 gctBOOL
+VIR_Lower_IsDstFP16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstInt(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst

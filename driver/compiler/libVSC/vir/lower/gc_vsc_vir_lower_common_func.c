@@ -544,6 +544,19 @@ VIR_Lower_IsDstFloat(
 }
 
 gctBOOL
+VIR_Lower_IsDstFP16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   typeId   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
+
+    gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isFloat(typeId) && VIR_GetTypeSize(VIR_GetTypeComponentType(typeId)) == 2;
+}
+
+gctBOOL
 VIR_Lower_IsSrc0Unsigned(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
