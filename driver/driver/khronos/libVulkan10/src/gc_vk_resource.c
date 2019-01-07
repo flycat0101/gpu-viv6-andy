@@ -1268,7 +1268,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 
         __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->enabledFeatures.robustBufferAccess &&
+            devCtx->database->ROBUSTNESS &&
+            !devCtx->database->SH_ROBUSTNESS_FIX)
         {
             __VK_MEMZERO(dvm->hostAddr, dvm->size);
         }
@@ -2022,7 +2024,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBuffer(
         /* Initialize __vkBuffer specific data fields here */
         buf->devCtx = devCtx;
         buf->memCb = __VK_ALLOCATIONCB;
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->enabledFeatures.robustBufferAccess &&
+            devCtx->database->ROBUSTNESS &&
+            !devCtx->database->SH_ROBUSTNESS_FIX)
         {
             buf->memReq.size = __VK_ALIGN(pCreateInfo->size, 16);
         }

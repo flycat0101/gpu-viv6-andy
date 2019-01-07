@@ -5413,7 +5413,7 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    if (devCtx->database->ROBUSTNESS)
+    if (devCtx->enabledFeatures.robustBufferAccess)
     {
         vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
     }
@@ -5930,7 +5930,7 @@ static VkResult halti5_pip_build_computeshader(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    if (devCtx->database->ROBUSTNESS)
+    if (devCtx->enabledFeatures.robustBufferAccess)
     {
         vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
     }
@@ -6457,7 +6457,7 @@ VkResult halti5_patch_pipeline(
                                      | VSC_COMPILER_FLAG_RECOMPILER
                                      | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
 
-            if (devCtx->database->ROBUSTNESS)
+            if (devCtx->enabledFeatures.robustBufferAccess)
             {
                 vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
             }

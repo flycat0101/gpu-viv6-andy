@@ -1081,7 +1081,7 @@ __VK_INLINE VkResult halti5_setIndexBufferCmd(
             xlatePRindex[cmdBuf->bindInfo.indexBuffer.indexType]);
     }
 
-    if (database->ROBUSTNESS)
+    if (devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
     {
         uint32_t endAddress = srcAddr + (uint32_t)buf->memReq.size - 1;
         __vkCmdLoadSingleHWState(pCmdBuffer, 0x01FE, VK_FALSE, endAddress);
@@ -4014,7 +4014,7 @@ VkResult halti5_setVertexBuffers(
             }
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5180 + i, VK_FALSE, srcAddr);
 
-            if (database->ROBUSTNESS)
+            if (cmdBuf->devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
             {
                 uint32_t endAddress = srcAddr + (uint32_t)buf->memReq.size - 1;
                 __vkCmdLoadSingleHWState(&pCmdBuffer, 0x51B0 + i, VK_FALSE, endAddress);
@@ -4620,7 +4620,7 @@ VkResult halti5_setRenderTargets(
                         );
                 }
 
-                if (database->ROBUSTNESS)
+                if (devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
                 {
                     uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1;
                     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5270, VK_FALSE, endAddress);
@@ -4721,7 +4721,7 @@ VkResult halti5_setRenderTargets(
                         (rtImageView->createInfo.subresourceRange.layerCount > 0) ? (uint32_t)pLevel->sliceSize : 0);
                 }
 
-                if (database->ROBUSTNESS)
+                if (devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
                 {
                     uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1;
                     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5270 + hwRtIndex, VK_FALSE, endAddress);
@@ -4799,7 +4799,7 @@ VkResult halti5_setRenderTargets(
                 (dsImageView->createInfo.subresourceRange.layerCount > 0) ? (uint32_t)pLevel->sliceSize : 0);
         }
 
-        if (database->ROBUSTNESS)
+        if (devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
         {
             uint32_t endAddress = rtBaseAddr + (uint32_t)pLevel->sliceSize - 1 ;
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0531, VK_FALSE, endAddress);
@@ -6238,7 +6238,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)(buf->memOffset + resInfo->u.bufferInfo.offset);
                         data[dataCount++] = physical;
-                        if (devCtx->database->ROBUSTNESS)
+                        if (devCtx->enabledFeatures.robustBufferAccess)
                         {
                             data[dataCount++] = physical;
                             data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
@@ -6262,7 +6262,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         physical = buf->memory->devAddr;
                         physical += offset;
                         data[dataCount++] = physical;
-                        if (devCtx->database->ROBUSTNESS)
+                        if (devCtx->enabledFeatures.robustBufferAccess)
                         {
                             data[dataCount++] = physical;
                             data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
@@ -6369,7 +6369,7 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)(buf->memOffset + resInfo->u.bufferInfo.offset);
                         data[dataCount++] = physical;
-                        if (devCtx->database->ROBUSTNESS)
+                        if (devCtx->enabledFeatures.robustBufferAccess)
                         {
                             data[dataCount++] = physical;
                             data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
@@ -6387,7 +6387,7 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
                         physical = buf->memory->devAddr;
                         physical += (uint32_t)resInfo->u.bufferInfo.offset + dynamicOffsets[(*dynamicOffsetIndex) + arrayIdx];
                         data[dataCount++] = physical;
-                        if (devCtx->database->ROBUSTNESS)
+                        if (devCtx->enabledFeatures.robustBufferAccess)
                         {
                             data[dataCount++] = physical;
                             data[dataCount++] = physical + (uint32_t)buf->memReq.size - 1;
