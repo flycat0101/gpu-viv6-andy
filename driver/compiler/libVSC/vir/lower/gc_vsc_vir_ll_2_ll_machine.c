@@ -51,12 +51,54 @@ _hasNot32IntDIV(
     return gcvTRUE;
 }
 
+static gctBOOL
+_set_HighPrecision(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_Symbol          *pSym = gcvNULL;
+    VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(Opnd);
+    if (opndKind == VIR_OPND_VIRREG ||
+        opndKind == VIR_OPND_SYMBOL ||
+        opndKind == VIR_OPND_SAMPLER_INDEXING)
+    {
+        pSym = VIR_Operand_GetSymbol(Opnd);
+        VIR_Symbol_SetPrecision(pSym, VIR_PRECISION_HIGH);
+    }
+
+    VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_adjustPrecisionByNextInstDest(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_Instruction     *nextInst = VIR_Inst_GetNext(Inst);
+    VIR_Operand         *nextDest;
+
+    gcmASSERT(nextInst && VIR_Inst_GetDest(nextInst));
+
+    nextDest = VIR_Inst_GetDest(nextInst);
+    if (VIR_Operand_GetPrecision(nextDest) == VIR_PRECISION_HIGH)
+    {
+        return _set_HighPrecision(Context, Inst, Opnd);
+    }
+    return gcvTRUE;
+}
+
+
 static VIR_PatternMatchInst _divPatInst0[] = {
     { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNEW_SIN_COS_LOG_DIV, VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _divRepInst0[] = {
-    { VIR_OP_PRE_DIV, 0, VIR_PATTERN_TEMP_TYPE_XY, { -1, 2, 3, 0 }, { 0 } },
+    { VIR_OP_PRE_DIV, 0, VIR_PATTERN_TEMP_TYPE_XY, { -1, 2, 3, 0 }, { _adjustPrecisionByNextInstDest } },
     { VIR_OP_MUL, 0, 0, {  1, -1, -1, 0 }, { 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
 };
 
@@ -151,9 +193,9 @@ static VIR_PatternMatchInst _modPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _modRepInst0[] = {
-    { VIR_OP_DIV, 0, 0, { -1, 2, 3, 0 }, { 0 } },
-    { VIR_OP_FLOOR, 0, 0, { -1, -1, 0, 0 }, { 0 } },
-    { VIR_OP_MAD, 0, 0, { 1, 3, -1, 2 }, { 0, VIR_Lower_SetOpndNeg, 0, 0 } },
+    { VIR_OP_DIV, 0, 0, { -1, 2, 3, 0 }, { _set_HighPrecision } },
+    { VIR_OP_FLOOR, 0, 0, { -1, -1, 0, 0 }, { _set_HighPrecision } },
+    { VIR_OP_MAD, 0, 0, { 1, 3, -1, 2 }, { 0, VIR_Lower_SetOpndNeg, _set_HighPrecision, 0 } },
 };
 
 static VIR_PatternMatchInst _modPatInst1[] = {
