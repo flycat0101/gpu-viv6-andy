@@ -850,7 +850,7 @@ static void __vki_InitializePhysicalDevicePorperties(
 
     maxAniso = (database->REG_Halti0 && (!database->NO_ANISTRO_FILTER)) ? 16: 1;
     maxVaryings = database->VaryingCount;
-    maxAttributes = database->PIPELINE_32_ATTRIBUTES ? 32 : 16;
+    maxAttributes = 16;
     numberOfStreams = database->Streams;
     maxAttribOffset = database->NEW_GPIPE ? 2047 : 255;
     maxStreamStride = database->REG_Halti4 ? 2048 : 256;
