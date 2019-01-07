@@ -41,4 +41,6 @@ gc_vidmem_write(void *data);
 int
 gc_dump_trigger_write(void *data);
 
+int
+gc_clk_show(void *data);
 #endif
