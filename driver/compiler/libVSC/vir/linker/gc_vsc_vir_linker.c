@@ -693,6 +693,9 @@ _CreateIntrinsicLib(
         else if (pHwCfg->hwFeatureFlags.hasHalti5)
         {
             gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, gcLibFMA_Func_fmaSupported);
+
+            gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti5);
 
             gcoOS_StrCatSafe(sloBuiltinSource,
