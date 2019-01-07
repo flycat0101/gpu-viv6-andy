@@ -1263,7 +1263,7 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT64                shBuf;
 
             /* A signal. */
-            IN gctUINT32                signal;
+            IN gctUINT64                signal;
 
             OUT gctINT32                fd;
         }
