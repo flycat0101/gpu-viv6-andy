@@ -877,7 +877,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
 
     case GL_TRANSFORM_FEEDBACK_BUFFER_BINDING:
-        *ip++ = gc->xfb.boundXfbObj->boundBufName;
+        *ip++ = gc->bufferObject.generalBindingPoint[__GL_XFB_BUFFER_INDEX].boundBufName;
         break;
 
     case GL_TRANSFORM_FEEDBACK_PAUSED:

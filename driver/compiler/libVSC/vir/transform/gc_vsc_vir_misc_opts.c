@@ -4373,10 +4373,9 @@ _CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, 
     gctINT                     addedInstCount = 0;
     VIR_OpCode                 opCode;
     VIR_Uniform*               pUniform;
-    VIR_Operand*               firstOpnd = gcvNULL;
     VIR_Operand*               opnd;
     gctUINT                    i, j, firstUniformId, thisUniformId;
-    VIR_Symbol*                pSym = gcvNULL, *firstSym = gcvNULL;
+    VIR_Symbol*                pSym = gcvNULL;
     gctBOOL                    bFirstConstRegIndexing, bHitReadPortLimitation;
 
     /* Only have one or zero source, just bail out. */
@@ -4437,8 +4436,6 @@ _CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, 
                 /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
                 if (firstUniformId == NOT_ASSIGNED)
                 {
-                    firstOpnd = opnd;
-                    firstSym  = pSym;
                     firstUniformId = thisUniformId;
                     bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
                 }
