@@ -498,6 +498,9 @@ gcChipInitFormatMapInfo(
     /* case8 : ALPHA8*/
     patchFmtMapInfoCount += patchAlpha8Count;
 
+    /* case9 : A8L8*/
+    patchFmtMapInfoCount += patchA8L8Count;
+
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
     if (patchFmtMapInfoCount)
