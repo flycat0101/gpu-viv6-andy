@@ -3941,6 +3941,24 @@ gctBOOL _CheckMLLevelAlwaysInlineFunction(
                 break;
             }
         }
+        else if (opcode == VIR_OP_INTRINSIC)
+        {
+            VIR_IntrinsicsKind  intrinsicKind = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pInst, 0));
+            VIR_ParmPassing*    pParmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
+
+            /* If it is an image load/store intrinsic and the base is not a uniform, mark it as must-inline. */
+            if (VIR_Intrinsics_isImageLoad(intrinsicKind) || VIR_Intrinsics_isImageStore(intrinsicKind))
+            {
+                pOperand = pParmOpnd->args[0];
+                VIR_Operand_GetOperandInfo(pInst, pOperand, &opndInfo);
+
+                if (!opndInfo.isUniform)
+                {
+                    needInLine = gcvTRUE;
+                    break;
+                }
+            }
+        }
     }
 
     return needInLine;

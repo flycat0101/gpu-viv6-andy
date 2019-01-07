@@ -13081,6 +13081,13 @@ gctSTRING gcLibImageQuery_halti4 =
 "    size.xyz = size.xyz >> lod;\n"
 "    size.xyz = max(size.xyz, 1);\n"
 "    return size;\n"
+"}\n"
+"ivec2 _viv_image_query_size_lod_samplerBuffer(highp uvec4 img_desc, int lod)\n"
+"{\n"
+"    ivec4 size;\n"
+"    _viv_asm(GET_SAMPLER_LBS, size, img_desc);\n"
+"    size.xy = max(size.xy, 1);\n"
+"    return size.xy;\n"
 "}\n";
 
 /******************** advanced blend equation implementation ********************/
