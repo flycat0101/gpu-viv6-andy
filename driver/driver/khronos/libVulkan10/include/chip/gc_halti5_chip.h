@@ -706,6 +706,8 @@ typedef struct
     uint32_t regDepthConfig;
     uint32_t vsAllInputCount;
 
+    uint32_t psOutCntl4to7;
+
 } halti5_graphicsPipeline;
 
 typedef struct
@@ -937,6 +939,11 @@ VkResult halti5_setLineWidth(
     __vkCommandBuffer *cmdBuf
     );
 
+VkResult halti5_setPsOutputMode(
+    __vkCommandBuffer *cmdBuf,
+    __vkPipeline *pip
+    );
+
 VkResult halti5_setRenderTargets(
     __vkCommandBuffer *cmdBuf
     );
@@ -1003,6 +1010,12 @@ VkResult halti5_helper_set_linewidth(
     float lineWidth
     );
 
+VkResult halti5_helper_set_psOutputMode(
+    __vkDevContext *devCtx,
+    uint32_t **commandBuffer,
+    uint32_t oldPsOutCntl4to7,
+    uint32_t newPsOutCntl4to7
+    );
 
 VkResult halti5_helper_convertHwPEDesc(
     uint32_t vkFormat,
