@@ -488,8 +488,8 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Operand*      opnd;
     gctUINT           i;
     VIR_Const         virConst;
-    VIR_ConstVal      ImmValues[VIR_MAX_SRC_NUM];
-    VIR_TypeId        immTypeId[VIR_MAX_SRC_NUM];
+    VIR_ConstVal      ImmValues[VIR_MAX_SRC_NUM] = {0};
+    VIR_TypeId        immTypeId[VIR_MAX_SRC_NUM] = {0};
     gctBOOL           needChange[VIR_MAX_SRC_NUM];
     gctBOOL           hasChanged[VIR_MAX_SRC_NUM];
     VIR_Uniform*      pImmUniform;
