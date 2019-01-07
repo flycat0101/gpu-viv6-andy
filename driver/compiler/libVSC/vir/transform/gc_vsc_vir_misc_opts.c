@@ -7705,8 +7705,8 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
         return errCode;
     }
 
-    /* now lib function only support opencl(openvx), remove this if () if opengl/vulkan is supported */
-    if ((pPassWorker->pCompilerParam->cfg.ctx.clientAPI != gcvAPI_OPENCL))
+    /* now only apply patch to identified appNameId */
+    if (pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC)
     {
         return errCode;
     }
