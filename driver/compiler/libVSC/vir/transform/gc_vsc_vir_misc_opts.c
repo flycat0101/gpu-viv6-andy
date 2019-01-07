@@ -1465,6 +1465,10 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                  * so there is no need to insert a bounds info to the pointer */
                 pMemBaseUniform = VIR_Symbol_GetUniform(pSym);
             }
+            else if (VIR_Symbol_isInput(pSym) || VIR_Symbol_isOutput(pSym))
+            {
+                continue;
+            }
             else
             {
                 VIR_Operand_GetOperandInfo(inst, pOpnd, &operandInfo);
@@ -8065,9 +8069,11 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_OPCODE_isMemSt(opc))
             {
                 VIR_Operand *baseOper = VIR_Inst_GetSource(inst, 0);
-                if (VIR_Operand_GetSwizzle(baseOper) != VIR_SWIZZLE_XYZZ)
+                VIR_Symbol *pSym = VIR_Operand_GetSymbol(baseOper);
+                if (VIR_Operand_GetSwizzle(baseOper) != VIR_SWIZZLE_XYZZ ||
+                    (pSym && (VIR_Symbol_isInput(pSym) || VIR_Symbol_isOutput(pSym))))
                 {
-                    /* if base address is not a flat pointer skip */
+                    /* if base address is not a flat pointer or input/output, skip */
                     continue;
                 }
                 if (VIR_OPCODE_isMemSt(opc))
