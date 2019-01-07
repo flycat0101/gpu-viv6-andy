@@ -5871,7 +5871,7 @@ static VkResult halti5_helper_setDescSetInputAttach(
             {
                 /* Use the real used HW reg size. */
                 arraySize = __VK_MIN(descriptorBinding->std.descriptorCount,
-                                     hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegRange);
+                                     hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo);
             }
             else
             {
