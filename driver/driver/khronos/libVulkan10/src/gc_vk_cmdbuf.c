@@ -1346,63 +1346,59 @@ OnError:
 }
 
 void __vki_CmdResolveSubPass(
-    VkCommandBuffer commandBuffer
+    VkCommandBuffer commandBuffer,
+    __vkRenderSubPassInfo *subPassInfo
     )
 {
-    uint32_t i, j;
+    uint32_t j;
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
-    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     __vkFramebuffer *fb = cmdBuf->bindInfo.renderPass.fb;
 
-    for (i = 0; i < rdp->subPassInfoCount; i++)
+    for (j = 0; j < subPassInfo->colorCount; j++)
     {
-        __vkRenderSubPassInfo *subPassInfo = &rdp->subPassInfo[i];
-        for (j = 0; j < subPassInfo->colorCount; j++)
+        uint32_t resolve_ref = subPassInfo->resolve_attachment_index[j];
+        uint32_t color_ref = subPassInfo->color_attachment_index[j];
+        VkImageCopy regions;
+
+        if (resolve_ref != VK_ATTACHMENT_UNUSED)
         {
-            uint32_t resolve_ref = subPassInfo->resolve_attachment_index[j];
-            uint32_t color_ref = subPassInfo->color_attachment_index[j];
-            VkImageCopy regions;
+            __vkImageView *colorImageViews = fb->imageViews[color_ref];
+            __vkImageView *resolveImageViews = fb->imageViews[resolve_ref];
+            __vkImage *colorImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, colorImageViews->createInfo.image);
+            __vkImage *resolveImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, resolveImageViews->createInfo.image);
+            VkImage srcImg = colorImageViews->createInfo.image;
+            VkImage dstImg = resolveImageViews->createInfo.image;
 
-            if (resolve_ref != VK_ATTACHMENT_UNUSED)
+            const VkMemoryBarrier memBarrier =
             {
-                __vkImageView *colorImageViews = fb->imageViews[color_ref];
-                __vkImageView *resolveImageViews = fb->imageViews[resolve_ref];
-                __vkImage *colorImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, colorImageViews->createInfo.image);
-                __vkImage *resolveImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, resolveImageViews->createInfo.image);
-                VkImage srcImg = colorImageViews->createInfo.image;
-                VkImage dstImg = resolveImageViews->createInfo.image;
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                0,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+            };
+            __VK_MEMZERO(&regions, sizeof(VkImageCopy));
 
-                const VkMemoryBarrier memBarrier =
-                {
-                    VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-                    0,
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                };
-                __VK_MEMZERO(&regions, sizeof(VkImageCopy));
+            regions.dstOffset.x = regions.dstOffset.y = regions.dstOffset.z = 0;
+            regions.srcOffset.x = regions.srcOffset.y = regions.srcOffset.z = 0;
 
-                regions.dstOffset.x = regions.dstOffset.y = regions.dstOffset.z = 0;
-                regions.srcOffset.x = regions.srcOffset.y = regions.srcOffset.z = 0;
+            regions.srcSubresource.aspectMask = colorImageViews->createInfo.subresourceRange.aspectMask;
+            regions.srcSubresource.mipLevel = colorImageViews->createInfo.subresourceRange.baseMipLevel;
+            regions.srcSubresource.baseArrayLayer = colorImageViews->createInfo.subresourceRange.baseArrayLayer;
+            regions.srcSubresource.layerCount = fb->layers;
 
-                regions.srcSubresource.aspectMask = colorImageViews->createInfo.subresourceRange.aspectMask;
-                regions.srcSubresource.mipLevel = colorImageViews->createInfo.subresourceRange.baseMipLevel;
-                regions.srcSubresource.baseArrayLayer = colorImageViews->createInfo.subresourceRange.baseArrayLayer;
-                regions.srcSubresource.layerCount = fb->layers;
+            regions.dstSubresource.aspectMask = resolveImageViews->createInfo.subresourceRange.aspectMask;
+            regions.dstSubresource.mipLevel = resolveImageViews->createInfo.subresourceRange.baseMipLevel;
+            regions.dstSubresource.baseArrayLayer = resolveImageViews->createInfo.subresourceRange.baseArrayLayer;
+            regions.dstSubresource.layerCount = fb->layers;
 
-                regions.dstSubresource.aspectMask = resolveImageViews->createInfo.subresourceRange.aspectMask;
-                regions.dstSubresource.mipLevel = resolveImageViews->createInfo.subresourceRange.baseMipLevel;
-                regions.dstSubresource.baseArrayLayer = resolveImageViews->createInfo.subresourceRange.baseArrayLayer;
-                regions.dstSubresource.layerCount = fb->layers;
+            regions.extent.width = fb->width;
+            regions.extent.height = fb->height;
+            regions.extent.depth = 1;
 
-                regions.extent.width  = fb->width;
-                regions.extent.height = fb->height;
-                regions.extent.depth  = 1;
+            __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
 
-                __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-                    1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
-
-                __vk_CmdCopyImage(commandBuffer, srcImg, colorImg->createInfo.initialLayout, dstImg, resolveImg->createInfo.initialLayout, 1, &regions);
-            }
+            __vk_CmdCopyImage(commandBuffer, srcImg, colorImg->createInfo.initialLayout, dstImg, resolveImg->createInfo.initialLayout, 1, &regions);
         }
     }
 }
@@ -1414,6 +1410,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdNextSubpass(
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkRenderPass *rdp = cmd->bindInfo.renderPass.rdp;
+    __vkRenderSubPassInfo *subPassInfo = cmd->bindInfo.renderPass.subPass;
 
     cmd->bindInfo.renderPass.subPass++;
     cmd->bindInfo.renderPass.subPassContent = contents;
@@ -1459,7 +1456,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdNextSubpass(
         }
     }
 
-    __vki_CmdResolveSubPass(commandBuffer);
+    __vki_CmdResolveSubPass(commandBuffer, subPassInfo);
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
@@ -1467,8 +1464,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkRenderSubPassInfo *subPassInfo = cmd->bindInfo.renderPass.subPass;
 
-    __vki_CmdResolveSubPass(commandBuffer);
+    __vki_CmdResolveSubPass(commandBuffer, subPassInfo);
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
 
