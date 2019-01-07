@@ -2773,7 +2773,7 @@ VkResult halti5_clearImage(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
                 (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3978,7 +3978,7 @@ VkResult halti5_copyImage(
             (srcBltDesc.bltSwizzleEx | (dstBltDesc.bltSwizzleEx << 12))
             );
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
                 (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -4623,7 +4623,7 @@ VkResult halti5_fillBuffer(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
 
-    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
             (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -4875,7 +4875,7 @@ VkResult halti5_fillBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
                 (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -5125,7 +5125,7 @@ VkResult halti5_copyBuffer(
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
 
-            if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+            if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
             {
                 uint64_t endAddress;
 
@@ -5185,7 +5185,7 @@ VkResult halti5_copyBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copySize);
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
             uint64_t endAddress;
 
@@ -5395,7 +5395,7 @@ VkResult halti5_updateBuffer(
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
 
-            if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+            if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
             {
                 uint64_t endAddress;
 
@@ -5454,7 +5454,7 @@ VkResult halti5_updateBuffer(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)size);
 
-        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        if (devCtx->database->ROBUSTNESS && devCtx->database->SH_ROBUSTNESS_FIX)
         {
             uint64_t endAddress;
 
