@@ -23714,6 +23714,7 @@ gcLINKTREE_GenerateStates(
     ProgramState->stateBufferSize = stateBufferSize + size;
     ProgramState->hints = hints;
     stateBuffer       = gcvNULL;
+    hints             = gcvNULL;
 
 OnError:
     /* Free up uniform usage table. */

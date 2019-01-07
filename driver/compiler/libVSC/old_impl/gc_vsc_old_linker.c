@@ -13644,6 +13644,7 @@ gcLinkTreeThruVirShaders(
                 gcmONERROR(vscCreateKernel(&scParam, gcvNULL, &hwPgStates));
                 vscDestroyPrivateData(&coreSysCtx,
                                       coreSysCtx.hPrivData);
+                coreSysCtx.hPrivData = gcvNULL;
             }
             else
             {
@@ -13853,7 +13854,7 @@ OnError:
     if (stateBuffer) gcmOS_SAFE_FREE(gcvNULL, stateBuffer);
     if (hints)  gcmOS_SAFE_FREE(gcvNULL, hints);
     if (hwPgStates.pStateBuffer) {gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer); hwPgStates.stateBufferSize = 0;}
-    if (coreSysCtx.hPrivData) {VSC_PRIV_DATA* pPrivData = (VSC_PRIV_DATA*)coreSysCtx.hPrivData; vscPMP_Finalize(&pPrivData->pmp); gcoOS_Free(gcvNULL, pPrivData);}
+    if (coreSysCtx.hPrivData) {vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);}
     /* Return the status. */
     gcmFOOTER();
 
