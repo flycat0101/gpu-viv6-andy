@@ -498,7 +498,7 @@ static ssize_t gpu_govern_store(struct device_driver *dev, const char *buf, size
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
 static DRIVER_ATTR_RW(gpu_govern);
 #else
-static DRIVER_ATTR(gpu_mode, S_IRUGO | S_IWUSR, gpu_govern_show, gpu_govern_store);
+static DRIVER_ATTR(gpu_govern, S_IRUGO | S_IWUSR, gpu_govern_show, gpu_govern_store);
 #endif
 
 int init_gpu_opp_table(struct device *dev)
