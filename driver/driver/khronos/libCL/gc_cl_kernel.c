@@ -5082,15 +5082,6 @@ void doPatchCreateKernel(cl_program Program, cl_kernel Kernel, gctSTRING KernelN
         {
             *gcGetPatchId() = cl_patch_array[Program->patchIndex].patchID;
         }
-        else
-        {
-            *gcGetPatchId() = gcvPATCH_INVALID;
-        }
     }
-    else
-    {
-        *gcGetPatchId() = gcvPATCH_INVALID;
-    }
-
 }
 
