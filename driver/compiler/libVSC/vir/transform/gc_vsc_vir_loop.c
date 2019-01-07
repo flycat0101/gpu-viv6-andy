@@ -2585,7 +2585,8 @@ VIR_LoopOpts_Init(
     VIR_Function* func,
     VSC_OPTN_LoopOptsOptions* options,
     VIR_Dumper* dumper,
-    VSC_MM* mm
+    VSC_MM* mm,
+    gctBOOL hwSuppertCompDepForLS
     )
 {
     VIR_LoopOpts_SetShader(loopOpts, shader);
@@ -2594,6 +2595,7 @@ VIR_LoopOpts_Init(
     VIR_LoopOpts_SetOptions(loopOpts, options);
     VIR_LoopOpts_SetDumper(loopOpts, dumper);
     VIR_LoopOpts_SetMM(loopOpts, mm);
+    VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, hwSuppertCompDepForLS);
 }
 
 void
@@ -4362,6 +4364,70 @@ _VIR_LoopInfo_CopyLoop(
     return errCode;
 }
 
+/* return false if loop has memory instruction and hwSupportPerCompDepForLS is false */
+static gctBOOL
+_VIR_LoopInfo_CanDoStaticllyUnroll(
+    VIR_LoopInfo* loopInfo
+    )
+{
+    VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
+    VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
+    gctUINT instCounts, memInstCount = 0;
+
+    if (VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
+    {
+        return gcvTRUE;
+    }
+
+    instCounts = BB_GET_LENGTH(loopHead);
+    while(gcvTRUE)
+    {
+        VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
+
+        if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
+        {
+            memInstCount++;
+        }
+
+        if(instIter == BB_GET_END_INST(loopHead))
+        {
+            break;
+        }
+        else
+        {
+            instIter = VIR_Inst_GetNext(instIter);
+        }
+    }
+
+    if(loopEnd != loopHead)
+    {
+        instCounts += BB_GET_LENGTH(loopEnd);
+        instIter = BB_GET_START_INST(loopEnd);
+
+        while(gcvTRUE)
+        {
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
+            if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
+            {
+                 memInstCount++;
+            }
+
+            if(instIter == BB_GET_END_INST(loopEnd))
+            {
+                break;
+            }
+            else
+            {
+                instIter = VIR_Inst_GetNext(instIter);
+            }
+        }
+    }
+
+    /* if HWsupportPerCompDepForLS is false, the register used for ld/st need 8 instructions to reuse again */
+    return (instCounts >= (memInstCount << 3));
+}
+
 static VSC_ErrCode
 _VIR_LoopInfo_StaticallyUnroll(
     VIR_LoopInfo* loopInfo,
@@ -4461,6 +4527,11 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
         {
             return gcvFALSE;
         }
+    }
+    /* skip dynamic unroll to avoid register pressure if HWsupportPerCompDepForLS is false */
+    if (!VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
+    {
+        return gcvFALSE;
     }
 
     /* check load ratio */
@@ -4875,7 +4946,8 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
                 gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo));
 
                 if((addedLength < 2048) &&
-                   (addedLength + shaderLength < VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)))
+                   (addedLength + shaderLength < VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)) &&
+                   _VIR_LoopInfo_CanDoStaticllyUnroll(loopInfo))
                 {
                     errCode = _VIR_LoopInfo_StaticallyUnroll(loopInfo, (gctUINT)(iterations - 1));
 
@@ -5003,7 +5075,9 @@ VIR_LoopOpts_PerformOnFunction(
             }
         }
 
-        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT))
+        /* if hwsuppoertPerCompDepForLS is false, register is shorten in RA pass, skip licm */
+        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT) &&
+           VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts))
         {
             gctBOOL localChanged = gcvFALSE;
 
@@ -5147,6 +5221,7 @@ VIR_LoopOpts_PerformOnShader(
     VSC_OPTN_LoopOptsOptions* options = (VSC_OPTN_LoopOptsOptions*)pPassWorker->basePassWorker.pBaseOption;
     /* set the max instrunction numbers after unroll */
     gctUINT     allowedInstNumsAfterUnroll = _VIR_AllowedInstNumAfterUnroll(pPassWorker);
+    gctBOOL     hwSuppertCompDepForLS = pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportPerCompDepForLS;
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_LoopOptsOptions_GetBeforeShader(options), VSC_OPTN_LoopOptsOptions_GetAfterShader(options)))
     {
@@ -5180,7 +5255,8 @@ VIR_LoopOpts_PerformOnShader(
         VIR_LoopOpts loopOpts;
         VIR_Function* func = func_node->function;
 
-        VIR_LoopOpts_Init(&loopOpts, shader, func, options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
+        VIR_LoopOpts_Init(&loopOpts, shader, func, options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM,
+                          hwSuppertCompDepForLS);
         VIR_LoopOpts_SetAllowedInstNumAfterUnroll(&loopOpts, allowedInstNumsAfterUnroll);
         errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts);
         VIR_LoopOpts_Final(&loopOpts);

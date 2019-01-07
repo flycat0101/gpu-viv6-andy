@@ -29,6 +29,7 @@ typedef struct VIR_LOOPOPTS
     VIR_Dumper* dumper;
     VSC_MM* mm;
     gctUINT allowedInstNumAfterUnroll;
+    gctBOOL hwsupportPerCompDepForLS;
 } VIR_LoopOpts;
 
 #define VIR_LoopOpts_GetShader(lo)                        ((lo)->shader)
@@ -45,6 +46,8 @@ typedef struct VIR_LOOPOPTS
 #define VIR_LoopOpts_SetMM(lo, m)                         ((lo)->mm = (m))
 #define VIR_LoopOpts_GetAllowedInstNumAfterUnroll(lo)     ((lo)->allowedInstNumAfterUnroll)
 #define VIR_LoopOpts_SetAllowedInstNumAfterUnroll(lo, n)  ((lo)->allowedInstNumAfterUnroll = (n))
+#define VIR_LoopOpts_HWsupportPerCompDepForLS(lo)         ((lo)->hwsupportPerCompDepForLS)
+#define VIR_LoopOpts_SetHWsupportPerCompDepForLS(lo, b)   ((lo)->hwsupportPerCompDepForLS = (b))
 
 void
 VIR_LoopOpts_Init(
@@ -53,7 +56,8 @@ VIR_LoopOpts_Init(
     VIR_Function* func,
     VSC_OPTN_LoopOptsOptions* options,
     VIR_Dumper* dumper,
-    VSC_MM* mm
+    VSC_MM* mm,
+    gctBOOL hwSuppertCompDepForLS
     );
 
 void
