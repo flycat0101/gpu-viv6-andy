@@ -46,7 +46,6 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* LOG:  dump FE log file in case of compiler error */
     gcvFALSE, /* UNIFORM: dump uniform value when setting uniform */
     gcvFALSE, /* SPIRV: dump VIR shader convert from SPIRV */
-    gcvFALSE, /* SPIRV2FILE: dump SPIRV to tmp file for debugging */
     0, /* _dumpStart; */
     0x7fffffff, /* _dumpEnd */
 
@@ -1279,6 +1278,9 @@ gcOpt_hasMultipleDependencyForSameTemp(
                 continue;
 
             depIdx = dep->code->instruction.tempIndex;
+            /* TODO: check if the dependencies are in the same basic block
+             *       or defines different components
+             */
             if (depIdx == curDepIdx)
             {
                 /* check if any component is used in the both dependencies */
@@ -1289,6 +1291,8 @@ gcOpt_hasMultipleDependencyForSameTemp(
 
                 if ((usedComponents & depUsedComponents) != 0)
                 {
+                    /* TODO: check if the conflict component is actually killed by later
+                     * assignment */
                     if (!gcOpt_isRedefKillsAllPrevDef(Dependencies,
                                                 usedComponents & depUsedComponents))
                         return gcvTRUE;
@@ -6148,6 +6152,8 @@ _BuildDataFlowForCode(
 
         targetIsTemp = gcvTRUE;
 
+        /* TODO - need to handle indexed mode? */
+
         break;
     }
 
@@ -6238,6 +6244,8 @@ _BuildDataFlowForCode(
             }
         }
     }
+
+    /* TODO - Special case for TEXLD? */
 
     /* Determine usage of source1. */
     source = code->source1;

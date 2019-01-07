@@ -1219,7 +1219,7 @@ static gceSTATUS __SpvDecodeString(
         gctSTRING randName = gcvNULL;
         gcmONERROR(spvAllocate(spv->spvMemPool, 64, (gctPOINTER *)&randName));
         gcoOS_ZeroMemory(randName, 64);
-        gcoOS_PrintStrSafe(randName, SPV_VIR_NAME_SIZE, &offset, "#spv_unknow_id_%d", spv->unknowId++);
+        gcoOS_PrintStrSafe(randName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_unknow_id_%d", spv->unknowId++);
         *str = randName;
     }
 
@@ -1544,7 +1544,7 @@ static void __SpvGenerateVIRName(gcSPV spv, gctUINT id)
 {
     gctUINT offset = 0;
 
-    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_id%d", id);
+    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_id%d", id);
 }
 
 static void __SpvGenerateStructFiledName(gcSPV spv, gctSTRING structName, gctUINT id)
@@ -1558,14 +1558,14 @@ static void __SpvGenerateCopyMemoryName(gcSPV spv, gctUINT id)
 {
     gctUINT offset = 0;
 
-    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_copy_to_%d", id);
+    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_copy_to_%d", id);
 }
 
 static void __SpvGenerateFuncName(gcSPV spv, gctUINT id)
 {
     gctUINT offset = 0;
 
-    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_func_id%d", id);
+    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_func_id%d", id);
 }
 
 /* Generate the function return variable name */
@@ -1574,7 +1574,7 @@ static void __SpvGenerateFuncReturnName(gcSPV spv, gctCHAR * funcName)
     gctUINT offset = 0;
 
     gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset,
-        "#spv_%s_retValue", funcName);
+        "#sh_%s_retValue", funcName);
 
     spv->nameId++;
 }
@@ -1587,7 +1587,7 @@ static VIR_SymId __SpvGenerateVectorDynamicIndexSym(gcSPV spv, VIR_Shader *virSh
     VIR_NameId nameId;
     VIR_TypeId typeId;
 
-    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_id%d_VectorDynamicIndex", id);
+    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_id%d_VectorDynamicIndex", id);
 
     VIR_Shader_AddString(virShader, spv->virName, &nameId);
     VIR_Shader_AddArrayType(virShader,
@@ -1733,7 +1733,6 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         }
         /* According to spec, a push-constant uses a std430 layout. */
         VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_STD430);
-        /* Fall through. */
     case SpvStorageClassUniformConstant:
     case SpvStorageClassUniform:
     case SpvStorageClassAtomicCounter:
@@ -2021,11 +2020,9 @@ __SpvSetAccessChainOffsetToOperand(
         return;
     }
 
-    if (VIR_Operand_GetOpKind(Operand) != VIR_OPND_IMMEDIATE)
-    {
-        VIR_Operand_SetMatrixStride(Operand, SPV_ID_SYM_MATRIX_STRIDE(ResultId));
-        VIR_Operand_SetLayoutQual(Operand, SPV_ID_SYM_LAYOUT_QUAL(ResultId));
-    }
+    VIR_Operand_SetMatrixStride(Operand, SPV_ID_SYM_MATRIX_STRIDE(ResultId));
+    VIR_Operand_SetLayoutQual(Operand, SPV_ID_SYM_LAYOUT_QUAL(ResultId));
+
     if (spvOffsetType == SpvOffsetType_None)
     {
         return;
@@ -2256,8 +2253,9 @@ static VSC_ErrCode __SpvAddInterfaceBlockSymbol(
     /*
     ** If this type is from spriv assembly directly, then more than one IBs may use it as name,
     ** we need to use the resultId as the IB name.
+    ** TODO: we should use a flag to check if a type name is created by ourself.
     */
-    if (gcmIS_SUCCESS(gcoOS_StrNCmp(typeName, "#spv_", 4)))
+    if (gcmIS_SUCCESS(gcoOS_StrNCmp(typeName, "#sh_", 4)))
     {
         __SpvGenerateVIRName(spv, spv->resultId);
         VIR_Shader_AddString(virShader, spv->virName, &typeNameId);
@@ -3742,6 +3740,7 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     arrayed = SPV_ID_TYPE_IMAGE_ARRAY(targetId);
     msaa = SPV_ID_TYPE_IMAGE_MSAA(targetId);
     sampled = SPV_ID_TYPE_IMAGE_SAMPLED(targetId);
+
     sampledType = SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(targetId);
 
     if (format != SpvImageFormatUnknown)
@@ -4480,7 +4479,7 @@ static VSC_ErrCode __SpvConstructWorkgroup(
         VIR_Symbol_SetLocation(sym, -1);
 
         /* create a shared ssb for compute shader */
-        virErrCode = VIR_Shader_AddString(virShader, _sldSharedVariableStorageBlockName, &nameId);
+        virErrCode = VIR_Shader_AddString(virShader, "#sh_spv_shared_ssbo", &nameId);
         if (virErrCode != VSC_ERR_NONE) return virErrCode;
 
         virErrCode = VIR_Shader_AddStructType(virShader, gcvFALSE, nameId, gcvFALSE, &virTypeId);
@@ -5011,7 +5010,7 @@ static VSC_ErrCode __SpvFoldingSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
         case SpvOpIAdd:
         case SpvOpISub:
         case SpvOpIMul:
-            gcmASSERT(gcvFALSE);
+            gcmASSERT(gcvFALSE); /* TODO: handle vector, need get value from spv id, and get result, map to spvid */
             break;
 
         case SpvOpCompositeInsert:
@@ -6801,6 +6800,8 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
+    (void)dstVirType;
+
     /* If the composite is a matrix, then it must be a variable. */
     if (SPV_ID_TYPE_IS_VECTOR(spvTypeId))
     {
@@ -6994,7 +6995,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             VIR_SymId nestSymId;
 
             gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_nested_%d", spv->resultId);
+            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_nested_%d", spv->resultId);
             VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
             VIR_Shader_AddSymbol(
@@ -7063,7 +7064,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             else
             {
                 gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-                gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_nested_offset_%d", spv->resultId);
+                gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_nested_offset_%d", spv->resultId);
                 VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
                 VIR_Shader_AddSymbol(
@@ -8534,7 +8535,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     }
 
     gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
-    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_shared_%d", dstSpvId);
+    gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_shared_%d", dstSpvId);
     VIR_Shader_AddString(virShader, spv->virName, &nameId);
 
     VIR_Shader_AddSymbol(
@@ -12874,28 +12875,6 @@ gcSPV_Decode(
         __SpvDumpSpriv(info->binary, info->sizeInByte);
     }
 
-    /* dump spriv to file and store in TEMP */
-    if (gcmGetOptimizerOption()->dumpSpirvToFile)
-    {
-#define _FILENAMEMAX 1024
-        gctCHAR    fileName[_FILENAMEMAX+1];
-        gctCHAR    tmpName[32];
-        gctUINT64  time;
-        gctUINT32 offset = 0;
-        vscGetTemporaryDir(fileName);
-#if _WIN32
-        gcoOS_StrCatSafe(fileName, _FILENAMEMAX, "\\");
-#else
-        gcoOS_StrCatSafe(fileName, _FILENAMEMAX, "/");
-#endif
-        gcoOS_GetTime(&time);
-        gcmVERIFY_OK(gcoOS_PrintStrSafe(tmpName, 32, &offset, "vk_%lld", (gctUINT64)time)); /*generate temp file name according time*/
-        gcoOS_StrCatSafe(fileName, _FILENAMEMAX, tmpName);
-        gcoOS_StrCatSafe(fileName, _FILENAMEMAX, ".spv"); /* file suffix*/
-
-        __gcSpvDumpSprivToFile(info->binary, info->sizeInByte, fileName);
-    }
-
     /* handle special flag */
     if (Spv->spvSpecFlag & SPV_SPECFLAG_ENTRYPOINT)
     {
@@ -12909,7 +12888,11 @@ gcSPV_Decode(
     __SpvParameterize(Spv);
 
     /* check first several byte for magic number/version/genereator/boundID/schema*/
-    gcmONERROR(__SpvValidate(Spv));
+    if (gcmIS_ERROR(__SpvValidate(Spv)))
+    {
+        gcmFOOTER();
+        return gcvSTATUS_INVALID_DATA;
+    }
 
 #if gcmDUMP_SPIRV_ASIIC
     __SpvDumpValidator(Spv->src, Spv->size * 4);
