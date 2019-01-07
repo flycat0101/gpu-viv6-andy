@@ -23,13 +23,18 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+enum
+{
+    EGL_PLATFORM_FLAG_GBM_ASYNC     = 1 << 0,
+};
 
 struct eglPlatform
 {
     /* Platform type, '0' for default (ie, by eglGetDisplay). */
     EGLenum platform;
 
+    /* platform flags */
+    gctUINT32   flags;
     /* Display. */
     /*
      * Get default display.

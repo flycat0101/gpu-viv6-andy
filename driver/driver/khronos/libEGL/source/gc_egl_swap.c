@@ -2054,7 +2054,8 @@ _SwapBuffersRegion(
             }
             thread->pendingSignal = gcvNULL;
         }
-        else if ((platform->platform == EGL_PLATFORM_GBM_VIV) && (!synchronous))
+        else if ((platform->platform == EGL_PLATFORM_GBM_VIV) && (!synchronous) &&
+                 (!(platform->flags & EGL_PLATFORM_FLAG_GBM_ASYNC)))
         {
             /* Using android native fence sync. */
             if (!platform->postWindowBackBufferFence(dpy, draw,

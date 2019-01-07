@@ -3713,7 +3713,7 @@ _SyncToPixmap(
 static struct eglPlatform androidPlatform =
 {
     EGL_PLATFORM_ANDROID_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

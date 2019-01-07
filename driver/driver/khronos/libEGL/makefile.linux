@@ -169,7 +169,7 @@ ifeq ($(EGL_API_GBM),1)
   ifneq ($(GBM_LIBS),)
     LDLIBS += $(GBM_LIBS)
   else
-    LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm
+    LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm -L$(AQROOT)/driver/gbm/backends/viv/$(OBJ_DIR) -l:gbm_viv.so
   endif
 endif
 

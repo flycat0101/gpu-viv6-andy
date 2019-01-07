@@ -2377,7 +2377,7 @@ _SyncToPixmap(
 static struct eglPlatform waylandPlatform =
 {
     EGL_PLATFORM_WAYLAND_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

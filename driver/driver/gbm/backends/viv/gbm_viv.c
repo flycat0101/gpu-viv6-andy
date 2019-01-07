@@ -53,6 +53,8 @@
 #define DRM_RDWR O_RDWR
 #endif
 
+#define DISABLE_PRINT_QUEUE    1
+
 struct gbm_backend gbm_viv_backend;
 
 static gceSTATUS
@@ -200,6 +202,7 @@ uint32_t gbm_viv_query_waylandbuffer(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
+
     return 1;
 OnError:
     return 0;
@@ -870,6 +873,7 @@ gbm_viv_create_buffers(
         }
 
         surf->buffers[i].status = FREE;
+        surf->buffers[i].lockCount = 0;
 
         switch (gbm_viv_bo_get_modifier(surf->buffers[i].bo))
         {
@@ -882,6 +886,8 @@ gbm_viv_create_buffers(
             break;
         }
     }
+
+    surf->free_count = surf->buffer_count;
 
     surf->fence_fd = -1;
     surf->fence_on = 0;
@@ -900,6 +906,46 @@ OnError:
     return status;
 }
 
+#if DISABLE_PRINT_QUEUE
+#define gbm_viv_surface_print_queue(surf, tag)
+#else
+static void gbm_viv_surface_print_queue(
+    struct gbm_viv_surface *surf,
+    char * tag
+    )
+{
+    gcmPRINT("Queue status: %s", tag);
+    if (surf->queue.head != surf->queue.tail)
+    {
+        int i;
+        if (surf->queue.head  < surf->queue.tail)
+        {
+            gcmPRINT("Queued number: %d", (surf->queue.tail - surf->queue.head));
+            for (i = surf->queue.head; i < surf->queue.tail; i++)
+            {
+                gcmPRINT("%dth = %d", i, surf->queue.data[i]);
+            }
+        }
+        else
+        {
+            gcmPRINT("Queued number: %d", (surf->queue.tail + (GBM_QUEUE_SIZE -  surf->queue.head)));
+            for (i = surf->queue.head; i < GBM_QUEUE_SIZE; i++)
+            {
+                gcmPRINT("%dth = %d", i, surf->queue.data[i]);
+            }
+            for (i = 0; i < surf->queue.tail; i++)
+            {
+               gcmPRINT("%dth = %d", i, surf->queue.data[i]);
+            }
+        }
+    }
+    else
+    {
+        gcmPRINT("Queue is empty");
+    }
+}
+#endif
+
 static struct gbm_surface *
 gbm_viv_surface_create(
     struct gbm_device *gbm,
@@ -912,6 +958,7 @@ gbm_viv_surface_create(
     )
 {
     gceSTATUS status;
+    gctSTRING envctrl = gcvNULL;
     uint32_t usage = GBM_BO_USE_SCANOUT;
     struct gbm_viv_surface *surf = calloc(1, sizeof(*surf));
     if (!surf)
@@ -926,13 +973,31 @@ gbm_viv_surface_create(
     surf->base.format = format;
     surf->base.flags = flags;
 
+    surf->queue.head = surf->queue.tail = 0;
+    surf->lastIndex = -1;
+    for (int i = 0; i < GBM_QUEUE_SIZE; i++)
+    {
+        surf->queue.data[i] = -1;
+    }
+
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surf->lock));
+
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
         format, usage, modifiers, count));
 
+    surf->aSync = gcvFALSE;
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GBM_ENABLE_ASYNC", &envctrl)) && envctrl)
+    {
+        gcmPRINT("enable async");
+        surf->aSync = gcvTRUE;
+    }
     return &surf->base;
 
 OnError:
     /*Create gbm_bo failed */
+    if (surf->lock)
+        gcoOS_DeleteMutex(gcvNULL, surf->lock);
     if (surf)
         free(surf);
 
@@ -947,23 +1012,135 @@ gbm_viv_surface_lock_front_buffer(
     struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
     struct gbm_bo *bo = NULL;
     struct gbm_viv_bo *viv_bo = NULL;
+    bool found = false;
 
-    int i;
-
-    for (i = 0; i < surf->buffer_count; i++)
+    do
     {
-        if (surf->buffers[i].status == FRONT_BUFFER)
+        unsigned int headIndex;
+        gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
+        if (surf->queue.tail != surf->queue.head)
         {
-            surf->buffers[i].status = LOCKED_BY_CLIENT;
-            bo = surf->buffers[i].bo;
+            /* not empty, dequeue the head */
+            gbm_viv_surface_print_queue(surf, "before_deqeue");
+            headIndex = surf->queue.data[surf->queue.head];
+            surf->queue.head = (surf->queue.head + 1) %  GBM_QUEUE_SIZE;
+            surf->buffers[headIndex].status = LOCKED_BY_CLIENT;
+            surf->buffers[headIndex].lockCount = 1;
+            surf->lastIndex = headIndex;
+            bo = surf->buffers[headIndex].bo;
             viv_bo = gbm_viv_bo(bo);
 
+            gbm_viv_surface_print_queue(surf, "after_dequeue");
             if (viv_bo->modifier == DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC)
             {
                 gcoSURF_UpdateMetadata(viv_bo->surface, viv_bo->ts_fd);
             }
+            found = true;
+        }
+        gcoOS_ReleaseMutex(gcvNULL, surf->lock);
+
+        if (found)
+            break;
+
+        /* not found a prepared bo, if aSync is enabled, go with the last bo and don't block rendering thread */
+        if (surf->aSync)
+        {
+            if (surf->lastIndex != -1)
+            {
+                headIndex = surf->lastIndex;
+                gcmASSERT(surf->buffers[headIndex].status == LOCKED_BY_CLIENT);
+
+                surf->buffers[headIndex].lockCount++;
+                bo = surf->buffers[headIndex].bo;
+                found = true;
+            }
+
+            if (found)
+                break;
         }
     }
+    while (1);
+
+    return bo;
+}
+
+void
+gbm_viv_surface_enqueue(
+    struct gbm_viv_surface *surf,
+    gcoSURF surface
+    )
+{
+    int i;
+    bool done = false;
+    for (i = 0; i < surf->buffer_count; i++)
+    {
+       struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+        if (viv_bo->surface == surface)
+        {
+            break;
+        }
+    }
+
+    if (i == surf->buffer_count)
+    {
+        gcmPRINT("FATAL error: The enqueued surface is not any of gbm buffer");
+        return;
+    }
+
+    do
+    {
+        gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
+        if (((surf->queue.tail + 1) % GBM_QUEUE_SIZE) != surf->queue.head)
+        {
+            /* queue is not full */
+            gbm_viv_surface_print_queue(surf, "before_enqueue");
+            surf->queue.data[surf->queue.tail] = i;
+            surf->queue.tail = (surf->queue.tail + 1) % GBM_QUEUE_SIZE;
+            done = true;
+            gbm_viv_surface_print_queue(surf, "after_enqueue");
+        }
+        gcoOS_ReleaseMutex(gcvNULL, surf->lock);
+        if (done)
+            break;
+    }
+    while (1);
+
+    return;
+}
+
+struct gbm_bo *
+gbm_viv_surface_get_free_buffer(
+    struct gbm_viv_surface *surf
+    )
+{
+    int i = 0;
+    struct gbm_bo * bo = NULL;
+    bool found = false;
+
+    do
+    {
+        if (surf->buffers[i].status == FREE)
+        {
+            gcmASSERT(surf->buffers[i].lockCount == 0);
+            surf->buffers[i].status = USED_BY_EGL;
+            bo = surf->buffers[i].bo;
+            surf->free_count--;
+            found = true;
+            if (surf->free_count == 1)
+            {
+                while (surf->queue.head == surf->queue.tail)
+                {
+                    usleep(10);
+                }
+            }
+        }
+        if (found)
+           break;
+
+        if ((i++) == surf->buffer_count)
+            i = 0;
+
+    } while (1);
 
     return bo;
 }
@@ -981,7 +1158,19 @@ gbm_viv_surface_release_buffer(
     {
         if (surf->buffers[i].bo == bo)
         {
-            surf->buffers[i].status = FREE;
+            surf->buffers[i].lockCount --;
+            if (0 == surf->buffers[i].lockCount)
+            {
+                surf->buffers[i].status = FREE;
+                surf->free_count++;
+
+                if (surf->lastIndex == i)
+                    surf->lastIndex = -1;
+            }
+            else
+            {
+                gcmPRINT("The %dth buffer is multiple locked(%d)", i, surf->buffers[i].lockCount);
+            }
             break;
         }
     }
@@ -1040,6 +1229,9 @@ gbm_viv_surface_destroy(
 
         /* Flush hardware to scheduled surface free to takeplace */
         gcoHAL_Commit(gcvNULL, gcvTRUE);
+
+        if (surf->lock)
+            gcoOS_DeleteMutex(gcvNULL, surf->lock);
 
         free(surf);
     }

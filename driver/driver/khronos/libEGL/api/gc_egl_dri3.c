@@ -3634,7 +3634,7 @@ _MakeCurrent(
 static struct eglPlatform driPlatform =
 {
     EGL_PLATFORM_DRI3_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

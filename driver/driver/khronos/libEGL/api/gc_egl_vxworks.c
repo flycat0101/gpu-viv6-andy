@@ -4146,7 +4146,7 @@ _SyncToPixmap(
 static struct eglPlatform vxworksPlatform =
 {
     EGL_PLATFORM_FB_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

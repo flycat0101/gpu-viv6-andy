@@ -4185,7 +4185,7 @@ _SyncToPixmap(
 static struct eglPlatform fbdevPlatform =
 {
     EGL_PLATFORM_FB_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

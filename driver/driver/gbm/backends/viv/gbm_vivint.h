@@ -19,7 +19,8 @@
 #include "gbmint.h"
 #include "common_drm.h"
 
-#define GBM_MAX_BUFFER  4
+#define GBM_MAX_BUFFER  8
+#define GBM_QUEUE_SIZE (GBM_MAX_BUFFER + 1)
 
 struct gbm_viv_surface;
 struct gbm_viv_buffer;
@@ -49,6 +50,7 @@ struct gbm_viv_bo
 struct gbm_viv_buffer
 {
     struct gbm_bo *bo;
+    unsigned int lockCount;
 
     enum {
         LOCKED_BY_CLIENT, /* taken by gbm_surface_lock_front_buffer */
@@ -58,16 +60,31 @@ struct gbm_viv_buffer
     } status;
 };
 
+struct gbm_viv_queue
+{
+    unsigned int head;
+    unsigned int tail;
+    int data[GBM_QUEUE_SIZE];
+};
+
 struct gbm_viv_surface
 {
     struct gbm_surface base;
 
     gctINT buffer_count;
+    gctINT free_count;
     struct gbm_viv_buffer buffers[GBM_MAX_BUFFER];
+
+    struct gbm_viv_queue queue;
+
+    gctPOINTER lock;
+
+    gctINT lastIndex;
 
     gctBOOL extResolve;
     int fence_fd;
     uint32_t fence_on;
+    gctBOOL aSync;
 };
 
 struct
@@ -159,4 +176,14 @@ gbm_viv_surface(struct gbm_surface *surface)
     return (struct gbm_viv_surface *) surface;
 }
 
+struct gbm_bo *
+gbm_viv_surface_get_free_buffer(
+    struct gbm_viv_surface *surf
+    );
+
+void
+gbm_viv_surface_enqueue(
+    struct gbm_viv_surface *surf,
+    gcoSURF surface
+    );
 #endif

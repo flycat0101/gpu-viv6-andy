@@ -2745,7 +2745,7 @@ _SyncToPixmap(
 static struct eglPlatform dfbPlatform =
 {
     EGL_PLATFORM_DFB_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

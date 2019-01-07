@@ -6324,7 +6324,7 @@ _RSForSwap(
 static struct eglPlatform driPlatform =
 {
     EGL_PLATFORM_DRI_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

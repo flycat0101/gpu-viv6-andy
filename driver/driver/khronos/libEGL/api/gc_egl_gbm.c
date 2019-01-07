@@ -47,6 +47,7 @@ typedef struct gbm_device *  PlatformDisplayType;
 typedef struct gbm_surface * PlatformWindowType;
 typedef struct gbm_bo *      PlatformPixmapType;
 
+static struct eglPlatform gbmPlatform;
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
 
@@ -447,22 +448,17 @@ gceSTATUS
 gbm_SetDisplayVirtual(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
+    IN gcoSURF Surface,
     IN gctUINT Offset,
     IN gctINT X,
     IN gctINT Y
     )
 {
-    int i;
     struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) Window);
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
 
-    for (i = 0; i < surf->buffer_count; i++) {
-        if (surf->buffers[i].status == USED_BY_EGL) {
-            surf->buffers[i].status = FRONT_BUFFER;
-            break;
-        }
-    }
+    gbm_viv_surface_enqueue(surf, Surface);
 
     /* Success. */
     gcmFOOTER_NO();
@@ -778,23 +774,14 @@ gbm_GetDisplayBackbufferEx(
     OUT gctINT * Y
     )
 {
-    int i;
     struct gbm_viv_surface * surf = (struct gbm_viv_surface *)Window;
 
-    for (i = 0; i < surf->buffer_count; i++)
-    {
-        if (surf->buffers[i].status == FREE)
-        {
-            struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
-
-            *surface = viv_bo->surface;
-            surf->buffers[i].status = USED_BY_EGL;
-            *Offset  = 0;
-            *X       = 0;
-            *Y       = 0;
-            break;
-        }
-    }
+    struct gbm_viv_bo *viv_bo = (struct gbm_viv_bo *)gbm_viv_surface_get_free_buffer(surf);
+    gcmASSERT(viv_bo);
+    *surface = viv_bo->surface;
+    *Offset  = 0;
+    *X       = 0;
+    *Y       = 0;
 
     return (*surface) ? gcvSTATUS_OK : gcvSTATUS_OUT_OF_RESOURCES;
 }
@@ -2467,6 +2454,7 @@ _PostWindowBackBufferFence(
 
         status = gbm_SetDisplayVirtual((PlatformDisplayType) Display->hdc,
                                        (PlatformWindowType) win,
+                                       surface,
                                        0,
                                        BackBuffer->origin.x,
                                        BackBuffer->origin.y);
@@ -2556,6 +2544,7 @@ _PostWindowBackBuffer(
 
         status = gbm_SetDisplayVirtual((PlatformDisplayType) Display->hdc,
                                        (PlatformWindowType) win,
+                                       surface,
                                        0,
                                        BackBuffer->origin.x,
                                        BackBuffer->origin.y);
@@ -2690,8 +2679,12 @@ _SynchronousPost(
     void * win = Surface->hwnd;
     struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) win);
 
-    if (gbm_surface_in_fence_on(&(surf->base)))
+    if (gbm_surface_in_fence_on(&(surf->base)) ||
+        (gbmPlatform.flags & EGL_PLATFORM_FLAG_GBM_ASYNC))
+    {
         return EGL_FALSE;
+    }
+
     return EGL_TRUE;
 }
 
@@ -3266,7 +3259,7 @@ _SyncToPixmap(
 static struct eglPlatform gbmPlatform =
 {
     EGL_PLATFORM_GBM_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,
@@ -3303,6 +3296,11 @@ veglGetGbmPlatform(
 {
     gceSTATUS status = gcvSTATUS_OK;
     PlatformDisplayType dpy;
+    gctSTRING envctrl = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GBM_ENABLE_ASYNC", &envctrl)) && envctrl)
+    {
+        gbmPlatform.flags |= EGL_PLATFORM_FLAG_GBM_ASYNC;
+    }
 
     gcmONERROR(gbm_GetDisplayByDevice(&dpy, NativeDisplay));
 

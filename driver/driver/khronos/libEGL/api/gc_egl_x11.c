@@ -3214,7 +3214,7 @@ _SyncToPixmap(
 static struct eglPlatform x11Platform =
 {
     EGL_PLATFORM_X11_VIV,
-
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,

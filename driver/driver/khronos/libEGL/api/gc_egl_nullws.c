@@ -104,6 +104,7 @@ _QueryBufferAge(
 
 static struct eglPlatform nullwsPlatform = {
     EGL_PLATFORM_NULLWS_VIV,
+    0,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,
