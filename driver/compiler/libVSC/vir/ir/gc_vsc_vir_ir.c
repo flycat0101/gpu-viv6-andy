@@ -6030,6 +6030,7 @@ VIR_UBO_Identical(
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctSTRING                  name1 = gcvNULL, name2 = gcvNULL;
+    gctBOOL                    hasInstanceName1, hasInstanceName2;
     VIR_Type*                  type1;
     VIR_Type*                  type2;
     gctBOOL                    matched = gcvFALSE;
@@ -6064,6 +6065,14 @@ VIR_UBO_Identical(
         {
             errCode = VSC_ERR_UNIFORM_TYPE_MISMATCH;
             ON_ERROR(errCode, "UBO \"%s\" layout mismatch.", name1);
+        }
+
+        hasInstanceName1 = (VIR_IB_GetFlags(Sym1->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
+        hasInstanceName2 = (VIR_IB_GetFlags(Sym2->u2.ubo) & VIR_IB_WITH_INSTANCE_NAME) != 0;
+        if(hasInstanceName1 != hasInstanceName2)
+        {
+            errCode = VSC_ERR_UNIFORM_TYPE_MISMATCH;
+            ON_ERROR(errCode, "UBO \"%s\" instance name mismatch.", name1);
         }
 
         /* check base addr uniform. */
