@@ -3038,6 +3038,33 @@ VkResult halti5_clearImage(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
             );
 
+        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
+
         __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -4334,6 +4361,33 @@ VkResult halti5_copyImage(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
             );
 
+        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
+
         __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -4880,6 +4934,33 @@ VkResult halti5_fillBuffer(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
         );
 
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+    }
+
     if (extraSize > 0)
     {
         /* Move address to the extra size */
@@ -5015,6 +5096,33 @@ VkResult halti5_fillBuffer(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
             );
+
+        if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
     }
 
     __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -5315,6 +5423,33 @@ VkResult halti5_copyBuffer(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
         );
+
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+    }
 
     __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
@@ -5618,6 +5753,33 @@ VkResult halti5_updateBuffer(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
         );
+
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+    }
 
     __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
