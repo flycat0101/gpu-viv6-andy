@@ -301,7 +301,7 @@ gbm_viv_bo_get_fd(struct gbm_bo *_bo)
         }
     }
 
-    return bo->fd;
+    return dup(bo->fd);
 }
 
 static void *
@@ -696,6 +696,7 @@ gbm_viv_bo_create(
     bo->base.gbm = gbm;
     bo->base.format = format;
     bo->modifier = modifier;
+    bo->fd = bo->ts_fd = -1;
 
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
     gcmONERROR(gbm_viv_get_hal_format(format, &gc_format));
