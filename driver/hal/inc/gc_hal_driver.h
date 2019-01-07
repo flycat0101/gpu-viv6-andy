@@ -199,6 +199,10 @@ typedef enum _gceHAL_COMMAND_CODES
     /* Wait until GPU finishes access to a resource. */
     gcvHAL_WAIT_FENCE,
 
+    /* Commit mutex. */
+    gcvHAL_COMMIT_MUTEX,
+    gcvHAL_RELEASE_MUTEX,
+
 #if gcdDEC_ENABLE_AHB
     gcvHAL_DEC300_READ,
     gcvHAL_DEC300_WRITE,

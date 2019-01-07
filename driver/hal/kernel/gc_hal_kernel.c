@@ -2705,6 +2705,7 @@ gckKERNEL_Dispatch(
                 }
             }
         }
+
         gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
         commitMutexAcquired = gcvFALSE;
 
@@ -3427,6 +3428,17 @@ gckKERNEL_Dispatch(
             Interface->u.WaitFence.handle,
             Interface->u.WaitFence.timeOut
             ));
+        break;
+
+    case gcvHAL_COMMIT_MUTEX:
+        gcmkONERROR(gckOS_AcquireMutex(Kernel->os,
+            Kernel->device->commitMutex,
+            gcvINFINITE
+            ));
+        break;
+
+    case gcvHAL_RELEASE_MUTEX:
+        gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
         break;
 
 #if gcdDEC_ENABLE_AHB

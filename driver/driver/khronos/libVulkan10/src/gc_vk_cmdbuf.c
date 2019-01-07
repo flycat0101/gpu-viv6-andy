@@ -719,8 +719,18 @@ VkResult __vk_CommitStateBuffers(
 
     for (icommitPool = 0; icommitPool <= curPoolIndex; ++icommitPool)
     {
+        gcsHAL_INTERFACE iface;
         VkBool32 bLast = (icommitPool == curPoolIndex);
         uint32_t count = bLast ? commitCount : (uint32_t)(__VK_MAX_COMMITS << icommitPool);
+
+        __VK_MEMZERO(&iface, sizeof(iface));
+        iface.command = gcvHAL_COMMIT_MUTEX;
+        /* Call kernel service. */
+        __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+
+        /* Update commit stamp. */
+        devQueue->commitStamp = iface.u.Commit.commitStamp;
+
         for (icommits = 0; icommits < count; icommits++)
         {
             uint32_t *states;
@@ -732,6 +742,13 @@ VkResult __vk_CommitStateBuffers(
 
             __vk_QueueReleaseSpace(devQueue, stateSize);
         }
+
+        __VK_MEMZERO(&iface, sizeof(iface));
+        iface.command = gcvHAL_RELEASE_MUTEX;
+        /* Call kernel service. */
+        __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+        /* Update commit stamp. */
+        devQueue->commitStamp = iface.u.Commit.commitStamp;
     }
 
     __VK_ONERROR(__vk_QueueCommit(devQueue));
