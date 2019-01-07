@@ -712,7 +712,6 @@ static void _VSC_IS_InstSched_InitBubble(
     gctUINT32 cacheld_latency = hw_uarch_caps->cacheLdCycles;
     gctUINT32 cachest_latency = hw_uarch_caps->cacheStCycles;
     gctUINT32 texld_bubble, memld_bubble, memst_bubble, cache_ld_bubble, cache_st_bubble, texld_bandwidth, memld_bandwidth;
-    gctUINT32 memld_bubble_valuefromhc; /* value compute from hw config */
 
     if(VSC_OPTN_ISOptions_GetRegCount(options))
     {
@@ -775,13 +774,8 @@ static void _VSC_IS_InstSched_InitBubble(
     }
     texld_bubble = texld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (texld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
-    /* reduce the value of memld_bubble to 6 if hw feature supportPerCompDepForLS is false,
-     * which may help to avoid too many load instructions are sheduled together and
-     * decrease the register allocation pressure */
-    memld_bubble_valuefromhc = memld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
+    memld_bubble = memld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (memld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
-    memld_bubble = (hw_cfg->hwFeatureFlags.supportPerCompDepForLS) ?
-                   memld_bubble_valuefromhc : (memld_bubble_valuefromhc > 6) ? 6 : memld_bubble_valuefromhc;
 
     memst_bubble = memst_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (memst_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
@@ -1603,6 +1597,84 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_DUPerChannel(
     return err_code;
 }
 
+static VSC_ErrCode _VSC_IS_DepDag_UpdateMemLdBubble(
+    IN VSC_IS_InstSched* is,
+    IN OUT VSC_IS_DepDag* dag
+    )
+{
+    VSC_ErrCode err_code  = VSC_ERR_NONE;
+    VSC_DG_ITERATOR iter;
+    VSC_IS_DepDagNode* node;
+    VSC_SIMPLE_RESIZABLE_ARRAY ldnodeArray;
+
+    vscSRARR_Initialize(&ldnodeArray, is->pMM, 0, sizeof(VSC_IS_DepDagNode*), gcvNULL);
+
+    vscDG_ITERATOR_Initialize(&iter, VSC_IS_DepDag_GetDGraph(dag),
+        VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, VSC_GRAPH_TRAVERSAL_ORDER_PREV, gcvFALSE);
+
+    /* chech each node if the count of succ edge is larger than 6 */
+    for(node = (VSC_IS_DepDagNode*)vscDG_ITERATOR_Begin(&iter);
+        node != gcvNULL; node = (VSC_IS_DepDagNode*)vscDG_ITERATOR_Next(&iter))
+    {
+        VSC_ADJACENT_LIST* edge_list;
+        VSC_UL_ITERATOR depiter;
+        VSC_IS_DepDagEdge* edge;
+        edge_list = VSC_IS_DepDagNode_GetSuccEdgeList(node);
+        if (edge_list && (vscUNILST_GetNodeCount(edge_list) > 6))
+        {
+            /* add all succ "memld" node to ldnodeArray */
+            vscSRARR_Clear(&ldnodeArray);
+            VSC_ADJACENT_LIST_ITERATOR_INIT(&depiter, edge_list);
+            for(edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&depiter);
+                edge != gcvNULL; edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&depiter))
+            {
+                VSC_IS_DepDagNode* ret = VSC_IS_DepDagEdge_GetToNode(edge);
+                if (ret)
+                {
+                    VIR_Instruction *inst = VSC_IS_DepDagNode_GetInst(ret);
+                    if (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst)))
+                    {
+                        vscSRARR_AddElement(&ldnodeArray, (void *)&ret);
+                    }
+                }
+            }
+            /* check more than 6 memld node are dependent on same instruction
+             * reduce memld bubble value of edge from memLd node which edge conflict type is MLRS_RU or MLRS_RS
+             */
+            if (vscSRARR_GetElementCount(&ldnodeArray) > 6)
+            {
+                gctUINT i;
+                /* get dependence node of memLd Node */
+                for (i = 0; i < vscSRARR_GetElementCount(&ldnodeArray); i++)
+                {
+                    VSC_IS_DepDagNode* ldnode = *(VSC_IS_DepDagNode **)vscSRARR_GetElement(&ldnodeArray, i);
+                    VSC_ADJACENT_LIST* ldedge_list = VSC_IS_DepDagNode_GetSuccEdgeList(ldnode);
+                    VSC_UL_ITERATOR lddepiter;
+                    VSC_IS_DepDagEdge* ldedge;
+                    if (ldedge_list)
+                    {
+                        VSC_ADJACENT_LIST_ITERATOR_INIT(&lddepiter, ldedge_list);
+                        for(ldedge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&lddepiter);
+                            ldedge != gcvNULL; ldedge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&lddepiter))
+                        {
+                            gctUINT32 conflict_type = VSC_IS_DepDagEdge_GetConflictType(ldedge);
+                            if (VSC_IS_ConflictType_HasMLRS_RU(conflict_type) ||
+                                VSC_IS_ConflictType_HasMLRS_RS(conflict_type))
+                            {
+                                gctUINT newbubbleValue = VSC_IS_DepDagEdge_GetBubble(ldedge) > 6 ? 6 : VSC_IS_DepDagEdge_GetBubble(ldedge);
+                                VSC_IS_DepDagEdge_SetBubble(ldedge, newbubbleValue);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    vscDG_ITERATOR_End(&iter);
+    vscSRARR_Finalize(&ldnodeArray);
+    return err_code;
+}
+
 static VSC_ErrCode _VSC_IS_BuildDAGForBB(
     IN OUT VSC_IS_InstSched* is
     )
@@ -1655,6 +1727,17 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         free(tail_nodes);
 
         _VSC_IS_DepDag_SetKillPriority(dag);
+
+        /* if hw feature supportPerCompDepForLS is false and
+         * multi memLd (> 6) are dependenced on same instruction
+         * reduce the value of memld_bubble of the edge (memLd, toNode) if the
+         * conflict type is MLRS_RU or MLRS_RS
+         * which to avoid the memLD are scheduled together
+         */
+        if (!is->hwCfg->hwFeatureFlags.supportPerCompDepForLS)
+        {
+            _VSC_IS_DepDag_UpdateMemLdBubble(is, dag);
+        }
     }
 
     /* dump dependence dag */
@@ -4181,6 +4264,9 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
         }
     }
 
+    /* update bubble value after merge */
+   /* _VSC_IS_DepDagNode_UpdateBubbleValueIfNeeded(top_node, bottom_node, detour_edges_bv);*/
+
     if(VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_BUBBLESCHED) &&
        (VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_BUBBLESCHED_INCLUDE_RECUR) || !recursive_call))
     {
@@ -5330,6 +5416,36 @@ VSC_ErrCode VSC_IS_InstSched_PerformOnShader(
 
     return errcode;
 }
+/*
+void _VSC_IS_DepDagNode_UpdateBubbleValueIfNeeded(
+    IN VSC_IS_DepDagNode* start,
+    IN VSC_IS_DepDagNode* end,
+    IN VSC_BIT_VECTOR* edges_bv
+    )
+{
+    VSC_IS_DepDagNode* iter = start;
+    gctBOOL prevIsMemLd = iter && (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(iter->inst))) ? gcvTRUE : gcvFALSE;
+    VSC_IS_DepDagEdge* edge = gcvNULL;
+    gctUINT  continusMemLd = 0;
+    if (!start)
+    {
+        return;
+    }
+    do
+    {
+        iter = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(iter, gcvTRUE, edges_bv, &edge);
+        if (!edge)
+        {
+           break;
+        }
+        if (prevIsMemLd
+    } while(iter && iter != end);
+
+    if(end)
+    {
+
+    }
+}*/
 
 /* dump functions */
 void _VSC_IS_DepDagNode_Dump(
