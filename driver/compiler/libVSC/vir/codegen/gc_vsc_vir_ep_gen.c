@@ -3746,15 +3746,37 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(PROG_VK_INPUT_ATTACHMENT_TABL
         }
     }
 
-    /* Set image size */
-    _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
-                  &pUtbEntry->iaBinding,
-                  pSep);
+    if (bIsSampler)
+    {
+        _AddExtraSamplerArray(&pUtbEntry->hwMappings[stageIdx].ppExtraSamplerArray,
+                              &pUtbEntry->iaBinding,
+                              pShader,
+                              pSep,
+                              gcvFALSE,
+                              gcvFALSE,
+                              -1,
+                              1,
+                              0);
 
-    /* Extra image layer */
-    _AddExtraImageLayer(&pUtbEntry->pExtraLayer[stageIdx],
-                        &pUtbEntry->iaBinding,
-                        pSep);
+        /* Set textureSize/lodMinMax */
+        _AddTextureSizeAndLodMinMax(&pUtbEntry->pTextureSize[stageIdx],
+                                    &pUtbEntry->pLodMinMax[stageIdx],
+                                    &pUtbEntry->pLevelsSamples[stageIdx],
+                                    &pUtbEntry->iaBinding,
+                                    pSep);
+    }
+    else
+    {
+        /* Set image size */
+        _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
+                      &pUtbEntry->iaBinding,
+                      pSep);
+
+        /* Extra image layer */
+        _AddExtraImageLayer(&pUtbEntry->pExtraLayer[stageIdx],
+                            &pUtbEntry->iaBinding,
+                            pSep);
+    }
 
     return VSC_ERR_NONE;
 }
@@ -4401,29 +4423,76 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(PROG_VK_INPUT_ATTACHMENT_T
     gctUINT                              i, j;
     SHADER_PRIV_CONSTANT_ENTRY*          pPrivCnstEntry;
     SHADER_PRIV_UAV_ENTRY*               pPrivUavEntry;
+    SHADER_PRIV_SAMPLER_ENTRY*           pPrivSamplerEntry;
+    gctBOOL                              bIsSampler = gcvFALSE;
 
     for (i = 0; i < pInputAttachmentTable->countOfEntries; i++)
     {
         pIaEntries = &pInputAttachmentTable->pIaEntries[i];
 
-        /* Image size */
-        pPrivCnstEntry = pIaEntries->pImageSize[stageIdx];
-        if (pPrivCnstEntry)
-        {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-            *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-        }
+        bIsSampler = (pIaEntries->hwMappings[stageIdx].uavMapping.hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER);
 
-        /* Extra image layer */
-        pPrivUavEntry = pIaEntries->pExtraLayer[stageIdx];
-        if (pPrivUavEntry)
+        if (bIsSampler)
         {
-            for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)
+            /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+            if (pIaEntries->hwMappings[stageIdx].ppExtraSamplerArray)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)
+                {
+                    pPrivSamplerEntry = pIaEntries->hwMappings[stageIdx].ppExtraSamplerArray[j];
+                    if (pPrivSamplerEntry)
+                    {
+                        gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivSamplerEntry->commonPrivm.pPrivateData);
+                        *(gctUINT*)pPrivSamplerEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+                    }
+                }
+            }
 
-                pPrivUavEntry ++;
+            /* Texture size */
+            pPrivCnstEntry = pIaEntries->pTextureSize[stageIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+            }
+
+            /* lodMinMax */
+            pPrivCnstEntry = pIaEntries->pLodMinMax[stageIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+            }
+
+            /* levelsSamples */
+            pPrivCnstEntry = pIaEntries->pLevelsSamples[stageIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+            }
+        }
+        else
+        {
+            /* Image size */
+            pPrivCnstEntry = pIaEntries->pImageSize[stageIdx];
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+            }
+
+            /* Extra image layer */
+            pPrivUavEntry = pIaEntries->pExtraLayer[stageIdx];
+            if (pPrivUavEntry)
+            {
+                for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
+
+                    pPrivUavEntry ++;
+                }
             }
         }
     }

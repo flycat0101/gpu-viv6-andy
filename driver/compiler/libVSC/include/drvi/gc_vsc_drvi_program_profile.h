@@ -730,6 +730,10 @@ PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE;
 typedef union PROG_VK_INPUT_ATTACHMENT_HW_MAPPING
 {
     SHADER_UAV_SLOT_MAPPING                     uavMapping;
+
+    /* For the case that HW does not natively support separated sampler. The array size is
+       iaBinding::arraySize */
+    SHADER_PRIV_SAMPLER_ENTRY**                 ppExtraSamplerArray;
 }
 PROG_VK_INPUT_ATTACHMENT_HW_MAPPING;
 
@@ -747,22 +751,43 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
 
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_INPUT_ATTACHMENT_HW_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /*
+    ** If hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER,
+    ** it is treated as a sampler, otherwise it is treated as an image.
+    */
+    /*----------------------------------Image-related----------------------------------*/
     /* For image storage, it might need a image-size attached. As each image in
-       storageBinding::arraySize array has image-size, so this is the first entry
+       iaBinding::arraySize array has image-size, so this is the first entry
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
 
-    /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
+    /* Extra layer HW mapping. As currently, for images in in iaBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so
        this is the first entry of extra-image */
     SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
 
+    /*----------------------------------Sampler-related----------------------------------*/
+    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
+       iaBinding::arraySize array has texture-size, so this is the first entry
+       of texture-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* For texel buffer, it might need a lodMinMax attached. As each texel buffer in
+       iaBinding::arraySize array has lodMinMax, so this is the first entry
+       of lodMinMax array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLodMinMax[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* For texel buffer, it might need a levelsSamples attached. As each texel buffer in
+       iaBinding::arraySize array has levelsSamples, so this is the first entry
+       of lodMinMax array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLevelsSamples[VSC_MAX_SHADER_STAGE_COUNT];
+
     /* Which kinds of inst operation acting on sampler (has flag VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER). The count of
        this resOpBit is same as iaBinding::arraySize */
     VSC_RES_OP_BIT*                             pResOpBits;
-
-    /* Different shader stage may have different HW mappings. */
-    PROG_VK_INPUT_ATTACHMENT_HW_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
 }
 PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY;
 
