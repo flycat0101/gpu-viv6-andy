@@ -4364,7 +4364,7 @@ _VIR_LoopInfo_CopyLoop(
     return errCode;
 }
 
-/* return false if loop has memory instruction and hwSupportPerCompDepForLS is false */
+/* return false if loop has barrier instruction */
 static gctBOOL
 _VIR_LoopInfo_CanDoStaticllyUnroll(
     VIR_LoopInfo* loopInfo
@@ -4373,23 +4373,19 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
-    gctUINT instCounts, memInstCount = 0;
 
     if (VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
     {
         return gcvTRUE;
     }
-
-    instCounts = BB_GET_LENGTH(loopHead);
     while(gcvTRUE)
     {
         VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
 
-        if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
+        if (opcode == VIR_OP_BARRIER)
         {
-            memInstCount++;
+            return gcvFALSE;
         }
-
         if(instIter == BB_GET_END_INST(loopHead))
         {
             break;
@@ -4402,17 +4398,15 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
 
     if(loopEnd != loopHead)
     {
-        instCounts += BB_GET_LENGTH(loopEnd);
         instIter = BB_GET_START_INST(loopEnd);
 
         while(gcvTRUE)
         {
             VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-            if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
+            if (opcode == VIR_OP_BARRIER)
             {
-                 memInstCount++;
+                return gcvFALSE;
             }
-
             if(instIter == BB_GET_END_INST(loopEnd))
             {
                 break;
@@ -4424,8 +4418,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
         }
     }
 
-    /* if HWsupportPerCompDepForLS is false, the register used for ld/st need 8 instructions to reuse again */
-    return (instCounts >= (memInstCount << 3));
+    return gcvTRUE;
 }
 
 static VSC_ErrCode
