@@ -9109,6 +9109,14 @@ gcOpt_LoadSWW(
                     gcmSL_OPCODE_GET(iterCode->prev->instruction.opcode, Opcode) == gcSL_MULSAT) break;
             }
 
+            /* Skip IMAGE_SAMPLER and IMAGE_RD  */
+            if (gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_IMAGE_SAMPLER ||
+                gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_IMAGE_RD ||
+                gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_IMAGE_RD_3D)
+            {
+                break;
+            }
+
             /* If the user is gcSL_LOAD, it can be only the nextLoadCode. */
             /* Stop if gcSL_LOAD for now. */
             if (gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_LOAD /*&&
