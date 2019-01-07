@@ -4390,6 +4390,12 @@ gcoHARDWARE_DetectProcess(
 #endif
             gcvFALSE
         },
+        {
+            gcvPATCH_WESTON,
+            /* weston */
+            "\x88\x9a\x8c\x8b\x90\x91",
+            gcvFALSE
+        },
 
     };
 

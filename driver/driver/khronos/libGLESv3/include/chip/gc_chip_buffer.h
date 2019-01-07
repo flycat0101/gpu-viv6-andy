@@ -129,7 +129,7 @@ typedef enum {
     /* Force ALPHA8 to RGBA8 */
     __GL_CHIP_FMT_PATCH_ALPHA8,
 
-    /* Force A8L8 to use native format as it could be streaming for each frame */
+    /* Force A8L8 to use gcvSURF_A8L8_1_A8R8G8B so we could handle copy texture from ARGB8 render target */
     __GL_CHIP_FMT_PATCH_A8L8,
 
 } __GLchipFmtPatch;

@@ -147,6 +147,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_ANDROID_CTS_UIRENDERING,
     gcvPATCH_OPENCV_ATOMIC,
     gcvPATCH_SKIA_SKQP,
+    gcvPATCH_WESTON,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
