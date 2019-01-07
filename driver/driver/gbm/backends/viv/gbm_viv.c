@@ -274,6 +274,45 @@ gbm_viv_is_format_supported(
     return 1;
 }
 
+gceSTATUS
+gbm_viv_get_hal_format(
+    uint32_t GbmFormat,
+    gceSURF_FORMAT *HalFormat
+    );
+
+static int
+gbm_viv_get_format_modifier_plane_count(struct gbm_device *gbm,
+                                        uint32_t format,
+                                        uint64_t modifier)
+{
+    uint64_t plane_count;
+    gceSURF_FORMAT halFormat;
+
+    if (gcmIS_ERROR(gbm_viv_get_hal_format(format, &halFormat)))
+        return -1;
+
+    switch (format)
+    {
+    case GBM_FORMAT_NV12:
+    case GBM_FORMAT_NV21:
+    case GBM_FORMAT_NV16:
+    case GBM_FORMAT_NV61:
+        plane_count = 2;
+        break;
+
+    case GBM_FORMAT_YUV420:
+    case GBM_FORMAT_YVU420:
+        plane_count = 3;
+        break;
+
+    default:
+        plane_count = 1;
+        break;
+    }
+
+   return plane_count;
+}
+
 static int
 gbm_viv_bo_write(
     struct gbm_bo *_bo,
@@ -1063,6 +1102,7 @@ viv_device_create(int fd)
     dev->base.bo_map = gbm_viv_bo_map;
     dev->base.bo_unmap = gbm_viv_bo_unmap;
     dev->base.is_format_supported = gbm_viv_is_format_supported;
+    dev->base.get_format_modifier_plane_count = gbm_viv_get_format_modifier_plane_count;
     dev->base.bo_write = gbm_viv_bo_write;
     dev->base.bo_get_fd = gbm_viv_bo_get_fd;
     dev->base.bo_get_planes = gbm_viv_bo_get_planes;
