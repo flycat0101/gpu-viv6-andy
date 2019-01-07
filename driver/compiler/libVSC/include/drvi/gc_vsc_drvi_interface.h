@@ -27,9 +27,10 @@
 /* 0.0.1.2 change VIR_Operand size, April. 9, 2017 */
 /* 1.3 for 6.2.4 release */
 /* 0.0.1.4 add atomic patch library function */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 4)
+/* 0.0.1.5 implement lib function nmin, nmax and nclamp, Oct. 24, 2018 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 5)
 
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 4)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 5)
 
 #define gcdSUPPORT_COMPUTE_SHADER   1
 #define gcdSUPPORT_TESS_GS_SHADER   1

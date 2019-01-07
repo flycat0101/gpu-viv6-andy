@@ -3425,6 +3425,71 @@ gctSTRING gcLibMatrixTranspose_Func =
 "   return temp;\n"
 "}\n";
 
+/* NMin, NMax and Nclamp. */
+gctSTRING gcLibNMin_Func =
+"float _viv_nmin_float(float a, float b)\n"
+"{\n"
+"   if (isnan(a))\n"
+"       return b;\n"
+"   else if (isnan(b))\n"
+"       return a;\n"
+"   else\n"
+"       return min(a, b);\n"
+"}\n"
+"vec2 _viv_nmin_vec2(vec2 a, vec2 b)\n"
+"{\n"
+"   return vec2(_viv_nmin_float(a.x, b.x), _viv_nmin_float(a.y, b.y));\n"
+"}\n"
+"vec3 _viv_nmin_vec3(vec3 a, vec3 b)\n"
+"{\n"
+"   return vec3(_viv_nmin_float(a.x, b.x), _viv_nmin_float(a.y, b.y), _viv_nmin_float(a.z, b.z));\n"
+"}\n"
+"vec4 _viv_nmin_vec4(vec4 a, vec4 b)\n"
+"{\n"
+"   return vec4(_viv_nmin_float(a.x, b.x), _viv_nmin_float(a.y, b.y), _viv_nmin_float(a.z, b.z), _viv_nmin_float(a.w, b.w));\n"
+"}\n";
+
+gctSTRING gcLibNMax_Func =
+"float _viv_nmax_float(float a, float b)\n"
+"{\n"
+"   if (isnan(a))\n"
+"       return b;\n"
+"   else if (isnan(b))\n"
+"       return a;\n"
+"   else\n"
+"       return max(a, b);\n"
+"}\n"
+"vec2 _viv_nmax_vec2(vec2 a, vec2 b)\n"
+"{\n"
+"   return vec2(_viv_nmax_float(a.x, b.x), _viv_nmax_float(a.y, b.y));\n"
+"}\n"
+"vec3 _viv_nmax_vec3(vec3 a, vec3 b)\n"
+"{\n"
+"   return vec3(_viv_nmax_float(a.x, b.x), _viv_nmax_float(a.y, b.y), _viv_nmax_float(a.z, b.z));\n"
+"}\n"
+"vec4 _viv_nmax_vec4(vec4 a, vec4 b)\n"
+"{\n"
+"   return vec4(_viv_nmax_float(a.x, b.x), _viv_nmax_float(a.y, b.y), _viv_nmax_float(a.z, b.z), _viv_nmax_float(a.w, b.w));\n"
+"}\n";
+
+gctSTRING gcLibNClamp_Func =
+"float _viv_nclamp_float(float a, float b, float c)\n"
+"{\n"
+"   return _viv_nmin_float(_viv_nmax_float(a, b), c);\n"
+"}\n"
+"vec2 _viv_nclamp_vec2(vec2 a, vec2 b, vec2 c)\n"
+"{\n"
+"   return _viv_nmin_vec2(_viv_nmax_vec2(a, b), c);\n"
+"}\n"
+"vec3 _viv_nclamp_vec3(vec3 a, vec3 b, vec3 c)\n"
+"{\n"
+"   return _viv_nmin_vec3(_viv_nmax_vec3(a, b), c);\n"
+"}\n"
+"vec4 _viv_nclamp_vec4(vec4 a, vec4 b, vec4 c)\n"
+"{\n"
+"   return _viv_nmin_vec4(_viv_nmax_vec4(a, b), c);\n"
+"}\n";
+
 /*********************************texture size implementation*********************************/
 /* For the 2D sampler. */
 gctSTRING gcLibTextureSize_Func_1 =
