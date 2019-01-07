@@ -2140,6 +2140,7 @@ gckOS_MapPhysical(
         {
             if ((physical >= mdl->dmaHandle)
             &&  (physical <  mdl->dmaHandle + mdl->bytes)
+            &&  (mdl->addr != 0)
             )
             {
                 *Logical = mdl->addr + (physical - mdl->dmaHandle);
