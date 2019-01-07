@@ -74,10 +74,10 @@ void CompilerInstance::setPreprocessor(Preprocessor *Value) {
 namespace {
   class BinaryDiagnosticSerializer : public DiagnosticClient {
     llvm::raw_ostream &OS;
-    SourceManager *SourceMgr;
   public:
     explicit BinaryDiagnosticSerializer(llvm::raw_ostream &OS)
-      : OS(OS), SourceMgr(0) { }
+      : OS(OS)
+    { }
 
     virtual void HandleDiagnostic(Diagnostic::Level DiagLevel,
                                   const DiagnosticInfo &Info);

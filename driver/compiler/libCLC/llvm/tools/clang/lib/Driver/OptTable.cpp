@@ -47,6 +47,7 @@ static int StrCmpOptionName(const char *A, const char *B) {
 
 namespace clang {
 namespace driver {
+#ifndef NDEBUG
 static inline bool operator<(const OptTable::Info &A, const OptTable::Info &B) {
   if (&A == &B)
     return false;
@@ -60,14 +61,17 @@ static inline bool operator<(const OptTable::Info &A, const OptTable::Info &B) {
          "Unexpected classes for options with same name.");
   return B.Kind == Option::JoinedClass;
 }
+#endif
 
 // Support lower_bound between info and an option name.
 static inline bool operator<(const OptTable::Info &I, const char *Name) {
   return StrCmpOptionName(I.Name, Name) == -1;
 }
+#ifndef NDEBUG
 static inline bool operator<(const char *Name, const OptTable::Info &I) {
   return StrCmpOptionName(Name, I.Name) == -1;
 }
+#endif
 }
 }
 

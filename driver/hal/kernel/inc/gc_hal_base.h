@@ -4678,8 +4678,8 @@ gckOS_Verify(
         } \
         while (gcvFALSE)
 #else
-#   define gcmVERIFY_OK(func)       func
-#   define gcmkVERIFY_OK(func)      func
+#   define gcmVERIFY_OK(func)       (void)func
+#   define gcmkVERIFY_OK(func)      (void)func
 #endif
 
 gctCONST_STRING

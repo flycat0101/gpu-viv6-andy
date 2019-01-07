@@ -2399,7 +2399,7 @@ static  clsVecCompSelType _BuiltinPackedVectorTypes[] =
   {clvTYPE_HALF_PACKED, {T_HALF, T_HALF_PACKED, T_HALF2_PACKED, T_HALF3_PACKED, T_HALF4_PACKED, 0, 0, 0, T_HALF8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_HALF16_PACKED}},
 };
 
-static const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
+const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
 
 /** function to compare builtin types for qsort **/
 static gctINT

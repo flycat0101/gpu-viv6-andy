@@ -187,7 +187,7 @@
     } while (gcvFALSE)
 
 /* Array to mark each opcode on its operation begin component-wise or not */
-static gctBOOL _IsOpcodeComponentWise[] =
+gctBOOL _IsOpcodeComponentWise[] =
 {
     /* clvOPCODE_INVALID = 0 */ gcvFALSE,
     /* clvOPCODE_NOP */ gcvFALSE,
