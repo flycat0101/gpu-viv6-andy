@@ -1751,8 +1751,6 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
 
             VIR_Type_SetArrayStride(pType, offset + arrayStride * arrayLength);
         }
-        /* According to spec, a push-constant uses a std430 layout. */
-        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_STD430);
         /* Fall through. */
     case SpvStorageClassUniformConstant:
     case SpvStorageClassUniform:
@@ -4752,12 +4750,14 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
         {
             symSpv.virSymbolKind = VIR_SYM_UNIFORM;
         }
+        symSpv.virLayoutQual |= VIR_LAYQUAL_STD430;
         break;
 
     case SpvStorageClassUniform:
         SPV_ID_INITIALIZED(spv->resultId) = gcvTRUE;
         symSpv.virSymbolKind = VIR_SYM_UBO;
         symSpv.virStorageClass = VIR_STORAGE_GLOBAL;
+        symSpv.virLayoutQual |= VIR_LAYQUAL_STD140;
         break;
 
     case SpvStorageClassInput:
