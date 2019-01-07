@@ -2311,7 +2311,8 @@ _VSC_MC_GEN_GenSource(
             VIR_Symbol  *sym        = VIR_Operand_GetSymbol(Opnd);
             gctUINT      index      = VIR_Operand_GetMatrixConstIndex(Opnd) +
                                         _VSC_MC_GEN_GenOpndRelIndexing(Gen, Inst, Opnd);
-            gctUINT      swizzle    = _VSC_MC_GEN_GenOpndSwizzle(Gen, Inst, Opnd);
+            gctUINT      swizzle    = VIR_Symbol_isSampler(sym) && VIR_OPCODE_isTexLd(opCode)
+                                       ? VIR_SWIZZLE_XYZW : _VSC_MC_GEN_GenOpndSwizzle(Gen, Inst, Opnd);
             gctUINT      indexed    = _VSC_MC_GEN_GenIndexed(Gen, Opnd);
             gctUINT      srcKind    = _VSC_MC_GEN_GenSrcType(Gen, sym);
 

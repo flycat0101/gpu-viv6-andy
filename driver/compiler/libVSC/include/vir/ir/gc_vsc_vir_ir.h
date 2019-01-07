@@ -933,6 +933,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_isIB(Sym)         (VIR_Symbol_isUBO(Sym) || \
                                       VIR_Symbol_isSBO(Sym) || \
                                       VIR_Symbol_isIOB(Sym))
+#define VIR_Symbol_UseUniform(Sym)   ((Sym)->_kind == VIR_SYM_UNIFORM   || \
+                                      (Sym)->_kind == VIR_SYM_SAMPLER   || \
+                                      (Sym)->_kind == VIR_SYM_IMAGE     )
 
 #define VIR_Symbol_isAttribute(Sym)  ((VIR_Symbol_isVariable(Sym) ||      \
                                        VIR_Symbol_isField(Sym))        && \
@@ -2679,25 +2682,25 @@ typedef enum VIR_SYMFLAG
 #define isSymCombinedSampler(sym)               (((sym)->flags & VIR_SYMFLAG_COMBINED_SAMPLER) != 0)
 #define isSymSkipNameCheck(sym)                 (((sym)->flags & VIR_SYMFLAG_SKIP_NAME_CHECK) != 0)
 
-#define isSymUBODUBO(sym)                       (((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
-#define isSymUBOCUBO(sym)                       (((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
+#define isSymUBODUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
+#define isSymUBOCUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
 
-#define isSymUniformLoadtimeConst(u)            (((u)->flags & VIR_SYMUNIFORMFLAG_LOADTIME_CONSTANT) != 0)
-#define isSymUniformCompiletimeInitialized(u)   (((u)->flags & VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED) != 0)
-#define isSymUniformUsedInShader(u)             (((u)->flags & VIR_SYMUNIFORMFLAG_USED_IN_SHADER) != 0)
-#define isSymUniformUsedInLTC(u)                (((u)->flags & VIR_SYMUNIFORMFLAG_USED_IN_LTC) != 0)
-#define isSymUniformMovedToDUB(u)               (((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_DUB) != 0)
-#define isSymUniformUsedInTextureSize(u)        (((u)->flags & VIR_SYMUNIFORMFLAG_SAMPLER_CALCULATE_TEX_SIZE) != 0)
-#define isSymUniformImplicitlyUsed(u)           (((u)->flags & VIR_SYMUNIFORMFLAG_IMPLICITLY_USED) != 0)
-#define isSymUniformForcedToActive(u)           (((u)->flags & VIR_SYMUNIFORMFLAG_FORCE_ACTIVE) != 0)
-#define isSymUniformMovingToDUBO(u)             (((u)->flags & VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO) != 0)
-#define isSymUniformAlwaysInDUB(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB) != 0)
-#define isSymUniformMovedToDUBO(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO) != 0)
-#define isSymUniformMovedToCUBO(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO) != 0)
+#define isSymUniformLoadtimeConst(u)            (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_LOADTIME_CONSTANT) != 0)
+#define isSymUniformCompiletimeInitialized(u)   (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED) != 0)
+#define isSymUniformUsedInShader(u)             (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_USED_IN_SHADER) != 0)
+#define isSymUniformUsedInLTC(u)                (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_USED_IN_LTC) != 0)
+#define isSymUniformMovedToDUB(u)               (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_DUB) != 0)
+#define isSymUniformUsedInTextureSize(u)        (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_SAMPLER_CALCULATE_TEX_SIZE) != 0)
+#define isSymUniformImplicitlyUsed(u)           (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_IMPLICITLY_USED) != 0)
+#define isSymUniformForcedToActive(u)           (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_FORCE_ACTIVE) != 0)
+#define isSymUniformMovingToDUBO(u)             (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO) != 0)
+#define isSymUniformAlwaysInDUB(u)              (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB) != 0)
+#define isSymUniformMovedToDUBO(u)              (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO) != 0)
+#define isSymUniformMovedToCUBO(u)              (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO) != 0)
 #define isSymUniformMovedToAUBO(u)              (isSymUniformMovedToDUBO(u) || isSymUniformMovedToCUBO(u))
-#define isSymUniformAtomicCounter(u)            (((u)->flags & VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER) != 0)
-#define isSymUniformTreatSamplerAsConst(u)      (((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST) != 0)
-#define isSymUniformTreatImageAsSampler(u)      (((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER) != 0)
+#define isSymUniformAtomicCounter(u)            (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER) != 0)
+#define isSymUniformTreatSamplerAsConst(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST) != 0)
+#define isSymUniformTreatImageAsSampler(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER) != 0)
 
 #define isSymCentroid(sym)                      (((sym)->flags & VIR_SYMFLAG_ISCENTROID) != 0)
 #define isSymSample(sym)                        (((sym)->flags & VIR_SYMFLAG_ISSAMPLE) != 0)
@@ -2710,12 +2713,12 @@ typedef enum VIR_SYMFLAG
 #define isSymAttrLocSetByDriver(sym)            (((sym)->flags & VIR_SYMFLAG_LOC_SET_BY_DRIVER) != 0)
 
 /* function flags */
-#define isSymKernelFunction(sym)                (((sym)->flags & VIR_SYMFLAG_ISKERNEL) != 0)
-#define isSymMainFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISMAIN) != 0)
-#define isSymEntryPointFunction(sym)            (((sym)->flags & VIR_SYMFLAG_ISENTRY) != 0)
-#define isSymInitFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISINITFUNC) != 0)
-#define isSymFiniFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISFINIFUNC) != 0)
-#define isSymBeRemoved(sym)                     (((sym)->flags & VIR_SYMFLAG_ISREMOVED) != 0)
+#define isSymKernelFunction(sym)                (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISKERNEL) != 0)
+#define isSymMainFunction(sym)                  (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISMAIN) != 0)
+#define isSymEntryPointFunction(sym)            (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISENTRY) != 0)
+#define isSymInitFunction(sym)                  (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISINITFUNC) != 0)
+#define isSymFiniFunction(sym)                  (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISFINIFUNC) != 0)
+#define isSymBeRemoved(sym)                     (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISREMOVED) != 0)
 
 /*   o UBO symbol
  *      . no instance name: we create an anonymous instance name for it,

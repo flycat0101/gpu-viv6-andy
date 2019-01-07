@@ -595,8 +595,8 @@ OnError:
 static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
                                           SHADER_EXECUTABLE_PROFILE* pSEP,
                                           gcsSURF_NODE_PTR* pCrSpillVidmemNode,
-                                          gctUINT * pCrSpillMemSize,
-                                          gctUINT32* pVidMemAddrOfSpillMem)
+                                          gctUINT32* pVidMemAddrOfSpillMem,
+                                          gctUINT * pCrSpillMemSize)
 
 {
     VSC_ErrCode                   errCode = VSC_ERR_NONE;
