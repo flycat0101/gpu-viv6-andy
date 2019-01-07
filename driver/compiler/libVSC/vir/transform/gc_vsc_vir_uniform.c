@@ -1830,7 +1830,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
 
     VIR_Operand_SetTempRegister(load_dest, func, load_symid, uniform_data_type_id);
     VIR_Operand_SetLvalue(load_dest, gcvTRUE);
-    VIR_Operand_SetEnable(load_dest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, uniform_data_type_id)));
+    VIR_Operand_SetEnable(load_dest, VIR_TypeId_Conv2Enable(uniform_data_type_id));
 
     /* set src0 of load to dubo_addr */
     VIR_Operand_SetTempRegister(load_src0, func, mad_symid, VIR_TYPE_UINT32);
@@ -3316,7 +3316,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
                 VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
-                VIR_Operand_SetEnable(loadDest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, operandTypeId)));
+                VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
                 VIR_Operand_SetSymbol(loadSrc0, func, addressSymId);
@@ -3420,7 +3420,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
                 VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
-                VIR_Operand_SetEnable(loadDest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, operandTypeId)));
+                VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 VIR_Operand_Copy(loadSrc0, madDest);
                 VIR_Operand_Change2Src(loadSrc0);
@@ -3587,7 +3587,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
                         VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
-                        VIR_Operand_SetEnable(loadDest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, operandTypeId)));
+                        VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                         addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
                         VIR_Operand_SetTempRegister(loadSrc0, func, addressSymId, VIR_TYPE_UINT32);
@@ -3827,7 +3827,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
                 VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
-                VIR_Operand_SetEnable(loadDest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, operandTypeId)));
+                VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 /* set loadSrc0 */
                 if(isSymUniformMovedToCUBO(uniformSym))
