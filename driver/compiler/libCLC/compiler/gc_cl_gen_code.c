@@ -25177,12 +25177,21 @@ cloIR_UNARY_EXPR_GenCode(
 
         if (operandParameters.constant != gcvNULL)
         {
-            status = cloIR_UNARY_EXPR_Evaluate(Compiler,
-                                               UnaryExpr->type,
-                                               operandParameters.constant,
-                                               UnaryExpr->u.fieldName,
-                                               &UnaryExpr->u.componentSelection,
-                                               &Parameters->constant);
+            if(UnaryExpr->type == clvUNARY_CAST)
+            {
+                status = cloIR_CAST_EXPR_Evaluate(Compiler,
+                                                  &UnaryExpr->exprBase.decl,
+                                                  operandParameters.constant);
+            }
+            else
+            {
+                status = cloIR_UNARY_EXPR_Evaluate(Compiler,
+                                                   UnaryExpr->type,
+                                                   operandParameters.constant,
+                                                   UnaryExpr->u.fieldName,
+                                                   &UnaryExpr->u.componentSelection,
+                                                   &Parameters->constant);
+            }
             if (gcmIS_ERROR(status)) return status;
 
             operandParameters.constant = gcvNULL;
