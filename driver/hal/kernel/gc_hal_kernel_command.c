@@ -2201,7 +2201,7 @@ gckCOMMAND_Commit(
             Command->os,
             0,
             contextPhysHandle,
-            offset,
+            entryAddress - contextBuffer->address,
             entryLogical,
             entryBytes
             ));
