@@ -1171,7 +1171,8 @@ _GenVstoreHalfCode(
                             PolynaryExpr->exprBase.base.stringNo,
                             rOperand,
                             lOperand,
-                            OperandsParameters[2].rOperands[0].dataType,
+                            /* Use half-float as the data type. */
+                            rOperand->dataType,
                             scaledIndex);
     if (gcmIS_ERROR(status)) return status;
 
