@@ -11674,15 +11674,16 @@ gckHARDWARE_QueryIdle(
 {
     gceSTATUS status;
     gctUINT32 idle;
-#if !gcdSECURITY
-    gctUINT32 address;
-#endif
     gctBOOL isIdle = gcvFALSE;
 
 #if gcdINTERRUPT_STATISTIC
     gckEVENT eventObj = Hardware->kernel->eventObj;
     gctINT32 pendingInterrupt;
 #endif
+
+    gctUINT32 dmaLow;
+    gctUINT32 opCode;
+    gctUINT32 i;
 
     gcmkHEADER_ARG("Hardware=0x%x", Hardware);
 
@@ -11714,23 +11715,31 @@ gckHARDWARE_QueryIdle(
         isIdle = gcvTRUE;
         break;
 #else
-        /* Read the current FE address. */
-        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
-                                         Hardware->core,
-                                         0x00664,
-                                         &address));
 
-        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
-                                         Hardware->core,
-                                         0x00664,
-                                         &address));
-
-        /* Test if address is inside the last WAIT/LINK sequence. */
-        if ((address < Hardware->lastWaitLink) ||
-            (address >= (gctUINT64)Hardware->lastWaitLink + 16))
+        /* Read dma low register enough times to test if current command buffer is WAIT/LINK */
+        for (i = 0; i < 10; i++)
         {
-            /* FE is not in WAIT/LINK yet. */
-            break;
+            gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
+                                             Hardware->core,
+                                             0x00668,
+                                             &dmaLow));
+
+            gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
+                                             Hardware->core,
+                                             0x00668,
+                                             &dmaLow));
+
+            opCode = dmaLow >> 27;
+
+            /* Test if current command buffer is WAIT/LINK . */
+            if (opCode != 0x7 && opCode != 0x8)
+            {
+                /* FE is not in WAIT/LINK yet, not idle. */
+                *IsIdle = gcvFALSE;
+
+                gcmkFOOTER_NO();
+                return gcvSTATUS_OK;
+            }
         }
 #endif
 
