@@ -132,6 +132,41 @@ static pthread_mutex_t __wl_egl_surface_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_once_t __once_control = PTHREAD_ONCE_INIT;
 
+static void __wl_swapworkers_done(struct wl_egl_window *window)
+{
+    VEGLDisplay dpy = NULL;
+    VEGLSurface sur = NULL;
+
+    /* Go through dpy list to find EGLSurface for window. */
+    gcoOS_LockPLS();
+    for (dpy = (VEGLDisplay)gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO); dpy != NULL; dpy = dpy->next)
+    {
+        for (sur = (VEGLSurface)dpy->surfaceStack; sur != NULL; sur = (VEGLSurface)sur->resObj.next)
+        {
+            if (sur->hwnd == window)
+            {
+                break;
+            }
+        }
+
+        if (sur)
+        {
+            break;
+        }
+    }
+    gcoOS_UnLockPLS();
+
+
+    /* Make sure all workers have been processed. */
+    if (sur && sur->workerDoneSignal != gcvNULL)
+    {
+        gcoOS_WaitSignal(gcvNULL,
+            sur->workerDoneSignal,
+            gcvINFINITE);
+    }
+}
+
+
 static void __wl_egl_init(void)
 {
     wl_list_init(&__wl_egl_surface_list);
@@ -376,6 +411,9 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
         if (egl_surface->display != display)
             continue;
 
+        pthread_mutex_unlock(&__wl_egl_surface_mutex);
+        __wl_swapworkers_done(egl_surface->window);
+        pthread_mutex_lock(&__wl_egl_surface_mutex);
 
         {
             if (egl_surface->frame_callback && egl_surface->commit_queue)
@@ -782,6 +820,7 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     __WLEGLDisplay display = egl_surface->display;
 
     __wl_egl_surface_unregister(egl_surface);
+    __wl_swapworkers_done(egl_surface->window);
 
     for (i = 0; i < egl_surface->nr_buffers; i++)
     {
