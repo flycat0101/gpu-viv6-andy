@@ -4753,8 +4753,11 @@ _texldInstMod(
 
 static gctUINT
 _texldInstType(
-    IN VIR_Instruction      *pInst)
+    IN VIR_LinkLibContext   *Context,
+    IN VIR_Instruction      *pInst
+    )
 {
+    gctBOOL supportTexldU = Context->pHwCfg->hwFeatureFlags.hasUniversalTexldV2 && Context->pHwCfg->hwFeatureFlags.hasTexldUFix;
     gctUINT retValue = TEXLDTYPE_NORMAL;
 
     switch (VIR_Inst_GetResOpType(pInst))
@@ -4778,6 +4781,15 @@ _texldInstType(
         retValue = TEXLDTYPE_GATHERPCF;
         break;
     case VIR_RES_OP_TYPE_FETCH:
+        /*
+        ** If this chip can't support TEXLDU, then the coordinate has been changed to the floating point,
+        ** we just need to treat it as a normal TEXLD.
+        */
+        if (supportTexldU)
+        {
+            retValue = TEXLDTYPE_U;
+        }
+        break;
     case VIR_RES_OP_TYPE_FETCH_MS:
         retValue = TEXLDTYPE_FETCHMS;
         break;
@@ -4918,7 +4930,7 @@ _InsertCallTexld(
     /* type */
     errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     ON_ERROR(errCode, "_InsertCallTexld");
-    VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(texldInst));
+    VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(Context, texldInst));
 
     /* create extra sampler */
     if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
