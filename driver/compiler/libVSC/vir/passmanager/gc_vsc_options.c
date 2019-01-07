@@ -2774,6 +2774,40 @@ void VSC_OPTN_FCPOptions_GetOptionFromString(
     }
 }
 
+void VSC_OPTN_ATOMPatchOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_ATOMPatchOptions  *options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "on", sizeof("on") - 1))
+        {
+            VSC_OPTN_ATOMPatchOptions_SetSwitchOn(options, gcvTRUE);
+            str += sizeof("on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "off", sizeof("off") - 1))
+        {
+            VSC_OPTN_ATOMPatchOptions_SetSwitchOn(options, gcvFALSE);
+            str += sizeof("off") - 1;
+        }
+    }
+}
+
+void VSC_OPTN_ATOMPatchOptions_Usage(
+    IN VIR_Dumper   *dumper
+    )
+{
+    gctSTRING usage =
+        "-ATOMPATCH:\n"
+        "    on                  turn on atomic patch phase\n"
+        "    off                 turn off atomic patch phase\n";
+
+    VIR_LOG(dumper, usage);
+    VIR_LOG_FLUSH(dumper);
+}
+
 void VSC_OPTN_FCPOptions_Dump(
     IN VSC_OPTN_FCPOptions  *options,
     IN VIR_Dumper           *dumper
@@ -2954,6 +2988,14 @@ void VSC_OPTN_ILFLinkOptions_SetDefault(
     VSC_OPTN_ILFLinkOptions_SetSwitchOn(options, gcvTRUE);
 }
 
+void VSC_OPTN_ATOMPatchOptions_SetDefault(
+    IN OUT VSC_OPTN_ATOMPatchOptions* options
+    )
+{
+    /* set default value as VSC_OPTN_ILFLinkOptions_SetDefault */
+    VSC_OPTN_ATOMPatchOptions_SetSwitchOn(options, gcvTRUE);
+}
+
 static gctBOOL
 _IsTriageForShaderId(
     IN gctINT           ShaderId,
@@ -3027,6 +3069,7 @@ void VSC_OPTN_Options_SetDefault(
     VSC_OPTN_SEPGenOptions_SetDefault(VSC_OPTN_Options_GetSEPGenOptions(options, 0), optLevel);
     VSC_OPTN_DumpOptions_SetDefault(VSC_OPTN_Options_GetDumpOptions(options));
     VSC_OPTN_ILFLinkOptions_SetDefault(VSC_OPTN_Options_GetILFLinkOptions(options));
+    VSC_OPTN_ATOMPatchOptions_SetDefault(VSC_OPTN_Options_GetATOMPatchOptions(options));
     VSC_OPTN_Options_SetOptionsUsage(options, gcvFALSE);
 }
 
@@ -3086,6 +3129,8 @@ VSC_OPTN_BASE* VSC_OPTN_Options_GetOption(VSC_OPTN_Options* pOptions, VSC_PASS_O
         return &pOptions->dump_options.optnBase;
     case VSC_PASS_OPTN_TYPE_ILF_LINK:
         return &pOptions->ilflink_options.optnBase;
+    case VSC_PASS_OPTN_TYPE_ATOM_PATCH:
+        return &pOptions->atompatch_options.optnBase;
     default:
         return gcvNULL;
     }
@@ -3310,6 +3355,13 @@ void VSC_OPTN_Options_GetOptionFromString(
         VSC_OPTN_FCPOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetFCPOptions(options, 0));
     }
 
+    gcoOS_StrStr(str, "-ATOMPATCH", &pos);
+    if (pos)
+    {
+        pos += sizeof("-ATOMPATCH") - 1;
+        VSC_OPTN_ATOMPatchOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetATOMPatchOptions(options));
+    }
+
     /* machine code generator: */
     gcoOS_StrStr(str, "-GEN", &pos);
     if (pos)
@@ -3513,10 +3565,13 @@ void VSC_OPTN_Options_SetOptionsByOptFlags(
     {
         gcmASSERT(!(OptFlags & VSC_COMPILER_OPT_NO_ILF_LINK));
         VSC_OPTN_ILFLinkOptions_SetSwitchOn(VSC_OPTN_Options_GetILFLinkOptions(Options), gcvTRUE);
+        /* atomic patch pass should follow with VIR_LinkInternalLibFunc by default */
+        VSC_OPTN_ATOMPatchOptions_SetSwitchOn(VSC_OPTN_Options_GetATOMPatchOptions(Options), gcvTRUE);
     }
     else if(OptFlags & VSC_COMPILER_OPT_NO_ILF_LINK)
     {
         VSC_OPTN_ILFLinkOptions_SetSwitchOn(VSC_OPTN_Options_GetILFLinkOptions(Options), gcvFALSE);
+        VSC_OPTN_ATOMPatchOptions_SetSwitchOn(VSC_OPTN_Options_GetATOMPatchOptions(Options), gcvFALSE);
     }
 
     if(OptFlags & VSC_COMPILER_OPT_FUNC_INLINE)
@@ -3585,6 +3640,12 @@ void VSC_OPTN_Options_SetSpecialOptions(
 
     /* temperarily switch off Post RA IS */
     VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 1), gcvFALSE);
+
+    /* disable atomic patch for compbenchcl for performance */
+    if (gcPatchId == gcvPATCH_COMPUTBENCH_CL)
+    {
+        VSC_OPTN_ATOMPatchOptions_SetSwitchOn(VSC_OPTN_Options_GetATOMPatchOptions(options), gcvFALSE);
+    }
 }
 
 gctBOOL VSC_OPTN_Options_GetOptLevelFromEnv(

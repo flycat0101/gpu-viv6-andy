@@ -7303,9 +7303,14 @@ static gctBOOL _vscVIR_CheckAtomSrcIsSameAddrForAllthreads(
     VIR_DEF_USAGE_INFO*        pDuInfo)
 {
     VIR_OperandInfo         srcOpndInfo;
-    VIR_Symbol *srcSym = VIR_Operand_GetSymbol(srcOpnd);
+    VIR_Symbol *srcSym = gcvNULL;
 
     gcmASSERT(inst && srcOpnd);
+
+    if (VIR_Operand_isSymbol(srcOpnd))
+    {
+        srcSym = VIR_Operand_GetSymbol(srcOpnd);
+    }
 
     if (VIR_Operand_isImm(srcOpnd) || VIR_Operand_isConst(srcOpnd) ||
         (srcSym && VIR_Symbol_isUniform(srcSym)))
@@ -7547,7 +7552,8 @@ OnError:
 DEF_QUERY_PASS_PROP(vscVIR_GenExternalAtomicCall)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
-    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_ILF_LINK; /* enable/disable according to pass VIR_LinkInternalLibFunc */
+    /* enable/disable according to the value of "VSC_PASS_OPTN_TYPE_ILF_LINK" except env control */
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_ATOM_PATCH;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }

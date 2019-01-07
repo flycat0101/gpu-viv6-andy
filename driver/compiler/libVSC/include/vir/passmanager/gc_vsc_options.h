@@ -1395,6 +1395,20 @@ void VSC_OPTN_ILFLinkOptions_SetDefault(
     IN OUT VSC_OPTN_ILFLinkOptions* options
     );
 
+/* option to control atomic patch */
+typedef struct _VSC_OPTN_ATOMICPATCHOPTIONS
+{
+    /* Must be first element */
+    VSC_OPTN_BASE optnBase;
+} VSC_OPTN_ATOMPatchOptions;
+
+#define VSC_OPTN_ATOMPatchOptions_GetSwitchOn(option)         VSC_OPTN_GetSwitchOn(&(option)->optnBase)
+#define VSC_OPTN_ATOMPatchOptions_SetSwitchOn(option, s)      VSC_OPTN_SetSwitchOn(&(option)->optnBase, (s))
+
+void VSC_OPTN_ATOMPatchOptions_SetDefault(
+    IN OUT VSC_OPTN_ATOMPatchOptions* options
+    );
+
 #define VSC_OPTN_SCPP_COUNT 1
 #define VSC_OPTN_PARAMOPT_COUNT 1
 #define VSC_OPTN_LoopOpts_COUNT 1
@@ -1452,6 +1466,7 @@ typedef struct _VSC_OPTN_OPTIONS
     VSC_OPTN_SEPGenOptions      sepgen_options[VSC_OPTN_SEPGen_COUNT];
     VSC_OPTN_DumpOptions        dump_options;
     VSC_OPTN_ILFLinkOptions     ilflink_options;
+    VSC_OPTN_ATOMPatchOptions   atompatch_options;
     gctBOOL                     options_usage;
 } VSC_OPTN_Options;
 
@@ -1484,6 +1499,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
     VSC_PASS_OPTN_TYPE_SEP_GEN,
     VSC_PASS_OPTN_TYPE_DUMP,
     VSC_PASS_OPTN_TYPE_ILF_LINK,
+    VSC_PASS_OPTN_TYPE_ATOM_PATCH,
     VSC_PASS_OPTN_TYPE_MAX,
 } VSC_PASS_OPTN_TYPE;
 
@@ -1514,6 +1530,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
 #define VSC_OPTN_Options_GetFCPOptions(option, i)          (&((option)->fcp_options[i]))
 #define VSC_OPTN_Options_GetDumpOptions(option)            (&((option)->dump_options))
 #define VSC_OPTN_Options_GetILFLinkOptions(option)         (&((option)->ilflink_options))
+#define VSC_OPTN_Options_GetATOMPatchOptions(option)       (&((option)->atompatch_options))
 #define VSC_OPTN_Options_GetOptionsUsage(option)           ((option)->options_usage)
 #define VSC_OPTN_Options_SetOptionsUsage(option, u)        ((option)->options_usage = (u))
 #define VSC_OPTN_Options_SetReset(option, u)               ((option)->reset = (u))
