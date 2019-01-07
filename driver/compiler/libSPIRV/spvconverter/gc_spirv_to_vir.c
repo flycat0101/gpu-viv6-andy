@@ -3344,7 +3344,8 @@ static VSC_ErrCode __SpvConvDecoratorToVIR(
                 symSpv->virPrecision = VIR_PRECISION_MEDIUM;
             }
 
-            if (decorationData->auxiliaryQualifier == SPV_AUXILIARY_PATCH)
+            /* if patch is used for gl_TessCoord, just skip the decoration */
+            if (decorationData->auxiliaryQualifier == SPV_AUXILIARY_PATCH && decorationData->builtIn != SpvBuiltInTessCoord)
             {
                 symSpv->perPatch = gcvTRUE;
 
@@ -11456,23 +11457,58 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     break;
 
                 case SpvExecutionModeSpacingEqual:
-                    virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_EQUAL;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_EQUAL;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessVertexSpacing = VIR_TESS_SPACING_EQUAL;
+                    }
                     break;
 
                 case SpvExecutionModeSpacingFractionalEven:
-                    virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_EVEN;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_EVEN;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessVertexSpacing = VIR_TESS_SPACING_EVEN;
+                    }
                     break;
 
                 case SpvExecutionModeSpacingFractionalOdd:
-                    virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_ODD;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessVertexSpacing = VIR_TESS_SPACING_ODD;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessVertexSpacing = VIR_TESS_SPACING_ODD;
+                    }
                     break;
 
                 case SpvExecutionModeVertexOrderCw:
-                    virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CW;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CW;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessOrdering = VIR_TESS_ORDER_CW;
+                    }
                     break;
 
                 case SpvExecutionModeVertexOrderCcw:
-                    virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CCW;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CCW;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessOrdering = VIR_TESS_ORDER_CCW;
+                    }
                     break;
 
                 case SpvExecutionModePixelCenterInteger:
@@ -11485,7 +11521,14 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     break;
 
                 case SpvExecutionModePointMode:
-                    virShader->shaderLayout.tes.tessPointMode = gcvTRUE;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessPointMode = gcvTRUE;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessPointMode = gcvTRUE;
+                    }
                     break;
 
                 case SpvExecutionModeXfb:
@@ -11522,6 +11565,8 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                         virShader->shaderLayout.geo.geoInPrimitive = VIR_GEO_TRIANGLES;
                     else if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
                         virShader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_TRIANGLE;
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                        virShader->shaderLayout.tcs.tessPrimitiveMode = VIR_TESS_PMODE_TRIANGLE;
                     break;
 
                 case SpvExecutionModeInputTrianglesAdjacency:
@@ -11529,11 +11574,25 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     break;
 
                 case SpvExecutionModeQuads:
-                    virShader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_QUAD;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_QUAD;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessPrimitiveMode = VIR_TESS_PMODE_QUAD;
+                    }
                     break;
 
                 case SpvExecutionModeIsolines:
-                    virShader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_ISOLINE;
+                    if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                    {
+                        virShader->shaderLayout.tes.tessPrimitiveMode = VIR_TESS_PMODE_ISOLINE;
+                    }
+                    else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                    {
+                        virShader->shaderLayout.tcs.tessPrimitiveMode = VIR_TESS_PMODE_ISOLINE;
+                    }
                     break;
 
                 case SpvExecutionModeOutputVertices:

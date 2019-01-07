@@ -4666,6 +4666,65 @@ static VIR_ShLevel _GetMaximumShaderLevelAmongLinkLibs(VSC_PROG_LIB_LINK_TABLE* 
     return maxShLevel;
 }
 
+/* check execution mode value of tcs and tes and copy setting from tcs to tes if needed*/
+static VSC_ErrCode
+_CheckAndUnifiedTessExecutionMode(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_Shader*                pPreStage = gcvNULL;
+    VIR_Shader*                pCurStage;
+    gctUINT                    stageIdx;
+
+    for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
+    {
+        pCurStage= (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage && pCurStage->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
+        {
+            if (pPreStage && pPreStage->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+            {
+                /* check tessPrimitiveMode, if value in TES is undefined, copy value from TCS */
+                gcmASSERT(pPreStage->shaderLayout.tcs.tessPrimitiveMode != VIR_TESS_PMODE_UNDEFINED ||
+                          pCurStage->shaderLayout.tes.tessPrimitiveMode != VIR_TESS_PMODE_UNDEFINED);
+                if ((pPreStage->shaderLayout.tcs.tessPrimitiveMode != pCurStage->shaderLayout.tes.tessPrimitiveMode) &&
+                    (pCurStage->shaderLayout.tes.tessPrimitiveMode == VIR_TESS_PMODE_UNDEFINED))
+                {
+                    pCurStage->shaderLayout.tes.tessPrimitiveMode = pPreStage->shaderLayout.tcs.tessPrimitiveMode;
+                }
+
+                /* check tessOrdering, if value in TES is undefined, copy value from TCS */
+                gcmASSERT((pPreStage->shaderLayout.tcs.tessOrdering != VIR_TESS_ORDER_UNDEFINED) ||
+                          (pCurStage->shaderLayout.tes.tessOrdering != VIR_TESS_ORDER_UNDEFINED));
+                if ((pPreStage->shaderLayout.tcs.tessOrdering != pCurStage->shaderLayout.tes.tessOrdering) &&
+                    (pCurStage->shaderLayout.tes.tessOrdering == VIR_TESS_ORDER_UNDEFINED))
+                {
+                    /* copy setting of tcs to tes */
+                    pCurStage->shaderLayout.tes.tessOrdering = pPreStage->shaderLayout.tcs.tessOrdering;
+                }
+
+                /* check tessVertexSpacing */
+                gcmASSERT((pPreStage->shaderLayout.tcs.tessVertexSpacing != VIR_TESS_SPACING_UNDEFINED) ||
+                          (pCurStage->shaderLayout.tes.tessVertexSpacing != VIR_TESS_SPACING_UNDEFINED));
+                if ((pPreStage->shaderLayout.tcs.tessVertexSpacing != pCurStage->shaderLayout.tes.tessVertexSpacing) &&
+                    (pCurStage->shaderLayout.tes.tessVertexSpacing == VIR_TESS_SPACING_UNDEFINED))
+                {
+                    pCurStage->shaderLayout.tes.tessVertexSpacing = pPreStage->shaderLayout.tcs.tessVertexSpacing;
+                }
+
+                /* check pointMode enabled in either tess stage */
+                if (pPreStage->shaderLayout.tcs.tessPointMode)
+                {
+                    pCurStage->shaderLayout.tes.tessPointMode = pPreStage->shaderLayout.tcs.tessPointMode;
+                }
+
+            }
+            break;
+        }
+        pPreStage = pCurStage;
+    }
+    return errCode;
+}
+
 gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                          PROGRAM_EXECUTABLE_PROFILE* pOutPEP,
                          VSC_HW_PIPELINE_SHADERS_STATES* pOutPgStates)
@@ -4817,6 +4876,10 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     vscGPPM_SetPassRes(&pgLinkHelper.pgPassMnger, pShPassResArray);
 
     bNeedActiveIo = (VSC_OPTN_FAIOOptions_GetSwitchOn(VSC_OPTN_Options_GetFAIOOptions(&options, 0)) || bHasTsOrGs);
+
+    /* check Tessellation execution mode of tcs and tes, if execution mode is set on tcs, copy to tes */
+    errCode = _CheckAndUnifiedTessExecutionMode(&pgLinkHelper);
+
 
     /* 1. At first fork link process, only do HL level compiling */
 

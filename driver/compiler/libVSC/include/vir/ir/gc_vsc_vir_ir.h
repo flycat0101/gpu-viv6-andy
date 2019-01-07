@@ -4345,7 +4345,8 @@ typedef enum _VIR_TESSPRIMITIVEMODE
 {
     VIR_TESS_PMODE_TRIANGLE = 0,
     VIR_TESS_PMODE_QUAD,
-    VIR_TESS_PMODE_ISOLINE
+    VIR_TESS_PMODE_ISOLINE,
+    VIR_TESS_PMODE_UNDEFINED, /* undefined primitivemode */
 } VIR_TessPrimitiveMode;
 
 typedef enum _VIR_TESSOUTPUTPRIMITIVE
@@ -4360,13 +4361,15 @@ typedef enum _VIR_TESSVERTEXSPACING
 {
     VIR_TESS_SPACING_EQUAL = 0, /* equal_spacing */
     VIR_TESS_SPACING_EVEN, /* fractional_even_spacing */
-    VIR_TESS_SPACING_ODD            /* fractional_odd_spacing */
+    VIR_TESS_SPACING_ODD, /* fractional_odd_spacing */
+    VIR_TESS_SPACING_UNDEFINED, /* undefined spacing value */
 } VIR_TessVertexSpacing;
 
 typedef enum _VIR_TESSORDERING
 {
     VIR_TESS_ORDER_CCW = 0, /* Counter Clockwise */
-    VIR_TESS_ORDER_CW               /* Clockwise */
+    VIR_TESS_ORDER_CW, /* Clockwise */
+    VIR_TESS_ORDER_UNDEFINED, /* undefined ordering value */
 } VIR_TessOrdering;
 
 typedef enum _VIR_GEOPRIMITIVE
@@ -4396,23 +4399,22 @@ typedef struct _VIR_COMPUTELAYOUT
     gctUINT32           adjustedWorkGroupSize;
 } VIR_ComputeLayout;
 
-typedef struct _VIR_TCSLAYOUT
+/* tcs and tes layout are defined in same struct */
+typedef struct _VIR_TESSLAYOUT
 {
-    /* Tesselation Control Shader layout */
+    /* common Tesselation Shader layout */
+    VIR_TessPrimitiveMode   tessPrimitiveMode : 4;
+    VIR_TessVertexSpacing   tessVertexSpacing : 3;
+    VIR_TessOrdering        tessOrdering      : 3;
+    gctBOOL                 tessPointMode     : 2;
+    /* Tesselation Control Shader layout only */
     gctINT                  tcsPatchInputVertices;
     gctINT                  tcsPatchOutputVertices;
     gctBOOL                 hasOutputVertexAccess;
-} VIR_TCSLayout;
+    /* Tesselation Evaluation Shader layout only */
+    gctINT                  tessPatchInputVertices;
+} VIR_TCSLayout, VIR_TESLayout;
 
-typedef struct _VIR_TESLAYOUT
-{
-    /* Tessellation Evaluation Shader layout qualifiers*/
-    VIR_TessPrimitiveMode   tessPrimitiveMode : 4;
-    VIR_TessVertexSpacing   tessVertexSpacing : 3;
-    VIR_TessOrdering        tessOrdering      : 2;
-    gctBOOL                 tessPointMode     : 2;
-    gctINT                  tessPatchInputVertices;   /* same value as tcsPatchOutputVertices after linking */
-} VIR_TESLayout;
 
 typedef struct _VIR_GEOLAYOUT
 {
