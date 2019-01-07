@@ -5832,6 +5832,7 @@ static VkResult halti5_helper_setDescSetInputAttach(
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
     struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     uint32_t entryIdx, arrayIdx;
+    uint32_t arraySize;
     uint32_t stageIdx = 0, activeStageMask;
 
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY *inputAttachEntry = VK_NULL_HANDLE;
@@ -5862,10 +5863,23 @@ static VkResult halti5_helper_setDescSetInputAttach(
             uint32_t hwConstRegAddrBase = hints->hwConstRegBases[stageIdx];
             uint32_t TxHwRegisterIdx = (stageIdx < VSC_SHADER_STAGE_PS) ? 0 : 1;
 
-            __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
+            __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR ||
+                        hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER);
             __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
-            for (arrayIdx = 0; arrayIdx < descriptorBinding->std.descriptorCount; arrayIdx++)
+            if (hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR)
+            {
+                /* Use the real used HW reg size. */
+                arraySize = __VK_MIN(descriptorBinding->std.descriptorCount,
+                                     hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegRange);
+            }
+            else
+            {
+                arraySize = descriptorBinding->std.descriptorCount;
+            }
+            __VK_ASSERT(arraySize);
+
+            for (arrayIdx = 0; arrayIdx < arraySize; arrayIdx++)
             {
                 __vkDescriptorResourceRegion curRegion;
                 __vkDescriptorResourceInfo *resInfo;
