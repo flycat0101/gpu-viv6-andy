@@ -35,8 +35,8 @@ struct _gckSHM_POOL
     gctUINT32 pageSize;                 /* Size of each page. */
     gctUINT32 poolSize;                 /* Size of this pool. */
     pthread_mutex_t mutex;              /* Mutex. */
-    gctUINT32 UserLogical;              /* Logical base address in user process. */
-    gctUINT32 KernelLogical;            /* logical base address in galcore process. */
+    gctPOINTER UserLogical;              /* Logical base address in user process. */
+    gctPOINTER KernelLogical;            /* logical base address in galcore process. */
     gctUINT32 Physical;                 /* Physical base address. */
     gctUINT32 cacheFlag;                /* Flag with which the shmPool was created. */
     struct _gckPAGE_USAGE* pageUsage;   /* List of pageUsage arrays. */
@@ -130,7 +130,7 @@ drv_mempool_destroy();
 void
 drv_mempool_alloc_contiguous(
     IN gctUINT32 Bytes,
-    OUT gctUINT32 * Physical,
+    OUT gctPHYS_ADDR_T * Physical,
     OUT gctPOINTER * Logical
     );
 
@@ -139,10 +139,10 @@ drv_mempool_free(
     IN gctPOINTER Logical
     );
 
-gctUINT32
+gctPOINTER
 drv_mempool_get_baseAddress();
 
-gctUINT32
+gctPHYS_ADDR_T
 drv_mempool_get_basePAddress();
 
 gctUINT32
@@ -154,11 +154,11 @@ drv_mempool_get_fileDescriptor();
 gceSTATUS
 drv_mempool_mem_offset(
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address);
+    OUT gctPHYS_ADDR_T * Address);
 
 gceSTATUS
 drv_mempool_get_kernel_logical(
-    IN gctUINT32 Address,
+    IN gctPHYS_ADDR_T Address,
     OUT gctPOINTER *Logical);
 
 /* Shared memory pool functions. */
@@ -202,13 +202,13 @@ gceSTATUS
 drv_shmpool_mem_offset(
     IN gctUINT32 Pid,
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address);
+    OUT gctPHYS_ADDR_T * Address);
 
 gceSTATUS
 drv_shmpool_mem_offset_by_user_logical(
     IN gctUINT32 Pid,
     IN gctPOINTER Logical,
-    OUT gctUINT32 * Address);
+    OUT gctPHYS_ADDR_T * Address);
 
 gctPOINTER
 drv_shmpool_alloc_contiguous(
