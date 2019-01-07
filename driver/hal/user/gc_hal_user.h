@@ -2684,6 +2684,7 @@ gcoHARDWARE_3DBlitMipMap(
     IN gceENGINE Engine,
     IN gcs3DBLIT_INFO_PTR Info,
     IN gctUINT SliceIdx,
+    IN gctBOOL sRGBDecode,
     INOUT gctPOINTER * Memory
     );
 

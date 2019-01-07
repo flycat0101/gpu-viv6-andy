@@ -5183,7 +5183,8 @@ gceSTATUS
 gcoTEXTURE_GenerateMipMap(
     IN gcoTEXTURE Texture,
     IN gctINT BaseLevel,
-    IN gctINT MaxLevel
+    IN gctINT MaxLevel,
+    IN gctBOOL sRGBDecode
     )
 {
     gctUINT maxLevel = gcmMIN(MaxLevel, Texture->levels - 1);
@@ -5263,6 +5264,7 @@ gcoTEXTURE_GenerateMipMap(
                 gcvENGINE_RENDER,
                 &info,
                 z,
+                sRGBDecode,
                 gcvNULL
                 ));
         }
@@ -5306,6 +5308,7 @@ gcoTEXTURE_GenerateMipMap(
                 gcvENGINE_RENDER,
                 &info,
                 i,
+                sRGBDecode,
                 gcvNULL
                 ));
         }
@@ -5338,8 +5341,19 @@ OnError:
 #endif
         {
             gcsMIPMAP_PTR prevMap;
+            gctBOOL sRGBDecodeEnable = gcvFALSE;
             prevMap = baseMipMap;
             map = baseMipMap->next;
+
+            if (sRGBDecode &&
+                ((baseMipMap->surface->format == gcvSURF_SBGR8) ||
+                (baseMipMap->surface->format == gcvSURF_A8_SBGR8) ||
+                (baseMipMap->surface->format == gcvSURF_X8_SBGR8) ||
+                (baseMipMap->surface->format == gcvSURF_A8_SRGB8) ||
+                (baseMipMap->surface->format == gcvSURF_X8_SRGB8)))
+            {
+                sRGBDecodeEnable = gcvTRUE;
+            }
 
             for (l = 0; l < genLevel; l++, map = map->next)
             {
@@ -5366,6 +5380,7 @@ OnError:
                 blitArgs.scissorTest        = gcvFALSE;
                 blitArgs.srcNumSlice        = 1;
                 blitArgs.dstNumSlice        = 1;
+                blitArgs.needDecode         = sRGBDecodeEnable;
                 status = gcoSURF_BlitCPU(&blitArgs);
                 prevMap = map;
             }
@@ -5779,7 +5794,8 @@ gceSTATUS
 gcoTEXTURE_GenerateMipMap(
     IN gcoTEXTURE Texture,
     IN gctINT BaseLevel,
-    IN gctINT MaxLevel
+    IN gctINT MaxLevel,
+    IN gctBOOL sRGBDecode
     )
 {
     return gcvSTATUS_OK;

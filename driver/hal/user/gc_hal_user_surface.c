@@ -12682,6 +12682,10 @@ gcoSURF_BlitCPU(
                                 gcoSURF_PixelToNonLinear(&samplePixels[sampleCount]);
 
                             }
+                            if (blitArgs.needDecode)
+                            {
+                                gcoSURF_PixelToLinear(&samplePixels[sampleCount]);
+                            }
 
                             sampleCount++;
                         }
@@ -12698,6 +12702,11 @@ gcoSURF_BlitCPU(
                 }
 
                 dstSurf->pfGetAddr(dstSurf, (gctSIZE_T)iDst, (gctSIZE_T)jDst, (gctSIZE_T)kDst, dstAddr_l);
+
+                if (blitArgs.needDecode)
+                {
+                    gcoSURF_PixelToNonLinear(&internal);
+                }
 
                 pfWritePixel(&internal, dstAddr_l, args->flags);
 

@@ -243,6 +243,7 @@ typedef struct _gcsSURF_BLIT_ARGS
     gcsRECT     scissor;
     gctUINT     flags;
     gctUINT     srcNumSlice, dstNumSlice;
+    gctBOOL     needDecode;
 }
 gcsSURF_BLIT_ARGS;
 
@@ -2382,7 +2383,8 @@ gceSTATUS
 gcoTEXTURE_GenerateMipMap(
     IN gcoTEXTURE Texture,
     IN gctINT   BaseLevel,
-    IN gctINT   MaxLevel
+    IN gctINT   MaxLevel,
+    IN gctBOOL  sRGBDecode
     );
 
 /******************************************************************************\

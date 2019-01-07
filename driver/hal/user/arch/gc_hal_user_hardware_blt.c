@@ -8348,6 +8348,7 @@ gcoHARDWARE_3DBlitMipMap(
     IN gceENGINE Engine,
     IN gcs3DBLIT_INFO_PTR Info,
     IN gctUINT SliceIdx,
+    IN gctBOOL sRGBDecode,
     INOUT gctPOINTER * Memory
     )
 {
@@ -8389,8 +8390,8 @@ gcoHARDWARE_3DBlitMipMap(
 
     gcmONERROR(_ConvertBlitFormat(gcvTRUE, srcSurf->format, &srcFormat, &srcSwizzle, gcvNULL, &bSrcFake));
     gcmONERROR(_ConvertBlitFormat(gcvFALSE, dstSurf->format, &destFormat, &destSwizzle, gcvNULL, &bDstFake));
-    srcSRGB = (srcSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE;
-    dstSRGB = (dstSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE;
+    srcSRGB = sRGBDecode && ((srcSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE);
+    dstSRGB = sRGBDecode && ((dstSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE);
 
     /* For gcvSURF_A8_SRGB8 format, seems 3DBlitMipMap have precision issue */
     gcoHARDWARE_GetPatchID(gcvNULL, &patchId);
