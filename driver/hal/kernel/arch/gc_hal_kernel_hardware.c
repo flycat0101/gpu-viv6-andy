@@ -853,7 +853,7 @@ _DumpDebugRegisters(
         control |= (pipe << 20);
         gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, 0x0, control));
 
-        gcmkASSERT(Descriptor->count % REG_PER_LINE);
+        gcmkASSERT(!(Descriptor->count % REG_PER_LINE));
 
         for (i = 0; i < Descriptor->count; i += REG_PER_LINE)
         {
