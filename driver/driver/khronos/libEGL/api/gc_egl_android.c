@@ -218,6 +218,10 @@ _GetNativeVisualId(
            : HAL_PIXEL_FORMAT_RGBA_8888;
         break;
 
+    case 64:
+        id = HAL_PIXEL_FORMAT_RGBA_FP16;
+        break;
+
     default:
         break;
     }
@@ -948,6 +952,9 @@ _TranslateANativeBufferFormat(
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
             return gcvSURF_YUY2;
 
+        case HAL_PIXEL_FORMAT_RGBA_FP16:
+            return gcvSURF_A16B16G16R16F;
+
         default:
             ALOGE("%s: unsupported android format: %d",
                   __func__, Buffer->format);
@@ -1462,6 +1469,10 @@ _CreateGenericDrmBufferSurface(
     /* Translate stride in bytes to in pixels. */
     switch (Format)
     {
+    case gcvSURF_A16B16G16R16F:
+        stride *= 8;
+        break;
+
     case gcvSURF_A8R8G8B8:
     case gcvSURF_X8R8G8B8:
     case gcvSURF_A8B8G8R8:
@@ -3412,6 +3423,11 @@ _ConnectPixmap(
     case gcvSURF_R5G6B5:
         pixmapStride = pixmap->stride * 2;
         break;
+
+    case gcvSURF_A16B16G16R16F:
+        pixmapStride = pixmap->stride * 8;
+        break;
+
     case gcvSURF_A8B8G8R8:
     case gcvSURF_X8B8G8R8:
     case gcvSURF_A8R8G8B8:
