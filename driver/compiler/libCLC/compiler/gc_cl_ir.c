@@ -10489,6 +10489,7 @@ OUT cloIR_BINARY_EXPR *BinaryExpr
     binaryExpr->type = Type;
     binaryExpr->leftOperand    = LeftOperand;
     binaryExpr->rightOperand = RightOperand;
+    binaryExpr->integerPromoted = gcvFALSE;
 
     /* Do the implicit type conversion. */
     status = cloIR_BINARY_EXPR_ImplicitTypeConv(Compiler,
@@ -10657,29 +10658,38 @@ _NeedImplicitTypeConv(
     )
 {
     gctBOOL need = gcvFALSE;
-    cloIR_EXPR rightExpr = BinaryExpr->rightOperand;
-    cloIR_BINARY_EXPR binaryRightExpr;
-    clsDATA_TYPE *leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
-    clsDATA_TYPE *rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
+    clsDATA_TYPE *leftExprDataType;
+    clsDATA_TYPE *rightExprDataType;
+    cloIR_BINARY_EXPR binaryExpr = BinaryExpr;
 
-    /* Right now only check arithmetic binary. */
-    if (rightExpr->base.vptr->type != clvIR_BINARY_EXPR)
+    if(BinaryExpr->type == clvBINARY_ASSIGN)
+    {
+        /* Right now only check arithmetic binary. */
+        if (cloIR_OBJECT_GetType(&BinaryExpr->rightOperand->base) != clvIR_BINARY_EXPR)
+        {
+            return gcvFALSE;
+        }
+        binaryExpr = (cloIR_BINARY_EXPR) &BinaryExpr->rightOperand->base;
+    }
+    else if(!(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
+              clmDECL_IsScalarInteger(&BinaryExpr->rightOperand->decl))) /*for integer promotion */
+    {
+        return gcvFALSE;
+    }
+    if (!(binaryExpr->type == clvBINARY_ADD  ||
+          binaryExpr->type == clvBINARY_SUB  ||
+          binaryExpr->type == clvBINARY_MUL  ||
+          binaryExpr->type == clvBINARY_DIV  ||
+          binaryExpr->type == clvBINARY_MOD  ||
+          binaryExpr->type == clvBINARY_AND  ||
+          binaryExpr->type == clvBINARY_OR   ||
+          binaryExpr->type == clvBINARY_XOR))
     {
         return gcvFALSE;
     }
 
-    binaryRightExpr = (cloIR_BINARY_EXPR)rightExpr;
-    if (!(binaryRightExpr->type == clvBINARY_ADD  ||
-          binaryRightExpr->type == clvBINARY_SUB  ||
-          binaryRightExpr->type == clvBINARY_MUL  ||
-          binaryRightExpr->type == clvBINARY_DIV  ||
-          binaryRightExpr->type == clvBINARY_MOD  ||
-          binaryRightExpr->type == clvBINARY_AND  ||
-          binaryRightExpr->type == clvBINARY_OR   ||
-          binaryRightExpr->type == clvBINARY_XOR))
-    {
-        return gcvFALSE;
-    }
+    leftExprDataType = BinaryExpr->leftOperand->decl.dataType;
+    rightExprDataType = BinaryExpr->rightOperand->decl.dataType;
 
     /* Check floating and integer only. */
     if ((clmIsElementTypeFloating(leftExprDataType->elementType) || clmIsElementTypeInteger(leftExprDataType->elementType))
@@ -10714,11 +10724,6 @@ cloIR_BINARY_EXPR_ImplicitTypeConv(
         return status;
     }
 
-    /* Now only enable for assignment. */
-    /*
-    ** Right now we only have assignment conversion.
-    ** VIV:TODO: we also need Integral Promotion.
-    */
     switch (BinaryExpr->type)
     {
     case clvBINARY_ASSIGN:
@@ -10735,6 +10740,57 @@ cloIR_BINARY_EXPR_ImplicitTypeConv(
         break;
 
     default:
+       if(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
+          clmDECL_IsScalarInteger(&BinaryExpr->rightOperand->decl)) /*for integer promotion */
+       {
+           clsDECL decl[1];
+           clsDATA_TYPE dataType[1];
+           gctBOOL promoted = gcvFALSE;
+
+           *dataType = *leftExprDataType;
+           clmDECL_Initialize(decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+           dataType->type = T_INT;
+           dataType->elementType = clvTYPE_INT;
+
+           if(cloIR_OBJECT_GetType(&BinaryExpr->leftOperand->base) == clvIR_BINARY_EXPR &&
+              ((cloIR_BINARY_EXPR)(&BinaryExpr->leftOperand->base))->integerPromoted)
+           {
+               status = cloCOMPILER_CloneDecl(Compiler,
+                                              BinaryExpr->leftOperand->decl.dataType->accessQualifier,
+                                              BinaryExpr->leftOperand->decl.dataType->addrSpaceQualifier,
+                                              decl,
+                                              &BinaryExpr->leftOperand->decl);
+               if (gcmIS_ERROR(status)) return status;
+               promoted = gcvTRUE;
+           }
+
+           if(cloIR_OBJECT_GetType(&BinaryExpr->rightOperand->base) == clvIR_BINARY_EXPR &&
+              ((cloIR_BINARY_EXPR)(&BinaryExpr->rightOperand->base))->integerPromoted)
+           {
+               status = cloCOMPILER_CloneDecl(Compiler,
+                                              BinaryExpr->rightOperand->decl.dataType->accessQualifier,
+                                              BinaryExpr->rightOperand->decl.dataType->addrSpaceQualifier,
+                                              decl,
+                                              &BinaryExpr->rightOperand->decl);
+               if (gcmIS_ERROR(status)) return status;
+               promoted = gcvTRUE;
+           }
+
+           if(!promoted &&
+              leftExprDataType->elementType < clvTYPE_INT &&
+              rightExprDataType->elementType < clvTYPE_INT)
+           {
+               status = cloIR_CAST_EXPR_Construct(Compiler,
+                                                  BinaryExpr->leftOperand->base.lineNo,
+                                                  BinaryExpr->leftOperand->base.stringNo,
+                                                  decl,
+                                                  BinaryExpr->leftOperand,
+                                                  &BinaryExpr->leftOperand);
+               if (gcmIS_ERROR(status)) return status;
+               promoted = gcvTRUE;
+            }
+            BinaryExpr->integerPromoted = promoted;
+        }
         break;
     }
 
@@ -11353,7 +11409,7 @@ OUT cloIR_CONSTANT * ResultConstant
             status = cloCOMPILER_CloneDecl(Compiler,
                                clvQUALIFIER_CONST,
                                PolynaryExpr->exprBase.decl.dataType->addrSpaceQualifier,
-                                               &PolynaryExpr->exprBase.decl,
+                               &PolynaryExpr->exprBase.decl,
                                &decl);
             if (gcmIS_ERROR(status)) return status;
 

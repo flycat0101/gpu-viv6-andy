@@ -1678,12 +1678,12 @@ cleITERATION_TYPE;
 struct _cloIR_ITERATION
 {
     struct _cloIR_BASE    base;
-    cleITERATION_TYPE    type;
-    cloIR_EXPR        condExpr;
-    cloIR_BASE        loopBody;
-    clsNAME_SPACE *        forSpace;
-    cloIR_BASE        forInitStatement;
-    cloIR_EXPR        forRestExpr;
+    cleITERATION_TYPE     type;
+    cloIR_EXPR            condExpr;
+    cloIR_BASE            loopBody;
+    clsNAME_SPACE *       forSpace;
+    cloIR_BASE            forInitStatement;
+    cloIR_EXPR            forRestExpr;
 };
 
 typedef struct _cloIR_ITERATION *cloIR_ITERATION;
@@ -1832,17 +1832,17 @@ cluCONSTANT_VALUE;
 struct _cloIR_CONSTANT
 {
     struct _cloIR_EXPR    exprBase;
-    gctUINT            valueCount;
-    cluCONSTANT_VALUE * values;
-    gctSTRING buffer;
-    clsNAME * variable;
-    gctUINT uniformCount;
+    gctUINT               valueCount;
+    cluCONSTANT_VALUE *   values;
+    gctSTRING             buffer;
+    clsNAME *             variable;
+    gctUINT               uniformCount   : 30;
+    gctBOOL               allValuesEqual : 2;
 
     union {
-       gcUNIFORM *uniformArr;
-       gcUNIFORM uniform;
+       gcUNIFORM *        uniformArr;
+       gcUNIFORM          uniform;
     } u;
-    gctBOOL allValuesEqual;
 };
 
 typedef struct _cloIR_CONSTANT *cloIR_CONSTANT;
@@ -2205,10 +2205,11 @@ cleBINARY_EXPR_TYPE;
 
 struct _cloIR_BINARY_EXPR
 {
-    struct _cloIR_EXPR    exprBase;
+    struct _cloIR_EXPR     exprBase;
     cleBINARY_EXPR_TYPE    type;
-    cloIR_EXPR        leftOperand;
-    cloIR_EXPR        rightOperand;
+    cloIR_EXPR             leftOperand;
+    cloIR_EXPR             rightOperand;
+    gctBOOL integerPromoted : 2;          /* expression had gone through integer promotion */
 };
 
 typedef struct _cloIR_BINARY_EXPR *cloIR_BINARY_EXPR;
@@ -2289,9 +2290,9 @@ IN cleBINARY_EXPR_TYPE BinaryOp
 struct _cloIR_SELECTION
 {
     struct _cloIR_EXPR    exprBase;
-    cloIR_EXPR        condExpr;
-    cloIR_BASE        trueOperand;
-    cloIR_BASE        falseOperand;
+    cloIR_EXPR            condExpr;
+    cloIR_BASE            trueOperand;
+    cloIR_BASE            falseOperand;
 };
 
 typedef struct _cloIR_SELECTION *cloIR_SELECTION;
@@ -2312,9 +2313,9 @@ cloIR_SELECTION_Construct(
 struct _cloIR_SWITCH
 {
     struct _cloIR_EXPR    exprBase;
-    cloIR_EXPR        condExpr;
-    cloIR_BASE        switchBody;
-    cloIR_LABEL        cases;
+    cloIR_EXPR            condExpr;
+    cloIR_BASE            switchBody;
+    cloIR_LABEL           cases;
 };
 
 typedef struct _cloIR_SWITCH *cloIR_SWITCH;
@@ -2333,11 +2334,11 @@ cloIR_SWITCH_Construct(
 
 struct _cloIR_POLYNARY_EXPR
 {
-    struct _cloIR_EXPR    exprBase;
+    struct _cloIR_EXPR       exprBase;
     clePOLYNARY_EXPR_TYPE    type;
-    cltPOOL_STRING        funcSymbol;    /* Only for the function call */
-    clsNAME *        funcName;    /* Only for the function call */
-    cloIR_SET        operands;
+    cltPOOL_STRING           funcSymbol;    /* Only for the function call */
+    clsNAME *                funcName;      /* Only for the function call */
+    cloIR_SET                operands;
 };
 
 typedef struct _cloIR_POLYNARY_EXPR *cloIR_POLYNARY_EXPR;
@@ -2345,8 +2346,8 @@ typedef struct _cloIR_POLYNARY_EXPR *cloIR_POLYNARY_EXPR;
 struct _cloIR_TYPECAST_ARGS
 {
     struct _cloIR_EXPR    exprBase;
-    cloIR_EXPR        lhs;
-    cloIR_SET        operands;
+    cloIR_EXPR            lhs;
+    cloIR_SET             operands;
 };
 
 typedef struct _cloIR_TYPECAST_ARGS *cloIR_TYPECAST_ARGS;
@@ -2365,9 +2366,9 @@ typedef gctUINT8 cltPARSER_STATE;
 struct _clsPARSER_STATE;
 typedef struct _clsPARSER_STATE
 {
-    slsSLINK_NODE node;
-    clsDECL castTypeDecl;
-    cltPARSER_STATE state;
+    slsSLINK_NODE    node;
+    clsDECL          castTypeDecl;
+    cltPARSER_STATE  state;
 }
 clsPARSER_STATE;
 
@@ -2566,19 +2567,19 @@ typedef gceSTATUS
 
 typedef struct _clsVISITOR
 {
-    clsOBJECT            object;
-    cltVISIT_SET_FUNC_PTR        visitSet;
-    cltVISIT_ITERATION_FUNC_PTR    visitIteration;
-    cltVISIT_JUMP_FUNC_PTR        visitJump;
-    cltVISIT_LABEL_FUNC_PTR        visitLabel;
-    cltVISIT_VARIABLE_FUNC_PTR    visitVariable;
-    cltVISIT_CONSTANT_FUNC_PTR    visitConstant;
+    clsOBJECT                       object;
+    cltVISIT_SET_FUNC_PTR           visitSet;
+    cltVISIT_ITERATION_FUNC_PTR     visitIteration;
+    cltVISIT_JUMP_FUNC_PTR          visitJump;
+    cltVISIT_LABEL_FUNC_PTR         visitLabel;
+    cltVISIT_VARIABLE_FUNC_PTR      visitVariable;
+    cltVISIT_CONSTANT_FUNC_PTR      visitConstant;
     cltVISIT_UNARY_EXPR_FUNC_PTR    visitUnaryExpr;
-    cltVISIT_BINARY_EXPR_FUNC_PTR    visitBinaryExpr;
-    cltVISIT_SELECTION_FUNC_PTR    visitSelection;
-    cltVISIT_SWITCH_FUNC_PTR    visitSwitch;
-    cltVISIT_POLYNARY_EXPR_FUNC_PTR    visitPolynaryExpr;
-    cltVISIT_TYPECAST_ARGS_FUNC_PTR    visitTypeCastArgs;
+    cltVISIT_BINARY_EXPR_FUNC_PTR   visitBinaryExpr;
+    cltVISIT_SELECTION_FUNC_PTR     visitSelection;
+    cltVISIT_SWITCH_FUNC_PTR        visitSwitch;
+    cltVISIT_POLYNARY_EXPR_FUNC_PTR visitPolynaryExpr;
+    cltVISIT_TYPECAST_ARGS_FUNC_PTR visitTypeCastArgs;
 }
 clsVISITOR;
 
