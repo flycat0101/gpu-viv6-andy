@@ -6824,6 +6824,33 @@ VkResult halti5_setDesriptorSets(
 
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
+    if (devCtx->database->ROBUSTNESS && !devCtx->database->SH_ROBUSTNESS_FIX)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+    }
+
     while (dirtyMask)
     {
         if (dirtyMask & (1 << setIdx))
