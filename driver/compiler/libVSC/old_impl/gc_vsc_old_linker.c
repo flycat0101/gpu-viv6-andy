@@ -13749,6 +13749,7 @@ gcLinkTreeThruVirShaders(
             /* Delete program states returned by compiler */
             gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer));
             hwPgStates.stateBufferSize = 0;
+            hwPgStates.pStateBuffer = gcvNULL;
         }
         else
         {
@@ -13854,7 +13855,7 @@ OnError:
     if (stateBuffer) gcmOS_SAFE_FREE(gcvNULL, stateBuffer);
     if (hints)  gcmOS_SAFE_FREE(gcvNULL, hints);
     if (hwPgStates.pStateBuffer) {gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer); hwPgStates.stateBufferSize = 0;}
-    if (coreSysCtx.hPrivData) {vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);}
+    if (clKernel && coreSysCtx.hPrivData) {vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);}
     /* Return the status. */
     gcmFOOTER();
 
