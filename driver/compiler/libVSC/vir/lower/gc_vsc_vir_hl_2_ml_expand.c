@@ -2321,7 +2321,7 @@ static VIR_PatternMatchInst _texldprojPatInst0[] = {
 static VIR_PatternReplaceInst _texldprojRepInst0[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableXFloat } },
     { VIR_OP_MOV, 0, 0, { -1, 0, 0, 0 }, { _setEnableYFloat, _constf_zero } },
-    { VIR_OP_MOV, 0, 0, { -1, 0, 0, 0 }, { _setEnableZFloat, _constf_zero } },
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableZFloat, VIR_Lower_SetSwizzleY } },
     { VIR_OP_TEXLDPROJ, 0, 0, { 1, 2, -1, 4 }, { 0, 0, _setSwizzleXYZ } },
 };
 
@@ -2332,7 +2332,7 @@ static VIR_PatternMatchInst _texldprojPatInst1[] = {
 static VIR_PatternReplaceInst _texldprojRepInst1[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableXFloat } },
     { VIR_OP_MOV, 0, 0, { -1, 0, 0, 0 }, { _setEnableYFloat, _constf_zero } },
-    { VIR_OP_MOV, 0, 0, { -1, 0, 0, 0 }, { _setEnableZFloat, _constf_zero } },
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableZFloat, VIR_Lower_SetSwizzleY } },
     { VIR_OP_TEXLDPROJ, 0, 0, { 1, 2, -1, 0 }, { 0, 0, _setSwizzleXYZ } },
 };
 
