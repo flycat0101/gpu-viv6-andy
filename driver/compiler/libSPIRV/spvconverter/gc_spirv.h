@@ -78,6 +78,12 @@ typedef enum{
     SPV_MAX_BUILTINVAR,
 }SpvBuiltinVariable;
 
+typedef struct {
+    gctBOOL hasName;
+    VIR_NameId field;
+    gctUINT member;
+} SpvStructMembers;
+
 typedef struct _SpvTypeDescriptor
 {
     SpvDescriptorHeader descriptorHeader;
@@ -145,9 +151,8 @@ typedef struct _SpvTypeDescriptor
 
         struct
         {
-            gctBOOL hasName[SPV_STRUCT_FIELD_NUM];
-            VIR_NameId field[SPV_STRUCT_FIELD_NUM];
-            gctUINT member[SPV_STRUCT_FIELD_NUM];
+            gctUINT maxNumField;
+            SpvStructMembers *fields;
         }st;
 
         struct
@@ -537,8 +542,12 @@ struct _gcSPV
     gctUINT                     generator;
     gctUINT                     bound;
 
-    /* Add 5 temp ID for internal used. */
+    /*
+    ** Add 5 temp ID for internal used.
+    ** VIV:TODO: need to change it to a pointer, not an array.
+    */
     gctUINT                     internalId[SPV_INTERNAL_ID_NUM];
+    gctBOOL                     internalIdUsed[SPV_INTERNAL_ID_NUM];
     VIR_Symbol *                internalSym;
 
     struct{
@@ -639,8 +648,9 @@ struct _gcSPV
     gctUINT                     argIndex;
     gctCHAR                     virName[SPV_VIR_NAME_SIZE];
     gctCHAR                     tempName[SPV_VIR_NAME_SIZE];
-    gctUINT                     operands[SPV_MAX_OPERAND_NUM];
+    gctUINT *                   operands;
     gctUINT                     operandSize;
+    gctUINT                     maxOperandSize;
     gctUINT                     unknowId;
 
     gctUINT                     entryID;
