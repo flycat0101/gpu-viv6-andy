@@ -7114,7 +7114,11 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol);
 VSC_ErrCode
 VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand);
 
-VIR_Uniform * VIR_Shader_GetTempRegSpillAddrUniform(VIR_Shader *pShader);
+VIR_Uniform *
+VIR_Shader_GetTempRegSpillAddrUniform(
+    IN VIR_Shader *pShader,
+    IN gctBOOL     bNeedBoundsCheck
+    );
 
 #define SHDR_SIG    gcmCC('S', 'H', 'D', 'R')
 #define ENDS_SIG    gcmCC('E', 'N', 'D', 'S')

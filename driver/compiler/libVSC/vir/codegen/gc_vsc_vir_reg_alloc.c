@@ -1105,8 +1105,15 @@ static void _VIR_RA_LS_Init(
     pRA->spillOffset = (pShader->vidmemSizeOfSpill + 15) & ~ (gctUINT)0x0F;
     /* reserved HW register for base address, offset, or threadIndex
        baseRegister.x base address for spill
-       baseRegister.y computed offset for spill (LDARR/STARR), save dest for spill(STARR) if the src2 is not in temp
-       baseRegister.z threadIndex got from the atomic_add */
+       if bounds check:
+         baseRegister.yz  spill mem block start and end address
+         baseRegister.w   computed offset for spill (LDARR/STARR),
+                          save dest for spill(STARR) if the src2 is not in temp
+         baseRegister.w   threadIndex got from the atomic add
+       else
+         baseRegister.y   computed offset for spill (LDARR/STARR),
+                          save dest for spill(STARR) if the src2 is not in temp
+         baseRegister.y   threadIndex got from the atomic add */
     pRA->baseRegister = VIR_INVALID_ID;
 
     if (VIR_Shader_HasMova(pShader))
@@ -7246,7 +7253,7 @@ _VIR_RA_LS_InsertSpill(
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
     _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
+    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
     /* src1 offset */
     VIR_Operand_SetImmediateUint(newInst->src[VIR_Operand_Src1],
@@ -7345,7 +7352,7 @@ _VIR_RA_LS_InsertSpillForDest(
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
     _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
+    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
     /* src1 offset */
     VIR_Operand_SetImmediateUint(newInst->src[VIR_Operand_Src1],
@@ -7466,7 +7473,7 @@ _VIR_RA_LS_InsertFill(
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
     _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
+    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
     /* compute offset */
     VIR_Operand_SetImmediateUint(newInst->src[VIR_Operand_Src1],
@@ -7772,8 +7779,8 @@ _VIR_RA_LS_InsertSpillOffset(
                                 pRA->spillOffsetSymId,
                                 VIR_TYPE_UINT32);
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
-    /* use baseRegister.y */
-    _VIR_RA_MakeColor(pRA->baseRegister, 1, &curColor);
+    /* use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, madInst->dest, curColor);
     VIR_Operand_SetEnable(madInst->dest, VIR_ENABLE_X);
 
@@ -7862,7 +7869,7 @@ _VIR_RA_LS_InsertSpill_LDARR(
     /* use baseRegister.x */
     _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
+    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
     /* src1 offset */
     if (pRA->spillOffsetSymId == VIR_INVALID_ID)
@@ -7873,8 +7880,8 @@ _VIR_RA_LS_InsertSpill_LDARR(
                                 pFunc,
                                 pRA->spillOffsetSymId,
                                 VIR_TYPE_UINT32);
-    /* use baseRegister.y */
-    _VIR_RA_MakeColor(pRA->baseRegister, 1, &curColor);
+    /* use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src1], curColor);
     VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src1], VIR_SWIZZLE_X);
 
@@ -7977,7 +7984,7 @@ _VIR_RA_LS_InsertFill_STARR(
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
     _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
+    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
     /* src1 - offset */
     if (pRA->spillOffsetSymId == VIR_INVALID_ID)
@@ -7988,8 +7995,8 @@ _VIR_RA_LS_InsertFill_STARR(
                                 pFunc,
                                 pRA->spillOffsetSymId,
                                 VIR_TYPE_UINT32);
-    /* use baseRegister.y */
-    _VIR_RA_MakeColor(pRA->baseRegister, 1, &curColor);
+    /* use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src1], curColor);
     VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src1], VIR_SWIZZLE_X);
 
@@ -8019,7 +8026,8 @@ _VIR_RA_LS_InsertFill_STARR(
     }
     else
     {
-        _VIR_RA_MakeColor(pRA->baseRegister, 1, &curColor);
+        /* use baseRegister's scratch channel */
+        _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     }
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->dest, curColor);
 
@@ -8072,6 +8080,32 @@ _VIR_RA_LS_GetSpillSize(
     return spillSize;
 }
 
+/* The Spill Memory Block Layout
+ *    +-----------------------------+  <--- #TempRegSpillMemAddr
+ *    |  spill-id-counter (32-bit)  |
+ *    +-----------------------------+  <---- start of spill memory area
+ *    |/////// 1st id //////////////|    A
+ *    |///// spill area ////////////|    |
+ *    |\\\\\\\ 2nd id \\\\\\\\\\\\\\|    |   total spill memory size =
+ *    |\\\\\ spill area \\\\\\\\\\\\|    |     perThreadSpillMemSz * groupSize
+ *    |                             |    |
+ *    |                             |    |   thread_i_spill_area =
+ *    |                             |    |     (#TempRegSpillMemAddr + 4) +
+ *    |\\\\\\ last id \\\\\\\\\\\\\\|    |     thread_spill_id * perThreadSpillMemSz
+ *    |\\\\\ spill area \\\\\\\\\\\\|    V
+ *    +-----------------------------+  <---- end of spill memory area
+ *
+ * o In non Robust OutOfBounds Check mode, the #TempRegSpillMemAddr is a uniform
+ *   contains 32-bit address the Spill Memory Block;
+ * o In Robust OutOfBounds Check mode, the #TempRegSpillMemAddr is a uniform
+ *   contains the Spill Memory Block bounds info:
+ *        .x:    start address of the Spill Memory Block
+ *        .y:    start address of the Spill Memory Block (same as .x)
+ *        .z:    end address of the Spill Memory Block
+ *
+ *  When address is assigned to some pointer variable, the .x value can be changed
+ *  but .y and .z will never be changed so the HW can do effctive bounds check
+ */
 static VSC_ErrCode
 _VIR_RA_LS_SpillAddrComputation(
     VIR_RA_LS           *pRA
@@ -8092,6 +8126,7 @@ _VIR_RA_LS_SpillAddrComputation(
 
     gctUINT             spillSize = _VIR_RA_LS_GetSpillSize(pRA, &groupSize);
     gctUINT             uniformIdx;
+    VIR_Instruction     *movInst = gcvNULL;
 
     pShader->vidmemSizeOfSpill = spillSize;
 
@@ -8137,10 +8172,38 @@ _VIR_RA_LS_SpillAddrComputation(
                                 pRA->threadIdxSymId,
                                 VIR_TYPE_UINT32);
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
-    /* use baseRegister.z */
-    _VIR_RA_MakeColor(pRA->baseRegister, 2, &curColor);
+    /* use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, atomicAddInst->dest, curColor);
     VIR_Operand_SetEnable(atomicAddInst->dest, VIR_ENABLE_X);
+    if (pRA->needBoundsCheck)
+    {
+        /* MOV  baseRegister.xyz, uSymSpillMemAddr.xyz */
+        retErrCode = VIR_Function_AddInstructionAfter(pFunc,
+                                                      VIR_OP_MOV,
+                                                      VIR_TYPE_UINT_X3,
+                                                      atomicAddInst,
+                                                      gcvTRUE,
+                                                      &movInst);
+        if (retErrCode != VSC_ERR_NONE) return retErrCode;
+
+        /* src0 - uSymSpillMemAddr.xyz */
+        VIR_Operand_SetOpKind(movInst->src[VIR_Operand_Src0], VIR_OPND_SYMBOL);
+        VIR_Operand_SetSym(movInst->src[VIR_Operand_Src0], uSymSpillMemAddr);
+        VIR_Operand_SetTypeId(movInst->src[VIR_Operand_Src0], VIR_TYPE_UINT_X3);
+        VIR_Operand_SetSwizzle(movInst->src[VIR_Operand_Src0], VIR_SWIZZLE_XYZZ);
+
+        /* dest */
+        VIR_Operand_SetTempRegister(movInst->dest,
+                                    pFunc,
+                                    pRA->baseAddrSymId,
+                                    VIR_TYPE_UINT_X3);
+        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
+        /* use baseRegister.x */
+        _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
+        _VIR_RA_LS_SetOperandHwRegInfo(pRA, movInst->dest, curColor);
+        VIR_Operand_SetEnable(movInst->dest, VIR_ENABLE_XYZ);
+    }
 
     /*
     ** For a CS, swathing is disabled now, so we need to reset the index to 0 for a new swath.
@@ -8151,7 +8214,7 @@ _VIR_RA_LS_SpillAddrComputation(
     retErrCode = VIR_Function_AddInstructionAfter(pFunc,
                                                   VIR_OP_IMOD,
                                                   VIR_TYPE_UINT16,
-                                                  atomicAddInst,
+                                                  movInst ? movInst : atomicAddInst,
                                                   gcvTRUE,
                                                   &modInst);
     if (retErrCode != VSC_ERR_NONE) return retErrCode;
@@ -8161,8 +8224,8 @@ _VIR_RA_LS_SpillAddrComputation(
                                 pFunc,
                                 pRA->threadIdxSymId,
                                 VIR_TYPE_UINT16);
-    /* use baseRegister.z */
-    _VIR_RA_MakeColor(pRA->baseRegister, 2, &curColor);
+    /*  use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, modInst->src[VIR_Operand_Src0], curColor);
     VIR_Operand_SetSwizzle(modInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
 
@@ -8175,8 +8238,8 @@ _VIR_RA_LS_SpillAddrComputation(
                                 pRA->threadIdxSymId,
                                 VIR_TYPE_UINT16);
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
-    /* use baseRegister.z */
-    _VIR_RA_MakeColor(pRA->baseRegister, 2, &curColor);
+    /*  use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, modInst->dest, curColor);
     VIR_Operand_SetEnable(modInst->dest, VIR_ENABLE_X);
 
@@ -8196,8 +8259,8 @@ _VIR_RA_LS_SpillAddrComputation(
                                 pFunc,
                                 pRA->threadIdxSymId,
                                 VIR_TYPE_UINT32);
-     /* use baseRegister.z */
-    _VIR_RA_MakeColor(pRA->baseRegister, 2, &curColor);
+     /*  use baseRegister's scratch channel */
+    _VIR_RA_MakeColor(pRA->baseRegister, pRA->scratchChannel, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, madInst->src[VIR_Operand_Src0], curColor);
     VIR_Operand_SetSwizzle(madInst->src[VIR_Operand_Src0], VIR_SWIZZLE_X);
 
@@ -8447,7 +8510,7 @@ _VIR_RA_LS_RewriteColor_Src(
             gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
             _VIR_RA_MakeColor(pRA->baseRegister, 0, &curColor);
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, pSrcOpnd, curColor);
-            VIR_Operand_SetSwizzle(pSrcOpnd, VIR_SWIZZLE_X);
+            VIR_Operand_SetSwizzle(pSrcOpnd, pRA->needBoundsCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
         }
     }
 
@@ -11853,6 +11916,8 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     gctBOOL             colorSucceed = gcvFALSE;
 
     gctBOOL             debugEnabled = gcmOPT_EnableDebug();
+    gctBOOL             needBoundsCheck =
+                           (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE))
@@ -11865,6 +11930,8 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     VIR_Shader_RenumberInstId(pShader);
 
     _VIR_RA_LS_Init(&ra, pShader, pHwCfg, pLvInfo, pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM);
+    ra.needBoundsCheck = needBoundsCheck;
+    ra.scratchChannel = needBoundsCheck ? VIR_CHANNEL_W : VIR_CHANNEL_Y;
 
     if (debugEnabled)
     {

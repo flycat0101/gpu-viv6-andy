@@ -226,13 +226,23 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 
     VIR_HwRegId                 resRegister;
 
+    gctBOOL                     needBoundsCheck;   /* for Robust OOB check HW and OOB check enabled */
     /* the offset for next spill, it starts from 0 */
     gctUINT                     spillOffset;
-    /* reserved HW register for base address, offset, or threadIndex
+    /* reserved HW register for base address, bounds info, offset, or threadIndex
        baseRegister.x base address for spill
-       baseRegister.y computed offset for spill (LDARR/STARR), save dest for spill(STARR) if the src2 is not in temp
-       baseRegister.z threadIndex got from the atomic add  */
+       if bounds check:
+         baseRegister.yz  spill mem block start and end address
+         baseRegister.w   computed offset for spill (LDARR/STARR),
+                          save dest for spill(STARR) if the src2 is not in temp
+         baseRegister.w   threadIndex got from the atomic add
+       else
+         baseRegister.y   computed offset for spill (LDARR/STARR),
+                          save dest for spill(STARR) if the src2 is not in temp
+         baseRegister.y   threadIndex got from the atomic add */
     VIR_HwRegId                 baseRegister;
+    gctUINT                     scratchChannel;  /* computed offset for spill, save dest for spill
+                                                  * threadIndex got from the atomic add */
 
     /* reserved HW register for saving MOVA src0 if
        LDARR spill base  */
