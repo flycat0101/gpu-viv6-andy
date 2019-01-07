@@ -2898,7 +2898,8 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
 
             gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT
                                  || VIR_Shader_IsCL(shader));
-            if(gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") != gcvSTATUS_OK)
+            if (!(VIR_Symbol_isSampler(sym) &&
+                  gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") == gcvSTATUS_OK))
             {
                 if(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_ANY)
                 {
@@ -2970,20 +2971,21 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
     VIR_Operand* dst = VIR_Inst_GetDest(inst);
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-    if(VIR_OPCODE_ExpectedResultPrecision(opcode))
+    if (VIR_OPCODE_ExpectedResultPrecision(opcode))
     {
         gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT
             || VIR_Shader_IsCL(VIR_Inst_GetShader(inst)));
 
-        if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
+        if (VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
         {
             VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst);
             VIR_Symbol* sym = VIR_Operand_GetSymbol(dst);
 
-            if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
             {
                 VIR_Symbol* opndSym0 = VIR_Operand_GetSymbol(VIR_Inst_GetSource(inst, 0));
-                if(gcoOS_StrCmp(VIR_Shader_GetSymNameString(VIR_Inst_GetShader(inst), opndSym0), "#BaseSamplerSym") == gcvSTATUS_OK)
+                if (VIR_Symbol_isSampler(opndSym0) &&
+                    gcoOS_StrCmp(VIR_Shader_GetSymNameString(VIR_Inst_GetShader(inst), opndSym0), "#BaseSamplerSym") == gcvSTATUS_OK)
                 {
                     precision = VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 1));
                 }
