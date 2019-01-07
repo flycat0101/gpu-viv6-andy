@@ -8447,7 +8447,7 @@ __glChipShaderBinary(
 
         gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_PRECOMPILED, &shader));
 
-        gcSHADER_GetCompilerVersion(vertexShader? vertexShader: fragmentShader, &compilerVersion);
+        gcSHADER_GetCompilerVersion(vertexShader ? vertexShader: fragmentShader, &compilerVersion);
         gcSHADER_SetCompilerVersion(shader, compilerVersion);
         gcmONERROR(gcSHADER_LoadHeader(shader, (gctPOINTER) binary, length, &shaderVersion));
 
@@ -8462,6 +8462,7 @@ __glChipShaderBinary(
         }
 
         gcmONERROR(gcSHADER_Destroy(shader));
+        shader = gcvNULL;
 
         if (!found)
         {
