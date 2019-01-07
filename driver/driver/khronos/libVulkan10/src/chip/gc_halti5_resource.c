@@ -3429,6 +3429,7 @@ VkResult halti5_copyImage(
             srcMsaa != dstMsaa)
         {
             useComputeBlit = VK_TRUE;
+            rawCopy = VK_FALSE;
         }
     }
 
