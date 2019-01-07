@@ -311,6 +311,7 @@ static VkResult halti5_program_blit_src_tex(
     case VK_FORMAT_R16_SINT:
     case VK_FORMAT_R16G16_SINT:
     case VK_FORMAT_R16G16B16A16_SINT:
+    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
         txSignExt = 0x2;
         break;
     case VK_FORMAT_R8_SINT:
@@ -1376,6 +1377,10 @@ static VkResult halti5_program_copy_src_img(
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
             break;
+        case 64:
+            if (pSrcImg->formatInfo.partCount == 2)
+                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
+            break;
         default:
             /* Not support other bpp currently */
             __VK_ASSERT(0);
@@ -1483,6 +1488,7 @@ static VkResult halti5_program_copy_dst_img(
     HwImgDesc hwImgDesc[__VK_MAX_PARTS];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
+    __vkImage *pSrcImg = srcRes->u.img.pImage;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
 
@@ -1515,6 +1521,12 @@ static VkResult halti5_program_copy_dst_img(
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
             break;
+        case 64:
+            if (pSrcImg->formatInfo.partCount == 2)
+            {
+                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
+            }
+            break;
         default:
             /* Not support other bpp currently */
             __VK_ASSERT(0);
@@ -1526,7 +1538,6 @@ static VkResult halti5_program_copy_dst_img(
         if (pDstImg->formatInfo.partCount == 1)
         {
             static VkExtent3D userSize;
-            __vkImage *pSrcImg = srcRes->u.img.pImage;
             __vkImageLevel *pImgLevel = &pDstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
 
             userSize.width  = pImgLevel->requestW * pSrcImg->formatInfo.partCount;
@@ -1545,7 +1556,6 @@ static VkResult halti5_program_copy_dst_img(
     {
         static __vkBufferView tmpBufView;
         static VkExtent3D dstSize;
-        __vkImage *pSrcImg = srcRes->u.img.pImage;
 
         params->dstOffset.x = params->dstOffset.y = params->dstOffset.z = 0;
 
@@ -1566,6 +1576,13 @@ static VkResult halti5_program_copy_dst_img(
             if (pSrcImg->formatInfo.partCount == 2)
             {
                 tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
+            }
+            break;
+        case 64:
+            /* Dst must be 2 part faked format here. */
+            if (pSrcImg->formatInfo.partCount == 2)
+            {
+                tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT];
             }
             break;
         default:
@@ -2219,6 +2236,25 @@ static uint32_t halti5_detect_blit_kind(
                          srcCategory, dstCategory);
         __VK_ASSERT(VK_FALSE);
     }
+    else if (srcRes->isImage && dstRes->isImage &&
+             srcBitsPerPixel >= 64 &&
+             srcMsaa != dstMsaa)
+    {
+        __VK_ASSERT(srcBitsPerPixel == dstBitsPerPixel);
+
+        switch (dstCategory)
+        {
+        case __VK_FMT_CATEGORY_SINT:
+            kind = HALTI5_BLIT_2D_SINT_DOWNSAMPLE;
+            break;
+        case __VK_FMT_CATEGORY_UINT:
+            kind = HALTI5_BLIT_2D_UINT_DOWNSAMPLE;
+            break;
+        default:
+            kind = HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE;
+            break;
+        }
+    }
     else if (srcParts != dstParts)
     {
         if (srcParts == 2 && dstParts == 1)
@@ -2244,26 +2280,6 @@ static uint32_t halti5_detect_blit_kind(
             __VK_DEBUG_PRINT(__VK_DBG_LEVEL_ERROR, "Compute blit unsupported fake formats: srcFormat=%u, dstFormat=%u\n",
                              srcFormat, dstFormat);
             __VK_ASSERT(VK_FALSE);
-        }
-    }
-    else if (srcRes->isImage && dstRes->isImage &&
-             srcFormat == dstFormat &&
-             srcBitsPerPixel >= 64 &&
-             srcMsaa != dstMsaa)
-    {
-        __VK_ASSERT(srcBitsPerPixel == dstBitsPerPixel);
-
-        switch (dstCategory)
-        {
-        case __VK_FMT_CATEGORY_SINT:
-            kind = HALTI5_BLIT_2D_SINT_DOWNSAMPLE;
-            break;
-        case __VK_FMT_CATEGORY_UINT:
-            kind = HALTI5_BLIT_2D_UINT_DOWNSAMPLE;
-            break;
-        default:
-            kind = HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE;
-            break;
         }
     }
     else if ((srcRes->isImage && !dstRes->isImage && srcFormat == __VK_FORMAT_R8_1_X8R8G8B8) ||

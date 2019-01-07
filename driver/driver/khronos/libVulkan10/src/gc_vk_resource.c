@@ -801,6 +801,21 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     {0,
     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
+    /*    __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT, */
+    {__VK_FMT_CATEGORY_SFLOAT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT,
+    {__VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
+    /*    __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT, */
+    {__VK_FMT_CATEGORY_SINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT,
+    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
+    /*    __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT, */
+    {__VK_FMT_CATEGORY_UINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT,
+    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
+     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
     /*  __VK_FORMAT_A4R4G4B4_UNFORM_PACK16, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNFORM_PACK16,
     {0,
@@ -2225,6 +2240,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         uint32_t level;
         gctUINT width, height, depth;
         VkBool32 enableCC;
+        uint32_t residentFormat;
         __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_IMAGE, sizeof(__vkImage), (__vkObject**)&img));
 
         img->devCtx = devCtx;
@@ -2241,7 +2257,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         }
         else
         {
-            uint32_t residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
+            residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
             img->formatInfo = g_vkFormatInfoTable[residentFormat];
         }
 
@@ -2250,6 +2266,26 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             /* Shouldn't happen if app pays attention to format queries */
             __VK_ASSERT(0);
             __VK_ONERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
+        }
+        else if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
+                 !devCtx->database->CACHE128B256BPERLINE)
+        {
+            uint32_t fakedFormat = VK_FORMAT_UNDEFINED;
+            switch (img->formatInfo.residentImgFormat)
+            {
+            case VK_FORMAT_R16G16B16A16_SFLOAT:
+                fakedFormat = __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT;
+                break;
+            case VK_FORMAT_R16G16B16A16_SINT:
+                fakedFormat = __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT;
+                break;
+            case VK_FORMAT_R16G16B16A16_UINT:
+                fakedFormat = __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT;
+                break;
+            default:
+                break;
+            }
+            img->formatInfo = g_vkFormatInfoTable[fakedFormat];
         }
 
         __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
