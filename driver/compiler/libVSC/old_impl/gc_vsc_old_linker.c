@@ -4050,7 +4050,7 @@ gcLINKTREE_Build(
                 gctINT instIndex = user->index - 1;
 
                 /* Get the nearest call instruction index. */
-                while (instIndex > 0 && Tree->shader->code[instIndex].opcode != gcSL_CALL)
+                while (instIndex >= 0 && Tree->shader->code[instIndex].opcode != gcSL_CALL)
                 {
                     instIndex --;
                 }
