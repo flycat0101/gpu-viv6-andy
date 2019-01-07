@@ -15834,7 +15834,8 @@ set_RCP_value(
         constValue.ty = gcSL_FLOAT;
         constValue.value.u = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
         constValue.value.f = 1.0f / constValue.value.f;
-        if (ValueFit20Bits(format, constValue.value.u))
+        if ((CodeGen->generateImmediate || CodeGen->forceGenImmediate) &&
+            ValueFit20Bits(format, constValue.value.u))
         {
             /* put the value in src1 immediate field if it can fit into 20 bits */
             gcEncodeSourceImmediate20(States, 1, &constValue);
