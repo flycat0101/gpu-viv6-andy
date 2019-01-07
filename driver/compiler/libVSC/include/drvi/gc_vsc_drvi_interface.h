@@ -611,6 +611,8 @@ gceSTATUS vscCompileShader(VSC_SHADER_COMPILER_PARAM* pCompilerParam,
 
 gcSHADER_KIND vscGetShaderKindFromShaderHandle(SHADER_HANDLE hShader);
 
+gceSTATUS vscGetTemporaryDir(OUT gctSTRING gcTmpDir);
+
 /* GL/Vulkan driver ONLY interface, this is HL interface to match glLinkProgram
    API. It may call vscCompileShader for each shader inside. After successfully
    program linking, a PEP will be generated. Also program states will auto be
@@ -668,7 +670,6 @@ gceSTATUS vscProgramHwShaderStages(VSC_HW_PIPELINE_SHADERS_PARAM*   pHwPipelineS
 
 
 
-
 /****************************************************************************
    Following are for future MC level recompiling. Right now, we are using HL
    recompiling, so these are not used now.
@@ -702,6 +703,8 @@ gcSHADER_ReadBufferFromFile(
     OUT gctSTRING    *buf,
     OUT gctUINT *bufSize
     );
+
+gceSTATUS vscGetTemporaryDir(OUT gctSTRING gcTmpDir);
 
 END_EXTERN_C();
 

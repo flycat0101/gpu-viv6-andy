@@ -1292,6 +1292,7 @@ gceSTATUS __SpvDumpLine(
     gctUINT word = 0;
     gctUINT operandNum = __SpvGetOperandNumFromOpCode(opCode);
     gctUINT i;
+    gctUINT printCacheSize = SPV_DUMP_MAX_SIZE * 3 / 4;
 
     gcmONERROR(__SpvDumpCheckId(resultId));
     gcmONERROR(__SpvDumpCheckId(typeId));
@@ -1326,10 +1327,14 @@ gceSTATUS __SpvDumpLine(
         SpvDump_Goto_OnError();
     }
 
+#define __PRINT_BUFFER_CACHE__          do { if ((offset) >= (printCacheSize)) { spvPRINT("%s", line); offset = 0; }; } while (0)
+
     /* handle all operands */
     for (i = 0; i < operandNum && numOperands > 0; i++)
     {
         SpvOperandClass operandClass = __SpvGetOperandClassFromOpCode(opCode, i);
+
+        __PRINT_BUFFER_CACHE__;
 
         switch (operandClass)
         {
@@ -1340,7 +1345,14 @@ gceSTATUS __SpvDumpLine(
             break;
 
         case OperandVariableIds:
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpIds(&stream[word], numOperands));
+            {
+                gctUINT i, j;
+                for (i = 0, j = 0; i < numOperands; i++, j++)
+                {
+                    gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%d ", stream[word + j]);
+                    __PRINT_BUFFER_CACHE__;
+                }
+            }
             SpvDump_Goto_OnError();
             break;
 
@@ -1354,7 +1366,14 @@ gceSTATUS __SpvDumpLine(
                 i++;
             }
 
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpIds(&stream[word], numOperands));
+            {
+                gctUINT i, j;
+                for (i = 0, j = 0; i < numOperands; i++, j++)
+                {
+                    gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%d ", stream[word + j]);
+                    __PRINT_BUFFER_CACHE__;
+                }
+            }
 
             SpvDump_Goto_OnError();
             break;
@@ -1368,6 +1387,9 @@ gceSTATUS __SpvDumpLine(
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "    ");
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "    Type %s, ", __SpvDumpId(stream[word++]));
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "member %s", __SpvDumpId(stream[word++]));
+
+                __PRINT_BUFFER_CACHE__;
+
                 numOperands -= 2;
             }
             break;
@@ -1381,6 +1403,9 @@ gceSTATUS __SpvDumpLine(
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "    ");
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "    case %s: ", __SpvDumpId(stream[word++]));
                 gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s", __SpvDumpId(stream[word++]));
+
+                __PRINT_BUFFER_CACHE__;
+
                 numOperands -= 2;
             }
             SpvDump_Goto_OnError();

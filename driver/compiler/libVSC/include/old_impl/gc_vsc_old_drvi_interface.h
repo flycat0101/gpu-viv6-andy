@@ -71,6 +71,7 @@ typedef enum _gceKernelBinaryKind
 /*
  *   Re-compilation & Dynamic Linker data sturctures
  */
+
 enum gceRecompileKind
 {
     gceRK_PATCH_NONE = 0,
@@ -1145,6 +1146,7 @@ typedef struct _gcOPTIMIZER_OPTION
     gctBOOL     dumpFELog;             /* dump FE log file in case of compiler error */
     gctBOOL     dumpUniform;           /* dump uniform value when setting uniform */
     gctBOOL     dumpSpirvIR;           /* dump VIR shader convert from SPIRV */
+    gctBOOL     dumpSpirvToFile;       /* dump SPRIV to file */
     gctINT      _dumpStart;            /* shader id start to dump */
     gctINT      _dumpEnd;              /* shader id end to dump */
 
@@ -7234,7 +7236,6 @@ gcSHADER_WriteShaderToFile(
     IN gcSHADER    Binary,
     IN gctSTRING    ShaderName
     );
-
 /*******************************************************************************
 **                                gcSHADER_ReadShaderFromFile
 ********************************************************************************
