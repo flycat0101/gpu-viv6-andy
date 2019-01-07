@@ -4384,7 +4384,7 @@ gcoHARDWARE_DetectProcess(
             gcvPATCH_SKIA_SKQP,
 #if defined(ANDROID)
             /* org.skia.skq */
-            "\x90\x8d\x98\xd1\x8c\x94\x96\x9e\xd1\x8c\x94\x8e"
+            "\x90\x8d\x98\xd1\x8c\x94\x96\x9e\xd1\x8c\x94\x8e",
 #else
             "\x9b\x92",
 #endif
