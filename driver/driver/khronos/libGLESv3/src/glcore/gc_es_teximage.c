@@ -5162,7 +5162,8 @@ GLvoid GL_APIENTRY __gles_BindImageTexture(__GLcontext *gc, GLuint unit, GLuint 
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if (!texObj->immutable && !texObj->bufObj)
+    if (!texObj->immutable && !texObj->bufObj &&
+        !(__glExtension[__GL_EXTID_OES_EGL_image_external_essl3].bEnabled && texObj->targetIndex == __GL_TEXTURE_EXTERNAL_INDEX))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }

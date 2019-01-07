@@ -623,6 +623,12 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
         break;
 
     case GL_TEXTURE_BASE_LEVEL:
+        if(__glExtension[__GL_EXTID_OES_EGL_image_external_essl3].bEnabled &&
+            __GL_TEXTURE_EXTERNAL_INDEX == targetIdx && param != 0)
+        {
+            __GL_ERROR_RET(GL_INVALID_OPERATION);
+        }
+
         if (param >= 0)
         {
             tex->params.baseLevel = tex->immutable
