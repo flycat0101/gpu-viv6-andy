@@ -4285,6 +4285,45 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
                                 node->base.context->deviceCount);
     if (status != VX_SUCCESS) goto error;
 
+    for(i = 0; i < paramCount; i++)
+    {
+        vx_parameter param = vxGetParameterByIndex(node, i);
+        vx_enum direction, type;
+
+        vxQueryParameter(param, VX_PARAMETER_TYPE, &type, sizeof(vx_enum));
+        vxQueryParameter(param, VX_PARAMETER_DIRECTION, &direction, sizeof(vx_enum));
+
+        if(type == VX_TYPE_IMAGE && (direction == VX_OUTPUT || direction == VX_BIDIRECTIONAL))
+        {
+            vx_rectangle_t rect;
+            vx_image image = (vx_image)&param->base;
+            vx_uint32 plane = 0;
+
+            if(image->importType != VX_MEMORY_TYPE_HOST || image->useInternalMem == vx_false_e)
+            {
+                if(param) vxReleaseParameter(&param);
+                continue;
+            }
+
+            gcoVX_Flush(gcvTRUE);
+
+            vxGetValidRegionImage(image, &rect);
+
+            for (plane = 0; plane < image->memory.planeCount; plane++)
+            {
+                if (image->memory.nodePtrs[plane] != VX_NULL && image->memory.logicals[plane] != image->memory.nodePtrs[plane]->logical)
+                {
+                    vx_size size = 0;
+                    size = vxComputeImagePatchSize(image, &rect, plane);
+                    /*Only copy different memory. For CTS GraphROI.Simple */
+                    if (size > 0 && (abs((vx_int32)(gcmALL_TO_UINT32(image->memory.logicals[plane]) - gcmALL_TO_UINT32(image->memory.nodePtrs[plane]->logical))) > (vx_int32)size))
+                        gcoOS_MemCopy(image->memory.logicals[plane], image->memory.nodePtrs[plane]->logical, size);
+                }
+            }
+        }
+
+        if(param) vxReleaseParameter(&param);
+    }
 #if gcdDUMP
     gcfVX_Flush(gcvTRUE);
 

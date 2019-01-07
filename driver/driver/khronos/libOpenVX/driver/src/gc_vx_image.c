@@ -445,7 +445,13 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
     }
     else
     {
+        vx_uint32 p = 0;
+
         image->useInternalMem = vx_false_e;
+        for(p = 0; p < image->planeCount; p++)
+        {
+            gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+        }
     }
 
     return vx_true_e;
@@ -2208,6 +2214,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
 
         if (vx_true_e == vxoContext_MemoryMap(image->base.context, (vx_reference)image, size, usage, mem_type, flags, &extra, (void **)&buf, map_id))
         {
+            vx_uint32 p = 0;
             /* use the addressing of the internal format */
             addr->dim_x    = end_x - start_x;
             addr->dim_y    = end_y - start_y;
@@ -2220,6 +2227,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
             *ptr = buf;
             vxoReference_Increment(&image->base, VX_REF_EXTERNAL);
 
+            if((image->useInternalMem == vx_false_e) && ((usage == VX_READ_ONLY) || (usage == VX_READ_AND_WRITE)))
+            {
+                for (p = 0; p < image->planeCount; p++)
+                {
+                    gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                }
+            }
             status = VX_SUCCESS;
         }
         else
@@ -2255,6 +2269,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
     {
         vx_context       context = image->base.context;
         vx_memory_map_s* map     = &context->memoryMaps[map_id];
+        vx_uint32        p = 0;
 
         if (map->used &&
             map->ref == (vx_reference)image)
@@ -2265,6 +2280,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
             vxoReference_Decrement(&image->base, VX_REF_EXTERNAL);
 
             status = VX_SUCCESS;
+
+            if((image->useInternalMem == vx_false_e) && ((map->usage == VX_WRITE_ONLY) || (map->usage == VX_READ_AND_WRITE)))
+            {
+                for (p = 0; p < image->planeCount; p++)
+                {
+                    gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                }
+            }
         }
         else
         {
@@ -2389,7 +2412,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                 {
                     if (image->useInternalMem == vx_false_e && image->memory.logicals[p] && image->memory.wrappedSize[p])
                     {
-                        gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                        gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     }
                     prev_ptrs[p] = image->memory.logicals[p];
                 }
@@ -2454,6 +2477,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                     }
                     else
                     {
+                        vx_bool sucess = vx_false_e;
+
                         vxoMemory_FreeWrappedMemory(context, &image->memory);
                         for (p = 0; p < image->planeCount; p++)
                         {
@@ -2461,7 +2486,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                             ptr = (vx_uint8*)new_ptrs[p];
                             image->memory.logicals[p] = ptr;
                         }
-                        vxoMemory_WrapUserMemory(context, &image->memory);
+                        sucess = vxoMemory_WrapUserMemory(context, &image->memory);
+                        if(sucess)
+                        {
+                            for(p = 0; p < image->planeCount; p++)
+                            {
+                                gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                            }
+                        }
                     }
                 }
                 else

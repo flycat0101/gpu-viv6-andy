@@ -507,10 +507,6 @@ gcfVX_GetImageInfo(
         {
             if(Image->useInternalMem == vx_false_e)
             {
-                if (Image->memory.logicals[plane] && Image->memory.wrappedSize[plane])
-                {
-                    gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
-                }
                 Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
             }
             else

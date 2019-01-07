@@ -194,7 +194,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
 
         /* Get the physical address. */
         status = gcoHAL_LockVideoMemory(memory->wrappedNode[planeIndex],
-                               gcvFALSE,
+                               gcvTRUE,
                                gcvENGINE_RENDER,
                                &memory->physicals[planeIndex],
                                gcvNULL);
