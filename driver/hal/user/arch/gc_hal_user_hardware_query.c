@@ -1289,6 +1289,15 @@ static struct _gcsSURF_FORMAT_INFO formatLuminance[] =
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_L8, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
+
+    {
+        gcmNameFormat(L8_RAW), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, {0}, {0}, {0}, {0}}},
+        {{{ 0, gcvCOMPONENT_NOTPRESENT }, { 0, 8 }, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_L8, 0x02, baseComponents_rgba, gcvTRUE
+    },
 };
 
 /* Format value range: 900-999
@@ -1358,6 +1367,16 @@ static struct _gcsSURF_FORMAT_INFO formatLuminanceAlpha[] =
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8L8_1_A8R8G8B8, 0x07, baseComponents_rrra, gcvTRUE
     },
+
+    {
+        gcmNameFormat(A8L8_RAW), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 8, 8 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
+        {{{ 8, 8 }, { 0, 8 }, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_A8L8, 0x04, baseComponents_rgba, gcvTRUE
+    },
+
 };
 
 /* Format value range: 1000-1099
@@ -4458,7 +4477,8 @@ gcoHARDWARE_InitializeFormatArrayTable(
         for (i = 0; i < gcmCOUNTOF(formatLuminanceAlpha); ++i)
         {
             /* change all closestTXFormat=gcvSURF_A8L8 to gcvSURF_A8L8_1_A8R8G8B8 */
-            if (formatLuminanceAlpha[i].closestTXFormat == gcvSURF_A8L8)
+            if (formatLuminanceAlpha[i].closestTXFormat == gcvSURF_A8L8 &&
+                formatLuminanceAlpha[i].format != gcvSURF_A8L8_RAW)
             {
                 formatLuminanceAlpha[i].closestTXFormat = gcvSURF_A8L8_1_A8R8G8B8;
                 formatLuminanceAlpha[i].txFormat        = gcvINVALID_TEXTURE_FORMAT;

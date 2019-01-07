@@ -1094,9 +1094,9 @@ static struct
 }
 _FormatTable[] =
 {
+
     /* 8 bpp R */
     {DRM_FORMAT_R8,       gcvSURF_R8,       __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
-
     /* 16 bpp RG */
     {DRM_FORMAT_GR88,     gcvSURF_G8R8,     __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
 
@@ -1171,6 +1171,11 @@ _FormatTable[] =
     /* 3 plane YCbCr */
     {DRM_FORMAT_YUV420, gcvSURF_I420,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
     {DRM_FORMAT_YVU420, gcvSURF_YV12,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+
+    /* Luminance */
+    {DRM_FORMAT_L8,     gcvSURF_L8_RAW,     __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+    {DRM_FORMAT_LA88,   gcvSURF_A8L8_RAW,   __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},
+
 };
 
 
