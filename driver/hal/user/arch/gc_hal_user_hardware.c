@@ -18322,12 +18322,15 @@ OnExit:
 
     gcmGETHARDWAREADDRESS(dstSurf->node, address);
     /* upload destination buffer to avoid uninitialized data */
-    gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
-                   address,
-                   dstSurf->node.logical,
-                   0,
-                   dstSurf->sliceSize);
+    if (gcvINVALID_ADDRESS != address)
+    {
+        gcmDUMP_BUFFER(gcvNULL,
+                       "memory",
+                       address,
+                       dstSurf->node.logical,
+                       0,
+                       dstSurf->sliceSize);
+    }
 #endif
 
 OnError:
