@@ -474,6 +474,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX,
     gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX,
     gcvFEATURE_USC_ATOMIC_FIX2,
+    gcvFEATURE_PA_LINECLIP_FIX,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */

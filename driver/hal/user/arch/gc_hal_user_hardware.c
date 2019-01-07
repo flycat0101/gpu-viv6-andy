@@ -2758,6 +2758,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX] = database->PE_TILE_CACHE_FLUSH_FIX;
 
     Features[gcvFEATURE_USC_ATOMIC_FIX2] = database->USC_ATOMIC_FIX2;
+    Features[gcvFEATURE_PA_LINECLIP_FIX] = database->PA_LINECLIP_FIX;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
