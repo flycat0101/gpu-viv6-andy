@@ -22,9 +22,7 @@ VIR_Lower_SetOpndNeg(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_Modifier           modifier = VIR_Operand_GetModifier(Opnd);
-
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_NEG | modifier);
+    VIR_Operand_NegateOperand(Context->shader, Opnd);
 
     return gcvTRUE;
 }
