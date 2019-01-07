@@ -182,8 +182,11 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                     VIR_Operand* source = VIR_Inst_GetSource(inst, 0);
                     VIR_PhiOperandArray* phiOperandArray = VIR_Operand_GetPhiOperands(source);
                     gctUINT i;
+
+                    /* Duplicate the variable and update the type as the dest operand type id.*/
                     VIR_Shader_DuplicateVariableFromSymbol(pShader, destSym, &dupDestSymId);
                     dupDestSym = VIR_Shader_GetSymFromId(pShader, dupDestSymId);
+                    VIR_Symbol_SetTypeId(dupDestSym, VIR_Operand_GetTypeId(dest));
 
                     for(i = 0; i < VIR_PhiOperandArray_GetCount(phiOperandArray); i++)
                     {
