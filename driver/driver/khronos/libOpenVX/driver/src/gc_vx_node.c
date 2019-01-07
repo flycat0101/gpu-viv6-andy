@@ -391,7 +391,8 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
 
     node->paramTable[index] = value;
 
-    if (node->childGraph != VX_NULL)
+    /* Note that we don't need to do anything special for parameters to child graphs. */
+    /*if (node->childGraph != VX_NULL)
     {
         vx_uint32 i;
 
@@ -407,7 +408,7 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
                 break;
             }
         }
-    }
+    }*/
 
     return VX_SUCCESS;
 }
