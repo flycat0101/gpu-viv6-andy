@@ -5940,7 +5940,7 @@ gckOS_WaitSignal(
     )
 {
     gceSTATUS status;
-    gcsSIGNAL_PTR signal;
+    gcsSIGNAL_PTR signal = gcvNULL;
     int done;
 
     gcmkHEADER_ARG("Os=0x%X Signal=0x%X Wait=0x%08X", Os, Signal, Wait);
