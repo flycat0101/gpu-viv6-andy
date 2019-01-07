@@ -9604,124 +9604,147 @@ IN cloIR_EXPR InitExpr
       if (gcmIS_ERROR(status)) return gcvNULL;
       initExpr = constVariableExpr;
   }
-  else if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_CONSTANT &&
-      (name->decl.dataType->accessQualifier == clvQUALIFIER_CONST ||
-       (!clmDECL_IsPointerType(&name->decl) &&
-        (!clmDECL_IsElementScalar(&name->decl) ||
-         clmDATA_TYPE_IsHighPrecision(name->decl.dataType))))) {
-     name->u.variableInfo.u.constant = gcvNULL;
-     if(!clsDECL_IsInitializableTo(&name->decl, &initExpr->decl)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        initExpr->base.lineNo,
-                                        initExpr->base.stringNo,
-                                        clvREPORT_ERROR,
-                                        "type mismatch between initializers and defined type"));
-        return DeclOrDeclListPtr;
-     }
-     else {
-        if(name->decl.dataType->elementType != initExpr->decl.dataType->elementType) {
-           clsDATA_TYPE dataType[1];
+  else {
+      clsNAME *unnamedConstant = gcvNULL;
 
-           valStart = ((cloIR_CONSTANT) initExpr)->values;
+      if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_VARIABLE) {
+          cloIR_VARIABLE variable = (cloIR_VARIABLE) &initExpr->base;
 
-           status = clParseConstantTypeConvert((cloIR_CONSTANT)(&initExpr->base),
-                                               name->decl.dataType->elementType,
-                                               valStart);
-           if (gcmIS_ERROR(status)) {
-              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                              InitExpr->base.lineNo,
-                                              InitExpr->base.stringNo,
-                                              clvREPORT_ERROR,
-                                              "type mismatch between initializers and defined type"));
-              return DeclOrDeclListPtr;
-           }
-           *dataType = *initExpr->decl.dataType;
-           if(clmDECL_IsScalar(&initExpr->decl)) {
-               if(clmDECL_IsArithmeticType(&name->decl)) {
-                   dataType->type = clGetVectorTerminalToken(name->decl.dataType->elementType, 1);
-                   if(clmDECL_IsPackedType(&name->decl)) {
-                       clsBUILTIN_DATATYPE_INFO *typeInfo = clGetBuiltinDataTypeInfo(dataType->type);
-                       dataType->type = typeInfo->dualType;
+          if(variable->name->u.variableInfo.isUnnamedConstant) {
+              unnamedConstant = variable->name;
+              gcmASSERT(unnamedConstant->u.variableInfo.u.constant);
+              initExpr = &unnamedConstant->u.variableInfo.u.constant->exprBase;
+          }
+      }
+      if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_CONSTANT &&
+          (name->decl.dataType->accessQualifier == clvQUALIFIER_CONST ||
+           (!clmDECL_IsPointerType(&name->decl) &&
+            (!clmDECL_IsElementScalar(&name->decl) ||
+             clmDATA_TYPE_IsHighPrecision(name->decl.dataType))))) {
+         name->u.variableInfo.u.constant = gcvNULL;
+         if(!clsDECL_IsInitializableTo(&name->decl, &initExpr->decl)) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                            initExpr->base.lineNo,
+                                            initExpr->base.stringNo,
+                                            clvREPORT_ERROR,
+                                            "type mismatch between initializers and defined type"));
+            return DeclOrDeclListPtr;
+         }
+         else {
+            if(name->decl.dataType->elementType != initExpr->decl.dataType->elementType) {
+               clsDATA_TYPE dataType[1];
+
+               valStart = ((cloIR_CONSTANT) initExpr)->values;
+
+               status = clParseConstantTypeConvert((cloIR_CONSTANT)(&initExpr->base),
+                                                   name->decl.dataType->elementType,
+                                                   valStart);
+               if (gcmIS_ERROR(status)) {
+                  gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                  InitExpr->base.lineNo,
+                                                  InitExpr->base.stringNo,
+                                                  clvREPORT_ERROR,
+                                                  "type mismatch between initializers and defined type"));
+                  return DeclOrDeclListPtr;
+               }
+               *dataType = *initExpr->decl.dataType;
+               if(clmDECL_IsScalar(&initExpr->decl)) {
+                   if(clmDECL_IsArithmeticType(&name->decl)) {
+                       dataType->type = clGetVectorTerminalToken(name->decl.dataType->elementType, 1);
+                       if(clmDECL_IsPackedType(&name->decl)) {
+                           clsBUILTIN_DATATYPE_INFO *typeInfo = clGetBuiltinDataTypeInfo(dataType->type);
+                           dataType->type = typeInfo->dualType;
+                       }
                    }
                }
-           }
-           else {
-               dataType->type = name->decl.dataType->type;
-           }
-           status = cloCOMPILER_CloneDataType(Compiler,
-                                              initExpr->decl.dataType->accessQualifier,
-                                              initExpr->decl.dataType->addrSpaceQualifier,
-                                              dataType,
-                                              &initExpr->decl.dataType);
-           if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
-        }
-        if(name->decl.dataType->accessQualifier == clvQUALIFIER_CONST) {
-           cloIR_CONSTANT constantExpr = (cloIR_CONSTANT)(&initExpr->base);
-
-           if(clmDECL_IsScalar(&constantExpr->exprBase.decl) && !clmDECL_IsScalar(&name->decl)) {
-               status = cloCOMPILER_CloneDecl(Compiler,
-                                              initExpr->decl.dataType->accessQualifier,
-                                              initExpr->decl.dataType->addrSpaceQualifier,
-                                              &name->decl,
-                                              &constantExpr->exprBase.decl);
+               else {
+                   dataType->type = name->decl.dataType->type;
+               }
+               status = cloCOMPILER_CloneDataType(Compiler,
+                                                  initExpr->decl.dataType->accessQualifier,
+                                                  initExpr->decl.dataType->addrSpaceQualifier,
+                                                  dataType,
+                                                  &initExpr->decl.dataType);
                if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+            }
+            if(name->decl.dataType->accessQualifier == clvQUALIFIER_CONST) {
+               cloIR_CONSTANT constantExpr = (cloIR_CONSTANT)(&initExpr->base);
 
-               constantExpr->allValuesEqual = gcvTRUE;
-           }
+               if(clmDECL_IsScalar(&constantExpr->exprBase.decl) && !clmDECL_IsScalar(&name->decl)) {
+                   status = cloCOMPILER_CloneDecl(Compiler,
+                                                  initExpr->decl.dataType->accessQualifier,
+                                                  initExpr->decl.dataType->addrSpaceQualifier,
+                                                  &name->decl,
+                                                  &constantExpr->exprBase.decl);
+                   if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
-           name->u.variableInfo.u.constant = constantExpr;
+                   constantExpr->allValuesEqual = gcvTRUE;
+               }
 
-           name->u.variableInfo.u.constant->variable = name;
-           if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
-              (clmDECL_IsAggregateType(&name->decl) ||
-               clmDATA_TYPE_IsHighPrecision(name->decl.dataType))) {
-               status = cloCOMPILER_AllocateVariableMemory(Compiler,
-                                                           name);
-               return DeclOrDeclListPtr;
-           }
-           /* if constant variable's elements are not scalar, make this to be allocated in driver */
-           else if (!clmDECL_IsPointerType(&name->decl) &&
-               (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
-                (clmDECL_IsExtendedVectorType(&name->decl) &&
-                 (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
-             /* force constant variable to be in constant address space */
-             status = cloCOMPILER_CloneDataType(Compiler,
-                                                name->decl.dataType->accessQualifier,
-                                                clvQUALIFIER_CONSTANT,
-                                                name->decl.dataType,
-                                                &name->decl.dataType);
-             if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+               name->u.variableInfo.u.constant = constantExpr;
 
-             status =  clsNAME_SetVariableAddressed(Compiler,
-                                                    name);
-             return DeclOrDeclListPtr;
-           }
-           else goto AssignLhs;
-        }
+               name->u.variableInfo.u.constant->variable = name;
+               if(unnamedConstant) {
+                   gctINT memoryOffset;
+
+                   /* Assume the properties of the unnamed constant to the lhs */
+                   memoryOffset = clmNAME_VariableMemoryOffset_GET(unnamedConstant);
+                   clmNAME_VariableMemoryOffset_SET(name, memoryOffset);
+                   name->u.variableInfo.allocated = unnamedConstant->u.variableInfo.allocated;
+                   name->u.variableInfo.isAddressed = unnamedConstant->u.variableInfo.isAddressed;
+                   return DeclOrDeclListPtr;
+               }
+               else if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
+                  (clmDECL_IsAggregateType(&name->decl) ||
+                   clmDATA_TYPE_IsHighPrecision(name->decl.dataType))) {
+                   status = cloCOMPILER_AllocateVariableMemory(Compiler,
+                                                               name);
+                   return DeclOrDeclListPtr;
+               }
+               /* if constant variable's elements are not scalar, make this to be allocated in driver */
+               else if (!clmDECL_IsPointerType(&name->decl) &&
+                   (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+                    (clmDECL_IsExtendedVectorType(&name->decl) &&
+                     (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
+                 /* force constant variable to be in constant address space */
+                 status = cloCOMPILER_CloneDataType(Compiler,
+                                                    name->decl.dataType->accessQualifier,
+                                                    clvQUALIFIER_CONSTANT,
+                                                    name->decl.dataType,
+                                                    &name->decl.dataType);
+                 if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+
+                 status =  clsNAME_SetVariableAddressed(Compiler,
+                                                        name);
+                 return DeclOrDeclListPtr;
+               }
+               else goto AssignLhs;
+            }
 
 #if _CREATE_UNNAMED_CONSTANT_IN_MEMORY
-        if((_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES && constant &&
-            (clmDATA_TYPE_IsHighPrecision(constant->exprBase.decl.dataType) ||
-             clmDECL_IsAggregateType(&constant->exprBase.decl))) ||
-            (!clmDECL_IsScalar(&initExpr->decl) &&
-             (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
-              (constant && clmDECL_IsAggregateTypeOverRegLimit(&constant->exprBase.decl)) ||
-              (clmDECL_IsExtendedVectorType(&name->decl) &&
-               (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))))) {
-           status = _CreateUnnamedConstantExpr(Compiler,
-                                               &name->decl,
-                                               (cloIR_CONSTANT) (&initExpr->base),
-                                               &initExpr);
+            if((_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES && constant &&
+                (clmDATA_TYPE_IsHighPrecision(constant->exprBase.decl.dataType) ||
+                 clmDECL_IsAggregateType(&constant->exprBase.decl))) ||
+                (!clmDECL_IsScalar(&initExpr->decl) &&
+                 (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+                  (constant && clmDECL_IsAggregateTypeOverRegLimit(&constant->exprBase.decl)) ||
+                  (clmDECL_IsExtendedVectorType(&name->decl) &&
+                   (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))))) {
+               status = _CreateUnnamedConstantExpr(Compiler,
+                                                   &name->decl,
+                                                   (cloIR_CONSTANT) (&initExpr->base),
+                                                   &initExpr);
 
-           if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+               if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
-           if(clmDECL_IsExtendedVectorType(&name->decl) && !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
-              !((cloIR_CONSTANT) (&initExpr->base))->allValuesEqual) {
-               name->u.variableInfo.isInitializedWithExtendedVectorConstant = gcvTRUE;
-           }
-        }
+               if(clmDECL_IsExtendedVectorType(&name->decl) && !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
+                  !((cloIR_CONSTANT) (&initExpr->base))->allValuesEqual) {
+                   name->u.variableInfo.isInitializedWithExtendedVectorConstant = gcvTRUE;
+               }
+            }
 #endif
-     }
+         }
+      }
   }
   {
     gcmASSERT(lhs);

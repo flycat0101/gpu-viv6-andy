@@ -24134,7 +24134,7 @@ cloIR_UNARY_EXPR_GenCastCode(
     IN OUT clsGEN_CODE_PARAMETERS * Parameters
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     clsGEN_CODE_PARAMETERS    operandParameters;
 
     /* Verify the arguments. */
@@ -24155,8 +24155,43 @@ cloIR_UNARY_EXPR_GenCastCode(
                      &operandParameters);
     if (gcmIS_ERROR(status)) return status;
 
+    if(operandParameters.hint & clvGEN_DEREF_CODE) {
+       clsIOPERAND  iOperand;
+       clsROPERAND  zeroROperand;
+
+       clsROPERAND_InitializeFloatOrVecOrMatConstant(&zeroROperand,
+                                                     clmGenCodeDataType(T_INT),
+                                                     0);
+       clsIOPERAND_New(Compiler, &iOperand, operandParameters.dataTypes[0].def);
+
+       if(operandParameters.needLOperand) {
+           clsROPERAND  rOperand;
+
+           clsROPERAND_InitializeUsingLOperand(&rOperand, &operandParameters.lOperands[0]);
+           gcmONERROR(clGenGenericCode2(Compiler,
+                                        UnaryExpr->exprBase.base.lineNo,
+                                        UnaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_LOAD,
+                                        &iOperand,
+                                        &rOperand,
+                                        &zeroROperand));
+           clsLOPERAND_InitializeUsingIOperand(operandParameters.lOperands, &iOperand);
+       }
+       if(operandParameters.needROperand) {
+           gcmONERROR(clGenGenericCode2(Compiler,
+                                        UnaryExpr->exprBase.base.lineNo,
+                                        UnaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_LOAD,
+                                        &iOperand,
+                                        &operandParameters.rOperands[0],
+                                        &zeroROperand));
+           clsROPERAND_InitializeUsingIOperand(operandParameters.rOperands, &iOperand);
+       }
+       operandParameters.hint &= ~clvGEN_DEREF_CODE;
+    }
+
     if(clmDECL_IsArray(&UnaryExpr->operand->decl)) {
-           operandParameters.operandCount = 1;
+        operandParameters.operandCount = 1;
     }
     gcmASSERT(operandParameters.operandCount == 1);
     if(clmDECL_IsPointerType(&UnaryExpr->exprBase.decl)) {
@@ -24208,9 +24243,10 @@ cloIR_UNARY_EXPR_GenCastCode(
       if(gcmIS_ERROR(status)) return status;
     }
 
+OnError:
     clsGEN_CODE_PARAMETERS_Finalize(&operandParameters);
 
-    return gcvSTATUS_OK;
+    return status;
 }
 
 static cloIR_EXPR
