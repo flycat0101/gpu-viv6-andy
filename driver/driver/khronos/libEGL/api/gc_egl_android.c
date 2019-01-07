@@ -218,9 +218,11 @@ _GetNativeVisualId(
            : HAL_PIXEL_FORMAT_RGBA_8888;
         break;
 
+#if ANDROID_SDK_VERSION >= 26
     case 64:
         id = HAL_PIXEL_FORMAT_RGBA_FP16;
         break;
+#endif
 
     default:
         break;
@@ -952,9 +954,10 @@ _TranslateANativeBufferFormat(
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
             return gcvSURF_YUY2;
 
+#if ANDROID_SDK_VERSION >= 26
         case HAL_PIXEL_FORMAT_RGBA_FP16:
             return gcvSURF_A16B16G16R16F;
-
+#endif
         default:
             ALOGE("%s: unsupported android format: %d",
                   __func__, Buffer->format);
