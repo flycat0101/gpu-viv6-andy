@@ -18422,6 +18422,7 @@ gckHARDWARE_QueryFrequency(
     gctUINT64 mcStart, shStart;
     gctUINT32 mcClk, shClk;
     gceSTATUS status;
+    gctUINT32 powerManagement = 0;
 
     gcmkHEADER_ARG("Hardware=0x%p", Hardware);
 
@@ -18430,7 +18431,9 @@ gckHARDWARE_QueryFrequency(
     mcStart = shStart = 0;
     mcClk   = shClk   = 0;
 
-    if (Hardware->options.powerManagement)
+    gckOS_QueryOption(Hardware->os, "powerManagement", &powerManagement);
+
+    if (powerManagement)
     {
         gcmkONERROR(gckHARDWARE_SetPowerManagement(
             Hardware, gcvFALSE
@@ -18455,7 +18458,7 @@ gckHARDWARE_QueryFrequency(
         Hardware->shClk = shClk;
     }
 
-    if (Hardware->options.powerManagement)
+    if (powerManagement)
     {
         gcmkONERROR(gckHARDWARE_SetPowerManagement(
             Hardware, gcvTRUE
