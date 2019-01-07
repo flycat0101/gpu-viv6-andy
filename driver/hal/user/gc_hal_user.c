@@ -3137,8 +3137,8 @@ gcoHAL_WrapUserMemory(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 #if defined(__QNXNTO__)
-    gctPOINTER lock_addr = gcmINT2PTR(gcmPTR2INT(UserMemoryDesc->logical) & ~(__PAGESIZE - 1));    /* Get the address aligned to pagesize */
-    size_t lock_size = (gcmPTR2INT(UserMemoryDesc->logical) & (__PAGESIZE - 1)) + UserMemoryDesc->size;        /* Get the size to lock (from the address + size */
+    gctPOINTER lock_addr = gcmINT2PTR(gcmPTR2SIZE(UserMemoryDesc->logical) & ~(__PAGESIZE - 1));    /* Get the address aligned to pagesize */
+    size_t lock_size = (gcmPTR2SIZE(UserMemoryDesc->logical) & (__PAGESIZE - 1)) + UserMemoryDesc->size;        /* Get the size to lock (from the address + size */
 #endif
 
     gcmHEADER_ARG("UserMemoryDesc=%d", UserMemoryDesc);

@@ -34637,7 +34637,7 @@ gcoHARDWARE_DrawBlit(
         attribPosPtr->linkage    = 0x0; /* Pos.*/
         attribPosPtr->size       = 0x2;
         attribPosPtr->normalized = 0x0;
-        attribPosPtr->offset     = gcmPTR2INT(positionData);
+        attribPosPtr->offset     = gcmPTR2SIZE(positionData);
         attribPosPtr->enabled    = gcvTRUE;
         attribPosPtr->isPosition = 0x0;
         attribPosPtr->stride     = 0x8;
@@ -34657,7 +34657,7 @@ gcoHARDWARE_DrawBlit(
         attribTexCoordPtr->linkage    = 0x1; /* tex coord */
         attribTexCoordPtr->size       = 0x2;
         attribTexCoordPtr->normalized = 0x0;
-        attribTexCoordPtr->offset     = gcmPTR2INT(positionData);
+        attribTexCoordPtr->offset     = gcmPTR2SIZE(positionData);
         attribTexCoordPtr->enabled    = gcvTRUE;
         attribTexCoordPtr->isPosition = 0x0;
         attribTexCoordPtr->stride     = 0x8;

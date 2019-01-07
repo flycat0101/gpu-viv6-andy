@@ -208,7 +208,7 @@ _GetPageCount(
     IN gctSIZE_T Size
     )
 {
-    gctUINTPTR_T logical = gcmPTR2INT(Logical);
+    gctUINTPTR_T logical = gcmPTR2SIZE(Logical);
 
     return ((logical + Size + __PAGESIZE - 1) >> 12) - (logical >> 12);
 }
@@ -219,7 +219,7 @@ _GetPageAlignedAddress(
     OUT gctUINT32 *Offset OPTIONAL
     )
 {
-    gctUINTPTR_T logical = gcmPTR2INT(Logical);
+    gctUINTPTR_T logical = gcmPTR2SIZE(Logical);
 
     if (Offset != gcvNULL)
     {
@@ -2092,7 +2092,7 @@ gckOS_AtomicExchangePtr(
 
     atom = (gcskATOM_PTR)Target;
 
-    oldValue = _smp_xchg((volatile unsigned *)&atom->counter, gcmPTR2INT(NewValue));
+    oldValue = _smp_xchg((volatile unsigned *)&atom->counter, gcmPTR2SIZE(NewValue));
 
     if (OldValue != gcvNULL)
     {
@@ -5999,7 +5999,7 @@ gckOS_StopThread(
     gcmkVERIFY_ARGUMENT(Thread != gcvNULL);
 
     /* Thread should have already been enabled to terminate. */
-    pthread_join((pthread_t)gcmPTR2INT(Thread), gcvNULL);
+    pthread_join((pthread_t)gcmPTR2SIZE(Thread), gcvNULL);
 
     gcmkFOOTER_NO();
     /* Success. */

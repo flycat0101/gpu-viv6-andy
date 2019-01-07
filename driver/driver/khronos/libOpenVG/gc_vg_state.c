@@ -111,7 +111,7 @@ static void _SetState(
         }
 
         /* Verify value alignment. */
-        if ((gcmPTR2INT(Values) & stateEntry->alignment) != 0)
+        if ((gcmPTR2SIZE(Values) & stateEntry->alignment) != 0)
         {
             vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
             break;
@@ -367,7 +367,7 @@ static void _GetState(
         }
 
         /* Verify value alignment. */
-        if ((gcmPTR2INT(Values) & stateEntry->alignment) != 0)
+        if ((gcmPTR2SIZE(Values) & stateEntry->alignment) != 0)
         {
             vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
             break;
