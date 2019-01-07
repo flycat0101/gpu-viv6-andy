@@ -315,6 +315,17 @@ _hasNEW_SIN_COS_LOG_DIV(
 }
 
 static gctBOOL
+_hasNEW_DIV_and_floor(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32_PTR States
+    )
+{
+    return _hasNEW_SIN_COS_LOG_DIV(Tree, CodeGen, Instruction, States) && _hasSIGN_FLOOR_CEIL(Tree, CodeGen, Instruction, States);
+}
+
+static gctBOOL
 _hasNEW_TEXLD(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -15677,6 +15688,18 @@ _SatAbs0(
 }
 
 static gctBOOL
+_SatNeg0(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32 * States
+    )
+{
+    gcSetSrcNEG(States, 0);
+    return gcvTRUE;
+}
+
+static gctBOOL
 _Sat0(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -18631,8 +18654,43 @@ const gcsSL_PATTERN patterns_MOD[] =
         MOD 1, 2, 3
             mod 1, 2, 3, 0, 0
     */
-    { 1, gcSL_MOD, 1, 2, 3 },
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _IntOpcode },
         { -1, 0x48, 1, 2, 3, 0, 0, value_type0 },
+
+    /*
+    ** MOD, temp(1), temp(2), temp(3)
+    ** -->
+    ** DIV, temp(4), temp(2), temp(3)
+    ** FLOOR, temp(4), temp(4)
+    ** MAD, temp(1), -temp(3),temp(4), temp(2)
+    */
+    /* Has new DIV and FLOOR */
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasNEW_DIV_and_floor },
+        { -3, 0x64, gcSL_CG_TEMP1, 0, 2, 3, 0, set_new_sin_cos_log_div },
+        { -2, 0x25, gcSL_CG_TEMP1, 0, 0, gcSL_CG_TEMP1 },
+        { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
+
+    /* Has new DIV but no FLOOR */
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasNEW_SIN_COS_LOG_DIV },
+        { -4, 0x64, gcSL_CG_TEMP1, 0, 2, 3, 0, set_new_sin_cos_log_div },
+        { -3, 0x13, gcSL_CG_TEMP2, 0, 0, gcSL_CG_TEMP1, 0 },
+        { -2, 0x01, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, -gcSL_CG_TEMP2, 0 },
+        { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
+
+    /* Has new FLOOR but no DIV */
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasSIGN_FLOOR_CEIL },
+        { -4, 0x0C, gcSL_CG_TEMP1, 0, 0, 3, 0, value_type0_from_src0 },
+        { -3, 0x03, gcSL_CG_TEMP1, 2, gcSL_CG_TEMP1, 0, 0, value_type0 },
+        { -2, 0x25, gcSL_CG_TEMP1, 0, 0, gcSL_CG_TEMP1 },
+        { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
+
+    /* Has no FLOOR and DIV */
+    { 1, gcSL_MOD, 1, 2, 3 },
+        { -5, 0x0C, gcSL_CG_TEMP1, 0, 0, 3, 0, value_type0_from_src0 },
+        { -4, 0x03, gcSL_CG_TEMP1, 2, gcSL_CG_TEMP1, 0, 0, value_type0 },
+        { -3, 0x13, gcSL_CG_TEMP2, 0, 0, gcSL_CG_TEMP1, 0 },
+        { -2, 0x01, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, -gcSL_CG_TEMP2, 0 },
+        { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
 
     { 0 }
 };
