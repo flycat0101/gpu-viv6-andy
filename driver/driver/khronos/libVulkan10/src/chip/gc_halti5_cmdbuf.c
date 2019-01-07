@@ -4113,8 +4113,8 @@ VkResult halti5_setScissor(
     }
     else
     {
-        rtWidth = 0;
-        rtHeight = 0;
+        rtWidth = fb->width;
+        rtHeight = fb->height;
     }
 
     /* Intersect scissor with RT size, HW cannot handle out of range scissor */
