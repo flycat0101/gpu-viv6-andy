@@ -822,9 +822,11 @@ unsigned *pped_count)
         llvm::sys::Path(tmpfile_name).eraseFromDisk();
         source_pped[pped] = _LoadFileToBuffer(Compiler, count, tmpoutputfile_name);
 //keep the temporary preprocessed file for debugging
-#ifndef _DEBUG
-        llvm::sys::Path(tmpoutputfile_name).eraseFromDisk();
-#endif
+        if(!gcmOPT_DUMP_FELOG())
+        {
+            llvm::sys::Path(tmpoutputfile_name).eraseFromDisk();
+        }
+
         if(Temp_success == false || source_pped[pped] == NULL) {
           if(source_pped[pped] == NULL) {
 #ifndef _DEBUG
