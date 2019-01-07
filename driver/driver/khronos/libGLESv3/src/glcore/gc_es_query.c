@@ -1813,13 +1813,6 @@ GLvoid GL_APIENTRY __gles_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if (gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED] ||
-        gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE] ||
-        gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN])
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
     start = __glGenerateNames(gc, gc->query.noShare, n);
 
     for (i = 0; i < n; i++)
