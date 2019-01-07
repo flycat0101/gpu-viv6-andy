@@ -4244,6 +4244,15 @@ IN cloCOMPILER Compiler
 }
 
 gctBOOL
+cloCOMPILER_IsNameSpaceGlobal(
+IN cloCOMPILER Compiler,
+clsNAME_SPACE *  NameSpace
+)
+{
+   return NameSpace == Compiler->context.globalSpace;
+}
+
+gctBOOL
 cloCOMPILER_IsNameSpaceUnnamed(
 IN cloCOMPILER Compiler,
 clsNAME_SPACE *  NameSpace

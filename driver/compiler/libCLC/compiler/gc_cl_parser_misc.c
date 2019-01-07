@@ -9610,7 +9610,8 @@ IN cloIR_EXPR InitExpr
       if (cloIR_OBJECT_GetType(&initExpr->base) == clvIR_VARIABLE) {
           cloIR_VARIABLE variable = (cloIR_VARIABLE) &initExpr->base;
 
-          if(variable->name->u.variableInfo.isUnnamedConstant) {
+          if(variable->name->u.variableInfo.isUnnamedConstant &&
+             cloCOMPILER_IsNameSpaceGlobal(Compiler, name->mySpace)) {
               unnamedConstant = variable->name;
               gcmASSERT(unnamedConstant->u.variableInfo.u.constant);
               initExpr = &unnamedConstant->u.variableInfo.u.constant->exprBase;

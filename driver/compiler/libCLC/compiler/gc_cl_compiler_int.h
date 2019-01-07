@@ -409,6 +409,12 @@ IN cloCOMPILER Compiler,
 IN struct _clsNAME_SPACE *  NameSpace
 );
 
+gctBOOL
+cloCOMPILER_IsNameSpaceGlobal(
+IN cloCOMPILER Compiler,
+IN struct _clsNAME_SPACE *  NameSpace
+);
+
 gceSTATUS
 cloCOMPILER_DumpIR(
     IN cloCOMPILER Compiler
