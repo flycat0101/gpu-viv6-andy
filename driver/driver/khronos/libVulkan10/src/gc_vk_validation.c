@@ -33,62 +33,82 @@
 #define __VK_ERROR_DEVICE_MISMATCH                      ((VkResult)(VK_RESULT_RANGE_SIZE + 14))
 #define __VK_ERROR_NOT_ALIGNED                          ((VkResult)(VK_RESULT_RANGE_SIZE + 15))
 
+
 extern __vkInstance *__vkInstanceRoot;
 extern gctPOINTER  __vkRootMutex;
 
 static const char* __vkiGetResultString(VkResult result)
 {
-    static const char *sRetStr[] =
+    switch ((int32_t)result)
     {
-        "VK_SUCCESS",
-        "VK_NOT_READY",
-        "VK_TIMEOUT",
-        "VK_EVENT_SET",
-        "VK_EVENT_RESET",
-        "VK_INCOMPLETE",
-        "VK_ERROR_OUT_OF_HOST_MEMORY",
-        "VK_ERROR_OUT_OF_DEVICE_MEMORY",
-        "VK_ERROR_INITIALIZATION_FAILED",
-        "VK_ERROR_DEVICE_LOST",
-        "VK_ERROR_MEMORY_MAP_FAILED",
-        "VK_ERROR_LAYER_NOT_PRESENT",
-        "VK_ERROR_EXTENSION_NOT_PRESENT",
-        "VK_ERROR_FEATURE_NOT_PRESENT",
-        "VK_ERROR_INCOMPATIBLE_DRIVER",
-        "VK_ERROR_TOO_MANY_OBJECTS",
-        "VK_ERROR_FORMAT_NOT_SUPPORTED",
-        "VK_ERROR_FRAGMENTED_POOL",
-        "__VK_ERROR_DEVICE_ALREADY_CREATED",
-        "__VK_ERROR_INVALID_POINTER",
-        "__VK_ERROR_INVALID_VALUE",
-        "__VK_ERROR_INVALID_HANDLE",
-        "__VK_ERROR_INVALID_FORMAT",
-        "__VK_ERROR_INVALID_IMAGE",
-        "__VK_ERROR_INVALID_DESCRIPTOR_SET_DATA",
-        "__VK_ERROR_INVALID_QUEUE_TYPE",
-        "__VK_ERROR_INVALID_LAYER",
-        "__VK_ERROR_BAD_SHADER_CODE",
-        "__VK_ERROR_BAD_PIPELINE_DATA",
-        "__VK_ERROR_NOT_MAPPABLE",
-        "__VK_ERROR_INCOMPLETE_COMMAND_BUFFER",
-        "__VK_ERROR_BUILDING_COMMAND_BUFFER",
-        "__VK_ERROR_DEVICE_MISMATCH",
-        "__VK_ERROR_NOT_ALIGNED"
-    };
-
-    if (result >= VK_RESULT_BEGIN_RANGE && result < 0)
-    {
-        return sRetStr[VK_RESULT_END_RANGE - result];
-    }
-    else if ((result >= 0 && result <= VK_RESULT_END_RANGE) ||
-             (result >= VK_RESULT_RANGE_SIZE && result <= __VK_ERROR_NOT_ALIGNED))
-    {
-        return sRetStr[result];
-    }
-    else
-    {
-        switch (result)
-        {
+        case VK_SUCCESS:
+            return "VK_SUCCESS";
+        case VK_NOT_READY:
+            return "VK_NOT_READY";
+        case VK_TIMEOUT:
+            return "VK_TIMEOUT";
+        case VK_EVENT_SET:
+            return "VK_EVENT_SET";
+        case VK_EVENT_RESET:
+            return "VK_EVENT_RESET";
+        case VK_INCOMPLETE:
+            return "VK_INCOMPLETE";
+        case VK_ERROR_OUT_OF_HOST_MEMORY:
+            return "VK_ERROR_OUT_OF_HOST_MEMORY";
+        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+            return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+        case VK_ERROR_INITIALIZATION_FAILED:
+            return "VK_ERROR_INITIALIZATION_FAILED";
+        case VK_ERROR_DEVICE_LOST:
+            return "VK_ERROR_DEVICE_LOST";
+        case VK_ERROR_MEMORY_MAP_FAILED:
+            return "VK_ERROR_MEMORY_MAP_FAILED";
+        case VK_ERROR_LAYER_NOT_PRESENT:
+            return "VK_ERROR_LAYER_NOT_PRESENT";
+        case VK_ERROR_EXTENSION_NOT_PRESENT:
+            return "VK_ERROR_EXTENSION_NOT_PRESENT";
+        case VK_ERROR_FEATURE_NOT_PRESENT:
+            return "VK_ERROR_FEATURE_NOT_PRESENT";
+        case VK_ERROR_INCOMPATIBLE_DRIVER:
+            return "VK_ERROR_INCOMPATIBLE_DRIVER";
+        case VK_ERROR_TOO_MANY_OBJECTS:
+            return "VK_ERROR_TOO_MANY_OBJECTS";
+        case VK_ERROR_FORMAT_NOT_SUPPORTED:
+            return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+        case VK_ERROR_FRAGMENTED_POOL:
+            return "VK_ERROR_FRAGMENTED_POOL";
+        case __VK_ERROR_DEVICE_ALREADY_CREATED:
+            return "__VK_ERROR_DEVICE_ALREADY_CREATED";
+        case __VK_ERROR_INVALID_POINTER:
+            return "__VK_ERROR_INVALID_POINTER";
+        case __VK_ERROR_INVALID_VALUE:
+            return "__VK_ERROR_INVALID_VALUE";
+        case __VK_ERROR_INVALID_HANDLE:
+            return "__VK_ERROR_INVALID_HANDLE";
+        case __VK_ERROR_INVALID_FORMAT:
+            return "__VK_ERROR_INVALID_FORMAT";
+        case __VK_ERROR_INVALID_IMAGE:
+            return "__VK_ERROR_INVALID_IMAGE";
+        case __VK_ERROR_INVALID_DESCRIPTOR_SET_DATA:
+            return "__VK_ERROR_INVALID_DESCRIPTOR_SET_DATA";
+        case __VK_ERROR_INVALID_QUEUE_TYPE:
+            return "__VK_ERROR_INVALID_QUEUE_TYPE";
+        case __VK_ERROR_INVALID_LAYER:
+            return "__VK_ERROR_INVALID_LAYER";
+        case __VK_ERROR_BAD_SHADER_CODE:
+            return "__VK_ERROR_BAD_SHADER_CODE";
+        case __VK_ERROR_BAD_PIPELINE_DATA:
+            return "__VK_ERROR_BAD_PIPELINE_DATA";
+        case __VK_ERROR_NOT_MAPPABLE:
+            return "__VK_ERROR_NOT_MAPPABLE";
+        case __VK_ERROR_INCOMPLETE_COMMAND_BUFFER:
+            return "__VK_ERROR_INCOMPLETE_COMMAND_BUFFER";
+        case __VK_ERROR_BUILDING_COMMAND_BUFFER:
+            return "__VK_ERROR_BUILDING_COMMAND_BUFFER";
+        case __VK_ERROR_DEVICE_MISMATCH:
+            return "__VK_ERROR_DEVICE_MISMATCH";
+        case __VK_ERROR_NOT_ALIGNED:
+            return "__VK_ERROR_NOT_ALIGNED";
         case VK_ERROR_SURFACE_LOST_KHR:
             return "VK_ERROR_SURFACE_LOST_KHR";
         case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
@@ -104,11 +124,8 @@ static const char* __vkiGetResultString(VkResult result)
         case VK_ERROR_INVALID_SHADER_NV:
             return "VK_ERROR_INVALID_SHADER_NV";
         default:
-            break;
-        }
+            return "__VK_ERROR_UNKNOWN_RESULT";
     }
-
-    return "ERROR_UNKNOWN_RESULT";
 }
 
 __VK_INLINE void __vkLogShaderStrings(size_t codeSize, unsigned char *pCode)
@@ -139,7 +156,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateInstance(const VkInstanceCreateInfo
     VkResult result = VK_SUCCESS;
     __vkInstance *inst;
 
-    __VK_LOG_API("(tid=%d): vkCreateInstance(%p, %p)", gcoOS_GetCurrentThreadID(), pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateInstance(%p, %p)", gcoOS_GetCurrentThreadID(), pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!pCreateInfo || !pInstance)
@@ -169,7 +186,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateInstance(const VkInstanceCreateInfo
     result = __vk_CreateInstance(pCreateInfo, pAllocator, pInstance);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (instance=%p) %s\n", __VK_PTRVALUE(pInstance), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (instance=%p)\n", __vkiGetResultString(result), __VK_PTRVALUE(pInstance));
     return result;
 }
 
@@ -179,7 +196,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyInstance(VkInstance instance, const Vk
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkDestroyInstance(%p, %p)", gcoOS_GetCurrentThreadID(), instance, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyInstance(%p, %p)", gcoOS_GetCurrentThreadID(), instance, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -217,7 +234,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumeratePhysicalDevices(VkInstance insta
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEnumeratePhysicalDevices(%p, %d, %p)", gcoOS_GetCurrentThreadID(), instance, pPhysicalDeviceCount, pPhysicalDevices);
+    __VK_LOG_API("(tid=%p): vkEnumeratePhysicalDevices(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pPhysicalDeviceCount, pPhysicalDevices);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -244,7 +261,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumeratePhysicalDevices(VkInstance insta
     result = __vk_EnumeratePhysicalDevices(instance, pPhysicalDeviceCount, pPhysicalDevices);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPhysicalDeviceCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pPhysicalDeviceCount));
     return result;
 }
 
@@ -253,7 +270,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFeatures(VkPhysicalDevice ph
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFeatures(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFeatures);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceFeatures(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFeatures);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -278,7 +295,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties(VkPhysicalD
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFormatProperties(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, pFormatProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceFormatProperties(%p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, pFormatProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -308,7 +325,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(Vk
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceImageFormatProperties(%p, %d, %d, %d, %d, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, type, tiling, usage, flags, pImageFormatProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceImageFormatProperties(%p, %u, %u, %u, %u, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, type, tiling, usage, flags, pImageFormatProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -349,7 +366,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceProperties(VkPhysicalDevice 
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceProperties(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceProperties(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -374,7 +391,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceQueueFamilyProperties(VkPhys
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceQueueFamilyProperties(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceQueueFamilyProperties(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -399,7 +416,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceMemoryProperties(VkPhysicalD
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceQueueFamilyProperties(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pMemoryProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceQueueFamilyProperties(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pMemoryProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -425,7 +442,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __valid_GetInstanceProcAddr(VkInstance 
     PFN_vkVoidFunction pFunc = gcvNULL;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetInstanceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), instance, pName);
+    __VK_LOG_API("(tid=%p): vkGetInstanceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), instance, pName);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -460,7 +477,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __valid_GetDeviceProcAddr(VkDevice devi
     PFN_vkVoidFunction pFunc = gcvNULL;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDeviceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), device, pName);
+    __VK_LOG_API("(tid=%p): vkGetDeviceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), device, pName);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -488,7 +505,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDevice(VkPhysicalDevice physicalDev
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDevice(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDevice(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -516,7 +533,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDevice(VkPhysicalDevice physicalDev
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (device=%p) %s\n", __VK_PTRVALUE(pDevice), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (device=%p)\n", __vkiGetResultString(result), __VK_PTRVALUE(pDevice));
 
     return result;
 }
@@ -526,7 +543,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDevice(VkDevice device, const VkAlloca
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyDevice(%p)", gcoOS_GetCurrentThreadID(), device, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyDevice(%p)", gcoOS_GetCurrentThreadID(), device, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -547,7 +564,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceExtensionProperties(cons
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEnumerateInstanceExtensionProperties(%s, %d, %p)", gcoOS_GetCurrentThreadID(), pLayerName, pCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkEnumerateInstanceExtensionProperties(%s, %p, %p)", gcoOS_GetCurrentThreadID(), pLayerName, pCount, pProperties);
 
     if (!pCount)
     {
@@ -558,7 +575,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceExtensionProperties(cons
     result = __vk_EnumerateInstanceExtensionProperties(pLayerName, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n",__VK_PTRVALUE(pCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pCount));
 
     return result;
 }
@@ -568,7 +585,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceExtensionProperties(VkPhys
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEnumerateDeviceExtensionProperties(%p, %s, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pLayerName, pCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkEnumerateDeviceExtensionProperties(%p, %s, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pLayerName, pCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -585,7 +602,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceExtensionProperties(VkPhys
     result = __vk_EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pCount));
 
     return result;
 }
@@ -594,7 +611,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceLayerProperties(uint32_t
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEnumerateInstanceLayerProperties(%d, %p)", gcoOS_GetCurrentThreadID(), pCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkEnumerateInstanceLayerProperties(%p, %p)", gcoOS_GetCurrentThreadID(), pCount, pProperties);
 
     if (!pCount)
     {
@@ -605,7 +622,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceLayerProperties(uint32_t
     result = __vk_EnumerateInstanceLayerProperties(pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pCount));
 
     return result;
 }
@@ -615,7 +632,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceLayerProperties(VkPhysical
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEnumerateDeviceLayerProperties(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkEnumerateDeviceLayerProperties(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -632,7 +649,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceLayerProperties(VkPhysical
     result = __vk_EnumerateDeviceLayerProperties(physicalDevice, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pCount));
 
     return result;
 }
@@ -643,7 +660,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceQueue(VkDevice device, uint32_t queu
     __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDeviceQueue(%p, %d, %d)", gcoOS_GetCurrentThreadID(), device, queueFamilyIndex, queueIndex);
+    __VK_LOG_API("(tid=%p): vkGetDeviceQueue(%p, %u, %u)", gcoOS_GetCurrentThreadID(), device, queueFamilyIndex, queueIndex);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -665,7 +682,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceQueue(VkDevice device, uint32_t queu
     __vk_GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (queue=%p) %s\n", __VK_PTRVALUE(pQueue), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (queue=%p)\n", __vkiGetResultString(result), __VK_PTRVALUE(pQueue));
     devCtx->currentResult = result;
 }
 
@@ -678,7 +695,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueSubmit(VkQueue queue, uint32_t submi
     __vkCommandBuffer *cmd;
     uint32_t i, j, cmdbufcount;
 
-    __VK_LOG_API("(tid=%d): vkQueueSubmit(%p, %d, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, submitCount, pSubmits, fence);
+    __VK_LOG_API("(tid=%p): vkQueueSubmit(%p, %u, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, submitCount, pSubmits, fence);
 
     /* API validation logic that can be skipped at runtime */
     if (!pqe || pqe->sType != __VK_OBJECT_TYPE_CMD_QUEUE)
@@ -729,7 +746,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueWaitIdle(VkQueue queue)
     __vkDevQueue *pqe = (__vkDevQueue *)queue;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkQueueWaitIdle(%p)", gcoOS_GetCurrentThreadID(), queue);
+    __VK_LOG_API("(tid=%p): vkQueueWaitIdle(%p)", gcoOS_GetCurrentThreadID(), queue);
 
     /* API validation logic that can be skipped at runtime */
     if (!pqe || pqe->sType != __VK_OBJECT_TYPE_CMD_QUEUE)
@@ -752,7 +769,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_DeviceWaitIdle(VkDevice device)
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDeviceWaitIdle(%p)", gcoOS_GetCurrentThreadID(), device);
+    __VK_LOG_API("(tid=%p): vkDeviceWaitIdle(%p)", gcoOS_GetCurrentThreadID(), device);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -775,7 +792,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateMemory(VkDevice device, const VkM
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkAllocateMemory(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkAllocateMemory(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -807,7 +824,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateMemory(VkDevice device, const VkM
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (memory=0x%llx) %s\n", __VK_PTRVALUE(pMemory), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (memory=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pMemory));
     devCtx->currentResult = result;
 
     return result;
@@ -819,7 +836,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_FreeMemory(VkDevice device, VkDeviceMemory me
     __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, memory);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkFreeMemory(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, memory, pAllocator);
+    __VK_LOG_API("(tid=%p): vkFreeMemory(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, memory, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -856,7 +873,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_MapMemory(VkDevice device, VkDeviceMemory
     __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkMapMemory(%p, 0x%llx, %lld, %lld, 0x%x, %p)", gcoOS_GetCurrentThreadID(), device, mem, offset, size, flags, ppData);
+    __VK_LOG_API("(tid=%p): vkMapMemory(%p, 0x%llx, %llu, %llu, %u, %p)", gcoOS_GetCurrentThreadID(), device, mem, offset, size, flags, ppData);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -898,7 +915,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_MapMemory(VkDevice device, VkDeviceMemory
     result = __vk_MapMemory(device, mem, offset, size, flags, ppData);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (addr=%p) %s\n", __VK_PTRVALUE(ppData), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (addr=%p)\n", __vkiGetResultString(result), __VK_PTRVALUE(ppData));
     devCtx->currentResult = result;
 
     return result;
@@ -910,7 +927,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_UnmapMemory(VkDevice device, VkDeviceMemory m
     __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkUnmapMemory(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, mem);
+    __VK_LOG_API("(tid=%p): vkUnmapMemory(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, mem);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -947,7 +964,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FlushMappedMemoryRanges(VkDevice device, 
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkFlushMappedMemoryRanges(%p, %d, %p)", gcoOS_GetCurrentThreadID(), device, memRangeCount, pMemRanges);
+    __VK_LOG_API("(tid=%p): vkFlushMappedMemoryRanges(%p, %u, %p)", gcoOS_GetCurrentThreadID(), device, memRangeCount, pMemRanges);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1007,7 +1024,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_InvalidateMappedMemoryRanges(VkDevice dev
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkInvalidateMappedMemoryRanges(%p, %d, %p)", gcoOS_GetCurrentThreadID(), device, memRangeCount, pMemRanges);
+    __VK_LOG_API("(tid=%p): vkInvalidateMappedMemoryRanges(%p, %u, %p)", gcoOS_GetCurrentThreadID(), device, memRangeCount, pMemRanges);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1067,7 +1084,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceMemoryCommitment(VkDevice device, Vk
     __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, memory);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDeviceMemoryCommitment(%p, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), device, memory, pCommittedMemoryInBytes);
+    __VK_LOG_API("(tid=%p): vkGetDeviceMemoryCommitment(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, memory, pCommittedMemoryInBytes);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1102,7 +1119,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceMemoryCommitment(VkDevice device, Vk
     __vk_GetDeviceMemoryCommitment(device, memory, pCommittedMemoryInBytes);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %lld %s\n", __VK_PTRVALUE(pCommittedMemoryInBytes), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %llu\n", __vkiGetResultString(result), __VK_PTRVALUE(pCommittedMemoryInBytes));
     devCtx->currentResult = result;
 }
 
@@ -1113,7 +1130,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BindBufferMemory(VkDevice device, VkBuffe
     __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkBindBufferMemory(%p, 0x%llx, 0x%llx, %lld)", gcoOS_GetCurrentThreadID(), device, buffer, mem, memOffset);
+    __VK_LOG_API("(tid=%p): vkBindBufferMemory(%p, 0x%llx, 0x%llx, %llu)", gcoOS_GetCurrentThreadID(), device, buffer, mem, memOffset);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1196,7 +1213,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BindImageMemory(VkDevice device, VkImage 
     __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkBindImageMemory(%p, 0x%llx, 0x%llx, %lld)", gcoOS_GetCurrentThreadID(), device, image, mem, memOffset);
+    __VK_LOG_API("(tid=%p): vkBindImageMemory(%p, 0x%llx, 0x%llx, %llu)", gcoOS_GetCurrentThreadID(), device, image, mem, memOffset);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1230,7 +1247,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetBufferMemoryRequirements(VkDevice device, 
     __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetBufferMemoryRequirements(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, buffer, pMemoryRequirements);
+    __VK_LOG_API("(tid=%p): vkGetBufferMemoryRequirements(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, buffer, pMemoryRequirements);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1267,7 +1284,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageMemoryRequirements(VkDevice device, V
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetImageMemoryRequirements(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, image, pMemoryRequirements);
+    __VK_LOG_API("(tid=%p): vkGetImageMemoryRequirements(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, image, pMemoryRequirements);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1299,7 +1316,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageSparseMemoryRequirements(VkDevice dev
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetImageSparseMemoryRequirements(%p, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), device, image, pNumRequirements, pSparseMemoryRequirements);
+    __VK_LOG_API("(tid=%p): vkGetImageSparseMemoryRequirements(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), device, image, pNumRequirements, pSparseMemoryRequirements);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1321,7 +1338,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageSparseMemoryRequirements(VkDevice dev
     __vk_GetImageSparseMemoryRequirements(device, image, pNumRequirements, pSparseMemoryRequirements);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pNumRequirements), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pNumRequirements));
     devCtx->currentResult = result;
 }
 
@@ -1330,7 +1347,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSparseImageFormatProperties(%p, %d, %d, %d, %d, %d, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, type, samples, usage, tiling, pPropertyCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSparseImageFormatProperties(%p, %u, %u, %u, %u, %u, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, type, samples, usage, tiling, pPropertyCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -1362,7 +1379,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
     __vk_GetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, type, samples, usage, tiling, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPropertyCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pPropertyCount));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
@@ -1370,7 +1387,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueBindSparse(VkQueue queue, uint32_t b
     __vkDevQueue *pqe = (__vkDevQueue *)queue;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkQueueBindSparse(%p, %d, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, bindInfoCount, pBindInfo, fence);
+    __VK_LOG_API("(tid=%p): vkQueueBindSparse(%p, %u, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, bindInfoCount, pBindInfo, fence);
 
     /* API validation logic that can be skipped at runtime */
     if (!pqe || pqe->sType != __VK_OBJECT_TYPE_CMD_QUEUE)
@@ -1398,7 +1415,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFence(VkDevice device, const VkFenc
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateFence(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateFence(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1425,7 +1442,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFence(VkDevice device, const VkFenc
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (fence=0x%llx) %s\n", __VK_PTRVALUE(pFence), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (fence=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pFence));
     devCtx->currentResult = result;
 
     return result;
@@ -1437,7 +1454,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyFence(VkDevice device, VkFence fence, 
     __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyFence(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, fence, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyFence(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, fence, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1467,7 +1484,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetFences(VkDevice device, uint32_t fen
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkResetFences(%p, %d, %p)", gcoOS_GetCurrentThreadID(), device, fenceCount, pFences);
+    __VK_LOG_API("(tid=%p): vkResetFences(%p, %u, %p)", gcoOS_GetCurrentThreadID(), device, fenceCount, pFences);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1505,7 +1522,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetFenceStatus(VkDevice device, VkFence f
     __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetFenceStatus(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, fence);
+    __VK_LOG_API("(tid=%p): vkGetFenceStatus(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, fence);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1535,7 +1552,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_WaitForFences(VkDevice device, uint32_t f
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkWaitForFences(%p, %d, %p, %d, %lld)", gcoOS_GetCurrentThreadID(), device, fenceCount, pFences, waitAll, timeout);
+    __VK_LOG_API("(tid=%p): vkWaitForFences(%p, %u, %p, %d, %llu)", gcoOS_GetCurrentThreadID(), device, fenceCount, pFences, waitAll, timeout);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1572,7 +1589,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSemaphore(VkDevice device, const Vk
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateSemaphore(%p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateSemaphore(%p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1599,7 +1616,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSemaphore(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (semaphore=0x%llx) %s\n", __VK_PTRVALUE(pSemaphore), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (semaphore=%u)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSemaphore));
     devCtx->currentResult = result;
 
     return result;
@@ -1611,7 +1628,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySemaphore(VkDevice device, VkSemaphore
     __vkSemaphore *smp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, semaphore);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroySemaphore(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, semaphore, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroySemaphore(%p, %u, %p)", gcoOS_GetCurrentThreadID(), device, semaphore, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1639,7 +1656,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateEvent(VkDevice device, const VkEven
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateEvent(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateEvent(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1666,7 +1683,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateEvent(VkDevice device, const VkEven
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (event=0x%llx) %s\n", __VK_PTRVALUE(pEvent), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (event=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pEvent));
     devCtx->currentResult = result;
 
     return result;
@@ -1678,7 +1695,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyEvent(VkDevice device, VkEvent event, 
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyEvent(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, event, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyEvent(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, event, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1707,7 +1724,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetEventStatus(VkDevice device, VkEvent e
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetEventStatus(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
+    __VK_LOG_API("(tid=%p): vkGetEventStatus(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1736,7 +1753,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_SetEvent(VkDevice device, VkEvent event)
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkSetEvent(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
+    __VK_LOG_API("(tid=%p): vkSetEvent(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1765,7 +1782,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetEvent(VkDevice device, VkEvent event
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkResetEvent(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
+    __VK_LOG_API("(tid=%p): vkResetEvent(%p, 0x%llx)", gcoOS_GetCurrentThreadID(), device, event);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1793,7 +1810,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateQueryPool(VkDevice device, const Vk
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateQueryPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateQueryPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1820,7 +1837,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateQueryPool(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (queryPool=0x%llx) %s\n", __VK_PTRVALUE(pQueryPool), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (queryPool=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pQueryPool));
     devCtx->currentResult = result;
 
     return result;
@@ -1832,7 +1849,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyQueryPool(VkDevice device, VkQueryPool
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyQueryPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, queryPool, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyQueryPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, queryPool, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1861,7 +1878,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetQueryPoolResults(VkDevice device, VkQu
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetQueryPoolResults(%p, 0x%llx, %d, %d, %p, %p, %lld, %d)", gcoOS_GetCurrentThreadID(), device, queryPool, firstQuery, queryCount, dataSize, pData, stride, flags);
+    __VK_LOG_API("(tid=%p): vkGetQueryPoolResults(%p, 0x%llx, %u, %u, %p, %p, %llu, %u)", gcoOS_GetCurrentThreadID(), device, queryPool, firstQuery, queryCount, dataSize, pData, stride, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1894,7 +1911,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBuffer(VkDevice device, const VkBuf
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateBuffer(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateBuffer(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -1955,7 +1972,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBuffer(VkDevice device, const VkBuf
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (buffer=0x%llx) %s\n", __VK_PTRVALUE(pBuffer), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (buffer=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pBuffer));
     devCtx->currentResult = result;
 
     return result;
@@ -1967,7 +1984,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyBuffer(VkDevice device, VkBuffer buffe
     __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyBuffer(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, buffer, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyBuffer(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, buffer, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2004,7 +2021,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBufferView(VkDevice device, const V
     __vkBuffer *buf = gcvNULL;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateBufferView(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateBufferView(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2061,7 +2078,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBufferView(VkDevice device, const V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (view=0x%llx) %s\n", __VK_PTRVALUE(pView), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (view=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pView));
     devCtx->currentResult = result;
 
     return result;
@@ -2073,7 +2090,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyBufferView(VkDevice device, VkBufferVi
     __vkBufferView *bfv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBufferView *, bufferView);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyBufferView(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, bufferView, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyBufferView(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, bufferView, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2101,7 +2118,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImage(VkDevice device, const VkImag
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateImage(%p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateImage(%p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2128,7 +2145,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImage(VkDevice device, const VkImag
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (image=0x%llx) %s\n", __VK_PTRVALUE(pImage), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (image=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pImage));
     devCtx->currentResult = result;
 
     return result;
@@ -2140,7 +2157,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyImage(VkDevice device, VkImage image, 
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyImage(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, image, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyImage(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, image, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2169,7 +2186,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageSubresourceLayout(VkDevice device, Vk
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetImageSubresourceLayout(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), device, image, pSubresource, pLayout);
+    __VK_LOG_API("(tid=%p): vkGetImageSubresourceLayout(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), device, image, pSubresource, pLayout);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2200,7 +2217,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImageView(VkDevice device, const Vk
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateImageView(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateImageView(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2227,7 +2244,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImageView(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (view=0x%llx) %s\n", __VK_PTRVALUE(pView), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (view=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pView));
     devCtx->currentResult = result;
 
     return result;
@@ -2239,7 +2256,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyImageView(VkDevice device, VkImageView
     __vkImageView *imv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImageView *, imageView);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyImageView(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, imageView, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyImageView(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, imageView, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2267,7 +2284,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateShaderModule(VkDevice device, const
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateShaderModule(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateShaderModule(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     __vkLogShaderStrings(pCreateInfo->codeSize, (unsigned char *)pCreateInfo->pCode);
 
@@ -2296,7 +2313,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateShaderModule(VkDevice device, const
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (shaderModule=0x%llx) %s\n", __VK_PTRVALUE(pShaderModule), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (shaderModule=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pShaderModule));
     devCtx->currentResult = result;
 
     return result;
@@ -2308,7 +2325,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyShaderModule(VkDevice device, VkShader
     __vkShaderModule *shm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkShaderModule *, shaderModule);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyShaderModule(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, shaderModule, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyShaderModule(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, shaderModule, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2336,7 +2353,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineCache(VkDevice device, cons
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreatePipelineCache(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreatePipelineCache(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2363,7 +2380,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineCache(VkDevice device, cons
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipelineCache=0x%llx) %s\n", __VK_PTRVALUE(pPipelineCache), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (pipelineCache=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pPipelineCache));
     devCtx->currentResult = result;
 
     return result;
@@ -2375,7 +2392,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipelineCache(VkDevice device, VkPipel
     __vkPipelineCache *ppc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineCache *, pipelineCache);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyPipelineCache(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyPipelineCache(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2404,7 +2421,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPipelineCacheData(VkDevice device, VkP
     __vkPipelineCache *ppc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineCache *, pipelineCache);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPipelineCacheData(%p, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, pDataSize, pData);
+    __VK_LOG_API("(tid=%p): vkGetPipelineCacheData(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, pDataSize, pData);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2435,7 +2452,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_MergePipelineCaches(VkDevice device, VkPi
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkMergePipelineCaches(%p, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), device, destCache, srcCacheCount, pSrcCaches);
+    __VK_LOG_API("(tid=%p): vkMergePipelineCaches(%p, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), device, destCache, srcCacheCount, pSrcCaches);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2477,7 +2494,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateGraphicsPipelines(VkDevice device, 
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateGraphicsPipelines(%p, 0x%llx, %d, %p %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, createInfoCount, pCreateInfos, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateGraphicsPipelines(%p, 0x%llx, %u, %p %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, createInfoCount, pCreateInfos, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2504,7 +2521,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateGraphicsPipelines(VkDevice device, 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", __VK_PTRVALUE(pPipelines), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (pipeline=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pPipelines));
     devCtx->currentResult = result;
 
     return result;
@@ -2515,7 +2532,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateComputePipelines(VkDevice device, V
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateComputePipelines(%p, 0x%llx, %d, %p, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, createInfoCount, pCreateInfos, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateComputePipelines(%p, 0x%llx, %u, %p, %p)", gcoOS_GetCurrentThreadID(), device, pipelineCache, createInfoCount, pCreateInfos, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2542,7 +2559,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateComputePipelines(VkDevice device, V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", __VK_PTRVALUE(pPipelines), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (pipeline=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pPipelines));
     devCtx->currentResult = result;
 
     return result;
@@ -2554,7 +2571,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipeline(VkDevice device, VkPipeline p
     __vkPipeline *ppl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipeline *, pipeline);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyPipeline(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipeline, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyPipeline(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipeline, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2582,7 +2599,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineLayout(VkDevice device, con
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreatePipelineLayout(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreatePipelineLayout(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2609,7 +2626,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineLayout(VkDevice device, con
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipelineLayout=0x%llx) %s\n", __VK_PTRVALUE(pPipelineLayout), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (pipelineLayout=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pPipelineLayout));
     devCtx->currentResult = result;
 
     return result;
@@ -2621,7 +2638,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipelineLayout(VkDevice device, VkPipe
     __vkPipelineLayout *ppl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, pipelineLayout);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyPipelineLayout(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipelineLayout, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyPipelineLayout(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, pipelineLayout, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2649,7 +2666,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSampler(VkDevice device, const VkSa
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateSampler(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateSampler(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2676,7 +2693,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSampler(VkDevice device, const VkSa
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (sampler=0x%llx) %s\n", __VK_PTRVALUE(pSampler), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (sampler=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSampler));
     devCtx->currentResult = result;
 
     return result;
@@ -2688,7 +2705,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySampler(VkDevice device, VkSampler sam
     __vkSampler *spl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSampler *, sampler);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroySampler(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, sampler, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroySampler(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, sampler, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2716,7 +2733,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorSetLayout(VkDevice device
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDescriptorSetLayout(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDescriptorSetLayout(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2743,7 +2760,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorSetLayout(VkDevice device
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (layout=0x%llx) %s\n", __VK_PTRVALUE(pSetLayout), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (layout=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSetLayout));
     devCtx->currentResult = result;
 
     return result;
@@ -2755,7 +2772,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorSetLayout(VkDevice device, V
     __vkDescriptorSetLayout *dsl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetLayout *, descriptorSetLayout);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroySampler(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorSetLayout, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroySampler(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorSetLayout, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2783,7 +2800,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorPool(VkDevice device, con
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDescriptorPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDescriptorPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2810,7 +2827,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorPool(VkDevice device, con
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (descPool=0x%llx) %s\n", __VK_PTRVALUE(pDescriptorPool), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (descPool=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pDescriptorPool));
     devCtx->currentResult = result;
 
     return result;
@@ -2823,7 +2840,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorPool(VkDevice device, VkDesc
     VkResult result = VK_SUCCESS;
     uint32_t i = 0;
 
-    __VK_LOG_API("(tid=%d): vkDestroyDescriptorPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorPool, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyDescriptorPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorPool, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2873,7 +2890,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetDescriptorPool(VkDevice device, VkDe
     VkResult result = VK_SUCCESS;
     uint32_t i = 0;
 
-    __VK_LOG_API("(tid=%d): vkResetDescriptorPool(%p, 0x%llx, %x)", gcoOS_GetCurrentThreadID(), device, descriptorPool, flags);
+    __VK_LOG_API("(tid=%p): vkResetDescriptorPool(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), device, descriptorPool, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2924,7 +2941,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateDescriptorSets(VkDevice device, c
     __vkDescriptorSet *des;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkAllocateDescriptorSets(%p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo);
+    __VK_LOG_API("(tid=%p): vkAllocateDescriptorSets(%p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -2951,7 +2968,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateDescriptorSets(VkDevice device, c
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (descSet=0x%llx) %s\n", __VK_PTRVALUE(pDescriptorSets), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (descSet=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pDescriptorSets));
     devCtx->currentResult = result;
 
     return result;
@@ -2965,7 +2982,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FreeDescriptorSets(VkDevice device, VkDes
     __vkDescriptorSet *des;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkFreeDescriptorSets(%p, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), device, descriptorPool, count, pDescriptorSets);
+    __VK_LOG_API("(tid=%p): vkFreeDescriptorSets(%p, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), device, descriptorPool, count, pDescriptorSets);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3010,7 +3027,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_UpdateDescriptorSets(VkDevice device, uint32_
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkUpdateDescriptorSets(%p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), device, writeCount, pDescriptorWrites, copyCount, pDescriptorCopies);
+    __VK_LOG_API("(tid=%p): vkUpdateDescriptorSets(%p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), device, writeCount, pDescriptorWrites, copyCount, pDescriptorCopies);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3057,7 +3074,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFramebuffer(VkDevice device, const 
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateFramebuffer(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateFramebuffer(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3084,7 +3101,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFramebuffer(VkDevice device, const 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (framebuffer=0x%llx) %s\n", __VK_PTRVALUE(pFramebuffer), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (framebuffer=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pFramebuffer));
     devCtx->currentResult = result;
 
     return result;
@@ -3096,7 +3113,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyFramebuffer(VkDevice device, VkFramebu
     __vkFramebuffer *fbb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFramebuffer *, framebuffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyFramebuffer(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, framebuffer, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyFramebuffer(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, framebuffer, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3124,7 +3141,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateRenderPass(VkDevice device, const V
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateRenderPass(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateRenderPass(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3151,7 +3168,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateRenderPass(VkDevice device, const V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (renderPass=0x%llx) %s\n", __VK_PTRVALUE(pRenderPass), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (renderPass=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pRenderPass));
     devCtx->currentResult = result;
 
     return result;
@@ -3163,7 +3180,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyRenderPass(VkDevice device, VkRenderPa
     __vkRenderPass *rdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkRenderPass *, renderPass);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyRenderPass(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, renderPass, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyRenderPass(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, renderPass, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3192,7 +3209,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetRenderAreaGranularity(VkDevice device, VkR
     __vkRenderPass *rdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkRenderPass *, renderPass);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetRenderAreaGranularity(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, renderPass, pGranularity);
+    __VK_LOG_API("(tid=%p): vkGetRenderAreaGranularity(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, renderPass, pGranularity);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3223,7 +3240,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateCommandPool(VkDevice device, const 
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateCommandPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateCommandPool(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3250,7 +3267,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateCommandPool(VkDevice device, const 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (commandPool=0x%llx) %s\n", __VK_PTRVALUE(pCommandPool), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (commandPool=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pCommandPool));
     devCtx->currentResult = result;
 
     return result;
@@ -3292,7 +3309,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyCommandPool(VkDevice device, VkCommand
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyCommandPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, commandPool, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyCommandPool(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, commandPool, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3327,7 +3344,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetCommandPool(VkDevice device, VkComma
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkResetCommandPool(%p, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), device, commandPool, flags);
+    __VK_LOG_API("(tid=%p): vkResetCommandPool(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), device, commandPool, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3358,7 +3375,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateCommandBuffers(VkDevice device, c
     __vkCommandBuffer *cmb;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkAllocateCommandBuffers(%p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo);
+    __VK_LOG_API("(tid=%p): vkAllocateCommandBuffers(%p, %p)", gcoOS_GetCurrentThreadID(), device, pAllocateInfo);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3395,7 +3412,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateCommandBuffers(VkDevice device, c
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (commandBuffer=%p) %s\n", __VK_PTRVALUE(pCommandBuffers), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (commandBuffer=%p)\n", __vkiGetResultString(result), __VK_PTRVALUE(pCommandBuffers));
     devCtx->currentResult = result;
 
     return result;
@@ -3408,7 +3425,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_FreeCommandBuffers(VkDevice device, VkCommand
     __vkCommandBuffer *cmb;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkFreeCommandBuffers(%p, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), device, commandPool, commandBufferCount, pCommandBuffers);
+    __VK_LOG_API("(tid=%p): vkFreeCommandBuffers(%p, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), device, commandPool, commandBufferCount, pCommandBuffers);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -3441,7 +3458,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BeginCommandBuffer(VkCommandBuffer comman
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkBeginCommandBuffer(%p, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, pBeginInfo);
+    __VK_LOG_API("(tid=%p): vkBeginCommandBuffer(%p, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, pBeginInfo);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3471,7 +3488,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EndCommandBuffer(VkCommandBuffer commandB
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkEndCommandBuffer(%p)", gcoOS_GetCurrentThreadID(), commandBuffer);
+    __VK_LOG_API("(tid=%p): vkEndCommandBuffer(%p)", gcoOS_GetCurrentThreadID(), commandBuffer);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3496,7 +3513,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetCommandBuffer(VkCommandBuffer comman
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkResetCommandBuffer(%p, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, flags);
+    __VK_LOG_API("(tid=%p): vkResetCommandBuffer(%p, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3522,7 +3539,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindPipeline(VkCommandBuffer commandBuffer
     __vkPipeline *ppl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipeline *, pipeline);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdBindPipeline(%p, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineBindPoint, pipeline);
+    __VK_LOG_API("(tid=%p): vkCmdBindPipeline(%p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineBindPoint, pipeline);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3555,7 +3572,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetViewport(VkCommandBuffer commandBuffer,
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetViewport(%p, %d, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, firstViewPort, viewportCount, pViewports);
+    __VK_LOG_API("(tid=%p): vkCmdSetViewport(%p, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, firstViewPort, viewportCount, pViewports);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3578,7 +3595,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetScissor(VkCommandBuffer commandBuffer, 
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetScissor(%p, %d, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, firstScissor, scissorCount, pScissors);
+    __VK_LOG_API("(tid=%p): vkCmdSetScissor(%p, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, firstScissor, scissorCount, pScissors);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3601,7 +3618,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetLineWidth(VkCommandBuffer commandBuffer
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetLineWidth(%p, %f)", gcoOS_GetCurrentThreadID(), commandBuffer, lineWidth);
+    __VK_LOG_API("(tid=%p): vkCmdSetLineWidth(%p, %f)", gcoOS_GetCurrentThreadID(), commandBuffer, lineWidth);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3624,7 +3641,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetDepthBias(VkCommandBuffer commandBuffer
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetDepthBias(%p, %f, %f, %f)", gcoOS_GetCurrentThreadID(), commandBuffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
+    __VK_LOG_API("(tid=%p): vkCmdSetDepthBias(%p, %f, %f, %f)", gcoOS_GetCurrentThreadID(), commandBuffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3647,7 +3664,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetBlendConstants(VkCommandBuffer commandB
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetBlendConstants(%p, %f %f %f %f)", gcoOS_GetCurrentThreadID(), commandBuffer,
+    __VK_LOG_API("(tid=%p): vkCmdSetBlendConstants(%p, %f %f %f %f)", gcoOS_GetCurrentThreadID(), commandBuffer,
                                     blendConstants[0], blendConstants[1], blendConstants[2], blendConstants[3]);
 
     /* API validation logic that can be skipped at runtime */
@@ -3671,7 +3688,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetDepthBounds(VkCommandBuffer commandBuff
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetDepthBounds(%p, %f %f)", gcoOS_GetCurrentThreadID(), commandBuffer, minDepthBounds, maxDepthBounds);
+    __VK_LOG_API("(tid=%p): vkCmdSetDepthBounds(%p, %f %f)", gcoOS_GetCurrentThreadID(), commandBuffer, minDepthBounds, maxDepthBounds);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3694,7 +3711,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetStencilCompareMask(VkCommandBuffer comm
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetStencilCompareMask(%p, %x %x)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, compareMask);
+    __VK_LOG_API("(tid=%p): vkCmdSetStencilCompareMask(%p, %u %u)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, compareMask);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3717,7 +3734,7 @@ vk_Exit:
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetStencilWriteMask(%p, %x %x)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, writeMask);
+    __VK_LOG_API("(tid=%p): vkCmdSetStencilWriteMask(%p, %u %u)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, writeMask);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3740,7 +3757,7 @@ vk_Exit:
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetStencilReference(%p, %x %x)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, reference);
+    __VK_LOG_API("(tid=%p): vkCmdSetStencilReference(%p, %u %u)", gcoOS_GetCurrentThreadID(), commandBuffer, faceMask, reference);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3766,7 +3783,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindDescriptorSets(VkCommandBuffer command
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkCmdBindDescriptorSets(%p, 0x%x, 0x%llx, %d, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineBindPoint, layout, firstSet, setCount, pDescriptorSets, dynamicOffsetCount, pDynamicOffsets);
+    __VK_LOG_API("(tid=%p): vkCmdBindDescriptorSets(%p, %u, 0x%llx, %u, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineBindPoint, layout, firstSet, setCount, pDescriptorSets, dynamicOffsetCount, pDynamicOffsets);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3815,7 +3832,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindIndexBuffer(VkCommandBuffer commandBuf
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdBindIndexBuffer(%p, 0x%llx, %lld, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, indexType);
+    __VK_LOG_API("(tid=%p): vkCmdBindIndexBuffer(%p, 0x%llx, %llu, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, indexType);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3850,7 +3867,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindVertexBuffers(VkCommandBuffer commandB
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkCmdBindVertexBuffers(%p, %d, %d, %p, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, startBinding, bindingCount, pBuffers, pOffsets);
+    __VK_LOG_API("(tid=%p): vkCmdBindVertexBuffers(%p, %u, %u, %p, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, startBinding, bindingCount, pBuffers, pOffsets);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3887,7 +3904,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDraw(VkCommandBuffer commandBuffer, uint32
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDraw(%p, %d, %d, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    __VK_LOG_API("(tid=%p): vkCmdDraw(%p, %u, %u, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3910,7 +3927,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndexed(VkCommandBuffer commandBuffer,
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDrawIndexed(%p, %d, %d, %d, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    __VK_LOG_API("(tid=%p): vkCmdDrawIndexed(%p, %u, %u, %u, %d, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3934,7 +3951,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndirect(VkCommandBuffer commandBuffer
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDrawIndirect(%p, 0x%llx, %lld, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, count, stride);
+    __VK_LOG_API("(tid=%p): vkCmdDrawIndirect(%p, 0x%llx, %llu, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, count, stride);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3963,7 +3980,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndexedIndirect(VkCommandBuffer comman
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDrawIndexedIndirect(%p, 0x%llx, %lld, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, count, stride);
+    __VK_LOG_API("(tid=%p): vkCmdDrawIndexedIndirect(%p, 0x%llx, %llu, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset, count, stride);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -3991,7 +4008,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDispatch(VkCommandBuffer commandBuffer, ui
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDispatch(%p, %d, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, x, y, z);
+    __VK_LOG_API("(tid=%p): vkCmdDispatch(%p, %u, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, x, y, z);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4015,7 +4032,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDispatchIndirect(VkCommandBuffer commandBu
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdDispatchIndirect(%p, 0x%llx, %lld)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset);
+    __VK_LOG_API("(tid=%p): vkCmdDispatchIndirect(%p, 0x%llx, %llu)", gcoOS_GetCurrentThreadID(), commandBuffer, buffer, offset);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4045,7 +4062,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyBuffer(VkCommandBuffer commandBuffer, 
     __vkBuffer *dbf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, destBuffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdCopyBuffer(%p, 0x%llx, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcBuffer, destBuffer, regionCount, pRegions);
+    __VK_LOG_API("(tid=%p): vkCmdCopyBuffer(%p, 0x%llx, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcBuffer, destBuffer, regionCount, pRegions);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4085,7 +4102,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyImage(VkCommandBuffer commandBuffer, V
     __vkImage *dmg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, destImage);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdCopyImage(%p, 0x%llx, 0x%x, 0x%llx, 0x%x, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
+    __VK_LOG_API("(tid=%p): vkCmdCopyImage(%p, 0x%llx, %u, 0x%llx, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4130,7 +4147,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBlitImage(VkCommandBuffer commandBuffer, V
     __vkImage *dmg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, destImage);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdBlitImage(%p, 0x%llx, 0x%x, 0x%llx, 0x%x, %d, %p, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions, filter);
+    __VK_LOG_API("(tid=%p): vkCmdBlitImage(%p, 0x%llx, %u, 0x%llx, %u, %u, %p, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions, filter);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4180,7 +4197,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyBufferToImage(VkCommandBuffer commandB
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, destImage);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdCopyBufferToImage(%p, 0x%llx, 0x%llx, 0x%x, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcBuffer, destImage, destImageLayout, regionCount, pRegions);
+    __VK_LOG_API("(tid=%p): vkCmdCopyBufferToImage(%p, 0x%llx, 0x%llx, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcBuffer, destImage, destImageLayout, regionCount, pRegions);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4225,7 +4242,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyImageToBuffer(VkCommandBuffer commandB
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, srcImage);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdCopyImageToBuffer(%p, 0x%llx, 0x%x, 0x%llx, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destBuffer, regionCount, pRegions);
+    __VK_LOG_API("(tid=%p): vkCmdCopyImageToBuffer(%p, 0x%llx, %u, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destBuffer, regionCount, pRegions);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4269,7 +4286,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdUpdateBuffer(VkCommandBuffer commandBuffer
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, destBuffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdUpdateBuffer(%p, 0x%llx, %lld, %lld, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, destBuffer, destOffset, dataSize, pData);
+    __VK_LOG_API("(tid=%p): vkCmdUpdateBuffer(%p, 0x%llx, %llu, %llu, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, destBuffer, destOffset, dataSize, pData);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4303,7 +4320,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdFillBuffer(VkCommandBuffer commandBuffer, 
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, destBuffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdFillBuffer(%p, 0x%llx, %lld, %lld, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, destBuffer, destOffset, fillSize, data);
+    __VK_LOG_API("(tid=%p): vkCmdFillBuffer(%p, 0x%llx, %llu, %llu, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, destBuffer, destOffset, fillSize, data);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4332,7 +4349,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearColorImage(VkCommandBuffer commandBuf
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdClearColorImage(%p, 0x%llx, 0x%x, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+    __VK_LOG_API("(tid=%p): vkCmdClearColorImage(%p, 0x%llx, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4371,7 +4388,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearDepthStencilImage(VkCommandBuffer com
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, image);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdClearDepthStencilImage(%p, 0x%llx, 0x%x, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, image, imageLayout, pDepthStencil, rangeCount, pRanges);
+    __VK_LOG_API("(tid=%p): vkCmdClearDepthStencilImage(%p, 0x%llx, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, image, imageLayout, pDepthStencil, rangeCount, pRanges);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4409,7 +4426,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearAttachments(VkCommandBuffer commandBu
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdClearAttachments(%p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, attachmentCount, pAttachments, rectCount, pRects);
+    __VK_LOG_API("(tid=%p): vkCmdClearAttachments(%p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, attachmentCount, pAttachments, rectCount, pRects);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4444,7 +4461,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResolveImage(VkCommandBuffer commandBuffer
     __vkImage *dmg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, destImage);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdResolveImage(%p, 0x%llx, 0x%x, 0x%llx, 0x%x, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
+    __VK_LOG_API("(tid=%p): vkCmdResolveImage(%p, 0x%llx, %u, 0x%llx, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4488,7 +4505,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetEvent(VkCommandBuffer commandBuffer, Vk
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdSetEvent(%p, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, event, stageMask);
+    __VK_LOG_API("(tid=%p): vkCmdSetEvent(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, event, stageMask);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4517,7 +4534,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResetEvent(VkCommandBuffer commandBuffer, 
     __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdResetEvent(%p, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, event, stageMask);
+    __VK_LOG_API("(tid=%p): vkCmdResetEvent(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, event, stageMask);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4547,8 +4564,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdWaitEvents(VkCommandBuffer commandBuffer, 
     VkResult result = VK_SUCCESS;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkCmdWaitEvents(%p, %d, %p, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, eventCount, pEvents, srcStageMask, destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
-
+    __VK_LOG_API("(tid=%p): vkCmdWaitEvents(%p, %u, %p, %u, %u, %u, %p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, eventCount, pEvents, srcStageMask, destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
 
     /* API validation logic that can be skipped at runtime */
@@ -4596,8 +4612,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdPipelineBarrier(VkCommandBuffer commandBuf
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdPipelineBarrier(%p, %d, %d, %d, %d, %p, %d, %p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcStageMask, destStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
-
+    __VK_LOG_API("(tid=%p): vkCmdPipelineBarrier(%p, %u, %u, %u, %u, %p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcStageMask, destStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
 
     /* API validation logic that can be skipped at runtime */
@@ -4637,7 +4652,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBeginQuery(VkCommandBuffer commandBuffer, 
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdBeginQuery(%p, 0x%llx, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, slot, flags);
+    __VK_LOG_API("(tid=%p): vkCmdBeginQuery(%p, 0x%llx, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, slot, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4666,7 +4681,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdEndQuery(VkCommandBuffer commandBuffer, Vk
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdEndQuery(%p, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, slot);
+    __VK_LOG_API("(tid=%p): vkCmdEndQuery(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, slot);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4695,7 +4710,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResetQueryPool(VkCommandBuffer commandBuff
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdResetQueryPool(%p, 0x%llx, %d, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, firstQuery, queryCount);
+    __VK_LOG_API("(tid=%p): vkCmdResetQueryPool(%p, 0x%llx, %u, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, firstQuery, queryCount);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4724,7 +4739,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdWriteTimestamp(VkCommandBuffer commandBuff
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdWriteTimestamp(%p, %d, 0x%llx, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineStage, queryPool, entry);
+    __VK_LOG_API("(tid=%p): vkCmdWriteTimestamp(%p, %u, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, pipelineStage, queryPool, entry);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4759,7 +4774,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyQueryPoolResults(VkCommandBuffer comma
     __vkBuffer *bfr = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, destBuffer);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdCopyQueryPoolResults(%p, 0x%llx, %d, %d, 0x%llx, %lld, %lld, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, firstQuery, queryCount, destBuffer, destOffset, destStride, flags);
+    __VK_LOG_API("(tid=%p): vkCmdCopyQueryPoolResults(%p, 0x%llx, %u, %u, 0x%llx, %llu, %llu, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, queryPool, firstQuery, queryCount, destBuffer, destOffset, destStride, flags);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4793,7 +4808,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdPushConstants(VkCommandBuffer commandBuffe
     __vkPipelineLayout *plt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, layout);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdPushConstants(%p, 0x%llx, %d, %d, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, layout, stageFlags, start, length, values);
+    __VK_LOG_API("(tid=%p): vkCmdPushConstants(%p, 0x%llx, %u, %u, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, layout, stageFlags, start, length, values);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4826,7 +4841,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBeginRenderPass(VkCommandBuffer commandBuf
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdBeginRenderPass(%p, %p, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, pRenderPassBegin, contents);
+    __VK_LOG_API("(tid=%p): vkCmdBeginRenderPass(%p, %p, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, pRenderPassBegin, contents);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4854,7 +4869,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdNextSubpass(VkCommandBuffer commandBuffer,
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdNextSubpass(%p, %d)", gcoOS_GetCurrentThreadID(), commandBuffer, contents);
+    __VK_LOG_API("(tid=%p): vkCmdNextSubpass(%p, %u)", gcoOS_GetCurrentThreadID(), commandBuffer, contents);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4882,7 +4897,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdEndRenderPass(VkCommandBuffer commandBuffe
     __vkCommandBuffer *cmb = (__vkCommandBuffer *)commandBuffer;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCmdEndRenderPass(%p)", gcoOS_GetCurrentThreadID(), commandBuffer);
+    __VK_LOG_API("(tid=%p): vkCmdEndRenderPass(%p)", gcoOS_GetCurrentThreadID(), commandBuffer);
 
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
@@ -4906,7 +4921,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdExecuteCommands(VkCommandBuffer commandBuf
     __vkCommandBuffer *cmd;
     uint32_t i;
 
-    __VK_LOG_API("(tid=%d): vkCmdExecuteCommands(%p, %d, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, commandBuffersCount, pCmdBuffers);
+    __VK_LOG_API("(tid=%p): vkCmdExecuteCommands(%p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, commandBuffersCount, pCmdBuffers);
 
     /* API validation logic that can be skipped at runtime */
     if (!pCmdBuffers)
@@ -4940,7 +4955,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySurfaceKHR(VkInstance instance, VkSurf
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroySurfaceKHR(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), instance, surface, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroySurfaceKHR(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), instance, surface, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -4965,7 +4980,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceSupportKHR(VkPhys
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSurfaceSupportKHR(%p, %d, 0x%llx)", gcoOS_GetCurrentThreadID(), physicalDevice, queueFamilyIndex, surface);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSurfaceSupportKHR(%p, %u, 0x%llx)", gcoOS_GetCurrentThreadID(), physicalDevice, queueFamilyIndex, surface);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -4992,7 +5007,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceSupportKHR(VkPhys
     __vk_GetPhysicalDeviceSurfaceSupportKHR(physicalDevice, queueFamilyIndex, surface, pSupported);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d  %s\n", __VK_PTRVALUE(pSupported), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pSupported));
 
     return result;
 }
@@ -5002,7 +5017,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceCapabilitiesKHR(V
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSurfaceCapabilitiesKHR(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pSurfaceCapabilities);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSurfaceCapabilitiesKHR(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pSurfaceCapabilities);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5034,7 +5049,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceFormatsKHR(VkPhys
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSurfaceFormatsKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pSurfaceFormatCount, pSurfaceFormats);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSurfaceFormatsKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pSurfaceFormatCount, pSurfaceFormats);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5066,7 +5081,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfacePresentModesKHR(V
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSurfacePresentModesKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pPresentModeCount, pPresentModes);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSurfacePresentModesKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, surface, pPresentModeCount, pPresentModes);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5098,7 +5113,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSwapchainKHR(VkDevice  device, cons
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateSwapchainKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateSwapchainKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5125,7 +5140,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSwapchainKHR(VkDevice  device, cons
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", __VK_PTRVALUE(pSwapchain), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (swapChain=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSwapchain));
     devCtx->currentResult = result;
 
     return result;
@@ -5137,7 +5152,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySwapchainKHR(VkDevice  device, VkSwapc
     __vkSwapchainKHR *swp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSwapchainKHR *, swapchain);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroySwapchainKHR(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroySwapchainKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5166,7 +5181,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainImagesKHR(VkDevice device, Vk
     __vkSwapchainKHR *swp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSwapchainKHR *, swapchain);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetSwapchainImagesKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, pSwapchainImageCount, pSwapchainImages);
+    __VK_LOG_API("(tid=%p): vkGetSwapchainImagesKHR(%p, %p, %p, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, pSwapchainImageCount, pSwapchainImages);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5188,7 +5203,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainImagesKHR(VkDevice device, Vk
     result = __vk_GetSwapchainImagesKHR(device, swapchain, pSwapchainImageCount, pSwapchainImages);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pSwapchainImageCount), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %llu\n", __vkiGetResultString(result), __VK_PTRVALUE(pSwapchainImageCount));
     devCtx->currentResult = result;
 
     return result;
@@ -5202,7 +5217,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AcquireNextImageKHR(VkDevice device, VkSw
     __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkAcquireNextImageKHR(%p, 0x%llx, %lld, 0x%llx, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, timeout, semaphore, fence, pImageIndex);
+    __VK_LOG_API("(tid=%p): vkAcquireNextImageKHR(%p, 0x%llx, %llu, %u, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, swapchain, timeout, semaphore, fence, pImageIndex);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5229,7 +5244,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AcquireNextImageKHR(VkDevice device, VkSw
     result = __vk_AcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pImageIndex), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s %u\n", __vkiGetResultString(result), __VK_PTRVALUE(pImageIndex));
     devCtx->currentResult = result;
 
     return result;
@@ -5240,7 +5255,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueuePresentKHR(VkQueue  queue, const VkP
     __vkDevQueue *pqe = (__vkDevQueue *)queue;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkQueuePresentKHR(%p, %p)", gcoOS_GetCurrentThreadID(), queue, pPresentInfo);
+    __VK_LOG_API("(tid=%p): vkQueuePresentKHR(%p, %p)", gcoOS_GetCurrentThreadID(), queue, pPresentInfo);
 
     /* API validation logic that can be skipped at runtime */
     if (!pqe || pqe->sType != __VK_OBJECT_TYPE_CMD_QUEUE)
@@ -5268,7 +5283,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPropertiesKHR(VkP
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceDisplayPropertiesKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pPropertyCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceDisplayPropertiesKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pPropertyCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5295,7 +5310,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPlanePropertiesKH
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceDisplayPlanePropertiesKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pPropertyCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceDisplayPlanePropertiesKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pPropertyCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5322,7 +5337,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneSupportedDisplaysKHR(VkPhy
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDisplayPlaneSupportedDisplaysKHR(%p, %d, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, planeIndex, pDisplayCount, pDisplays);
+    __VK_LOG_API("(tid=%p): vkGetDisplayPlaneSupportedDisplaysKHR(%p, %u, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, planeIndex, pDisplayCount, pDisplays);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5350,7 +5365,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayModePropertiesKHR(VkPhysicalDev
     __vkDisplayKHR *dpy = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayKHR *, display);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDisplayModePropertiesKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, display, pPropertyCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetDisplayModePropertiesKHR(%p, %p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, display, pPropertyCount, pProperties);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5383,7 +5398,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayModeKHR(VkPhysicalDevice phy
     __vkDisplayKHR *dpy = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayKHR *, display);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDisplayModeKHR(%p, 0x%llx, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, display, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDisplayModeKHR(%p, %p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, display, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5405,7 +5420,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayModeKHR(VkPhysicalDevice phy
     __vk_CreateDisplayModeKHR(physicalDevice, display, pCreateInfo, pAllocator, pMode);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (displayMode=0x%llx) %s\n", __VK_PTRVALUE(pMode), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (displayMode=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pMode));
 
     return result;
 }
@@ -5416,7 +5431,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneCapabilitiesKHR(VkPhysical
     __vkDisplayModeKHR *dpm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayModeKHR *, mode);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetDisplayPlaneCapabilitiesKHR(%p, 0x%llx, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, mode, planeIndex, pCapabilities);
+    __VK_LOG_API("(tid=%p): vkGetDisplayPlaneCapabilitiesKHR(%p, %p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, mode, planeIndex, pCapabilities);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5448,7 +5463,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayPlaneSurfaceKHR(VkInstance i
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDisplayPlaneSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDisplayPlaneSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5470,7 +5485,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayPlaneSurfaceKHR(VkInstance i
      result = __vk_CreateDisplayPlaneSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (surface=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSurface));
 
     return result;
 }
@@ -5480,7 +5495,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSharedSwapchainsKHR(VkDevice device
 //  __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateSharedSwapchainsKHR(%p, %d, %p, %p)", gcoOS_GetCurrentThreadID(), device, swapchainCount, pCreateInfos, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateSharedSwapchainsKHR(%p, %u, %p, %p)", gcoOS_GetCurrentThreadID(), device, swapchainCount, pCreateInfos, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!pCreateInfos || pCreateInfos->sType != VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR)
@@ -5492,7 +5507,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSharedSwapchainsKHR(VkDevice device
      result = __vk_CreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", __VK_PTRVALUE(pSwapchains), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (swapChain=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSwapchains));
 
     return result;
 }
@@ -5502,7 +5517,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFeatures2KHR(VkPhysicalDevic
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFeatures2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFeatures);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceFeatures2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFeatures);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE || pFeatures->sType != VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR)
@@ -5526,7 +5541,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceProperties2KHR(VkPhysicalDev
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pProperties);
 
     if (!pProperties)
     {
@@ -5544,7 +5559,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties2KHR(VkPhysi
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceFormatProperties2KHR(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, pFormatProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceFormatProperties2KHR(%p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, format, pFormatProperties);
 
     if (!pFormatProperties)
     {
@@ -5562,7 +5577,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties2KH
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceImageFormatProperties2KHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pImageFormatInfo, pImageFormatProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceImageFormatProperties2KHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pImageFormatInfo, pImageFormatProperties);
 
     if (!pImageFormatProperties)
     {
@@ -5582,7 +5597,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceQueueFamilyProperties2KHR(Vk
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceQueueFamilyProperties2KHR(%p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, *pQueueFamilyPropertyCount, pQueueFamilyProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceQueueFamilyProperties2KHR(%p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, *pQueueFamilyPropertyCount, pQueueFamilyProperties);
 
     if (!pQueueFamilyProperties)
     {
@@ -5600,7 +5615,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceMemoryProperties2KHR(VkPhysi
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceMemoryProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pMemoryProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceMemoryProperties2KHR(%p, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pMemoryProperties);
 
     if (!pMemoryProperties)
     {
@@ -5618,7 +5633,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties2
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceSparseImageFormatProperties2KHR(%p, %p, %d, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFormatInfo, *pPropertyCount, pProperties);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceSparseImageFormatProperties2KHR(%p, %p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, pFormatInfo, *pPropertyCount, pProperties);
 
     if (!pPropertyCount)
     {
@@ -5629,14 +5644,14 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties2
     __vk_GetPhysicalDeviceSparseImageFormatProperties2KHR(physicalDevice, pFormatInfo, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR void VKAPI_CALL __valid_TrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlagsKHR flags)
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkTrimCommandPoolKHR(%p, %p, %d)", gcoOS_GetCurrentThreadID(), device, commandPool, flags);
+    __VK_LOG_API("(tid=%p): vkTrimCommandPoolKHR(%p, 0x%llx, %u)", gcoOS_GetCurrentThreadID(), device, commandPool, flags);
     if (!commandPool)
     {
         result = __VK_ERROR_INVALID_POINTER;
@@ -5646,7 +5661,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_TrimCommandPoolKHR(VkDevice device, VkCommand
     __vk_TrimCommandPoolKHR(device, commandPool, flags);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
@@ -5654,7 +5669,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDebugReportCallbackEXT(VkInstance i
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateDebugReportCallbackEXT(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateDebugReportCallbackEXT(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5676,7 +5691,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDebugReportCallbackEXT(VkInstance i
      result = __vk_CreateDebugReportCallbackEXT(instance, pCreateInfo, pAllocator, pCallback);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __VK_PTRVALUE(pCallback), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (Callback=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pCallback));
 
     return result;
 }
@@ -5687,7 +5702,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDebugReportCallbackEXT(VkInstance inst
     __vkDebugCallbackEXT *dcb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDebugCallbackEXT *, callback);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDestroyDebugReportCallbackEXT(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, callback, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyDebugReportCallbackEXT(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, callback, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5712,7 +5727,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DebugReportMessageEXT(VkInstance instance, Vk
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkDebugReportMessageEXT(%p, %d, %d, %d, %d, %d,\n%s, %s)", gcoOS_GetCurrentThreadID(), instance, flags, objectType, object, location, messageCode, pLayerPrefix, pMessage);
+    __VK_LOG_API("(tid=%p): vkDebugReportMessageEXT(%p, %u, %u, 0x%llx, %u, %d,\n%s, %s)", gcoOS_GetCurrentThreadID(), instance, flags, objectType, object, location, messageCode, pLayerPrefix, pMessage);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5755,7 +5770,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWaylandSurfaceKHR(VkInstance instan
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateWaylandSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateWaylandSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5772,7 +5787,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWaylandSurfaceKHR(VkInstance instan
      result = __vk_CreateWaylandSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (surface=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSurface));
 
     return result;
 }
@@ -5799,7 +5814,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateAndroidSurfaceKHR(VkInstance instan
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateAndroidSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateAndroidSurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5816,7 +5831,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateAndroidSurfaceKHR(VkInstance instan
      result = __vk_CreateAndroidSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (surface=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSurface));
 
     return result;
 }
@@ -5826,7 +5841,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainGrallocUsageANDROID(VkDevice 
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkGetSwapchainGrallocUsageANDROID(%p, %x, %x)", gcoOS_GetCurrentThreadID(), device, format, imageUsage);
+    __VK_LOG_API("(tid=%p): vkGetSwapchainGrallocUsageANDROID(%p, %u, %u)", gcoOS_GetCurrentThreadID(), device, format, imageUsage);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5838,7 +5853,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainGrallocUsageANDROID(VkDevice 
     result = __vk_GetSwapchainGrallocUsageANDROID(device, format, imageUsage, grallocUsage);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (grallocUsage=0x%08X) %s\n", __VK_PTRVALUE(grallocUsage), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (grallocUsage=%d)\n", __vkiGetResultString(result), __VK_PTRVALUE(grallocUsage));
     devCtx->currentResult = result;
 
     return result;
@@ -5852,7 +5867,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AcquireImageANDROID(VkDevice device, VkIm
     __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkAcquireImageANDROID(%p, 0x%llx, %d, 0x%llx, 0x%llx)", gcoOS_GetCurrentThreadID(), device, image, nativeFenceFd, semaphore, fence);
+    __VK_LOG_API("(tid=%p): vkAcquireImageANDROID(%p, 0x%llx, %d, %u, 0x%llx)", gcoOS_GetCurrentThreadID(), device, image, nativeFenceFd, semaphore, fence);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
@@ -5890,7 +5905,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueSignalReleaseImageANDROID(VkQueue qu
     __vkDevQueue *pqe = (__vkDevQueue *)queue;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkQueueSignalReleaseImageANDROID(%p, %u, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, waitSemaphoreCount, pWaitSemaphores, image);
+    __VK_LOG_API("(tid=%p): vkQueueSignalReleaseImageANDROID(%p, %u, %p, 0x%llx)", gcoOS_GetCurrentThreadID(), queue, waitSemaphoreCount, pWaitSemaphores, image);
 
     if (!pqe || pqe->sType != __VK_OBJECT_TYPE_CMD_QUEUE)
     {
@@ -5901,7 +5916,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueSignalReleaseImageANDROID(VkQueue qu
     result = __vk_QueueSignalReleaseImageANDROID(queue, waitSemaphoreCount, pWaitSemaphores, image, pNativeFenceFd);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (nativeFenceFd=%d) %s\n", __VK_PTRVALUE(pNativeFenceFd), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (nativeFenceFd=%d)\n", __vkiGetResultString(result), __VK_PTRVALUE(pNativeFenceFd));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -5914,7 +5929,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWin32SurfaceKHR(VkInstance instance
     __vkInstance *inst = (__vkInstance *)instance;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vkCreateWin32SurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
+    __VK_LOG_API("(tid=%p): vkCreateWin32SurfaceKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), instance, pCreateInfo, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!inst || inst->sType != __VK_OBJECT_TYPE_INSTANCE)
@@ -5931,7 +5946,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWin32SurfaceKHR(VkInstance instance
      result = __vk_CreateWin32SurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
+    __VK_LOG_API(" ==> %s (surface=0x%llx)\n", __vkiGetResultString(result), __VK_PTRVALUE(pSurface));
 
     return result;
 }
@@ -5941,7 +5956,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceWin32PresentationSupport
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkBool32 result = VK_TRUE;
 
-    __VK_LOG_API("(tid=%d): vkGetPhysicalDeviceWin32PresentationSupportKHR(%p, %d)", gcoOS_GetCurrentThreadID(), physicalDevice, queueFamilyIndex);
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceWin32PresentationSupportKHR(%p, %u)", gcoOS_GetCurrentThreadID(), physicalDevice, queueFamilyIndex);
 
     /* API validation logic that can be skipped at runtime */
     if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
@@ -5958,7 +5973,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceWin32PresentationSupport
     result = __vk_GetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, queueFamilyIndex);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d\n", result);
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5969,7 +5984,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __valid_icdGetInstanceProcAddr(VkInstan
     PFN_vkVoidFunction pFunc = gcvNULL;
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vk_icdGetInstanceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), instance, pName);
+    __VK_LOG_API("(tid=%p): vk_icdGetInstanceProcAddr(%p, %s)", gcoOS_GetCurrentThreadID(), instance, pName);
 
     /* Do not check instance, NULL instance is valid. */
     if (!pName)
@@ -5997,7 +6012,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_icdNegotiateLoaderICDInterfaceVersion(uin
 {
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%d): vk_icdNegotiateLoaderICDInterfaceVersion(%p)", gcoOS_GetCurrentThreadID(), pVersion);
+    __VK_LOG_API("(tid=%p): vk_icdNegotiateLoaderICDInterfaceVersion(%p)", gcoOS_GetCurrentThreadID(), pVersion);
 
     if (!pVersion)
     {
@@ -6010,11 +6025,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_icdNegotiateLoaderICDInterfaceVersion(uin
 vk_Exit:
     if (__VK_IS_SUCCESS(result))
     {
-        __VK_LOG_API(" ==> %d (*pVersion=%d)", result, *pVersion);
+        __VK_LOG_API(" ==> %s (*pVersion=%d)\n", __vkiGetResultString(result), __VK_PTRVALUE(pVersion));
     }
     else
     {
-        __VK_LOG_API(" ==> %s", __vkiGetResultString(result));
+        __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
         result = VK_ERROR_INCOMPATIBLE_DRIVER;
     }
 

@@ -427,120 +427,115 @@ veglInitDeviceThreadData(
 
 EGLint LOG_eglGetError_pre(void)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetError_pre\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglGetError_pre\n", gcoOS_GetCurrentThreadID());
     return 0;
 }
 
 EGLint LOG_eglGetError_post(EGLint err)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetError_post() = 0x%04x\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), err);
+    EGL_LOG_API("EGL(tid=%p): eglGetError_post() = 0x%04X\n", gcoOS_GetCurrentThreadID(), err);
     return 0;
 }
 
 EGLDisplay LOG_eglGetDisplay_pre(EGLNativeDisplayType display_id)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetDisplay_pre 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)display_id);
-
+    EGL_LOG_API("EGL(tid=%p): eglGetDisplay_pre %p\n",
+                gcoOS_GetCurrentThreadID(), display_id);
     return gcvNULL;
 }
 
 EGLDisplay LOG_eglGetDisplay_post(EGLNativeDisplayType display_id, EGLDisplay ret_disp)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetDisplay_post 0x%08X => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)display_id, (EGLint)(gctUINTPTR_T)ret_disp);
+    EGL_LOG_API("EGL(tid=%p): eglGetDisplay_post %p => %p\n",
+                gcoOS_GetCurrentThreadID(), display_id, ret_disp);
 
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglInitialize 0x%08X (0x%08X) (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)major, (EGLint)(gctUINTPTR_T)minor);
+    EGL_LOG_API("EGL(tid=%p): eglInitialize %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, major, minor);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglTerminate(EGLDisplay dpy)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglTerminate 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy);
+    EGL_LOG_API("EGL(tid=%p): eglTerminate %p\n",
+                gcoOS_GetCurrentThreadID(), dpy);
+
     return EGL_TRUE;
 }
 
 const char * LOG_eglQueryString_pre(EGLDisplay dpy, EGLint name)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryString_pre 0x%08X 0x%08X\n",
-                 (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, name);
+    EGL_LOG_API("EGL(tid=%p): eglQueryString_pre %p 0x%04X\n",
+                 gcoOS_GetCurrentThreadID(), dpy, name);
+
     return gcvNULL;
 }
 
 const char * LOG_eglQueryString_post(EGLDisplay dpy, EGLint name, const char* str)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryString_post 0x%08X 0x%08X = \n%s\n",
-                 (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, name, str);
+    EGL_LOG_API("EGL(tid=%p): eglQueryString_post %p 0x%04X = %s\n",
+                 gcoOS_GetCurrentThreadID(), dpy, name, str);
+
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglGetConfigs_pre(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetConfigs_pre 0x%08X (0x%08X) 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)configs,
-                config_size, (EGLint)(gctUINTPTR_T)num_config);
+    EGL_LOG_API("EGL(tid=%p): eglGetConfigs_pre %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, configs, config_size, num_config);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglGetConfigs_post(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetConfigs_post 0x%08X (0x%08X) 0x%08X %d\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)configs,
-                config_size, *num_config);
+    EGL_LOG_API("EGL(tid=%p): eglGetConfigs_post %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, configs, config_size, *num_config);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglChooseConfig_pre(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglChooseConfig_pre 0x%08X (0x%08X) (0x%08X) 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)configs, config_size, (EGLint)(gctUINTPTR_T)num_config);
+    EGL_LOG_API("EGL(tid=%p): eglChooseConfig_pre %p %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, attrib_list, configs, config_size, num_config);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglChooseConfig_post(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglChooseConfig_post 0x%08X (0x%08X) (0x%08X) 0x%08X %d\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)configs, config_size, *num_config);
+    EGL_LOG_API("EGL(tid=%p): eglChooseConfig_post %p %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, attrib_list, configs, config_size, *num_config);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglGetConfigAttrib_pre(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetConfigAttrib_pre 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglGetConfigAttrib_pre %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, attribute, *value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglGetConfigAttrib_post(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetConfigAttrib_post 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglGetConfigAttrib_post %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, attribute, *value);
 
     return EGL_TRUE;
 }
 
-
 EGLSurface LOG_eglCreateWindowSurface_pre(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateWindowSurface_pre 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)win, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateWindowSurface_pre %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, win, attrib_list);
 
     return gcvNULL;
 }
@@ -550,19 +545,16 @@ EGLSurface LOG_eglCreateWindowSurface_post(EGLDisplay dpy, EGLConfig config, EGL
     EGLint width  = ret_surface ? ((VEGLSurface)ret_surface)->config.width  : 0;
     EGLint height = ret_surface ? ((VEGLSurface)ret_surface)->config.height : 0;
 
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateWindowSurface_post 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X (%d x %d)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)win, (EGLint)(gctUINTPTR_T)attrib_list, (EGLint)(gctUINTPTR_T)ret_surface,
-                width, height);
+    EGL_LOG_API("EGL(tid=%p): eglCreateWindowSurface_post %p %p %p %p => %p (%d x %d)\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, win, attrib_list, ret_surface, width, height);
 
     return gcvNULL;
 }
 
 EGLSurface LOG_eglCreatePbufferSurface_pre(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePbufferSurface_pre 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePbufferSurface_pre %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, attrib_list);
 
     return NULL;
 }
@@ -572,19 +564,16 @@ EGLSurface LOG_eglCreatePbufferSurface_post(EGLDisplay dpy, EGLConfig config, co
     EGLint width  = ret_surface ? ((VEGLSurface)ret_surface)->config.width  : 0;
     EGLint height = ret_surface ? ((VEGLSurface)ret_surface)->config.height : 0;
 
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePbufferSurface_post 0x%08X 0x%08X (0x%08X) => 0x%08X (%d x %d)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)attrib_list, (EGLint)(gctUINTPTR_T)ret_surface,
-                width, height);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePbufferSurface_post %p %p %p => %p (%d x %d)\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, attrib_list, ret_surface, width, height);
 
     return NULL;
 }
 
 EGLSurface LOG_eglCreatePixmapSurface_pre(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePixmapSurface_pre 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-               (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config, (EGLint)(gctUINTPTR_T)pixmap,
-               (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePixmapSurface_pre %p %p %p %p\n",
+               gcoOS_GetCurrentThreadID(), dpy, config, pixmap, attrib_list);
 
     return gcvNULL;
 }
@@ -594,75 +583,74 @@ EGLSurface LOG_eglCreatePixmapSurface_post(EGLDisplay dpy, EGLConfig config, EGL
     EGLint width  = ret_surface ? ((VEGLSurface)ret_surface)->config.width  : 0;
     EGLint height = ret_surface ? ((VEGLSurface)ret_surface)->config.height : 0;
 
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePixmapSurface_post 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X (%d x %d)\n",
-               (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config, (EGLint)(gctUINTPTR_T)pixmap,
-               (EGLint)(gctUINTPTR_T)attrib_list, (EGLint)(gctUINTPTR_T)ret_surface,
-               width, height);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePixmapSurface_post %p %p %p %p => %p (%d x %d)\n",
+               gcoOS_GetCurrentThreadID(), dpy, config, pixmap, attrib_list, ret_surface, width, height);
 
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglDestroySurface(EGLDisplay dpy, EGLSurface surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroySurface 0x%08X 0x%08X\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface);
+    EGL_LOG_API("EGL(tid=%p): eglDestroySurface %p %p\n", gcoOS_GetCurrentThreadID(), dpy, surface);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglQuerySurface_pre(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQuerySurface_pre 0x%08X 0x%08X 0x%08X 0x%08X\n",
-               (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-               (EGLint)(gctUINTPTR_T)surface, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglQuerySurface_pre %p %p %d %p\n",
+               gcoOS_GetCurrentThreadID(), dpy, surface, attribute, value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglQuerySurface_post(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQuerySurface_post 0x%08X 0x%08X 0x%08X 0x%08X\n",
-               (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-               (EGLint)(gctUINTPTR_T)surface, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglQuerySurface_post %p %p %d %d\n",
+               gcoOS_GetCurrentThreadID(), dpy, surface, attribute, *value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglBindAPI(EGLenum api)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglBindAPI 0x%08X\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), api);
+    EGL_LOG_API("EGL(tid=%p): eglBindAPI 0x%04X\n", gcoOS_GetCurrentThreadID(), api);
+
     return EGL_TRUE;
 }
 
 EGLenum LOG_eglQueryAPI_pre(void)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryAPI_pre\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglQueryAPI_pre\n", gcoOS_GetCurrentThreadID());
+
     return EGL_TRUE;
 }
 
 EGLenum LOG_eglQueryAPI_post(EGLenum api)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryAPI_post = 0x%04x\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), api);
+    EGL_LOG_API("EGL(tid=%p): eglQueryAPI_post = 0x%04X\n", gcoOS_GetCurrentThreadID(), api);
+
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglWaitClient(void)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglWaitClient\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglWaitClient\n", gcoOS_GetCurrentThreadID());
+
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglReleaseThread(void)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglReleaseThread\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglReleaseThread\n", gcoOS_GetCurrentThreadID());
+
     return EGL_TRUE;
 }
 
 EGLSurface LOG_eglCreatePbufferFromClientBuffer_pre(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePbufferFromClientBuffer_pre 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, buftype,
-                (EGLint)(gctUINTPTR_T)buffer, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePbufferFromClientBuffer_pre %p 0x%04X %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, buftype, buffer, config, attrib_list);
 
     return gcvNULL;
 }
@@ -672,165 +660,152 @@ EGLSurface LOG_eglCreatePbufferFromClientBuffer_post(EGLDisplay dpy, EGLenum buf
     EGLint width  = ret_surface ? ((VEGLSurface)ret_surface)->config.width  : 0;
     EGLint height = ret_surface ? ((VEGLSurface)ret_surface)->config.height : 0;
 
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePbufferFromClientBuffer_post 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X (%d x %d)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, buftype,
-                (EGLint)(gctUINTPTR_T)buffer, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)attrib_list, (EGLint)(gctUINTPTR_T)ret_surface,
-                width, height);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePbufferFromClientBuffer_post %p 0x%04X %p %p %p => %p (%d x %d)\n",
+                gcoOS_GetCurrentThreadID(), dpy, buftype, buffer, config, attrib_list, ret_surface, width, height);
 
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglSurfaceAttrib(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglSurfaceAttrib 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface, attribute, value);
+    EGL_LOG_API("EGL(tid=%p): eglSurfaceAttrib %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, attribute, value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglBindTexImage(EGLDisplay dpy, EGLSurface surface, EGLint buffer)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglBindTexImage 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface, buffer);
+    EGL_LOG_API("EGL(tid=%p): eglBindTexImage %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, buffer);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglReleaseTexImage(EGLDisplay dpy, EGLSurface surface, EGLint buffer)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglReleaseTexImage 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface, buffer);
+    EGL_LOG_API("EGL(tid=%p): eglReleaseTexImage %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, buffer);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglSwapInterval(EGLDisplay dpy, EGLint interval)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglSwapInterval 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, interval);
+    EGL_LOG_API("EGL(tid=%p): eglSwapInterval %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, interval);
 
     return EGL_TRUE;
 }
 
 EGLContext LOG_eglCreateContext_pre(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateContext_pre 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)share_context,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateContext_pre %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, share_context, attrib_list);
 
     return gcvNULL;
 }
 
 EGLContext LOG_eglCreateContext_post(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list, EGLContext ret_context)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateContext_post 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)share_context,
-                (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_context);
+    EGL_LOG_API("EGL(tid=%p): eglCreateContext_post %p %p %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, share_context, attrib_list, ret_context);
 
     return gcvNULL;
 }
 
-
 EGLBoolean LOG_eglDestroyContext(EGLDisplay dpy, EGLContext ctx)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroyContext 0x%08X 0x%08X\n",
-               (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)ctx);
+    EGL_LOG_API("EGL(tid=%p): eglDestroyContext %p %p\n",
+               gcoOS_GetCurrentThreadID(), dpy, ctx);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglMakeCurrent 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)draw,
-                (EGLint)(gctUINTPTR_T)read, (EGLint)(gctUINTPTR_T)ctx);
+    EGL_LOG_API("EGL(tid=%p): eglMakeCurrent %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, draw, read, ctx);
 
     return EGL_TRUE;
 }
 
 EGLContext LOG_eglGetCurrentContext_pre()
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentContext_pre\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentContext_pre\n",
+                gcoOS_GetCurrentThreadID());
 
     return gcvNULL;
 }
 
 EGLContext LOG_eglGetCurrentContext_post(EGLContext ret_ctx)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentContext_post => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)ret_ctx);
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentContext_post => %p\n",
+                gcoOS_GetCurrentThreadID(), ret_ctx);
 
     return gcvNULL;
 }
 
 EGLSurface LOG_eglGetCurrentSurface_pre(EGLint readdraw)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentSurface_pre 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), readdraw);
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentSurface_pre %d\n",
+                gcoOS_GetCurrentThreadID(), readdraw);
 
     return gcvNULL;
 }
 
 EGLSurface LOG_eglGetCurrentSurface_post(EGLint readdraw, EGLSurface ret_surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentSurface_post 0x%08X => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), readdraw, (EGLint)(gctUINTPTR_T)ret_surface);
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentSurface_post %d => %p\n",
+                gcoOS_GetCurrentThreadID(), readdraw, ret_surface);
 
     return gcvNULL;
 }
 
 EGLDisplay LOG_eglGetCurrentDisplay_pre()
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentDisplay_pre\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentDisplay_pre\n",
+                gcoOS_GetCurrentThreadID());
 
     return gcvNULL;
 }
 
-
 EGLDisplay LOG_eglGetCurrentDisplay_post(EGLDisplay ret_dpy)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetCurrentDisplay_post => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)ret_dpy) ;
+    EGL_LOG_API("EGL(tid=%p): eglGetCurrentDisplay_post => %p\n",
+                gcoOS_GetCurrentThreadID(), ret_dpy) ;
 
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglQueryContext_pre(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryContext_pre 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglQueryContext_pre %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, attribute, value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglQueryContext_post(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglQueryContext_post 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, attribute, *value);
+    EGL_LOG_API("EGL(tid=%p): eglQueryContext_post %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, attribute, *value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglWaitGL(void)
 {
-    EGL_LOG_API("EGL(0x%x: eglWaitGL\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(0x%x: eglWaitGL\n",
+                gcoOS_GetCurrentThreadID());
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglWaitNative(EGLint engine)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglWaitNative 0x%08X\n", engine, (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID());
+    EGL_LOG_API("EGL(tid=%p): eglWaitNative %d\n",
+                gcoOS_GetCurrentThreadID(), engine);
 
     return EGL_TRUE;
 }
@@ -839,189 +814,157 @@ static EGLint frameNum = 0;
 
 EGLBoolean LOG_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglSwapBuffers 0x%08X 0x%08X, Frame Number = %d\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface, frameNum++);
+    EGL_LOG_API("EGL(tid=%p): eglSwapBuffers %p %p, Frame Number = %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, frameNum++);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglCopyBuffers(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCopyBuffers 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)surface,
-                (EGLint)(gctUINTPTR_T)target);
+    EGL_LOG_API("EGL(tid=%p): eglCopyBuffers %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, target);
 
     return EGL_TRUE;
 }
 
 void LOG_eglGetProcAddress_pre(const char *procname)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetProcAddress_pre %s\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), procname);
+    EGL_LOG_API("EGL(tid=%p): eglGetProcAddress_pre %s\n",
+                gcoOS_GetCurrentThreadID(), procname);
 }
 
 void LOG_eglGetProcAddress_post(const char *procname, __eglMustCastToProperFunctionPointerType func)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetProcAddress_post %s\n => (0x%08X)",
-                 (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), procname, (EGLint)(gctUINTPTR_T)func);
+    EGL_LOG_API("EGL(tid=%p): eglGetProcAddress_post %s\n => %p",
+                gcoOS_GetCurrentThreadID(), procname, func);
 }
 
 /* EGL 1.5. */
 EGLSync LOG_eglCreateSync_pre(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateSync_pre 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                type, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateSync_pre %p 0x%04X %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, type, attrib_list);
 
     return gcvNULL;
 }
 
 EGLSync LOG_eglCreateSync_post(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list, EGLSync ret_sync)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateSync_post 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                type, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_sync);
+    EGL_LOG_API("EGL(tid=%p): eglCreateSync_post %p 0x%04X %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, type, attrib_list, ret_sync);
 
     return gcvNULL;
-
 }
 
 EGLBoolean LOG_eglDestroySync(EGLDisplay dpy, EGLSync sync)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroySync 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync);
+    EGL_LOG_API("EGL(tid=%p): eglDestroySync %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync);
 
     return EGL_TRUE;
-
 }
 
 EGLint LOG_eglClientWaitSync(EGLDisplay dpy, EGLSync sync, EGLint flags, EGLTime timeout)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglClientWaitSync 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, flags, (EGLint)(gctUINTPTR_T)timeout);
+    EGL_LOG_API("EGL(tid=%p): eglClientWaitSync %p %p %d %ll\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, flags, timeout);
 
     return EGL_TRUE;
-
 }
 
 EGLBoolean LOG_eglGetSyncAttrib_pre(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetSyncAttrib_pre 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, attribute, (EGLint)(gctUINTPTR_T)value);
+    EGL_LOG_API("EGL(tid=%p): eglGetSyncAttrib_pre %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, attribute, value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglGetSyncAttrib_post(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value, EGLAttrib ret_value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetSyncAttrib_post 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, attribute, (EGLint)(gctUINTPTR_T)value, ret_value);
+    EGL_LOG_API("EGL(tid=%p): eglGetSyncAttrib_post %p %p %d %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, attribute, value, ret_value);
 
     return EGL_TRUE;
 }
 
 EGLImage LOG_eglCreateImage_pre(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateImage_pre 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, target,
-                (EGLint)(gctUINTPTR_T)buffer,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateImage_pre %p %p 0x%04X %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, target, buffer, attrib_list);
 
     return gcvNULL;
 }
 
 EGLImage LOG_eglCreateImage_post(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list, EGLImage ret_image)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateImage_post 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, target,
-                (EGLint)(gctUINTPTR_T)buffer,
-                (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_image);
+    EGL_LOG_API("EGL(tid=%p): eglCreateImage_post %p %p 0x%04X %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, target, buffer, attrib_list, ret_image);
 
     return gcvNULL;
 }
 
 EGLBoolean LOG_eglDestroyImage(EGLDisplay dpy, EGLImage image)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroyImage 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)image);
+    EGL_LOG_API("EGL(tid=%p): eglDestroyImage %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, image);
 
     return EGL_TRUE;
 }
 
 EGLDisplay LOG_eglGetPlatformDisplay_pre(EGLenum platform, void *native_display, const EGLAttrib *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplay 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglGetPlatformDisplay 0x%04X %p %p\n",
+                gcoOS_GetCurrentThreadID(), platform, native_display, attrib_list);
 
     return EGL_NO_DISPLAY;
 }
 
 EGLDisplay LOG_eglGetPlatformDisplay_post(EGLenum platform, void *native_display, const EGLAttrib *attrib_list, EGLDisplay ret_dpy)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplay 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_dpy);
+    EGL_LOG_API("EGL(tid=%p): eglGetPlatformDisplay 0x%04X %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), platform, native_display, attrib_list, ret_dpy);
 
     return EGL_NO_DISPLAY;
 }
 
 EGLSurface LOG_eglCreatePlatformWindowSurface_pre(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurface 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformWindowSurface %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_window, attrib_list);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformWindowSurface_post(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list, EGLSurface ret_surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurface 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_surface);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformWindowSurface %p %p %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_window, attrib_list, ret_surface);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformPixmapSurface_pre(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurface 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformPixmapSurface %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_pixmap, attrib_list);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformPixmapSurface_post(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list, EGLSurface ret_surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurface 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_surface);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformPixmapSurface %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_pixmap, attrib_list, ret_surface);
 
     return EGL_NO_SURFACE;
 }
 
 EGLBoolean LOG_eglWaitSync(EGLDisplay dpy, EGLSync sync, EGLint flags)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglWaitSync 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)sync, flags);
+    EGL_LOG_API("EGL(tid=%p): eglWaitSync %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, flags);
 
     return EGL_TRUE;
 }
@@ -1029,19 +972,16 @@ EGLBoolean LOG_eglWaitSync(EGLDisplay dpy, EGLSync sync, EGLint flags)
 /* EGL_KHR_lock_surface. */
 EGLBoolean LOG_eglLockSurfaceKHR(EGLDisplay dpy, EGLSurface surface, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglLockSurfaceKHR 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglLockSurfaceKHR %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, attrib_list);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglUnlockSurfaceKHR(EGLDisplay dpy, EGLSurface surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglUnlockSurfaceKHR 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)surface);
+    EGL_LOG_API("EGL(tid=%p): eglUnlockSurfaceKHR %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface);
 
     return EGL_TRUE;
 }
@@ -1049,32 +989,24 @@ EGLBoolean LOG_eglUnlockSurfaceKHR(EGLDisplay dpy, EGLSurface surface)
 /* EGL_KHR_image. */
 EGLImageKHR LOG_eglCreateImageKHR_pre(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateImageKHR_pre 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, target,
-                (EGLint)(gctUINTPTR_T)buffer,
-                (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateImageKHR_pre %p %p 0x%04X %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, target, buffer, attrib_list);
 
     return gcvNULL;
 }
 
 EGLImageKHR LOG_eglCreateImageKHR_post(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list, EGLImageKHR ret_image)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateImageKHR_post 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)ctx, target,
-                (EGLint)(gctUINTPTR_T)buffer,
-                (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_image);
+    EGL_LOG_API("EGL(tid=%p): eglCreateImageKHR_post %p %p 0x%04X %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, ctx, target, buffer, attrib_list, ret_image);
 
     return gcvNULL;
 }
 
-
 EGLBoolean LOG_eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroyImageKHR 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)image);
+    EGL_LOG_API("EGL(tid=%p): eglDestroyImageKHR %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, image);
 
     return EGL_TRUE;
 }
@@ -1082,29 +1014,24 @@ EGLBoolean LOG_eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image)
 /* EGL_KHR_fence_sync. */
 EGLSyncKHR LOG_eglCreateSyncKHR_pre(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateSyncKHR_pre 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                type, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreateSyncKHR_pre %p 0x%04X %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, type, attrib_list);
 
     return gcvNULL;
 }
 
 EGLSyncKHR LOG_eglCreateSyncKHR_post(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list, EGLSyncKHR ret_sync)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreateSyncKHR_post 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                type, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_sync);
+    EGL_LOG_API("EGL(tid=%p): eglCreateSyncKHR_post %p 0x%04X %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, type, attrib_list, ret_sync);
 
     return gcvNULL;
-
 }
 
 EGLBoolean LOG_eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglDestroySyncKHR 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync);
+    EGL_LOG_API("EGL(tid=%p): eglDestroySyncKHR %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync);
 
     return EGL_TRUE;
 
@@ -1112,28 +1039,24 @@ EGLBoolean LOG_eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync)
 
 EGLint LOG_eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglClientWaitSyncKHR 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, flags, (EGLint)(gctUINTPTR_T)timeout);
+    EGL_LOG_API("EGL(tid=%p): eglClientWaitSyncKHR %p %p %d %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, flags, timeout);
 
     return EGL_TRUE;
-
 }
 
 EGLBoolean LOG_eglGetSyncAttribKHR_pre(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetSyncAttribKHR_pre 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, attribute, (EGLint)(gctUINTPTR_T)value);
+    EGL_LOG_API("EGL(tid=%p): eglGetSyncAttribKHR_pre %p %p %d %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, attribute, value);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglGetSyncAttribKHR_post(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetSyncAttribKHR_post 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, attribute, (EGLint)(gctUINTPTR_T)value, ret_value);
+    EGL_LOG_API("EGL(tid=%p): eglGetSyncAttribKHR_post %p %p %p %p => %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, attribute, value, ret_value);
 
     return EGL_TRUE;
 }
@@ -1141,9 +1064,8 @@ EGLBoolean LOG_eglGetSyncAttribKHR_post(EGLDisplay dpy, EGLSyncKHR sync, EGLint 
 /* EGL_KHR_wait_sync. */
 EGLint LOG_eglWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglWaitSyncKHR 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)sync, flags);
+    EGL_LOG_API("EGL(tid=%p): eglWaitSyncKHR %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, flags);
 
     return EGL_TRUE;
 }
@@ -1151,9 +1073,8 @@ EGLint LOG_eglWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags)
 /* EGL_KHR_reusable_sync. */
 EGLBoolean LOG_eglSignalSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglSignalSyncKHR 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), (EGLint)(gctUINTPTR_T)dpy,
-                (EGLint)(gctUINTPTR_T)sync, mode);
+    EGL_LOG_API("EGL(tid=%p): eglSignalSyncKHR %p %p 0x%04X\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, mode);
 
     return EGL_TRUE;
 
@@ -1162,72 +1083,57 @@ EGLBoolean LOG_eglSignalSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode)
 /* EGL_EXT_platform_base. */
 EGLDisplay LOG_eglGetPlatformDisplayEXT_pre(EGLenum platform, void *native_display, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplayEXT 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglGetPlatformDisplayEXT %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), platform, native_display, attrib_list);
 
     return EGL_NO_DISPLAY;
 }
 
 EGLDisplay LOG_eglGetPlatformDisplayEXT_post(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplayEXT 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_dpy);
+    EGL_LOG_API("EGL(tid=%p): eglGetPlatformDisplayEXT %p %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), platform, native_display, attrib_list, ret_dpy);
 
     return EGL_NO_DISPLAY;
 }
 
 EGLSurface LOG_eglCreatePlatformWindowSurfaceEXT_pre(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X)\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformWindowSurfaceEXT %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_window, attrib_list);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformWindowSurfaceEXT_post(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list, EGLSurface ret_surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_surface);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformWindowSurfaceEXT %p %p %p %p => %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_window, attrib_list, ret_surface);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformPixmapSurfaceEXT_pre(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurfaceEXT 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformPixmapSurfaceEXT %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_pixmap, attrib_list);
 
     return EGL_NO_SURFACE;
 }
 
 EGLSurface LOG_eglCreatePlatformPixmapSurfaceEXT_post(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list, EGLSurface ret_surface)
 {
-    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurfaceEXT 0x%08X 0x%08X 0x%08X 0x%08X\n",
-                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
-                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
-                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list,
-                (EGLint)(gctUINTPTR_T)ret_surface);
+    EGL_LOG_API("EGL(tid=%p): eglCreatePlatformPixmapSurfaceEXT %p %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, config, native_pixmap, attrib_list, ret_surface);
 
     return EGL_NO_SURFACE;
 }
 
 /* EGL_KHR_partial_update. */
-EGLBoolean LOG_eglSetDamageRegionKHR (EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
+EGLBoolean LOG_eglSetDamageRegionKHR(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
 {
-    EGL_LOG_API("EGL(tid=0x%lx): eglSetDamageRegionKHR 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
-                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
-                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
-                (long)(uintptr_t)rects, n_rects);
+    EGL_LOG_API("EGL(tid=%p): eglSetDamageRegionKHR %p %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, rects, n_rects);
 
     return EGL_TRUE;
 }
@@ -1235,10 +1141,8 @@ EGLBoolean LOG_eglSetDamageRegionKHR (EGLDisplay dpy, EGLSurface surface, EGLint
 /* EGL_KHR_swap_buffers_with_damage. */
 EGLBoolean LOG_eglSwapBuffersWithDamageKHR(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
 {
-    EGL_LOG_API("EGL(tid=0x%lx): eglSwapBuffersWithDamageKHR 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
-                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
-                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
-                (long)(uintptr_t)rects, n_rects);
+    EGL_LOG_API("EGL(tid=%p): eglSwapBuffersWithDamageKHR %p %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, rects, n_rects);
 
     return EGL_TRUE;
 }
@@ -1246,10 +1150,8 @@ EGLBoolean LOG_eglSwapBuffersWithDamageKHR(EGLDisplay dpy, EGLSurface surface, E
 /* EGL_EXT_swap_buffers_with_damage. */
 EGLBoolean LOG_eglSwapBuffersWithDamageEXT(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
 {
-    EGL_LOG_API("EGL(tid=0x%lx): eglSwapBuffersWithDamageEXT 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
-                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
-                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
-                (long)(uintptr_t)rects, n_rects);
+    EGL_LOG_API("EGL(tid=%p): eglSwapBuffersWithDamageEXT %p %p %p %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, surface, rects, n_rects);
 
     return EGL_TRUE;
 }
@@ -1257,21 +1159,16 @@ EGLBoolean LOG_eglSwapBuffersWithDamageEXT(EGLDisplay dpy, EGLSurface surface, E
 /* EGL_EXT_image_dma_buf_import_modifiers */
 EGLBoolean LOG_eglQueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats)
 {
-     EGL_LOG_API("EGL(tid=0x%lx): LOG_eglQueryDmaBufFormatsEXT 0x%08lX 0x%08lX 0x%08x 0x%08lX 0x%08lx\n",
-                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
-                (long)(uintptr_t)dpy, max_formats,
-                (long)(uintptr_t)formats, (long)(uintptr_t)num_formats);
+     EGL_LOG_API("EGL(tid=%p): LOG_eglQueryDmaBufFormatsEXT %p %d %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, max_formats, formats, num_formats);
 
     return EGL_TRUE;
 }
 
 EGLBoolean LOG_eglQueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers)
 {
-     EGL_LOG_API("EGL(tid=0x%lx): eglQueryDmaBufModifiersEXT 0x%08lX 0x%08lX 0x%08x 0x%08x 0x%08lx 0x%08lx\n",
-                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
-                (long)(uintptr_t)dpy, format,
-                 max_modifiers, (long)(uintptr_t)modifiers,
-                (long)(uintptr_t)external_only, (long)(uintptr_t)num_modifiers);
+     EGL_LOG_API("EGL(tid=%p): eglQueryDmaBufModifiersEXT %p %d %d %p %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
 
     return EGL_TRUE;
 }
@@ -1455,7 +1352,7 @@ char *veglTraceFuncNames[] = {
     "eglCreatePlatformWindowSurfaceEXT",
     "eglCreatePlatformPixmapSurfaceEXT",
     /* EGL_KHR_partial_update */
-    "eglSetDamageRegionKHR"
+    "eglSetDamageRegionKHR",
     "eglSwapBuffersWithDamageKHR",
     "eglSwapBuffersWithDamageEXT",
     /* EGL_EXT_image_dma_buf_import_modifiers */
