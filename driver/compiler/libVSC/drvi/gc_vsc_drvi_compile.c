@@ -733,6 +733,8 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(vscVIR_DoLocalVectorization, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, 0, gcvNULL);
 
+    CALL_SH_PASS(vscVIR_ClampPointSize, 0, gcvNULL);
+
     /* We are at the end of LL of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Low);
 

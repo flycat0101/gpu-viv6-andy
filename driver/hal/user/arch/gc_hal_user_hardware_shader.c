@@ -177,6 +177,9 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->maxLocalMemSizeInByte                 = attribBufSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize                 = Hardware->config->resultWindowMaxSize;
 
+    pVscHwCfg->minPointSize                          = 0.5f;
+    pVscHwCfg->maxPointSize                          = 128.0f;
+
     /*
     ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
     ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
@@ -292,6 +295,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     /* LODQ doesn't return the correct raw LOD value, which can match the spec requirement. */
     pVscHwCfg->hwFeatureFlags.hasLODQFix             = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix  = IS_HW_SUPPORT(gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX);
+    pVscHwCfg->hwFeatureFlags.hasPointSizeFix        = gcvTRUE;
 
     pVscHwCfg->hwFeatureFlags.hasUSCAtomicFix2       = IS_HW_SUPPORT(gcvFEATURE_USC_ATOMIC_FIX2);
 
