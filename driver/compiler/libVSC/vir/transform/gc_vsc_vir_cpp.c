@@ -46,8 +46,8 @@ static void VSC_CPP_Init(
     IN VIR_Shader                   *shader,
     IN VIR_DEF_USAGE_INFO           *du_info,
     IN VSC_OPTN_CPPOptions          *options,
+    IN VSC_CPP_PASS_DATA            *passData,
     IN VIR_Dumper                   *dumper,
-    IN gctBOOL                      globaCPP,
     IN VSC_MM                       *pMM
     )
 {
@@ -55,8 +55,8 @@ static void VSC_CPP_Init(
     VSC_CPP_SetCurrBB(cpp, gcvNULL);
     VSC_CPP_SetDUInfo(cpp, du_info);
     VSC_CPP_SetOptions(cpp, options);
+    VSC_CPP_SetPassData(cpp, passData);
     VSC_CPP_SetDumper(cpp, dumper);
-    VSC_CPP_SetGlobalCPP(cpp, globaCPP);
     VSC_CPP_SetFWOptCount(cpp, 0);
     VSC_CPP_SetBWOptCount(cpp, 0);
 
@@ -2032,7 +2032,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
     VIR_FunctionNode    *func_node;
     VSC_CPP_CopyPropagation cpp;
     VSC_OPTN_CPPOptions* cpp_options = (VSC_OPTN_CPPOptions*)pPassWorker->basePassWorker.pBaseOption;
-    gctBOOL              bGlobal = *(gctBOOL*)pPassWorker->basePassWorker.pPrvData;
+    VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
 
     if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(cpp_options),
         VSC_OPTN_CPPOptions_TRACE_INPUT))
@@ -2040,8 +2040,13 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         VIR_Shader_Dump(gcvNULL, "Shader before Copy Propagation", shader, gcvTRUE);
     }
 
-    VSC_CPP_Init(&cpp, shader, pPassWorker->pDuInfo, cpp_options,
-                 pPassWorker->basePassWorker.pDumper, bGlobal, pPassWorker->basePassWorker.pMM);
+    if (pPassWorker->basePassWorker.pPrvData)
+    {
+        cppPassData = *(VSC_CPP_PASS_DATA*)pPassWorker->basePassWorker.pPrvData;
+    }
+
+    VSC_CPP_Init(&cpp, shader, pPassWorker->pDuInfo, cpp_options, &cppPassData,
+                 pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
 
     /* don't perform global CPP when the cfg has too many nodes*/
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
