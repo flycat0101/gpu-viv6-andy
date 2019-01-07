@@ -61,6 +61,8 @@
 #include "gc_hal_driver.h"
 #include "gc_hal_kernel_mutex.h"
 #include "gc_hal_metadata.h"
+#include "gc_hal_user_buffer.h"
+
 
 #if gcdENABLE_VG
 #include "gc_hal_kernel_vg.h"
@@ -819,6 +821,11 @@ struct _gckCOMMAND
     gckASYNC_COMMAND            asyncCommand;
 
     gctBOOL                     dummyDraw;
+
+    /* a copy in kernel space for current committing command buffer
+     * avoid occupyting stack space.
+     */
+    struct _gcoCMDBUF           _commandBufferObject;
 };
 
 typedef struct _gcsEVENT *      gcsEVENT_PTR;

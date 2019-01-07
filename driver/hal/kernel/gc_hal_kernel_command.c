@@ -1812,7 +1812,6 @@ gckCOMMAND_Commit(
 
 #if !gcdNULL_DRIVER
     gcsCONTEXT_PTR contextBuffer;
-    struct _gcoCMDBUF _commandBufferObject;
     gctPHYS_ADDR_T commandBufferPhysical;
     gctUINT8_PTR commandBufferLogical = gcvNULL;
     gctUINT32 commandBufferAddress = 0;
@@ -1924,7 +1923,7 @@ gckCOMMAND_Commit(
 #else
     if (needCopy)
     {
-        commandBufferObject = &_commandBufferObject;
+        commandBufferObject = &Command->_commandBufferObject;
 
         gcmkONERROR(gckOS_CopyFromUserData(
             Command->os,
