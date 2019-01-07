@@ -5216,7 +5216,7 @@ static VkResult halti5_pip_build_gfxshaders(
 
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-    vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
     vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
@@ -5825,7 +5825,7 @@ static VkResult halti5_pip_build_computeshader(
 
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-    vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
     vscCompileParams.cfg.ctx.isPatchLib = gcvFALSE;
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
@@ -6448,7 +6448,7 @@ VkResult halti5_patch_pipeline(
             __VK_MEMZERO(&vscLibLinkTable, sizeof(vscLibLinkTable));
             __VK_MEMCOPY(vscLinkParams.hShaderArray, hShaderArrayCopy, sizeof(hShaderArrayCopy));
             vscLinkParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-            vscLinkParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+            vscLinkParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
             vscLinkParams.cfg.ctx.isPatchLib = gcvFALSE;
             vscLinkParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
             vscLinkParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS

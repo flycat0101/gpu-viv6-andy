@@ -254,6 +254,10 @@ void __vk_utils_reverseBytes(
     uint32_t destSize
     );
 
+VkBool32 __vk_utils_reverseMatch(
+    const char *source,
+    const char *dest
+    );
 
 /*
 * Compute the floor of the log base 2 of a unsigned integer (used mostly
