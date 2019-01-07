@@ -13866,6 +13866,8 @@ slGenGenericCode2WithFormat(
     case slvOPCODE_PARAM_CHAIN:
     case slvOPCODE_INTRINSIC:
     case slvOPCODE_INTRINSIC_ST:
+
+    case slvOPCODE_MOD:
         break;
 
     default: gcmASSERT(0);

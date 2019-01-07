@@ -10513,6 +10513,22 @@ _GenModCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if(_GEN_MOD_IN_BACKEND)
+    {
+        status = slGenGenericCode2(Compiler,
+                                   PolynaryExpr->exprBase.base.lineNo,
+                                   PolynaryExpr->exprBase.base.stringNo,
+                                   slvOPCODE_MOD,
+                                   IOperand,
+                                   &OperandsParameters[0].rOperands[0],
+                                   &OperandsParameters[1].rOperands[0]);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
     /* div t0, x (operand0), y (operand1) */
     slsIOPERAND_New(Compiler,
                     &intermIOperands[0],

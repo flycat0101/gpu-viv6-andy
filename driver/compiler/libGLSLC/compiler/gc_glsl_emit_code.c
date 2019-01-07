@@ -13,6 +13,7 @@
 
 #include "gc_glsl_emit_code.h"
 #define _USE_F2I_OPCODE  1
+#define _GEN_MOD_IN_BACKEND 1
 
 gceSTATUS
 sloCODE_EMITTER_NewBasicBlock(
@@ -5040,7 +5041,11 @@ _ConvOpcode(
     case slvOPCODE_MULHI:                   return gcSL_MULHI;
     case slvOPCODE_DIV:                     gcmASSERT(0); return gcSL_NOP;
     case slvOPCODE_IDIV:                    gcmASSERT(0); return gcSL_NOP;
+#if !_GEN_MOD_IN_BACKEND
     case slvOPCODE_MOD:                     gcmASSERT(0); return gcSL_NOP;
+#else
+    case slvOPCODE_MOD:                     return gcSL_MOD;
+#endif
 
     case slvOPCODE_TEXTURE_LOAD:            return gcSL_TEXLD;
     case slvOPCODE_TEXTURE_LOAD_U:          return gcSL_TEXLD_U;
@@ -8437,6 +8442,7 @@ _EmitScalarOrVectorModDivCode(
     return status;
 }
 
+#if !_GEN_MOD_IN_BACKEND
 static gceSTATUS
 _EmitModCode(
              IN sloCOMPILER Compiler,
@@ -8550,6 +8556,7 @@ _EmitModCode(
     gcmFOOTER();
     return status;
 }
+#endif
 
 static gceSTATUS
 _EmitIdivCode(
@@ -8941,7 +8948,9 @@ static slsSPECIAL_CODE_EMITTER2 SpecialCodeEmitterTable2[] =
     {slvOPCODE_NOT_EQUAL,          _EmitNotEqualCode},
 
     {slvOPCODE_DOT,                _EmitDotCode},
+#if !_GEN_MOD_IN_BACKEND
     {slvOPCODE_MOD,                _EmitModCode},
+#endif
     {slvOPCODE_IDIV,               _EmitIdivCode},
     {slvOPCODE_LOAD,               _EmitLoadCode},
     {slvOPCODE_STORE1,             _EmitStoreCode},

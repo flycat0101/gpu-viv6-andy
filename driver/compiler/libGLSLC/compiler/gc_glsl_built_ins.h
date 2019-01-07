@@ -19,6 +19,7 @@
 
 #define slmMAX_BUILT_IN_PARAMETER_COUNT        10
 #define __SUPPORT_128_BPP_DATA__               0
+#define _GEN_MOD_IN_BACKEND                    1
 
 gceSTATUS
 slLoadGeneralBuiltIns(
