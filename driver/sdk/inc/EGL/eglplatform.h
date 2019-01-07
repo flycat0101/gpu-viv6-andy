@@ -89,12 +89,6 @@ typedef struct wl_display     *EGLNativeDisplayType;
 typedef struct wl_egl_pixmap  *EGLNativePixmapType;
 typedef struct wl_egl_window  *EGLNativeWindowType;
 
-#elif defined(__GBM__)
-
-typedef struct gbm_device  *EGLNativeDisplayType;
-typedef struct gbm_bo      *EGLNativePixmapType;
-typedef void               *EGLNativeWindowType;
-
 #elif defined(__ANDROID__) || defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 26
 #    include <system/window.h>
@@ -114,6 +108,13 @@ typedef struct ANativeWindow*           EGLNativeWindowType;
 typedef intptr_t EGLNativeDisplayType;
 typedef intptr_t EGLNativePixmapType;
 typedef intptr_t EGLNativeWindowType;
+
+#elif defined(__QNXNTO__) /* QNX */
+
+#include <screen/screen.h>
+typedef int             EGLNativeDisplayType;
+typedef screen_window_t EGLNativeWindowType;
+typedef screen_pixmap_t EGLNativePixmapType;
 
 #elif defined(__unix__) || defined(USE_X11)
 
@@ -149,6 +150,12 @@ typedef Window   EGLNativeWindowType;
 
 #endif
 
+#elif defined(__GBM__)
+
+typedef struct gbm_device  *EGLNativeDisplayType;
+typedef struct gbm_bo      *EGLNativePixmapType;
+typedef void               *EGLNativeWindowType;
+
 #elif defined(__APPLE__)
 
 typedef int   EGLNativeDisplayType;
@@ -162,13 +169,6 @@ typedef void *EGLNativeWindowType;
 typedef void              *EGLNativeDisplayType;
 typedef khronos_uintptr_t  EGLNativePixmapType;
 typedef khronos_uintptr_t  EGLNativeWindowType;
-
-#elif defined(__QNXNTO__) /* QNX */
-
-#include <screen/screen.h>
-typedef int             EGLNativeDisplayType;
-typedef screen_window_t EGLNativeWindowType;
-typedef screen_pixmap_t EGLNativePixmapType;
 
 #else
 #error "Platform not recognized"
