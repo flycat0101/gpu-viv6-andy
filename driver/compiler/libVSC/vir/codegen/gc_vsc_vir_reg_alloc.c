@@ -1713,6 +1713,8 @@ gctBOOL _VIR_RA_LS_removableLDARR(
         pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
         for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
         {
+            VIR_Instruction *redefinedBase = gcvNULL;
+
             pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
             pUseInst = pUsage->usageKey.pUsageInst;
 
@@ -1729,6 +1731,13 @@ gctBOOL _VIR_RA_LS_removableLDARR(
                 VIR_Inst_GetOpcode(pUseInst) == VIR_OP_VX_IMG_STORE ||
                 VIR_Inst_GetOpcode(pUseInst) == VIR_OP_IMG_STORE_3D ||
                 VIR_Inst_GetOpcode(pUseInst) == VIR_OP_LDARR)
+            {
+                retValue = gcvFALSE;
+                continue;
+            }
+
+            /* check baseOpnd is redefined between pInst and pUseInst */
+            if (vscVIR_RedefineBetweenInsts(pRA->pMM, pLvInfo->pDuInfo, pInst, pUseInst, pBaseOpnd, &redefinedBase))
             {
                 retValue = gcvFALSE;
                 continue;

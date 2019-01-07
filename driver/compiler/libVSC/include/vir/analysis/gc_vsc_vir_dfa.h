@@ -797,6 +797,13 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
                                                    VIR_Instruction**   ppFirstOtherDefInst,
                                                    VIR_Instruction**   ppFirstMultiDefUsageInst);
 
+gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_MM                   *pMM,
+                                    IN VIR_DEF_USAGE_INFO       *duInfo,
+                                    IN VIR_Instruction          *startInst,
+                                    IN VIR_Instruction          *endInst,
+                                    IN VIR_Operand              *srcOpnd,
+                                    OUT VIR_Instruction         **redefInst);
+
 /*
  *  LV analysis
  */
