@@ -22,6 +22,11 @@ typedef enum _VSC_CPP_FLAG
 {
     VSC_CPP_NONE                    = 0x00,
     VSC_CPP_USE_SRC_TYPE_FROM_MOVE  = 0x01,
+    /*
+    ** Check if we need to copy the MOVE from a output parameter,
+    ** we can't enable it if there is a inliner after this CPP pass due to the limitation in VIR_Shader_FindParmInst.
+    */
+    VSC_CPP_COPY_FROM_OUTPUT_PARAM  = 0x02,
 } VSC_CPP_FLAG;
 
 typedef struct _VSC_CPP_PASS_DATA

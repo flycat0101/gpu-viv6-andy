@@ -717,7 +717,10 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
     CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);
+
+    cppPassData.cppFlag |= VSC_CPP_COPY_FROM_OUTPUT_PARAM;
     CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &cppPassData);
+
     CALL_SH_PASS(VSC_PARAM_Optimization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
@@ -760,7 +763,10 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
         CALL_SH_PASS(vscVIR_PutScalarConstToImm, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PutImmValueToUniform, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_CheckPosAndDepthConflict, 0, gcvNULL);
+
+        cppPassData.cppFlag |= VSC_CPP_COPY_FROM_OUTPUT_PARAM;
         CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &cppPassData);
+
         CALL_SH_PASS(VSC_DCE_Perform, 1, gcvNULL);
         CALL_SH_PASS(vscVIR_FixDynamicIdxDep, 0, gcvNULL);
     }

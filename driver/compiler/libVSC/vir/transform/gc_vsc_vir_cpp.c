@@ -302,6 +302,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
 
     VIR_GENERAL_UD_ITERATOR udIter;
     VIR_DEF         *pDef;
+    gctBOOL         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
 
     do
     {
@@ -620,6 +621,24 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             VIR_LOG_FLUSH(dumper);
                         }
                         break;
+                    }
+
+                    /* If COPY_FROM_OUTPUT_PARAM is disabled, we need to check if this source is a output parameter. */
+                    if (!bCopyFromOutputParam && movSrcInfo.isVreg && VIR_Operand_isSymbol(movSrc))
+                    {
+                        VIR_Symbol*     pSrcSym = VIR_Operand_GetSymbol(movSrc);
+
+                        if (VIR_Symbol_isVreg(pSrcSym))
+                        {
+                            if (VIR_Symbol_isOutParamVirReg(pSrcSym) || VIR_Symbol_isOutParam(VIR_Symbol_GetVregVariable(pSrcSym)))
+                            {
+                                break;
+                            }
+                        }
+                        else if (VIR_Symbol_isOutParam(pSrcSym))
+                        {
+                            break;
+                        }
                     }
 
                     /*  if there is a use that has def other than mov, this mov
