@@ -8005,7 +8005,6 @@ DEF_QUERY_PASS_PROP(vscVIR_GenRobustBoundCheck)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
@@ -8061,6 +8060,8 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
             }
         }
     }
+    /* invalid cfg */
+    pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
