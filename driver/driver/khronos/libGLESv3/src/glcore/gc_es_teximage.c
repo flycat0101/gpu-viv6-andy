@@ -486,6 +486,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
                                         GLenum internalFormat)
 {
     GLboolean invalid = GL_FALSE;
+    gcePATCH_ID patchID = gcvPATCH_INVALID;
 
     if (!tex)
     {
@@ -601,7 +602,8 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         ** but in GLES spec3.0, it is a valid texture format.
         */
         case GL_SRGB8_ALPHA8:
-            if(gc->apiVersion < __GL_API_VERSION_ES30)
+            gcoHAL_GetPatchID(gcvNULL, &patchID);
+            if(gc->apiVersion < __GL_API_VERSION_ES30 && patchID != gcvPATCH_ANDROID_CTS_UIRENDERING)
             {
                 invalid = GL_TRUE;
             }
