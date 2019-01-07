@@ -178,6 +178,7 @@ typedef struct __GLchipFeatureRec
         GLuint                   hasMultiPixelPipes         : 1;
         GLuint                   hasSingleBuffer            : 1;
         GLuint                   hasPaLineClipFix           : 1;
+        GLuint                   hasMSAA                    : 1;
     }hwFeature;
 } __GLchipFeature;
 

@@ -454,11 +454,15 @@ gcChipInitExtension(
     __glExtension[__GL_EXTID_EXT_multi_draw_arrays].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_frag_depth].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_discard_framebuffer].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_EXT_multisampled_render_to_texture].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_robustness].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_texture_type_2_10_10_10_REV].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_texture_sRGB_decode].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_texture_rg].bEnabled = GL_TRUE;
+
+    if (chipCtx->chipFeature.hwFeature.hasMSAA)
+    {
+        __glExtension[__GL_EXTID_EXT_multisampled_render_to_texture].bEnabled = GL_TRUE;
+    }
 
     if (chipCtx->chipFeature.hwFeature.hasTxAnisFilter)
     {
@@ -871,7 +875,7 @@ gcChipInitChipFeature(
     chipFeature->hwFeature.hasMultiPixelPipes = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTI_PIXELPIPES);
     chipFeature->hwFeature.hasSingleBuffer = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_BUFFER);
     chipFeature->hwFeature.hasPaLineClipFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PA_LINECLIP_FIX);
-
+    chipFeature->hwFeature.hasMSAA = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA);
 
     /* Get Halti support level */
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
