@@ -2216,9 +2216,14 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NON_HALTI,     "texture2DProj", gcvNULL, _GenTexture2DProjCode,        T_VEC4,     2, {T_SAMPLER2D,    T_VEC4}, {0}, {0}},
     {slvEXTENSION_NON_HALTI,     "textureCube", gcvNULL, _GenTextureCubeCode,          T_VEC4,     2, {T_SAMPLERCUBE,  T_VEC3}, {0}, {0}},
 
-    {slvEXTENSION_EGL_IMAGE_EXTERNAL,     "texture2D", gcvNULL, _GenTexture2DCode,            T_VEC4,     2, {T_SAMPLEREXTERNALOES,    T_VEC2}, {0}, {0}},
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL,     "texture2D",     gcvNULL, _GenTexture2DCode,            T_VEC4,     2, {T_SAMPLEREXTERNALOES,    T_VEC2}, {0}, {0}},
     {slvEXTENSION_EGL_IMAGE_EXTERNAL,     "texture2DProj", gcvNULL, _GenTexture2DProjCode,        T_VEC4,     2, {T_SAMPLEREXTERNALOES,    T_VEC3}, {0}, {0}},
     {slvEXTENSION_EGL_IMAGE_EXTERNAL,     "texture2DProj", gcvNULL, _GenTexture2DProjCode,        T_VEC4,     2, {T_SAMPLEREXTERNALOES,    T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "texture",     gcvNULL, _GenTextureCode,          T_VEC4,      2, {T_SAMPLEREXTERNALOES,   T_VEC2}, {0}, {0}},
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "textureProj", gcvNULL, _GenTextureProjCode,      T_VEC4,      2, {T_SAMPLEREXTERNALOES,   T_VEC3}, {0}, {0}},
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "textureProj", gcvNULL, _GenTextureProjCode,      T_VEC4,      2, {T_SAMPLEREXTERNALOES,   T_VEC4}, {0}, {0}},
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "texelFetch",  gcvNULL, _GenTexelFetchCode,       T_VEC4,      3, {T_SAMPLEREXTERNALOES,   T_IVEC2, T_INT}, {0}, {0}},
 
     /* 3D Texture Lookup Functions */
     {slvEXTENSION_TEXTURE_3D, "texture3D", gcvNULL, _GenTexture3DCode,          T_VEC4,     2, {T_SAMPLER3D,    T_VEC3}, {0}, {0}},
@@ -2774,7 +2779,7 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_SAMPLERBUFFER},                    {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_buffer", {0}, {0}},
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_ISAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_buffer", {0}, {0}},
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_USAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_buffer", {0}, {0}},
-
+    {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "textureSize", gcvNULL,  gcvNULL,    T_IVEC2,_HP,2, {T_SAMPLEREXTERNALOES,    T_INT},      {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
     /* texture gather functions. */
     {slvEXTENSION_ES_31,    "textureGather", gcvNULL, gcvNULL,          T_VEC4,  ANY,   2, {T_SAMPLER2D,         T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_texture_gather, "_viv_textureGather_float_2D_NoComp", {0}, {0}},
     {slvEXTENSION_ES_31,    "textureGather", gcvNULL, gcvNULL,          T_VEC4,  ANY,   2, {T_SAMPLER2DARRAY,    T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_texture_gather, "_viv_textureGather_float_2DArray_NoComp", {0}, {0}},

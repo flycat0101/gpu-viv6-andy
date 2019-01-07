@@ -1444,6 +1444,7 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"GL_OES_texture_3D", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_EXT_frag_depth", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_OES_EGL_image_external", gcvNULL, gcvNULL, gcvFALSE},
+   {"GL_OES_EGL_image_external_essl3", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_FRAGMENT_PRECISION_HIGH", "1", gcvNULL, gcvFALSE},
    {"GL_EXT_shadow_samplers", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_VIV_asm", gcvNULL , gcvNULL, gcvFALSE},
