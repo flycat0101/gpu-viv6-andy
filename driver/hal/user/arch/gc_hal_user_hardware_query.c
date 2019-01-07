@@ -4785,7 +4785,7 @@ gcoHARDWARE_QueryBPP(
             case gcvSURF_NV16:
             case gcvSURF_NV61:
                 bpps[0] = 1.0;
-                bpps[1] = 2.0;
+                bpps[1] = 1.0;
                 break;
 
             case gcvSURF_YV12:
