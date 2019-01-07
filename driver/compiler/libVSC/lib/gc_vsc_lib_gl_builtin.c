@@ -42,6 +42,7 @@ gctSTRING gcLibFunc_TextureBufferSize_For_OES =
 ;
 
 gctSTRING gcLibFunc_TextureBufferSize_For_VK  =
+"#extension GL_EXT_texture_buffer:    enable\n"
 "#define MAX_TEXTURE_BUFFER_SIZE                            (8 * 1024) \n"
 ;
 
@@ -5584,7 +5585,6 @@ gctSTRING gcLibImageSize_halti4 =
 "    return uvec4(size);\n"
 "}\n";
 
-/* TO-DO: have T_GEN_IMAGE to combine functions */
 gctSTRING gcLibImageSize_2D_float =
 "highp uvec2 _viv_image_size_1(highp uvec4 img_desc)\n"
 "{\n"
@@ -8128,7 +8128,7 @@ gctSTRING gcLibImageLoad_Buffer_uint_img_access =
 
 /* texelFetch for sampler2D. */
 gctSTRING gcLibTexelFetch_Sampler2D =
-"highp vec4 _viv_image_fetch_sampler2D(sampler2D sampler, ivec2 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler2D(sampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8146,7 +8146,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler2D(isampler2D sampler, ivec2 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler2D(isampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8164,7 +8164,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler2D(usampler2D sampler, ivec2 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler2D(usampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8182,7 +8182,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler2D_offset(sampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler2D_offset(sampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8200,7 +8200,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler2D_offset(isampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler2D_offset(isampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8218,7 +8218,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler2D_offset(usampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler2D_offset(usampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8238,7 +8238,7 @@ gctSTRING gcLibTexelFetch_Sampler2D =
 "}\n";
 
 gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
-"highp vec4 _viv_image_fetch_sampler2D(sampler2D sampler, ivec2 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler2D(sampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8251,7 +8251,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler2D(isampler2D sampler, ivec2 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler2D(isampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8264,7 +8264,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler2D(usampler2D sampler, ivec2 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler2D(usampler2D sampler, ivec2 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8277,7 +8277,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler2D_offset(sampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler2D_offset(sampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8291,7 +8291,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler2D_offset(isampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler2D_offset(isampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8305,7 +8305,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler2D_offset(usampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler2D_offset(usampler2D sampler, ivec2 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8322,7 +8322,7 @@ gctSTRING gcLibTexelFetch_Sampler2D_halti4 =
 
 /* texelFetch for sampler2DArray. */
 gctSTRING gcLibTexelFetch_Sampler2DArray =
-"highp vec4 _viv_image_fetch_sampler_2d_array(sampler2DArray sampler, ivec3 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_array(sampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8342,7 +8342,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_array(isampler2DArray sampler, ivec3 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_array(isampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8362,7 +8362,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_array(usampler2DArray sampler, ivec3 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_array(usampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8382,7 +8382,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler_2d_array_offset(sampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_array_offset(sampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8402,7 +8402,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_array_offset(isampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_array_offset(isampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8422,7 +8422,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_array_offset(usampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_array_offset(usampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8444,7 +8444,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray =
 "}\n";
 
 gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
-"highp vec4 _viv_image_fetch_sampler_2d_array(sampler2DArray sampler, ivec3 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_array(sampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8458,7 +8458,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_array(isampler2DArray sampler, ivec3 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_array(isampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8472,7 +8472,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_array(usampler2DArray sampler, ivec3 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_array(usampler2DArray sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8486,7 +8486,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler_2d_array_offset(sampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_array_offset(sampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8501,7 +8501,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_array_offset(isampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_array_offset(isampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8516,7 +8516,7 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_array_offset(usampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_array_offset(usampler2DArray sampler, ivec3 p, int lod, ivec2 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8534,21 +8534,21 @@ gctSTRING gcLibTexelFetch_Sampler2DArray_halti4 =
 
 /* texelFetch for sampler2DMS. */
 gctSTRING gcLibTexelFetch_Sampler2DMS_halti4 =
-"highp vec4 _viv_image_fetch_sampler_2d_ms(sampler2DMS sampler, ivec2 p, int sampleIndex)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_ms(sampler2DMS sampler, ivec2 p, int sampleIndex)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
 "    _viv_asm(TEXLD, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_ms(isampler2DMS sampler, ivec2 p, int sampleIndex)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_ms(isampler2DMS sampler, ivec2 p, int sampleIndex)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
 "    _viv_asm(TEXLD, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_ms(usampler2DMS sampler, ivec2 p, int sampleIndex)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_ms(usampler2DMS sampler, ivec2 p, int sampleIndex)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
@@ -8558,21 +8558,21 @@ gctSTRING gcLibTexelFetch_Sampler2DMS_halti4 =
 
 /* texelFetch for sampler2DMSArray. */
 gctSTRING gcLibTexelFetch_Sampler2DMSArray_halti4 =
-"highp vec4 _viv_image_fetch_sampler_2d_ms_array(sampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler_2d_ms_array(sampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
 "    _viv_asm(TEXLD, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler_2d_ms_array(isampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler_2d_ms_array(isampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
 "    _viv_asm(TEXLD, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler_2d_ms_array(usampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler_2d_ms_array(usampler2DMSArray sampler, ivec3 p, int sampleIndex)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    _viv_asm(TEXFETCH_MS, result, sampler, sampleIndex);\n"
@@ -8582,7 +8582,7 @@ gctSTRING gcLibTexelFetch_Sampler2DMSArray_halti4 =
 
 /* texelFetch for sampler3D. */
 gctSTRING gcLibTexelFetch_Sampler3D =
-"highp vec4 _viv_image_fetch_sampler3D(sampler3D sampler, ivec3 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler3D(sampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8600,7 +8600,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler3D(isampler3D sampler, ivec3 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler3D(isampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8618,7 +8618,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler3D(usampler3D sampler, ivec3 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler3D(usampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8636,7 +8636,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler3D_offset(sampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler3D_offset(sampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8654,7 +8654,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler3D_offset(isampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler3D_offset(isampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8672,7 +8672,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler3D_offset(usampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler3D_offset(usampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8692,7 +8692,7 @@ gctSTRING gcLibTexelFetch_Sampler3D =
 "}\n";
 
 gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
-"highp vec4 _viv_image_fetch_sampler3D(sampler3D sampler, ivec3 p, int lod)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler3D(sampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8705,7 +8705,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler3D(isampler3D sampler, ivec3 p, int lod)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler3D(isampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8718,7 +8718,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler3D(usampler3D sampler, ivec3 p, int lod)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler3D(usampler3D sampler, ivec3 p, int lod)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8731,7 +8731,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, p);\n"
 "    return result;\n"
 "}\n"
-"highp vec4 _viv_image_fetch_sampler3D_offset(sampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp vec4 _viv_image_fetch_for_sampler_sampler3D_offset(sampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8745,7 +8745,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isampler3D_offset(isampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isampler3D_offset(isampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8759,7 +8759,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newP);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usampler3D_offset(usampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usampler3D_offset(usampler3D sampler, ivec3 p, int lod, ivec3 offset)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec3 lmm;\n"
@@ -8776,7 +8776,7 @@ gctSTRING gcLibTexelFetch_Sampler3D_halti4 =
 
 /* texelFetch for samplerBuffer. */
 gctSTRING gcLibTexelFetch_SamplerBuffer =
-"highp vec4 _viv_image_fetch_samplerBuffer(sampler2D sampler, int p)\n"
+"highp vec4 _viv_image_fetch_for_sampler_samplerBuffer(samplerBuffer sampler, int p)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec4 size;\n"
@@ -8786,7 +8786,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isamplerBuffer(isampler2D sampler, int p)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isamplerBuffer(isamplerBuffer sampler, int p)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec4 size;\n"
@@ -8796,7 +8796,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer =
 "    _viv_asm(TEXLD, result, sampler, fCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usamplerBuffer(usampler2D sampler, int p)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usamplerBuffer(usamplerBuffer sampler, int p)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec4 size;\n"
@@ -8808,7 +8808,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer =
 "}\n";
 
 gctSTRING gcLibTexelFetch_SamplerBuffer_halti4 =
-"highp vec4 _viv_image_fetch_samplerBuffer(sampler2D sampler, int p)\n"
+"highp vec4 _viv_image_fetch_for_sampler_samplerBuffer(samplerBuffer sampler, int p)\n"
 "{\n"
 "    highp vec4 result;\n"
 "    ivec2 newCoord = ivec2(p%MAX_TEXTURE_BUFFER_SIZE, p/MAX_TEXTURE_BUFFER_SIZE);\n"
@@ -8816,7 +8816,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newCoord);\n"
 "    return result;\n"
 "}\n"
-"highp ivec4 _viv_image_fetch_isamplerBuffer(isampler2D sampler, int p)\n"
+"highp ivec4 _viv_image_fetch_for_sampler_isamplerBuffer(isamplerBuffer sampler, int p)\n"
 "{\n"
 "    highp ivec4 result;\n"
 "    ivec2 newCoord = ivec2(p%MAX_TEXTURE_BUFFER_SIZE, p/MAX_TEXTURE_BUFFER_SIZE);\n"
@@ -8824,7 +8824,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer_halti4 =
 "    _viv_asm(TEXLD_U, result, sampler, newCoord);\n"
 "    return result;\n"
 "}\n"
-"highp uvec4 _viv_image_fetch_usamplerBuffer(usampler2D sampler, int p)\n"
+"highp uvec4 _viv_image_fetch_for_sampler_usamplerBuffer(usamplerBuffer sampler, int p)\n"
 "{\n"
 "    highp uvec4 result;\n"
 "    ivec2 newCoord = ivec2(p%MAX_TEXTURE_BUFFER_SIZE, p/MAX_TEXTURE_BUFFER_SIZE);\n"
@@ -8835,7 +8835,7 @@ gctSTRING gcLibTexelFetch_SamplerBuffer_halti4 =
 
 /* getLod. */
 gctSTRING gcLibGetLod =
-"highp vec2 _viv_calculate_lod(ivec4 size, ivec3 lmm, vec3 coord)\n"
+"highp vec2 _viv_calculate_lod(ivec4 size, ivec4 lmm, vec3 coord)\n"
 "{\n"
 "    float lambda_prime, clampResult;\n"
 "    vec3 temp1, temp2, temp3;\n"
@@ -8855,10 +8855,18 @@ gctSTRING gcLibGetLod =
 "    }\n"
 "    return vec2(clampResult, lambda_prime);\n"
 "}\n"
+"highp vec2 _viv_image_query_lod_1d(sampler2D sampler, float coord)\n"
+"{\n"
+"    ivec4 size;\n"
+"    ivec4 lmm;\n"
+"    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
+"    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
+"    return _viv_calculate_lod(size, lmm, vec3(coord, 0.0, 0.0));\n"
+"}\n"
 "highp vec2 _viv_image_query_lod_2d(sampler2D sampler, vec2 coord)\n"
 "{\n"
 "    ivec4 size;\n"
-"    ivec3 lmm;\n"
+"    ivec4 lmm;\n"
 "    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
 "    return _viv_calculate_lod(size, lmm, vec3(coord, 0.0));\n"
@@ -8866,7 +8874,7 @@ gctSTRING gcLibGetLod =
 "highp vec2 _viv_image_query_lod_3d(sampler3D sampler, vec3 coord)\n"
 "{\n"
 "    ivec4 size;\n"
-"    ivec3 lmm;\n"
+"    ivec4 lmm;\n"
 "    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
 "    return _viv_calculate_lod(size, lmm, coord);\n"
@@ -8874,7 +8882,7 @@ gctSTRING gcLibGetLod =
 "highp vec2 _viv_image_query_lod_cube(sampler2D sampler, vec3 coord)\n"
 "{\n"
 "    ivec4 size;\n"
-"    ivec3 lmm;\n"
+"    ivec4 lmm;\n"
 "    _viv_asm(GET_SAMPLER_LMM, lmm, sampler);\n"
 "    _viv_asm(GET_SAMPLER_LBS, size, sampler);\n"
 "    float maxCoord;\n"
@@ -8942,23 +8950,6 @@ gctSTRING gcLibImageStore_2D_float_rgba32f =
 "   }\n"
 "}\n";
 
-/* format rg16f */
-gctSTRING gcLibImageStore_2D_float_rg16f =
-"void _viv_image_store_image_2d_rg16f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
-"{\n"
-"   vec2 result;\n"
-"   ivec3 p1;\n"
-"   p1.xy = p;\n"
-"   p1.z = 0;\n"
-"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
-"   uint address = addrRet.y;\n"
-"   if (addrRet.x == 0u) {\n"
-"       _viv_asm(STORE1, result!<f:FLOAT16>, address, data.xy);\n"
-"       data.z = 0.0;\n"
-"       data.w = 1.0;\n"
-"   }\n"
-"}\n";
-
 /* format rgba16f */
 gctSTRING gcLibImageStore_2D_float =
 "void _viv_image_store_image_2d(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
@@ -8983,6 +8974,23 @@ gctSTRING gcLibImageStore_2D_float_rg32f =
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
 "       _viv_asm(STORE1, result!<f:FLOAT>, address, data.xy);\n"
+"       data.z = 0.0;\n"
+"       data.w = 1.0;\n"
+"   }\n"
+"}\n";
+
+/* format rg16f */
+gctSTRING gcLibImageStore_2D_float_rg16f =
+"void _viv_image_store_image_2d_rg16f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
+"{\n"
+"   vec2 result;\n"
+"   ivec3 p1;\n"
+"   p1.xy = p;\n"
+"   p1.z = 0;\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
+"   uint address = addrRet.y;\n"
+"   if (addrRet.x == 0u) {\n"
+"       _viv_asm(STORE1, result!<f:FLOAT16>, address, data.xy);\n"
 "       data.z = 0.0;\n"
 "       data.w = 1.0;\n"
 "   }\n"
@@ -9182,7 +9190,6 @@ gctSTRING gcLibImageStore_2D_float_r8 =
 "       _viv_asm(STORE1, result!<f:UINT8>, address, data2.x);\n"
 "   }\n"
 "}\n";
-
 
 /* format rgba32i */
 gctSTRING gcLibImageStore_2D_int_rgba32i =
@@ -13417,8 +13424,6 @@ gctSTRING gcLibBlendEquation_HSL_HUE =
 "            { sret = (src.xyz - vec3(minbase))* vec3(ssat) / vec3(sbase); }\n"
 "            else \n"
 "            { sret = vec3(0.0); } \n"
-/* TO-DO: fix the const vec. For now, should not written in
-             float lbase = dot(sret.xyz, vec(0.30, 0.59, 0.11)); */
 "            float lbase = sret.x * 0.30 + sret.y * 0.59 + sret.z * 0.11;\n"
 "            float llum = dst.x * 0.30 + dst.y * 0.59 + dst.z * 0.11;\n"
 "            float ldiff = llum - lbase;\n"
@@ -13913,8 +13918,6 @@ gctSTRING gcLibBlendEquation_HSL_HUE_hati4 =
 "            { sret = (src.xyz - vec3(minbase))* vec3(ssat) / vec3(sbase); }\n"
 "            else \n"
 "            { sret = vec3(0.0); } \n"
-/* TO-DO: fix the const vec. For now, should not written in
-             float lbase = dot(sret.xyz, vec(0.30, 0.59, 0.11)); */
 "            float lbase = sret.x * 0.30 + sret.y * 0.59 + sret.z * 0.11;\n"
 "            float llum = dst.x * 0.30 + dst.y * 0.59 + dst.z * 0.11;\n"
 "            float ldiff = llum - lbase;\n"

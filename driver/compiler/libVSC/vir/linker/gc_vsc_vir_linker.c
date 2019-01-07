@@ -686,7 +686,6 @@ _CreateIntrinsicLib(
 
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti2);
-
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti2);
 
@@ -1918,18 +1917,11 @@ _IntrisicOrExtFuncName(
     parmOpnd = VIR_Operand_GetParameters(src1Opnd);
 
     /* If it is image-related function, get image symbol. */
-    if (VIR_Intrinsics_isImageRelated(intrinsicKind) ||
-        VIR_Intrinsics_isImageAddr(intrinsicKind) ||
-        VIR_Intrinsics_isImageFetch(intrinsicKind))
+    if (VIR_Intrinsics_isImageRelated(intrinsicKind) || VIR_Intrinsics_isImageAddr(intrinsicKind) || VIR_Intrinsics_isImageFetchForSampler(intrinsicKind))
     {
         imageOpnd = parmOpnd->args[0];
         imageSym = VIR_Operand_GetSymbol(imageOpnd);
         imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(imageSym));
-
-        if (VIR_Intrinsics_isImageFetch(intrinsicKind) && VIR_TypeId_isImageBuffer(imageTypeId))
-        {
-            intrinsicKind = VIR_IK_image_load;
-        }
     }
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_INTRINSIC);
@@ -2036,7 +2028,7 @@ _IntrisicOrExtFuncName(
             _IntrisicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
         }
         /* Check for image fetch. */
-        else if (VIR_Intrinsics_isImageFetch(intrinsicKind))
+        else if (VIR_Intrinsics_isImageFetchForSampler(intrinsicKind))
         {
             _IntrisicImageFetchFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
         }
@@ -3435,7 +3427,7 @@ _UpdateOperandParameterForIntrinsicCall(
 
         gcmASSERT(argIdx == newArgNum);
     }
-    else if (VIR_Intrinsics_isImageFetch(IntrinsicsKind))
+    else if (VIR_Intrinsics_isImageFetchForSampler(IntrinsicsKind))
     {
         VIR_TypeId      opndTypeId = VIR_Operand_GetTypeId(opndParm->args[0]);
         VIR_Operand*    pTexldOperand = gcvNULL;
@@ -3927,7 +3919,6 @@ VIR_Lib_UpdateCallSites(
                         }
                         else
                         {
-                            /* to-do */
                             gcmASSERT(gcvFALSE);
                         }
                     }
@@ -4074,7 +4065,7 @@ _TranspointsDequeue(
     vscMM_Free(pMM, worklistNode);
 }
 
-/*********** functions for intrinsic function name LinkLib *************/
+/*********** functions for intrinsic/extCall function name LinkLib *************/
 static void
 _GetIntrinsicOrExtFunc(
     IN VIR_LinkLibContext         *Context,
@@ -4086,6 +4077,9 @@ _GetIntrinsicOrExtFunc(
     VIR_FunctionNode        *func_node;
     VIR_Function            *func;
     VSC_MM                  *pMM = Context->pMM;
+    VSC_LIB_LINK_POINT      *linkPoint = Context->linkPoint;
+    gctBOOL                  notLinkImageIntrinsic = (linkPoint->libLinkType == VSC_LIB_LINK_TYPE_FUNC_NAME) &&
+                                                      VIR_Shader_IsPatchLib(pShader);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -4106,7 +4100,40 @@ _GetIntrinsicOrExtFunc(
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
             {
                 VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
+                VIR_Operand *   src1 = VIR_Inst_GetSource(inst, 1);
+                VIR_ParmPassing * parmOpnd = VIR_Operand_GetParameters(src1);
                 VIR_IntrinsicsKind ik = VIR_Operand_GetIntrinsicKind(src0);
+
+                /* For some cases, we need to update the intrinsic kind. */
+                if (VIR_Intrinsics_isImageRelated(ik) || VIR_Intrinsics_isImageAddr(ik))
+                {
+                    if (notLinkImageIntrinsic)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        VIR_TypeId opndTypeId = VIR_Operand_GetTypeId(parmOpnd->args[0]);
+                        VIR_TypeId symTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(VIR_Operand_GetSymbol(parmOpnd->args[0])));
+                        /*
+                        ** The source of image_fetch can be a image or a sampler:
+                        ** 1) If it is a image, we convert it to a image_load.
+                        ** 2) If it is a sampler, we convert it to a image_fetch_for_sampler.
+                        */
+                        if (VIR_Intrinsics_isImageFetch(ik))
+                        {
+                            if (VIR_TypeId_isSampler(opndTypeId) || VIR_TypeId_isSampler(symTypeId))
+                            {
+                                ik = VIR_IK_image_fetch_for_sampler;
+                            }
+                            else
+                            {
+                                ik = VIR_IK_image_load;
+                            }
+                            VIR_Operand_SetIntrinsicKind(src0, ik);
+                        }
+                    }
+                }
 
                 callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
                 callInstNode->inst = inst;
@@ -5183,7 +5210,6 @@ _InsertCallTexldGatherPCF(
         VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(newInst, 0), 0);
     }
 
-
     /* comparemode */
     paramName = _GetLibFuncParam(LibFunc, argIdx);
     for (i = 0; i < Context->libSpecializationConstantCount; i++)
@@ -5627,7 +5653,7 @@ _LinkLib_Transform(
                 if (libFunc == gcvNULL)
                 {
                     errCode = VSC_ERR_UNSAT_LIB_SYMBOL;
-                    ON_ERROR(errCode, "_LinkLib_Transform");
+                    ON_ERROR(errCode, "_LinkLib_Transform: cannot find lib function \"%s\"", libFuncName);
                 }
             }
 
@@ -5655,7 +5681,7 @@ _LinkLib_Transform(
         }
 
         /* step2.3 insert the argument passing, call and return value passing instructions */
-        Context->insertCall(Context, transPoint, pFunc);
+        ON_ERROR0(Context->insertCall(Context, transPoint, pFunc));
 
         /* step2.4 update the call sites, this is particular for the calls inside the lib function,
            since the lib call site itself already has the right parameters/return passing*/
@@ -5870,7 +5896,6 @@ VIR_LinkLibLibrary(
     for (i = 0; i < pLibLinkTable->shLinkEntryCount; i ++)
     {
         libEntry = &pLibLinkTable->pShLibLinkEntries[i];
-
         _InitializeLibLinkEntryData(pMM, libEntry);
 
         /* for each link point */
@@ -6014,7 +6039,6 @@ VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
 OnError:
     return errCode;
 }
-
 
 DEF_QUERY_PASS_PROP(VIR_LinkInternalLibFunc)
 {
