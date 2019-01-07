@@ -69,6 +69,7 @@
 typedef struct _gcsCMA_PRIV * gcsCMA_PRIV_PTR;
 typedef struct _gcsCMA_PRIV {
     atomic_t cmasize;
+    gctBOOL cmaLimitRequest;
 }
 gcsCMA_PRIV;
 
@@ -142,6 +143,18 @@ _CMAFSLAlloc(
     gckOS os = Allocator->os;
 
     gcmkHEADER_ARG("Mdl=%p NumPages=0x%zx", Mdl, NumPages);
+
+    if (os->allocatorLimitMarker && !(Flags & gcvALLOC_FLAG_CMA_PREEMPT))
+    {
+        if (Flags & gcvALLOC_FLAG_CMA_LIMIT)
+        {
+            priv->cmaLimitRequest = gcvTRUE;
+        }
+        else if (priv->cmaLimitRequest == gcvTRUE)
+        {
+            gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+    }
 
     gcmkONERROR(gckOS_Allocate(os, sizeof(struct mdl_cma_priv), (gctPOINTER *)&mdl_priv));
     mdl_priv->kvaddr = gcvNULL;
@@ -561,6 +574,20 @@ _CMAFSLAlloctorInit(
                           | gcvALLOC_FLAG_4GB_ADDR
 #endif
                           ;
+
+#if defined(CONFIG_ARM64)
+    Os->allocatorLimitMarker = (Os->device->baseAddress + totalram_pages * PAGE_SIZE) > 0x100000000;
+#else
+    Os->allocatorLimitMarker = gcvFALSE;
+#endif
+    priv->cmaLimitRequest = gcvFALSE;
+
+    if (Os->allocatorLimitMarker)
+    {
+        allocator->capability |= gcvALLOC_FLAG_CMA_LIMIT;
+    }
+
+    allocator->capability |= gcvALLOC_FLAG_CMA_PREEMPT;
 
     *Allocator = allocator;
 
