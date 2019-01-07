@@ -18450,6 +18450,17 @@ gckHARDWARE_QueryFrequency(
 
     if (mcStart)
     {
+        if (powerManagement)
+        {
+            gcmkONERROR(gckHARDWARE_SetPowerManagement(
+                Hardware, gcvFALSE
+                ));
+        }
+
+        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+            Hardware, gcvPOWER_ON_AUTO
+            ));
+
         gckHARDWARE_ExitQueryClock(Hardware,
                                    mcStart, shStart,
                                    &mcClk, &shClk);

@@ -1876,6 +1876,12 @@ gceSTATUS gcoHARDWARE_UploadCSCTable(
     IN gctINT32_PTR Table
     );
 
+/* Query hardware frequency. */
+gceSTATUS
+gcoHARDWARE_QueryFrequency(
+    IN gcoHARDWARE Hardware
+    );
+
 /* About Compression. */
 gceSTATUS
 gcoHARDWARE_CheckConstraint(

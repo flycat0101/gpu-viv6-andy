@@ -3108,9 +3108,9 @@ OnError:
     return status;
 }
 
-static gceSTATUS
- _QueryHardwareFrequency(
-    gcoHARDWARE Hardware
+gceSTATUS
+gcoHARDWARE_QueryFrequency(
+    IN gcoHARDWARE Hardware
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -6022,7 +6022,6 @@ gcoHARDWARE_Construct(
     gcoOS_ZeroMemory(pointer,gcmSIZEOF(gcsHARDWARE_CONFIG));
     hardware->config = pointer;
     gcmONERROR(_QueryHardwareIdAndOptions(hardware));
-    gcmONERROR(_QueryHardwareFrequency(hardware));
 #if gcdENABLE_3D
     gcmONERROR(_SetSpecialHint(hardware));
 #endif
