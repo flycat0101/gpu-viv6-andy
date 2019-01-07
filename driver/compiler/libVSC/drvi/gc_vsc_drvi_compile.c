@@ -999,8 +999,6 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Convert atom* to extcall atom* if needed */
     CALL_SH_PASS(vscVIR_GenExternalAtomicCall, 0, gcvNULL);
 
-    CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
-
     /* Link intrinsic functions. */
     CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
 
