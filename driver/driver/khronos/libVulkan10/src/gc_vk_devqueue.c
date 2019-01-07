@@ -725,6 +725,7 @@ VkResult __vk_QueueCommit(
                     iface.u.Commit.index = 0;
                 }
             }
+            iface.commitMutex = gcvTRUE;
             iface.u.Commit.count = devCtx->chipInfo->gpuCoreCount;
             __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
@@ -743,6 +744,7 @@ VkResult __vk_QueueCommit(
             iface.u.Commit.shared = gcvFALSE;
             iface.u.Commit.index = 0;
             iface.u.Commit.count = 1;
+            iface.commitMutex = gcvTRUE;
 
             /* Call kernel service. */
             __VK_ONERROR(__vk_DeviceControl(&iface, coreIdx));
@@ -966,6 +968,8 @@ VkResult __vk_QueueCommitEvents(
             /* __VK_PDEV_QUEUEFAMILY_BLIT */
             gcvENGINE_BLT,
         };
+
+        iface.commitMutex   = devQueue->commitMutex ? gcvTRUE : gcvFALSE;
         iface.command       = gcvHAL_EVENT_COMMIT;
         iface.u.Event.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
         iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];

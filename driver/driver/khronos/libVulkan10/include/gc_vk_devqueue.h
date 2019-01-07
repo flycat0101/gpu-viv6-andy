@@ -60,6 +60,7 @@ struct __vkDevQueueRec
     uint64_t                    commitStamp;
     uint32_t                    inProcessBytes;
     gctSIGNAL signal;
+    VkBool32                    commitMutex;
 };
 
 VkResult __vk_CreateDeviceQueues(

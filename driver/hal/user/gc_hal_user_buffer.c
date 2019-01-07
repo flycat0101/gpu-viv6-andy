@@ -1883,6 +1883,7 @@ gcoBUFFER_Commit(
 
         iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_COMMIT;
+        iface.commitMutex = gcvFALSE;
         iface.engine = Buffer->info.engine;
         iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
         iface.u.Commit.deltas[0] = gcmPTR_TO_UINT64(StateDelta);

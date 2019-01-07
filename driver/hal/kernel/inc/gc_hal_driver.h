@@ -430,6 +430,9 @@ typedef struct _gcsHAL_INTERFACE
     /* Ignore information from TSL when doing IO control */
     gctBOOL                     ignoreTLS;
 
+    /* The mutext already acquired */
+    IN gctBOOL                  commitMutex;
+
     /* Union of command structures. */
     union _u
     {

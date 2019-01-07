@@ -2561,12 +2561,15 @@ gckKERNEL_Dispatch(
         break;
 
     case gcvHAL_EVENT_COMMIT:
-        gcmkONERROR(gckOS_AcquireMutex(Kernel->os,
-            Kernel->device->commitMutex,
-            gcvINFINITE
-            ));
+        if (!Interface->commitMutex)
+        {
+            gcmkONERROR(gckOS_AcquireMutex(Kernel->os,
+                Kernel->device->commitMutex,
+                gcvINFINITE
+                ));
 
-        commitMutexAcquired = gcvTRUE;
+            commitMutexAcquired = gcvTRUE;
+        }
         /* Commit an event queue. */
         if (Interface->engine == gcvENGINE_BLT)
         {
@@ -2584,16 +2587,22 @@ gckKERNEL_Dispatch(
                 Kernel->eventObj, gcmUINT64_TO_PTR(Interface->u.Event.queue), gcvFALSE));
         }
 
-        gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
-        commitMutexAcquired = gcvFALSE;
+        if (!Interface->commitMutex)
+        {
+            gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
+            commitMutexAcquired = gcvFALSE;
+        }
         break;
 
     case gcvHAL_COMMIT:
-        gcmkONERROR(gckOS_AcquireMutex(Kernel->os,
-            Kernel->device->commitMutex,
-            gcvINFINITE
-            ));
-        commitMutexAcquired = gcvTRUE;
+        if (!Interface->commitMutex)
+        {
+            gcmkONERROR(gckOS_AcquireMutex(Kernel->os,
+                Kernel->device->commitMutex,
+                gcvINFINITE
+                ));
+            commitMutexAcquired = gcvTRUE;
+        }
 
         /* Commit a command and context buffer. */
         if (Interface->engine == gcvENGINE_BLT)
@@ -2706,9 +2715,11 @@ gckKERNEL_Dispatch(
             }
         }
 
-        gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
-        commitMutexAcquired = gcvFALSE;
-
+        if (!Interface->commitMutex)
+        {
+            gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->device->commitMutex));
+            commitMutexAcquired = gcvFALSE;
+        }
         break;
 
     case gcvHAL_STALL:

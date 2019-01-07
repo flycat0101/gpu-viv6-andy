@@ -730,6 +730,7 @@ VkResult __vk_CommitStateBuffers(
 
         /* Update commit stamp. */
         devQueue->commitStamp = iface.u.Commit.commitStamp;
+        devQueue->commitMutex = VK_TRUE;
 
         for (icommits = 0; icommits < count; icommits++)
         {
@@ -749,6 +750,7 @@ VkResult __vk_CommitStateBuffers(
         __VK_ONERROR(__vk_DeviceControl(&iface, 0));
         /* Update commit stamp. */
         devQueue->commitStamp = iface.u.Commit.commitStamp;
+        devQueue->commitMutex = VK_FALSE;
     }
 
     __VK_ONERROR(__vk_QueueCommit(devQueue));
