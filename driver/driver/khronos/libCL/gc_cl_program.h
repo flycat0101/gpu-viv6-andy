@@ -45,6 +45,7 @@ typedef struct _cl_program
     cl_build_status         buildStatus;
     cl_program_binary_type  binaryType;
     gctINT                  status;
+    gctINT                  patchIndex;
 }
 clsProgram;
 

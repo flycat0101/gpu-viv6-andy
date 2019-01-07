@@ -88,6 +88,8 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+
+extern void doPatchCreateProgram(cl_program Program );
 /*****************************************************************************\
 |*                       OpenCL Program Object API                           *|
 \*****************************************************************************/
@@ -213,6 +215,7 @@ clCreateProgramWithSource(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    doPatchCreateProgram( program );
     gcmOS_SAFE_FREE(gcvNULL, sizes);
 
     VCL_TRACE_API(CreateProgramWithSource_Post)(Context, Count, Strings, Lengths, ErrcodeRet, program);
