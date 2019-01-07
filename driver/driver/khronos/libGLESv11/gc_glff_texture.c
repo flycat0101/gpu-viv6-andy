@@ -1532,6 +1532,7 @@ static gceSTATUS _AddMipMap(
             newWidth, newHeight,
             0, Faces,
             gcvPOOL_DEFAULT,
+            gcvTRUE,
             &lod1
             ));
 
@@ -1654,6 +1655,7 @@ static gceSTATUS _GenerateMipMap(
             newWidth, newHeight,
             0, Faces,
             gcvPOOL_DEFAULT,
+            gcvTRUE,
             &lod1
             ));
 
@@ -4330,6 +4332,7 @@ gceSTATUS glfUpdateTextureStates(
                         0,
                         gcvFACE_NONE,
                         gcvPOOL_DEFAULT,
+                        gcvTRUE,
                         &mipmap
                         );
 
@@ -7364,6 +7367,7 @@ GL_API void GL_APIENTRY glTexImage2D(
             Width, Height, 0,
             faces,
             gcvPOOL_DEFAULT,
+            gcvTRUE,
             &shareObj
             );
 
@@ -8163,6 +8167,7 @@ GL_API void GL_APIENTRY glCopyTexImage2D(
             Width, Height, 0,
             faces,
             gcvPOOL_DEFAULT,
+            gcvTRUE,
             &shareObj
             );
 
@@ -8349,7 +8354,7 @@ _TexSyncEGLImage(
 
             /* Create mipmap level 0. */
             status = gcoTEXTURE_AddMipMap(Texture->object,
-                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, &mipmap);
+                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &mipmap);
             if (gcmIS_ERROR(status))
             {
                 /* Destroy the texture. */
@@ -8749,6 +8754,7 @@ GL_API void GL_APIENTRY glCopyTexSubImage2D(
                 0,
                 gcvFACE_NONE,
                 gcvPOOL_DEFAULT,
+                gcvTRUE,
                 &map
                 );
         }
@@ -9746,6 +9752,7 @@ glfBindTexImage(
             width, height, 0,
             0,
             gcvPOOL_DEFAULT,
+            gcvTRUE,
             &mipView.surf
             ));
 

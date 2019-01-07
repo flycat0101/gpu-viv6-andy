@@ -1293,6 +1293,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
                         0,
                         gcvFACE_NONE,
                         gcvPOOL_DEFAULT,
+                        gcvTRUE,
                         &mipmap
                         );
 

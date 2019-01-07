@@ -2191,6 +2191,7 @@ gcoTEXTURE_AddMipMap(
     IN gctSIZE_T Depth,
     IN gctUINT Faces,
     IN gcePOOL Pool,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     );
 
@@ -2207,6 +2208,7 @@ gcoTEXTURE_AddMipMapEx(
     IN gcePOOL Pool,
     IN gctUINT32 Samples,
     IN gctBOOL Protected,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     );
 

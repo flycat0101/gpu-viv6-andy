@@ -30142,7 +30142,7 @@ gcChipPatchClear(
                 /* Resize RT surface */
                 gcmONERROR(gcoTEXTURE_Destroy(texInfo->object));
                 gcmONERROR(gcoTEXTURE_ConstructEx(gcvNULL, __glChipTexTargetToHAL[texObj->targetIndex], &texInfo->object));
-                gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object, 0, 0, format, width/SCALE, height/SCALE, 1, 1, gcvPOOL_DEFAULT, &rtView0.surf));
+                gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object, 0, 0, format, width/SCALE, height/SCALE, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &rtView0.surf));
                 /* Recall to update RT info */
                 gc->apiDispatchTable.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
                 gc->apiDispatchTable.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texName, 0);

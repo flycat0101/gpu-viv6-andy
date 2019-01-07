@@ -881,6 +881,7 @@ gcChipResidentTextureLevel(
                                           gcvPOOL_DEFAULT,
                                           texObj->samplesUsed,
                                           (gctBOOL)texObj->params.contentProtected,
+                                          mipmap->formatInfo->filterable,
                                           gcvNULL));
 
         if (chipCtx->needStencilOpt)
@@ -1711,6 +1712,7 @@ gcChipOrphanTexMipmap(
                                                     (gctSIZE_T)texObj->arrays : (gctSIZE_T)baseMipmap->depth,
                                         (texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX) ? 1 : texObj->arrays,
                                         gcvPOOL_DEFAULT,
+                                        baseMipmap->formatInfo->filterable,
                                         &newSurf));
 
         gcmONERROR(gcoSURF_Copy(newSurf, oldSurf));
@@ -1824,6 +1826,7 @@ gcChipCopyTexImage(
                                         1,
                                         texObj->arrays,
                                         gcvPOOL_DEFAULT,
+                                        mipmap->formatInfo->filterable,
                                         &texView.surf));
     }
 
@@ -2280,6 +2283,7 @@ gcChipCopyTexSubImage(
                                             (gctSIZE_T)texObj->arrays : (gctSIZE_T)mipmap->depth,
                                         __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
                                         gcvPOOL_DEFAULT,
+                                        mipmap->formatInfo->filterable,
                                         &texView.surf));
     }
 
@@ -3596,6 +3600,7 @@ __glChipGenerateMipMap(
                                         __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? texObj->arrays : baseMipmap->depth,
                                         __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
                                         gcvPOOL_DEFAULT,
+                                        baseMipmap->formatInfo->filterable,
                                         gcvNULL));
 
         GL_ASSERT(chipCtx->needStencilOpt == GL_FALSE);
@@ -3647,6 +3652,7 @@ __glChipGenerateMipMap(
                                           gcvPOOL_DEFAULT,
                                           0,
                                           surface->hints & gcvSURF_PROTECTED_CONTENT ? gcvTRUE : gcvFALSE,
+                                          baseMipmap->formatInfo->filterable,
                                           &dstSurface));
 
         /* only base level has valid data, we need to generate data for other mips */
@@ -4032,6 +4038,7 @@ __glChipBindTexImage(
                                         1,
                                         1,
                                         gcvPOOL_DEFAULT,
+                                        mipmap->formatInfo->filterable,
                                         &texView.surf));
 
         /* Resolve surface to texture mipmap: no flip in the resolve. */
@@ -4894,7 +4901,7 @@ gcChipTexSyncDirectVIV(
 
             /* Create mipmap level 0. */
             gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
-                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, &mipmap));
+                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &mipmap));
 
             /* Mipmap allocated, force dirty. */
             dirty = gcvTRUE;
@@ -5024,7 +5031,7 @@ gcChipTexSyncEGLImage(
 
             /* Create mipmap level 0. */
             gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
-                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, &mipmap));
+                0, gcvUNKNOWN_MIPMAP_IMAGE_FORMAT, textureFormat, width, height, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &mipmap));
 
             /* Mipmap allocated, force dirty. */
             dirty = gcvTRUE;

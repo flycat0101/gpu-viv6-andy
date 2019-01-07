@@ -1513,6 +1513,7 @@ GLvoid loadLineStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
         16*repeatCnt, 1, 0,
         0,
         gcvPOOL_DEFAULT,
+        gcvTRUE,
         gcvNULL
         );
 
@@ -1598,6 +1599,7 @@ GLvoid initPolygonStipplePatch(__GLcontext *gc, __GLchipContext *chipCtx)
            32, 0,
            0,
            gcvPOOL_DEFAULT,
+           gcvTRUE,
            gcvNULL
     );
 

@@ -1734,6 +1734,7 @@ gcoTEXTURE_AddMipMap(
     IN gctSIZE_T Depth,
     IN gctUINT Faces,
     IN gcePOOL Pool,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     )
 {
@@ -1749,6 +1750,7 @@ gcoTEXTURE_AddMipMap(
         Pool,
         0,
         gcvFALSE,
+        Filterable,
         Surface
         );
 }
@@ -1820,6 +1822,7 @@ gcoTEXTURE_AddMipMapEx(
     IN gcePOOL Pool,
     IN gctUINT32 Samples,
     IN gctBOOL Protected,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     )
 {
@@ -2043,8 +2046,9 @@ gcoTEXTURE_AddMipMapEx(
         }
 
         /* Set texture filterable property. */
-        Texture->filterable = !map->surface->formatInfo.fakedFormat ||
-                              map->surface->paddingFormat;
+        Texture->filterable = (!map->surface->formatInfo.fakedFormat ||
+                              map->surface->paddingFormat) &&
+                              Filterable;
 
         /* Update internal format no matter surface was reallocated or not */
         map->internalFormat = internalFormat;
@@ -5514,6 +5518,7 @@ gceSTATUS gcoTEXTURE_AddMipMap(
     IN gctSIZE_T Depth,
     IN gctUINT Faces,
     IN gcePOOL Pool,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     )
 {
@@ -5537,6 +5542,7 @@ gcoTEXTURE_AddMipMapEx(
     IN gcePOOL Pool,
     IN gctUINT32 Samples,
     IN gctBOOL Protected,
+    IN gctBOOL Filterable,
     OUT gcoSURF * Surface
     )
 {

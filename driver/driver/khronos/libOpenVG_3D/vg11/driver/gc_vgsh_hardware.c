@@ -946,6 +946,7 @@ gceSTATUS vgshCreateTexture(
                                              0,
                                              0,
                                              gcvPOOL_DEFAULT,
+                                             gcvTRUE,
                                              surface));
 
             gcmERR_BREAK(gcoSURF_SetResolvability(*surface, gcvFALSE));

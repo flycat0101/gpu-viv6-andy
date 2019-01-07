@@ -1123,7 +1123,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_RGBA,                            /* baseFormat */
         GL_UNSIGNED_INT,                    /* category */
         GL_FALSE,                           /* compressed */
-        GL_TRUE,                            /* filterable */
+        GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
         1, 1,                               /* blockW/H */

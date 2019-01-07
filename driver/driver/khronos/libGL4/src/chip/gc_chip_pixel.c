@@ -370,6 +370,7 @@ GLvoid initAccumOperationPatch(__GLcontext* gc)
            0,
            0,
            gcvPOOL_DEFAULT,
+           gcvTRUE,
            gcvNULL
     );
 
@@ -405,6 +406,7 @@ GLvoid initAccumOperationPatch(__GLcontext* gc)
            0,
            0,
            gcvPOOL_DEFAULT,
+           gcvTRUE,
            gcvNULL
     );
 
