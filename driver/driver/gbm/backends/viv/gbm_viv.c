@@ -1012,7 +1012,7 @@ gbm_viv_surface_lock_front_buffer(
     struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
     struct gbm_bo *bo = NULL;
     struct gbm_viv_bo *viv_bo = NULL;
-    bool found = false;
+    gctBOOL found = gcvFALSE;
 
     do
     {
@@ -1035,7 +1035,7 @@ gbm_viv_surface_lock_front_buffer(
             {
                 gcoSURF_UpdateMetadata(viv_bo->surface, viv_bo->ts_fd);
             }
-            found = true;
+            found = gcvTRUE;
         }
         gcoOS_ReleaseMutex(gcvNULL, surf->lock);
 
@@ -1052,14 +1052,14 @@ gbm_viv_surface_lock_front_buffer(
 
                 surf->buffers[headIndex].lockCount++;
                 bo = surf->buffers[headIndex].bo;
-                found = true;
+                found = gcvTRUE;
             }
 
             if (found)
                 break;
         }
     }
-    while (1);
+    while (gcvTRUE);
 
     return bo;
 }
@@ -1071,7 +1071,7 @@ gbm_viv_surface_enqueue(
     )
 {
     int i;
-    bool done = false;
+    gctBOOL done = gcvFALSE;
     for (i = 0; i < surf->buffer_count; i++)
     {
        struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
@@ -1096,14 +1096,14 @@ gbm_viv_surface_enqueue(
             gbm_viv_surface_print_queue(surf, "before_enqueue");
             surf->queue.data[surf->queue.tail] = i;
             surf->queue.tail = (surf->queue.tail + 1) % GBM_QUEUE_SIZE;
-            done = true;
+            done = gcvTRUE;
             gbm_viv_surface_print_queue(surf, "after_enqueue");
         }
         gcoOS_ReleaseMutex(gcvNULL, surf->lock);
         if (done)
             break;
     }
-    while (1);
+    while (gcvTRUE);
 
     return;
 }
@@ -1115,7 +1115,7 @@ gbm_viv_surface_get_free_buffer(
 {
     int i = 0;
     struct gbm_bo * bo = NULL;
-    bool found = false;
+    gctBOOL found = gcvFALSE;
 
     do
     {
@@ -1125,7 +1125,7 @@ gbm_viv_surface_get_free_buffer(
             surf->buffers[i].status = USED_BY_EGL;
             bo = surf->buffers[i].bo;
             surf->free_count--;
-            found = true;
+            found = gcvTRUE;
             if (surf->free_count == 1)
             {
                 while (surf->queue.head == surf->queue.tail)
@@ -1140,7 +1140,7 @@ gbm_viv_surface_get_free_buffer(
         if ((i++) == surf->buffer_count)
             i = 0;
 
-    } while (1);
+    } while (gcvTRUE);
 
     return bo;
 }
