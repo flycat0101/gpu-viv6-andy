@@ -2418,6 +2418,12 @@ _ConvGetSamplerIdx(
         VIR_OpCode           opcode = VIR_Inst_GetOpcode(pNextInst);
         gctUINT              srcIdx = (opcode == VIR_OP_LDARR) ? 1 : 0;
 
+        /*if met another get sample idx, stop searching nextInst*/
+        if (opcode == VIR_OP_GET_SAMPLER_IDX)
+        {
+            return errCode;
+        }
+
         src = VIR_Inst_GetSource(pNextInst, srcIdx);
         if (src == gcvNULL || !VIR_Operand_isSymbol(src))
         {
@@ -4120,14 +4126,14 @@ OnError:
     return errCode;
 }
 
-DEF_QUERY_PASS_PROP(vscVIR_PreprocessMLPostShader)
+DEF_QUERY_PASS_PROP(vscVIR_CheckMustInlineFuncForML)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
     pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
-VSC_ErrCode vscVIR_PreprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker)
+VSC_ErrCode vscVIR_CheckMustInlineFuncForML(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
