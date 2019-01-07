@@ -2523,7 +2523,7 @@ _PostWindowBackBufferFence(
     else
     {
         /* For gbm and fence, should not be here */
-        gcmASSERT(FALSE);
+        gcmASSERT(EGL_FALSE);
     }
 
     return EGL_TRUE;
