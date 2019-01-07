@@ -1332,6 +1332,11 @@ VIR_TypeId VIR_LinkLib_TypeConv(
                                     0,
                                     &outTyId);
             break;
+
+        case VIR_TY_POINTER:
+            outTyId = VIR_TYPE_UINT32;
+            break;
+
         default:
             gcmASSERT(gcvFALSE);
             break;
