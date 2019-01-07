@@ -267,13 +267,20 @@ clfAddEventToEventList(
                                     context->eventListMutex,
                                     gcvINFINITE));
 
-    Event->next = context->eventList;
-
-    if (Event->next)
+    if (context->eventList == gcvNULL)
     {
-        Event->next->previous = Event;
+        context->eventList = Event;
     }
-    context->eventList = Event;
+    else
+    {
+        cl_event tail = context->eventList;
+        while (tail->next != gcvNULL)
+        {
+            tail = tail->next;
+        }
+        tail->next = Event;
+        Event->previous = tail;
+    }
 
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL,
                                     context->eventListMutex));
