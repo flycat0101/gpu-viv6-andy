@@ -697,6 +697,27 @@ VIR_Lower_IsFloatOpcode(
     return gcvFALSE;
 }
 
+gctBOOL
+VIR_Lower_IsSrc1FloatConstant(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_PrimitiveTypeId baseType;
+    VIR_Operand *       src1 = VIR_Inst_GetSource(Inst, 1);
+
+    gcmASSERT(src1 != gcvNULL);
+
+    baseType = VIR_Lower_GetBaseType(Context->shader, src1);
+
+    if ((VIR_GetTypeFlag(baseType) & VIR_TYFLAG_ISFLOAT) &&
+       (VIR_Operand_isImm(src1) || VIR_Operand_isConst(src1)))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
 
 gctBOOL
 VIR_Lower_IsNotCLShader(

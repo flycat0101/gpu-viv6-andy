@@ -1103,6 +1103,15 @@ Generate20BitsImmediate(
     IN gctINT                OperandNo
     );
 
+/* return true if the Value can be fit into 20bits,
+   considering it may be negated or absoluted later
+  */
+gctBOOL
+ValueFit20Bits(
+    IN  gcSL_FORMAT         Format,
+    IN  gctUINT32           Hex32
+    );
+
 gctUINT32
 gcSHADER_GetHintSize(
     void

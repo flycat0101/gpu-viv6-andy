@@ -448,8 +448,8 @@ gcConvert20BitTo32BitValue(
 /* return true if the Value can be fit into 20bits,
    considering it may be negated or absoluted later
   */
-static gctBOOL
-_ValueFit20Bits(
+gctBOOL
+ValueFit20Bits(
     IN  gcSL_FORMAT         Format,
     IN  gctUINT32           Hex32
     )
@@ -14673,7 +14673,7 @@ _ProcessSource(
                         : (instruction->source1Index | (instruction->source1Indexed << 16));
 
                 if (Generate20BitsImmediate(CodeGen, instruction, Source) &&
-                    _ValueFit20Bits(format, value.hex32))
+                    ValueFit20Bits(format, value.hex32))
                 {
                     gcsConstantValue constValue;
                     constValue.ty = format;
@@ -15368,7 +15368,7 @@ _getSourceConstant(
             value;
             value.hex32 = (index & 0xFFFF) | (indexed << 16);
             if (Generate20BitsImmediate(CodeGen, instruction, SourceNo) &&
-                _ValueFit20Bits(format, value.hex32))
+                ValueFit20Bits(format, value.hex32))
             {
                 /* the constant can fit in immediate field,
                    do not put into uniform */

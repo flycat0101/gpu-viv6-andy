@@ -293,6 +293,18 @@ _hasSIGN_FLOOR_CEIL(
 }
 
 static gctBOOL
+_hasSIGN_FLOOR_CEIL_and_constSrc1(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32_PTR States
+    )
+{
+    return CodeGen->hasSIGN_FLOOR_CEIL &&
+           (gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_CONSTANT);
+}
+
+static gctBOOL
 _hasSQRT_TRIG(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -15807,6 +15819,52 @@ _isDstFloat(
 }
 
 static gctBOOL
+set_RCP_value(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32 * States
+    )
+{
+    gcsConstantValue constValue;
+    gcSL_FORMAT      format = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source1, Format);
+
+    if(format == gcSL_FLOAT)
+    {
+        constValue.ty = gcSL_FLOAT;
+        constValue.value.u = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
+        constValue.value.f = 1.0f / constValue.value.f;
+        if (ValueFit20Bits(format, constValue.value.u))
+        {
+            /* put the value in src1 immediate field if it can fit into 20 bits */
+            gcEncodeSourceImmediate20(States, 1, &constValue);
+        }
+        else
+        {
+            /* otherwise put into a new uniform, it may fail if there is no available uniform */
+            gctINT index = 0;
+            gctUINT8 swizzle = 0;
+            gcSL_TYPE constType;
+
+            gcmVERIFY_OK(_AddConstantVec1(Tree,
+                                          CodeGen,
+                                          constValue.value.f,
+                                          &index,
+                                          &swizzle,
+                                          &constType));
+
+            _UsingConstUniform(Tree, CodeGen, 1, index, swizzle, constType, States);
+        }
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 set_extended_opcode_lodq(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -18675,6 +18733,12 @@ const gcsSL_PATTERN patterns_MOD[] =
         { -4, 0x64, gcSL_CG_TEMP1, 0, 2, 3, 0, set_new_sin_cos_log_div },
         { -3, 0x13, gcSL_CG_TEMP2, 0, 0, gcSL_CG_TEMP1, 0 },
         { -2, 0x01, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, -gcSL_CG_TEMP2, 0 },
+        { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
+
+        /* Has new FLOOR but no DIV */
+    { 1, gcSL_MOD, 1, 2, 3, 0, 0, _hasSIGN_FLOOR_CEIL_and_constSrc1 },
+        { -3, 0x03, gcSL_CG_TEMP1, 2, 3, 0, 0, set_RCP_value },
+        { -2, 0x25, gcSL_CG_TEMP1, 0, 0, gcSL_CG_TEMP1 },
         { -1, 0x02, 1, 3, gcSL_CG_TEMP1, 2, 0, _SatNeg0 },
 
     /* Has new FLOOR but no DIV */

@@ -320,6 +320,12 @@ VIR_Lower_IsSrc0Unsigned(
     );
 
 gctBOOL
+VIR_Lower_IsSrc1FloatConstant(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsNotCLShader(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
