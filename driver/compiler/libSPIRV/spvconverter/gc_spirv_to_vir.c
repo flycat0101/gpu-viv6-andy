@@ -5725,9 +5725,22 @@ static VSC_ErrCode __SpvAddFuncCall(gcSPV spv, VIR_Shader * virShader)
         spvArgs = spv->operands[i];
         operand = parmOpnd->args[i - 1];
 
+        if (SPV_ID_TYPE(spvArgs) == SPV_ID_TYPE_SYMBOL)
+        {
+            VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvArgs));
+            VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+        }
+        else if (SPV_ID_TYPE(spvArgs) == SPV_ID_TYPE_CONST)
+        {
+            VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spvArgs));
+            VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
         VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spvArgs));
-        VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvArgs));
-        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
         VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvArgs));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
