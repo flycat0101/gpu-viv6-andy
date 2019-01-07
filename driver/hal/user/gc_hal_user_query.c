@@ -173,6 +173,45 @@ gceSTATUS gcoHAL_QueryChipIdentity(
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoHAL_QueryChipIdentityEx
+**
+**  Query the identity of the hardware.
+**
+**  INPUT:
+**
+**      gcoHAL Hal
+**          Pointer to an gcoHAL object.
+**
+**  OUTPUT:
+**
+**
+**
+*/
+gceSTATUS gcoHAL_QueryChipIdentityEx(
+    IN gcoHAL Hal,
+    IN gctUINT32 SizeOfParam,
+    OUT gcsHAL_CHIPIDENTITY *ChipIdentity
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER();
+
+    /* Query identity from hardware object. */
+    status = gcoHARDWARE_QueryChipIdentityEx(
+                                       gcvNULL,
+                                       SizeOfParam,
+                                       ChipIdentity);
+
+
+    /* Return status. */
+    gcmFOOTER();
+    return status;
+}
+
+
 
 /*******************************************************************************
 **

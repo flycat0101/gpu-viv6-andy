@@ -414,6 +414,20 @@ typedef struct _gcsHAL_LIMITS
 
 }gcsHAL_LIMITS;
 
+
+typedef struct _gcsHAL_CHIPIDENTITY
+{
+    gceCHIPMODEL                chipModel;
+    gctUINT32                   chipRevision;
+    gctUINT32                   productID;
+    gctUINT32                   customerID;
+    gctUINT32                   ecoID;
+    gceCHIP_FLAG                chipFlags;
+    gctUINT32                   platformFlagBits;
+}
+gcsHAL_CHIPIDENTITY;
+
+
 #define gcdEXTERNAL_MEMORY_NAME_MAX 32
 #define gcdEXTERNAL_MEMORY_DATA_MAX 8
 
@@ -589,6 +603,12 @@ gcoHAL_QueryChipIdentity(
     OUT gctUINT32* ChipRevision,
     OUT gctUINT32* ChipFeatures,
     OUT gctUINT32* ChipMinorFeatures
+    );
+
+gceSTATUS gcoHAL_QueryChipIdentityEx(
+    IN gcoHAL Hal,
+    IN gctUINT32 SizeOfParam,
+    OUT gcsHAL_CHIPIDENTITY *ChipIdentity
     );
 
 

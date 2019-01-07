@@ -7474,6 +7474,11 @@ gckOS_QueryOption(
         *Value = device->args.gpuProfiler;
         return gcvSTATUS_OK;
     }
+    else if (!strcmp(Option, "platformFlagBits"))
+    {
+        *Value = device->platform->flagBits;
+        return gcvSTATUS_OK;
+    }
 
     return gcvSTATUS_NOT_SUPPORTED;
 }

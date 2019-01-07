@@ -4947,6 +4947,59 @@ OnError:
     return status;
 }
 
+
+/*******************************************************************************
+**
+**  gcoHARDWARE_QueryChipIdentityEx
+**
+**  Query the identity of the hardware.
+**
+**  INPUT:
+**
+**      gcoHARDWARE Hardware
+**          Pointer to an gcoHARDWARE object.
+**
+**      gctUINT32  SizeOfParam
+**          Size of Parameter structure memory.
+**
+**  OUTPUT:
+**      gcsHAL_CHIPIDENTITY *ChipIdentity
+**          Pointer to memory buffer to have chip identity.
+*/
+gceSTATUS gcoHARDWARE_QueryChipIdentityEx(
+    IN  gcoHARDWARE Hardware,
+    IN  gctUINT32 SizeOfParam,
+    OUT gcsHAL_CHIPIDENTITY *ChipIdentity
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x SizeOfParam=0x%x ChipIdentity=%p ",
+                    Hardware, SizeOfParam, ChipIdentity);
+
+    gcmGETHARDWARE(Hardware);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    if (gcmSIZEOF(gcsHAL_CHIPIDENTITY) == SizeOfParam)
+    {
+        gcmASSERT(ChipIdentity);
+        ChipIdentity->chipModel = Hardware->config->chipModel;
+        ChipIdentity->chipRevision = Hardware->config->chipRevision;
+        ChipIdentity->customerID = Hardware->config->customerID;
+        ChipIdentity->ecoID = Hardware->config->ecoID;
+        ChipIdentity->productID = Hardware->config->productID;
+        ChipIdentity->platformFlagBits = Hardware->config->platformFlagBits;
+    }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+
 /*******************************************************************************
 **
 **  gcoHARDWARE_QueryCommandBuffer

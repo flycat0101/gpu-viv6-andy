@@ -3069,7 +3069,7 @@ static gceSTATUS
     config->customerID             = iface.u.QueryChipIdentity.customerID;
     config->ecoID                  = iface.u.QueryChipIdentity.ecoID;
     config->chipFlags              = iface.u.QueryChipIdentity.chipFlags;
-
+    config->platformFlagBits       = iface.u.QueryChipIdentity.platformFlagBits;
 
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_QUERY_CHIP_OPTION;

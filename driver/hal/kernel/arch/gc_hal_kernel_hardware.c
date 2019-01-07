@@ -345,6 +345,8 @@ _IdentifyHardwareByDatabase(
         Identity->chipFlags |= gcvCHIP_AXI_BUS128_BITS;
     }
 
+    gckOS_QueryOption(Os, "platformFlagBits", &Identity->platformFlagBits);
+
     /* Success. */
     gcmkFOOTER();
     return gcvSTATUS_OK;

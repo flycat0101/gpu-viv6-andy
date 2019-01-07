@@ -250,6 +250,7 @@ EXPORTS
     gcoHAL_Query3DCoreCount
     gcoHAL_QueryChipFeature
     gcoHAL_QueryChipIdentity
+    gcoHAL_QueryChipIdentityEx
     gcoHAL_QueryChipLimits
     gcoHAL_QueryPowerManagementState
     gcoHAL_QueryTiled

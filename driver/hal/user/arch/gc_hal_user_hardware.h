@@ -234,6 +234,8 @@ typedef struct _gcsHARDWARE_CONFIG
 
     gceCHIP_FLAG                chipFlags;
 
+    gctUINT32                   platformFlagBits;
+
     /* Data extracted from specs bits. */
 #if gcdENABLE_3D
     /* gcChipSpecs. */

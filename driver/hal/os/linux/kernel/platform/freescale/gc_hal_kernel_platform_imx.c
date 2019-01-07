@@ -1423,9 +1423,16 @@ _AdjustParam(
 {
     patch_param(Platform->device, Args);
 
-    if (of_find_compatible_node(NULL, NULL, "fsl,imx8mq-gpu") && ((Args->baseAddress + totalram_pages * PAGE_SIZE) > 0x100000000))
-        Platform->flagBits = gcvPLATFORM_FLAG_LIMIT_4G_ADDRESS;
+    if (of_find_compatible_node(NULL, NULL, "fsl,imx8mq-gpu") &&
+        ((Args->baseAddress + totalram_pages * PAGE_SIZE) > 0x100000000))
+    {
+        Platform->flagBits |= gcvPLATFORM_FLAG_LIMIT_4G_ADDRESS;
+    }
 
+    if (of_find_compatible_node(NULL, NULL, "fsl,imx8mm-gpu"))
+    {
+        Platform->flagBits |= gcvPLATFORM_FLAG_IMX_MM;
+    }
     return gcvSTATUS_OK;
 }
 

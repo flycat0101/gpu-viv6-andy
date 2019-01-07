@@ -467,6 +467,13 @@ gcoHARDWARE_QueryChipIdentity(
     OUT gctUINT32* ChipRevision
     );
 
+/* Query the identity of the hardware with structure parameter. */
+gceSTATUS gcoHARDWARE_QueryChipIdentityEx(
+    IN  gcoHARDWARE Hardware,
+    IN  gctUINT32 SizeOfParam,
+    OUT gcsHAL_CHIPIDENTITY *ChipIdentity
+    );
+
 /* Verify whether the specified feature is available in hardware. */
 gceSTATUS
 gcoHARDWARE_IsFeatureAvailable(
