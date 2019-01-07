@@ -13,6 +13,8 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 
 #include <hardware/gralloc.h>
 #include <cutils/log.h>
