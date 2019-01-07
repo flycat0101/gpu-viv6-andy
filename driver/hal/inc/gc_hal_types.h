@@ -813,7 +813,8 @@ gceSTATUS;
 **
 **      Return a value with all bytes in the 32 bit argument swapped.
 */
-#if !defined(__KERNEL__) && defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ >= 40300)
+#if !defined(__KERNEL__) && defined(__GNUC__) && (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ >= 40300) \
+   && !defined(__VXWORKS__)
 #  define gcmBSWAP32(x)     __builtin_bswap32(x)
 #else
 #  define gcmBSWAP32(x) ((gctUINT32)(\

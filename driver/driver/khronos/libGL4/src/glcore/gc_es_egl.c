@@ -128,7 +128,7 @@ __GLthreadPriv* __eglGetThreadEsPrivData(void* thrData)
 #if defined(_WINDOWS)
 
 
-#elif (defined(_LINUX_) || defined(__QNXNTO__)) || defined(__APPLE__)
+#elif (defined(_LINUX_) || defined(__QNXNTO__)) || defined(__APPLE__) || defined(__VXWORKS__)
 
 static void __attribute__((constructor)) __eglConstruct(void);
 static void __attribute__((destructor)) __eglDestruct(void);

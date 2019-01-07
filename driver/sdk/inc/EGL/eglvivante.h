@@ -229,7 +229,8 @@ typedef struct _platEvent
 }
 platEvent;
 
-#if defined(__linux__) && defined(EGL_API_FB) && !defined(__APPLE__)
+#if (defined(__linux__) && defined(EGL_API_FB) && !defined(__APPLE__)) \
+    || (defined(__VXWORKS__))
 
 void *
 fbGetDisplay(

@@ -724,6 +724,9 @@ _SupportedPlatforms[] =
 #if defined(EGL_API_FB)
     {"fbdev",   veglGetFbdevPlatform},
 #endif
+#if defined(__VXWORKS__)
+    {"vxworks", veglGetFbdevPlatform},
+#endif
     {"nullws",  veglGetNullwsPlatform},
     /* make sure gbm is after default platform */
 #if defined(__GBM__)

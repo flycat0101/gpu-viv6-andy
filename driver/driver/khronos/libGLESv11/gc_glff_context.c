@@ -1566,6 +1566,7 @@ glfLoadCompiler(
             gctPOINTER ptr;
         } finalizer;
 
+#if !defined(__VXWORKS__)
         status = gcoOS_LoadLibrary(gcvNULL,
 #if defined(__APPLE__)
                                    "libGLSLC.dylib",
@@ -1582,6 +1583,7 @@ glfLoadCompiler(
         {
             break;
         }
+#endif
 
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcInitializeCompiler", &intializer.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcFinalizeCompiler", &finalizer.ptr));

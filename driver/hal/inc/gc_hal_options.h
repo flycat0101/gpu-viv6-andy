@@ -1057,7 +1057,7 @@ This define enables the use of VM for gckCommand and fence buffers.
  */
 
 #ifndef gcdINTERRUPT_STATISTIC
-#if defined(LINUX) || defined(__QNXNTO__) || defined(UNDER_CE)
+#if defined(LINUX) || defined(__QNXNTO__) || defined(UNDER_CE) || defined(__VXWORKS__)
 #   define gcdINTERRUPT_STATISTIC               1
 #else
 #   define gcdINTERRUPT_STATISTIC               0
