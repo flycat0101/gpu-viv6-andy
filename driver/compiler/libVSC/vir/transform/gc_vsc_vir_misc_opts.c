@@ -7737,4 +7737,320 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+static VSC_ErrCode _vscVIR_InsertBoundCheckBefore(
+    VIR_Shader* pShader,
+    VIR_Function *pFunc,
+    VIR_Instruction *inst, /* insert before here */
+    VIR_Label *labelelse)
+{
+    VIR_VirRegId addrRegNo, newRegNo;
+    VIR_SymId    addrSymId, newSymId;
+    VIR_Instruction *addInst = gcvNULL, *addUpInst = gcvNULL;
+    VIR_Instruction *jmpcInst = gcvNULL, *jmpc1Inst = gcvNULL;
+    VIR_Operand* baseOper = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand* offsetOper = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand *newdestOper, *src0Oper, *src1Oper;
+    VSC_ErrCode errCode;
+    VIR_TypeId destOperTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst));
+    gctUINT     destOperTypeSize;
+
+    addrRegNo = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   addrRegNo,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &addrSymId);
+    /* add t1.x, base.x, offset */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                VIR_OP_ADD,
+                VIR_TYPE_UINT32,
+                inst,
+                gcvTRUE,
+                &addInst);
+    newdestOper = VIR_Inst_GetDest(addInst);
+    VIR_Operand_SetSymbol(newdestOper, pFunc, addrSymId);
+    VIR_Operand_SetEnable(newdestOper, VIR_ENABLE_X);
+
+    src0Oper = VIR_Inst_GetSource(addInst, 0);
+    VIR_Operand_Copy(src0Oper, baseOper);
+    VIR_Operand_SetSwizzle(src0Oper, VIR_SWIZZLE_XXXX);
+    VIR_Operand_SetTypeId(src0Oper, VIR_TYPE_UINT32);
+
+    src1Oper = VIR_Inst_GetSource(addInst, 1);
+    VIR_Operand_Copy(src1Oper, offsetOper);
+    VIR_Operand_SetSwizzle(src1Oper, VIR_Operand_GetSwizzle(offsetOper));
+
+    /* JMPC.lt labelelse, t1.x, base.y*/
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                  VIR_OP_JMPC,
+                  VIR_TYPE_UNKNOWN,
+                  inst,
+                  gcvTRUE,
+                  &jmpcInst);
+
+    src0Oper = VIR_Inst_GetSource(jmpcInst, 0);
+    VIR_Operand_SetSymbol(src0Oper, pFunc, addrSymId);
+    VIR_Operand_SetSwizzle(src0Oper, VIR_SWIZZLE_XXXX);
+
+    src1Oper = VIR_Inst_GetSource(jmpcInst, 1);
+    VIR_Operand_Copy(src1Oper, baseOper);
+    VIR_Operand_SetSwizzle(src1Oper, VIR_SWIZZLE_YYYY);
+    VIR_Operand_SetTypeId(src1Oper, VIR_TYPE_UINT32);
+
+    VIR_Operand_SetLabel(VIR_Inst_GetDest(jmpcInst), labelelse);
+    VIR_Inst_SetConditionOp(jmpcInst, VIR_COP_LESS);
+
+    gcmASSERT(VIR_TypeId_isPrimitive(destOperTypeId));
+    destOperTypeSize = VIR_GetTypeSize(destOperTypeId);
+
+    /*add t2.x, t1.x, (destOperTypeSize -1)*/
+    newRegNo = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   newRegNo,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &newSymId);
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                VIR_OP_ADD,
+                VIR_TYPE_UINT32,
+                inst,
+                gcvTRUE,
+                &addUpInst);
+    newdestOper = VIR_Inst_GetDest(addUpInst);
+    VIR_Operand_SetSymbol(newdestOper, pFunc, newSymId);
+    VIR_Operand_SetEnable(newdestOper, VIR_ENABLE_X);
+
+    src0Oper = VIR_Inst_GetSource(addUpInst, 0);
+    VIR_Operand_SetSymbol(src0Oper, pFunc, addrSymId);
+    VIR_Operand_SetSwizzle(src0Oper, VIR_SWIZZLE_XXXX);
+    VIR_Operand_SetTypeId(src0Oper, VIR_TYPE_UINT32);
+
+    src1Oper = VIR_Inst_GetSource(addUpInst, 1);
+    VIR_Operand_SetImmediateUint(src1Oper, (destOperTypeSize-1));
+    VIR_Operand_SetSwizzle(src1Oper, VIR_SWIZZLE_XXXX);
+
+    /*JMPC.GT labelelse, t2.x, base.z */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                  VIR_OP_JMPC,
+                  VIR_TYPE_UNKNOWN,
+                  inst,
+                  gcvTRUE,
+                  &jmpc1Inst);
+
+    src0Oper = VIR_Inst_GetSource(jmpc1Inst, 0);
+    VIR_Operand_SetSymbol(src0Oper, pFunc, newSymId);
+    VIR_Operand_SetSwizzle(src0Oper, VIR_SWIZZLE_XXXX);
+
+    src1Oper = VIR_Inst_GetSource(jmpc1Inst, 1);
+    VIR_Operand_Copy(src1Oper, baseOper);
+    VIR_Operand_SetSwizzle(src1Oper, VIR_SWIZZLE_ZZZZ);
+    VIR_Operand_SetTypeId(src1Oper, VIR_TYPE_UINT32);
+
+    VIR_Operand_SetLabel(VIR_Inst_GetDest(jmpc1Inst), labelelse);
+    VIR_Inst_SetConditionOp(jmpc1Inst, VIR_COP_GREATER);
+
+    return errCode;
+}
+
+static VSC_ErrCode _vscVIR_GenerateLoadBoundCheck(
+    VIR_Shader      *pShader,
+    VIR_Function    *pFunc,
+    VIR_Instruction *inst
+    )
+{
+    VSC_ErrCode errCode;
+    VIR_Instruction *labelelse_inst = gcvNULL, *labelmerge_inst = gcvNULL;
+    VIR_Label       *labelelse      = gcvNULL, *labelmerge = gcvNULL;
+    VIR_LabelId      labelelse_id, labelmerge_id;
+    VIR_Instruction *movInst = gcvNULL;
+    VIR_Instruction *jmpInst = gcvNULL;
+    /* else branch after inst */
+    VIR_Function_AddInstructionAfter(pFunc,
+                                     VIR_OP_LABEL,
+                                     VIR_TYPE_UNKNOWN,
+                                     inst,
+                                     gcvTRUE,
+                                     &labelelse_inst);
+    VIR_Function_AddLabel(pFunc, gcvNULL, &labelelse_id);
+    labelelse = VIR_GetLabelFromId(pFunc, labelelse_id);
+    labelelse->defined = labelelse_inst;
+    VIR_Operand_SetLabel(VIR_Inst_GetDest(labelelse_inst), labelelse);
+
+    /* lowBound check
+     * if base.x+ offset < base.y
+     *   goto labelelse
+     * if base.x + offset + (sizePtr-1) > base.z
+     *   goto labelelse
+     *    load
+     *    jmp labelmerge;
+     * labelelse:
+     *    mov
+     * labelmerge:
+     */
+    errCode = _vscVIR_InsertBoundCheckBefore(pShader, pFunc, inst, labelelse);
+
+    /*else branch : mov dest, 0 */
+    {
+        VIR_Operand *origDest = VIR_Inst_GetDest(inst);
+        VIR_Operand *movDest = gcvNULL;
+        VIR_Type *origDestType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(origDest));
+        VIR_Function_AddInstructionAfter(pFunc,
+                                         VIR_OP_MOV,
+                                         VIR_Operand_GetTypeId(origDest),
+                                         labelelse_inst,
+                                         gcvTRUE,
+                                         &movInst);
+        movDest = VIR_Inst_GetDest(movInst);
+        VIR_Operand_Copy(movDest, origDest);
+        VIR_Operand_SetEnable(movDest, VIR_Operand_GetEnable(origDest));
+
+        if (VIR_Type_isInteger(origDestType))
+        {
+            VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(movInst, 0), 0);
+        }
+        else if (VIR_Type_isFloat(origDestType))
+        {
+            VIR_Operand_SetImmediateFloat(VIR_Inst_GetSource(movInst, 0), 0.0);
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+    }
+    /* label merge: */
+    {
+        VIR_Function_AddInstructionAfter(pFunc,
+                                         VIR_OP_LABEL,
+                                         VIR_TYPE_UNKNOWN,
+                                         movInst,
+                                         gcvTRUE,
+                                         &labelmerge_inst);
+        VIR_Function_AddLabel(pFunc, gcvNULL, &labelmerge_id);
+        labelmerge = VIR_GetLabelFromId(pFunc, labelmerge_id);
+        labelmerge->defined = labelmerge_inst;
+        VIR_Operand_SetLabel(VIR_Inst_GetDest(labelmerge_inst), labelmerge);
+    }
+
+    /* insert jmp after inst
+     *        inst
+     *        jmp labelmerge
+     */
+    {
+        errCode = VIR_Function_AddInstructionAfter(pFunc,
+                    VIR_OP_JMP,
+                    VIR_TYPE_UNKNOWN,
+                    inst,
+                    gcvTRUE,
+                    &jmpInst);
+        VIR_Operand_SetLabel(VIR_Inst_GetDest(jmpInst), labelmerge);
+    }
+    return errCode;
+}
+
+static VSC_ErrCode _vscVIR_GenerateStoreBoundCheck(
+    VIR_Shader      *pShader,
+    VIR_Function    *pFunc,
+    VIR_Instruction *inst
+    )
+{
+    VSC_ErrCode errCode;
+    VIR_Instruction *labelmerge_inst = gcvNULL;
+    VIR_Label       *labelmerge = gcvNULL;
+    VIR_LabelId      labelmerge_id;
+
+    /* else branch after inst */
+    VIR_Function_AddInstructionAfter(pFunc,
+                                     VIR_OP_LABEL,
+                                     VIR_TYPE_UNKNOWN,
+                                     inst,
+                                     gcvTRUE,
+                                     &labelmerge_inst);
+    VIR_Function_AddLabel(pFunc, gcvNULL, &labelmerge_id);
+    labelmerge = VIR_GetLabelFromId(pFunc, labelmerge_id);
+    labelmerge->defined = labelmerge_inst;
+    VIR_Operand_SetLabel(VIR_Inst_GetDest(labelmerge_inst), labelmerge);
+
+    /* Bound check
+     *  if base.x < base.y-offset
+     *      jmp labelmerge
+     *  if base.x + offset + (size-1) > base.z
+     *      jmp labelmerge
+     *  store
+     * labelmerge:
+     */
+    errCode = _vscVIR_InsertBoundCheckBefore(pShader, pFunc, inst, labelmerge);
+
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_GenRobustBoundCheck)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VIR_Shader *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_FuncIterator func_iter;
+    VIR_FunctionNode* func_node;
+    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+
+    /* if vscVIR_AddOutOfBoundCheckSupport is not called, or HW support OOB-check
+     * skip generating bound check
+     */
+    if ((!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK)) ||
+        pHwCfg->hwFeatureFlags.supportOOBCheck)
+    {
+        return VSC_ERR_NONE;
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for(func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function     *func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction  *inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            VIR_OpCode opc = VIR_Inst_GetOpcode(inst);
+            if (VIR_OPCODE_isMemLd(opc) ||
+                VIR_OPCODE_isAttrLd(opc) ||
+                VIR_OPCODE_isAtom(opc) ||
+                VIR_OPCODE_isMemSt(opc))
+            {
+                VIR_Operand *baseOper = VIR_Inst_GetSource(inst, 0);
+                if (VIR_Operand_GetSwizzle(baseOper) != VIR_SWIZZLE_XYZZ)
+                {
+                    /* if base address is not a flat pointer skip */
+                    continue;
+                }
+                if (VIR_OPCODE_isMemSt(opc))
+                {
+                    /*if out of bound, skip the store instruction */
+                    _vscVIR_GenerateStoreBoundCheck(pShader, func, inst);
+                }
+                else
+                {
+                    _vscVIR_GenerateLoadBoundCheck(pShader, func, inst);
+                }
+            }
+        }
+    }
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After Generating Robust bound check ", pShader, gcvTRUE);
+    }
+
+    return errCode;
+}
 

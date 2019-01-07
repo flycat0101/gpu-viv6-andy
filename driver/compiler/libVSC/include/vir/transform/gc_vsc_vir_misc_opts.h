@@ -78,6 +78,9 @@ DECLARE_QUERY_PASS_PROP(vscVIR_GenCombinedSampler);
 VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_GenExternalAtomicCall);
 
+VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_GenRobustBoundCheck);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */
