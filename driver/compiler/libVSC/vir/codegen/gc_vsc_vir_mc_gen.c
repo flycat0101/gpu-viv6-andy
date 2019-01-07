@@ -2740,8 +2740,8 @@ _VSC_MC_GEN_GenInst(
     VSC_MC_CODEC_SRC        mcSrc[MAX_MC_SRC_COUNT];
 
     gctBOOL                 bNeedAppendNop = (Inst == Func->instList.pTail &&
-                                              Gen->Shader->functions.info.count > 1 &&
-                                              Func == Gen->Shader->mainFunction);
+                                              ((Gen->Shader->functions.info.count > 1) || virOpcode == VIR_OP_BARRIER) &&
+                                              (Func == Gen->Shader->mainFunction));
 
     memset(&mcInstCtrl, 0, sizeof(mcInstCtrl));
     memset(&mcDest, 0, sizeof(mcDest));
