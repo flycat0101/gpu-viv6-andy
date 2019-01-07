@@ -11742,6 +11742,10 @@ gckHARDWARE_QueryIdle(
                 gcmkFOOTER_NO();
                 return gcvSTATUS_OK;
             }
+            else if (opCode == 0x7)
+            {
+                break;
+            }
         }
 #endif
 
