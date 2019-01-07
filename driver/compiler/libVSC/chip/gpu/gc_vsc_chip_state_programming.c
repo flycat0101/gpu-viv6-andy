@@ -487,7 +487,8 @@ OnError:
 static VSC_ErrCode _AllocVidMemForGprSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
                                            SHADER_EXECUTABLE_PROFILE* pSEP,
                                            gcsSURF_NODE_PTR* pGprSpillVidmemNode,
-                                           gctUINT32* pVidMemAddrOfSpillMem)
+                                           gctUINT32* pVidMemAddrOfSpillMem,
+                                           gctUINT *  pGprSpillSize)
 
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -508,7 +509,7 @@ static VSC_ErrCode _AllocVidMemForGprSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPg
     }
 
     gcmASSERT(gprSpillSize);
-
+    *pGprSpillSize = gprSpillSize;
     (*pStatesPgmer->pSysCtx->drvCBs.pfnAllocVidMemCb)(pStatesPgmer->pSysCtx->hDrv,
                                                       gcvSURF_VERTEX,
                                                       "temp register spill memory",
@@ -535,6 +536,7 @@ OnError:
 static VSC_ErrCode _ProgramGprSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
                                            gctUINT startConstRegAddr,
                                            gctUINT spillMemAddr,
+                                           gctUINT gprSpillSize,
                                            VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                           errCode = VSC_ERR_NONE;
@@ -559,13 +561,30 @@ static VSC_ErrCode _ProgramGprSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
 
     gcmASSERT(pConstHwLocMapping);
     gcmASSERT(pConstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
-
-    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+    if (pSEP->exeHints.derivedHints.globalStates.bEnableRobustCheck)
     {
-        if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+        gctUINT upperLimit;
+        /* must at start with x and at least .x.y.z channels are allocated */
+        gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+
+        regAddr += 1;  /* .y lower limit */
+        VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+
+        regAddr += 1;  /* .z upper limit */
+        upperLimit = spillMemAddr + gprSpillSize - 1;
+        VSC_LOAD_HW_STATE(regAddr, upperLimit);
+    }
+    else
+    {
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
         {
-            regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
-            VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+            if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+            {
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+            }
         }
     }
 
@@ -576,6 +595,7 @@ OnError:
 static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
                                           SHADER_EXECUTABLE_PROFILE* pSEP,
                                           gcsSURF_NODE_PTR* pCrSpillVidmemNode,
+                                          gctUINT * pCrSpillMemSize,
                                           gctUINT32* pVidMemAddrOfSpillMem)
 
 {
@@ -606,6 +626,7 @@ static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgm
         gctUINT32 physical = NOT_ASSIGNED;
 
         pSpillData = (gctUINT*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper, crSpillSize);
+        * pCrSpillMemSize = crSpillSize;
 
         for (i = 0; i < pPrivUavEntry->memData.ctcCount; i ++)
         {
@@ -664,6 +685,7 @@ OnError:
 static VSC_ErrCode _ProgramCrSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
                                           gctUINT startConstRegAddr,
                                           gctUINT spillMemAddr,
+                                          gctUINT spillMemSize,
                                           VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                           errCode = VSC_ERR_NONE;
@@ -689,12 +711,30 @@ static VSC_ErrCode _ProgramCrSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
     gcmASSERT(pConstHwLocMapping);
     gcmASSERT(pConstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
-    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+    if (pSEP->exeHints.derivedHints.globalStates.bEnableRobustCheck)
     {
-        if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+        gctUINT upperLimit;
+        /* must at start with x and at least .x.y.z channels are allocated */
+        gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+
+        regAddr += 1;  /* .y lower limit */
+        VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+
+        regAddr += 1;  /* .z upper limit */
+        upperLimit = spillMemAddr + spillMemSize - 1;
+        VSC_LOAD_HW_STATE(regAddr, upperLimit);
+    }
+    else
+    {
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
         {
-            regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
-            VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+            if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+            {
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
+            }
         }
     }
 
@@ -1138,8 +1178,9 @@ static VSC_ErrCode _ProgramVsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     SHADER_EXECUTABLE_PROFILE* pVsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           gprSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    gprSpillSize = 0;
 
-    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pVsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pVsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem, &gprSpillSize);
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_VERTEX_SHADER] = gprSpillVidmemNode;
@@ -1147,6 +1188,7 @@ static VSC_ErrCode _ProgramVsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     errCode = _ProgramGprSpillMemAddr(pVsSEP,
                                       _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                       vidMemAddrOfSpillMem,
+                                      gprSpillSize,
                                       pStatesPgmer);
     ON_ERROR(errCode, "Program GPR spill mem address ");
 
@@ -1160,8 +1202,9 @@ static VSC_ErrCode _ProgramVsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     SHADER_EXECUTABLE_PROFILE* pVsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           crSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    crSpillMemSize = 0;
 
-    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pVsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pVsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem, &crSpillMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for cr spill");
 
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
@@ -1171,6 +1214,7 @@ static VSC_ErrCode _ProgramVsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
         errCode = _ProgramCrSpillMemAddr(pVsSEP,
                                          _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
+                                         crSpillMemSize,
                                          pStatesPgmer);
         ON_ERROR(errCode, "Program CR spill mem address ");
     }
@@ -1754,8 +1798,9 @@ static VSC_ErrCode _ProgramHsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     SHADER_EXECUTABLE_PROFILE* pHsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           gprSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    gprSpillSize = 0;
 
-    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pHsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pHsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem, &gprSpillSize);
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_TC_SHADER] = gprSpillVidmemNode;
@@ -1763,6 +1808,7 @@ static VSC_ErrCode _ProgramHsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     errCode = _ProgramGprSpillMemAddr(pHsSEP,
                                       _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                       vidMemAddrOfSpillMem,
+                                      gprSpillSize,
                                       pStatesPgmer);
     ON_ERROR(errCode, "Program GPR spill mem address ");
 
@@ -1776,8 +1822,9 @@ static VSC_ErrCode _ProgramHsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     SHADER_EXECUTABLE_PROFILE* pHsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           crSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    crSpillMemSize = 0;
 
-    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pHsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pHsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem, &crSpillMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for cr spill");
 
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
@@ -1787,6 +1834,7 @@ static VSC_ErrCode _ProgramHsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
         errCode = _ProgramCrSpillMemAddr(pHsSEP,
                                          _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
+                                         crSpillMemSize,
                                          pStatesPgmer);
         ON_ERROR(errCode, "Program CR spill mem address ");
     }
@@ -2442,8 +2490,9 @@ static VSC_ErrCode _ProgramDsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     SHADER_EXECUTABLE_PROFILE* pDsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           gprSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    gprSpillSize = 0;
 
-    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pDsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pDsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem, &gprSpillSize);
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_TE_SHADER] = gprSpillVidmemNode;
@@ -2451,6 +2500,7 @@ static VSC_ErrCode _ProgramDsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     errCode = _ProgramGprSpillMemAddr(pDsSEP,
                                       _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                       vidMemAddrOfSpillMem,
+                                      gprSpillSize,
                                       pStatesPgmer);
     ON_ERROR(errCode, "Program GPR spill mem address ");
 
@@ -2464,8 +2514,9 @@ static VSC_ErrCode _ProgramDsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     SHADER_EXECUTABLE_PROFILE* pDsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           crSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    crSpillMemSize = 0;
 
-    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pDsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pDsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem, &crSpillMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for cr spill");
 
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
@@ -2475,6 +2526,7 @@ static VSC_ErrCode _ProgramDsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
         errCode = _ProgramCrSpillMemAddr(pDsSEP,
                                          _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
+                                         crSpillMemSize,
                                          pStatesPgmer);
         ON_ERROR(errCode, "Program CR spill mem address ");
     }
@@ -2925,8 +2977,9 @@ static VSC_ErrCode _ProgramGsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     SHADER_EXECUTABLE_PROFILE* pGsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           gprSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    gprSpillSize = 0;
 
-    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pGsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pGsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem, &gprSpillSize);
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_GEOMETRY_SHADER] = gprSpillVidmemNode;
@@ -2934,6 +2987,7 @@ static VSC_ErrCode _ProgramGsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     errCode = _ProgramGprSpillMemAddr(pGsSEP,
                                       _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                       vidMemAddrOfSpillMem,
+                                      gprSpillSize,
                                       pStatesPgmer);
     ON_ERROR(errCode, "Program GPR spill mem address ");
 
@@ -2947,8 +3001,9 @@ static VSC_ErrCode _ProgramGsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     SHADER_EXECUTABLE_PROFILE* pGsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           crSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    crSpillMemSize = 0;
 
-    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pGsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pGsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem, &crSpillMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for cr spill");
 
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
@@ -2958,6 +3013,7 @@ static VSC_ErrCode _ProgramGsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
         errCode = _ProgramCrSpillMemAddr(pGsSEP,
                                          _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
+                                         crSpillMemSize,
                                          pStatesPgmer);
         ON_ERROR(errCode, "Program CR spill mem address ");
     }
@@ -4100,8 +4156,9 @@ static VSC_ErrCode _ProgramPsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     SHADER_EXECUTABLE_PROFILE* pPsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           gprSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    gprSpillSize = 0;
 
-    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pPsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForGprSpill(pStatesPgmer, pPsSEP, &gprSpillVidmemNode, &vidMemAddrOfSpillMem, &gprSpillSize);
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_FRAGMENT_SHADER] = gprSpillVidmemNode;
@@ -4109,6 +4166,7 @@ static VSC_ErrCode _ProgramPsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     errCode = _ProgramGprSpillMemAddr(pPsSEP,
                                       _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                       vidMemAddrOfSpillMem,
+                                      gprSpillSize,
                                       pStatesPgmer);
     ON_ERROR(errCode, "Program GPR spill mem address ");
 
@@ -4122,8 +4180,9 @@ static VSC_ErrCode _ProgramPsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     SHADER_EXECUTABLE_PROFILE* pPsSEP = pShHwInfo->pSEP;
     gcsSURF_NODE_PTR           crSpillVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSpillMem = NOT_ASSIGNED;
+    gctUINT                    crSpillMemSize = 0;
 
-    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pPsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem);
+    errCode = _AllocVidMemForCrSpill(pStatesPgmer, pPsSEP, &crSpillVidmemNode, &vidMemAddrOfSpillMem, &crSpillMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for cr spill");
 
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
@@ -4133,6 +4192,7 @@ static VSC_ErrCode _ProgramPsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
         errCode = _ProgramCrSpillMemAddr(pPsSEP,
                                          _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
+                                         crSpillMemSize,
                                          pStatesPgmer);
         ON_ERROR(errCode, "Program CR spill mem address ");
     }
@@ -6722,7 +6782,8 @@ OnError:
 static VSC_ErrCode _AllocVidMemForSharedMemory(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
                                                SHADER_EXECUTABLE_PROFILE* pGpsSEP,
                                                gcsSURF_NODE_PTR* pSharedMemVidmemNode,
-                                               gctUINT32* pVidMemAddrOfSharedMem)
+                                               gctUINT32* pVidMemAddrOfSharedMem,
+                                               gctUINT* pSharedMemSize)
 
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -6767,6 +6828,7 @@ static VSC_ErrCode _AllocVidMemForSharedMemory(VSC_CHIP_STATES_PROGRAMMER* pStat
     }
 
     *pVidMemAddrOfSharedMem = physical;
+    *pSharedMemSize = totalSharedMemVidMemSize;
 
 OnError:
     return errCode;
@@ -6775,6 +6837,7 @@ OnError:
 static VSC_ErrCode _ProgramSharedMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
                                            gctUINT startConstRegAddr,
                                            gctUINT sharedMemAddr,
+                                           gctUINT sharedMemSize,
                                            VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                           errCode = VSC_ERR_NONE;
@@ -6800,15 +6863,32 @@ static VSC_ErrCode _ProgramSharedMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
     gcmASSERT(pConstHwLocMapping);
     gcmASSERT(pConstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
-    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+    if (pGpsSEP->exeHints.derivedHints.globalStates.bEnableRobustCheck)
     {
-        if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+        gctUINT upperLimit;
+        /* must at start with x and at least .x.y.z channels are allocated */
+        gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
+
+        regAddr += 1;  /* .y lower limit */
+        VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
+
+        regAddr += 1;  /* .z upper limit */
+        upperLimit = sharedMemAddr + sharedMemSize - 1;
+        VSC_LOAD_HW_STATE(regAddr, upperLimit);
+    }
+    else
+    {
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
         {
-            regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
-            VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
+            if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+            {
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
+            }
         }
     }
-
 OnError:
     return errCode;
 }
@@ -6820,8 +6900,9 @@ static VSC_ErrCode _ProgramGpsSharedMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_S
     gcsSURF_NODE_PTR           sharedVidmemNode = gcvNULL;
     gctUINT                    vidMemAddrOfSharedMem = NOT_ASSIGNED;
     gctBOOL                    threadWalkInPs = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasThreadWalkerInPS;
+    gctUINT                    sharedMemSize = 0;
 
-    errCode = _AllocVidMemForSharedMemory(pStatesPgmer, pGpsSEP, &sharedVidmemNode, &vidMemAddrOfSharedMem);
+    errCode = _AllocVidMemForSharedMemory(pStatesPgmer, pGpsSEP, &sharedVidmemNode, &vidMemAddrOfSharedMem, &sharedMemSize);
     ON_ERROR(errCode, "Alloc vid-mem for shared memory");
 
     pStatesPgmer->pHints->shaderVidNodes.sharedMemVidMemNode = sharedVidmemNode;
@@ -6831,6 +6912,7 @@ static VSC_ErrCode _ProgramGpsSharedMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_S
                                     _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer)
                                   : _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                     vidMemAddrOfSharedMem,
+                                    sharedMemSize,
                                     pStatesPgmer);
     ON_ERROR(errCode, "Program shared mem address ");
 
