@@ -23,6 +23,11 @@ static void VSC_PH_Peephole_Init(
     IN VSC_MM* pMM
     )
 {
+    if (VIR_Shader_IsVulkan(shader))
+    {
+        VSC_OPTN_PHOptions_SetOPTS(options, VSC_OPTN_PHOptions_GetOPTS(options) | VSC_OPTN_PHOptions_OPTS_ADD_MEM_ADDR);
+    }
+
     VSC_PH_Peephole_SetShader(ph, shader);
     VSC_PH_Peephole_SetCurrBB(ph, gcvNULL);
     VSC_PH_Peephole_SetDUInfo(ph, du_info);
@@ -4394,6 +4399,273 @@ OnError:
     return errCode;
 }
 
+/*
+** Merge ADD/LOAD instructions and generate LOAD/STORE instruction:
+**  ADD   r1, r2, r3
+**  LOAD  r4, r1, 0
+** -->
+**  LOAD  r4, r2, r3
+*/
+static VSC_ErrCode _VSC_PH_GenerateLoadStore(
+    IN OUT VSC_PH_Peephole*     ph,
+    IN VIR_Instruction*         pAddInst,
+    OUT gctBOOL*                bGenerated
+    )
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_DEF_USAGE_INFO*         pDuInfo = VSC_PH_Peephole_GetDUInfo(ph);
+    VIR_Operand*                pAddDestOpnd = VIR_Inst_GetDest(pAddInst);
+    VIR_Enable                  addEnable = VIR_Operand_GetEnable(pAddDestOpnd);
+    VIR_OperandInfo             addDestInfo, addSrc0Info, addSrc1Info;
+    VIR_Operand*                pAddSrc0Opnd = VIR_Inst_GetSource(pAddInst, 0);
+    VIR_Operand*                pAddSrc1Opnd = VIR_Inst_GetSource(pAddInst, 1);
+    gctBOOL                     bAddSrc1Imm = gcvFALSE;
+    gctUINT                     src1Imm = 0;
+    gctUINT8                    channel;
+    VIR_GENERAL_DU_ITERATOR     du_iter;
+    gctBOOL                     bChanged = gcvFALSE, bNeedToMatchAllUsageInst = gcvFALSE;
+    VSC_HASH_TABLE*             pWorkingSet = gcvNULL;
+
+    /* Skip the non-uint ADD. */
+    if (!VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(pAddDestOpnd)))
+    {
+        return errCode;
+    }
+
+    /* Get the operand info. */
+    VIR_Operand_GetOperandInfo(pAddInst, pAddDestOpnd, &addDestInfo);
+    VIR_Operand_GetOperandInfo(pAddInst, pAddSrc0Opnd, &addSrc0Info);
+    VIR_Operand_GetOperandInfo(pAddInst, pAddSrc1Opnd, &addSrc1Info);
+
+    /*
+    ** If the dest operand is also one source operand, we can do this optimization only when the LOADs are all the
+    ** usage instructions, and we also need to remove this ADD instruction after the optimization.
+    */
+    if ((addSrc0Info.isVreg && addSrc0Info.u1.virRegInfo.virReg == addDestInfo.u1.virRegInfo.virReg)
+        ||
+        (addSrc1Info.isVreg && addSrc1Info.u1.virRegInfo.virReg == addDestInfo.u1.virRegInfo.virReg))
+    {
+        /* We can't remove this ADD if the dest is an output, so just skip it. */
+        if (addDestInfo.isOutput)
+        {
+            return errCode;
+        }
+        bNeedToMatchAllUsageInst = gcvTRUE;
+    }
+
+    /* Check if the source1 of ADD instruction is a immediate. */
+    if (VIR_Operand_isImm(pAddSrc1Opnd))
+    {
+        src1Imm = VIR_Operand_GetImmediateUint(pAddSrc1Opnd);
+        bAddSrc1Imm = gcvTRUE;
+    }
+
+    /* Initialize the working hash table. */
+    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
+             "Failed to initialize Hashtable");
+    pWorkingSet = VSC_PH_Peephole_WorkSet(ph);
+
+    for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+    {
+        VIR_USAGE*              pUsage;
+
+        if (!(addEnable & (1 << channel)))
+        {
+            continue;
+        }
+
+        /* Check the usage and find the LOAD/STORE instruction. */
+        vscVIR_InitGeneralDuIterator(&du_iter, VSC_PH_Peephole_GetDUInfo(ph), pAddInst, addDestInfo.u1.virRegInfo.virReg, channel, gcvFALSE);
+        for (pUsage = vscVIR_GeneralDuIterator_First(&du_iter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+            VIR_Instruction*    pUsageInst = pUsage->usageKey.pUsageInst;
+            VIR_Operand*        pUsageOpnd = pUsage->usageKey.pOperand;
+            VIR_Operand*        pBaseOpnd = gcvNULL;
+            VIR_Operand*        pOffsetOpnd = gcvNULL;
+            gctUINT             newOffset = 0;
+
+            /* Skip the exist one. */
+            if (vscHTBL_DirectTestAndGet(pWorkingSet, (void*)&(pUsage->usageKey), gcvNULL))
+            {
+                continue;
+            }
+
+            /* Skip the implicit usage. */
+            if (VIR_IS_IMPLICIT_USAGE_INST(pUsageInst))
+            {
+                if (bNeedToMatchAllUsageInst)
+                {
+                    goto OnError;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            pBaseOpnd = VIR_Inst_GetSource(pUsageInst, 0);
+            pOffsetOpnd = VIR_Inst_GetSource(pUsageInst, 1);
+
+            /* The usage operand must be the SRC0 of a LOAD/STORE instruction. */
+            if (!(VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pUsageInst)) || VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(pUsageInst)))
+                ||
+                pUsageOpnd != pBaseOpnd)
+            {
+                if (bNeedToMatchAllUsageInst)
+                {
+                    goto OnError;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            /* The offset must be a immediate operand. */
+            if (!VIR_Operand_isImm(pOffsetOpnd))
+            {
+                if (bNeedToMatchAllUsageInst)
+                {
+                    goto OnError;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            /* The offset can be a non-zero immediate only when the src1 of ADD instruction is also an imediate. */
+            newOffset = VIR_Operand_GetImmediateUint(pOffsetOpnd);
+            if (newOffset != 0 && !bAddSrc1Imm)
+            {
+                if (bNeedToMatchAllUsageInst)
+                {
+                    goto OnError;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            /* Save the valid case. */
+            vscHTBL_DirectSet(pWorkingSet, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, pUsage), gcvNULL);
+        }
+    }
+
+    /* do the transformation */
+    if (HTBL_GET_ITEM_COUNT(pWorkingSet))
+    {
+        VSC_HASH_ITERATOR       iter;
+        VSC_DIRECT_HNODE_PAIR   pair;
+
+        vscHTBLIterator_Init(&iter, pWorkingSet);
+        for (pair = vscHTBLIterator_DirectFirst(&iter);
+             IS_VALID_DIRECT_HNODE_PAIR(&pair);
+             pair = vscHTBLIterator_DirectNext(&iter))
+        {
+            VIR_USAGE*          pUsage = (VIR_USAGE*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
+            VIR_Instruction*    pUsageInst = pUsage->usageKey.pUsageInst;
+            VIR_Operand*        pBaseOpnd = VIR_Inst_GetSource(pUsageInst, 0);
+            VIR_Operand*        pOffsetOpnd = VIR_Inst_GetSource(pUsageInst, 1);
+            VIR_Swizzle         newSwizzle;
+            gctBOOL             pUpdateOffset = gcvFALSE;
+            gctUINT             newOffset = VIR_Operand_GetImmediateUint(pOffsetOpnd);
+
+            gcmASSERT(VIR_Operand_isImm(pOffsetOpnd));
+
+            if (bAddSrc1Imm)
+            {
+                newOffset += src1Imm;
+                pUpdateOffset = gcvTRUE;
+            }
+            else
+            {
+                gcmASSERT(newOffset == 0);
+            }
+
+            /* Delete the usage. */
+            vscVIR_DeleteUsage(pDuInfo,
+                               pAddInst,
+                               pUsageInst,
+                               pBaseOpnd,
+                               gcvFALSE,
+                               addDestInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pBaseOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+
+            /* Copy the base from src0 of ADD instruction and update the usage if needed. */
+            VIR_Operand_Copy(pBaseOpnd, pAddSrc0Opnd);
+            if (addSrc0Info.isVreg)
+            {
+                newSwizzle = VIR_Enable_GetMappingSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc0Opnd));
+                VIR_Operand_SetSwizzle(pBaseOpnd, newSwizzle);
+
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        VIR_ANY_DEF_INST,
+                                        pUsageInst,
+                                        pBaseOpnd,
+                                        gcvFALSE,
+                                        addSrc0Info.u1.virRegInfo.virReg,
+                                        1,
+                                        VIR_Swizzle_2_Enable(newSwizzle),
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+
+            /* Update the offset if it is an immeidate. */
+            if (pUpdateOffset)
+            {
+                VIR_Operand_SetImmediateUint(pOffsetOpnd, newOffset);
+            }
+            else
+            {
+                /* Copy the offset from src1 of ADD instruction and update the usage if needed. */
+                VIR_Operand_Copy(pOffsetOpnd, pAddSrc1Opnd);
+                if (addSrc1Info.isVreg)
+                {
+                    newSwizzle = VIR_Enable_GetMappingSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc1Opnd));
+                    VIR_Operand_SetSwizzle(pBaseOpnd, newSwizzle);
+
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            VIR_ANY_DEF_INST,
+                                            pUsageInst,
+                                            pOffsetOpnd,
+                                            gcvFALSE,
+                                            addSrc1Info.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(newSwizzle),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
+            }
+        }
+
+        /* We need to delete this ADD instruction when all usage instructions are matched. */
+        if (bNeedToMatchAllUsageInst)
+        {
+            errCode = VIR_Function_DeleteInstruction(VIR_Inst_GetFunction(pAddInst), pAddInst);
+            ON_ERROR(errCode, "Delete instruction error.");
+        }
+
+        bChanged = gcvTRUE;
+    }
+
+    /* Save the result. */
+    if (bGenerated)
+    {
+        *bGenerated = bChanged;
+    }
+
+OnError:
+    _VSC_PH_ResetHashTable(pWorkingSet);
+    return errCode;
+}
+
 static VSC_ErrCode _VSC_PH_RecordUsages(
     IN VSC_PH_Peephole      *ph,
     IN VIR_Instruction      *inst,
@@ -5603,6 +5875,34 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         }
     }
 
+    /*
+    ** Merge ADD/LOAD instructions and generate LOAD/STORE instruction:
+    **  ADD   r1, r2, r3
+    **  LOAD  r4, r1, 0
+    ** -->
+    **  LOAD  r4, r2, r3
+    */
+    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_ADD_MEM_ADDR))
+    {
+        inst = BB_GET_START_INST(bb);
+        while (inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
+        {
+            VIR_OpCode opc;
+            /*
+            ** We may delete this ADD instruction within this optimization,
+            ** so we need to get the next instruction first.
+            */
+            VIR_Instruction* pNextInst = VIR_Inst_GetNext(inst);
+
+            opc = VIR_Inst_GetOpcode(inst);
+            if (opc == VIR_OP_ADD)
+            {
+                _VSC_PH_GenerateLoadStore(ph, inst, gcvNULL);
+            }
+            inst = pNextInst;
+        }
+    }
+
     /* dump output bb */
     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_OUTPUT_BB))
     {
@@ -5737,7 +6037,8 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     VIR_Shader* shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
-    VSC_OPTN_PHOptions* options = (VSC_OPTN_PHOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VSC_OPTN_PHOptions tempOptions = *(VSC_OPTN_PHOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VSC_OPTN_PHOptions* options = &tempOptions;
     VSC_PH_Peephole ph;
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_PHOptions_GetBeforeShader(options), VSC_OPTN_PHOptions_GetAfterShader(options)))
@@ -5758,6 +6059,11 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
             VIR_LOG(dumper, "Peephole starts for shader(%d)\n", VIR_Shader_GetId(shader));
             VIR_LOG_FLUSH(dumper);
         }
+    }
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Before Peephole.", shader, gcvTRUE);
     }
 
     VSC_PH_Peephole_Init(&ph, shader, pPassWorker->pDuInfo, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
