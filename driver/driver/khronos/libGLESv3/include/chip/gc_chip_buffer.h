@@ -129,6 +129,9 @@ typedef enum {
     /* Force ALPHA8 to RGBA8 */
     __GL_CHIP_FMT_PATCH_ALPHA8,
 
+    /* Force A8L8 to use native format as it could be streaming for each frame */
+    __GL_CHIP_FMT_PATCH_A8L8,
+
 } __GLchipFmtPatch;
 
 typedef struct __GLchipFmtMapInfoRec

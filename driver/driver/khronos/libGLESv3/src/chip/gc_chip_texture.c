@@ -5739,7 +5739,7 @@ __glChipEglImageTargetTexture2DOES(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+    chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_A8L8);
 
     /* Validate the format. */
     switch (srcFormat)
