@@ -1733,10 +1733,18 @@ _Inst_ChangeOpnd2HP(
     gctUINT             usageIdx, defIdx, i;
     VIR_USAGE           *pUsage = gcvNULL;
     VIR_DEF*            pDef = gcvNULL;
+    VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(pOpnd);
 
     VIR_OperandInfo     operandInfo;
     VSC_DU_ITERATOR     duIter;
     VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
+
+
+    if (!(opndKind == VIR_OPND_VIRREG || opndKind == VIR_OPND_SYMBOL))
+    {
+        VIR_Operand_SetPrecision(pOpnd, VIR_PRECISION_HIGH);
+        return;
+    }
 
     VIR_Operand_GetOperandInfo(
         pInst,
@@ -1788,12 +1796,12 @@ _Inst_ChangeOpnd2HP(
                             for (j = 0; j < VIR_Inst_GetSrcNum(pDefInst); j++)
                             {
                                 VIR_Operand *src = VIR_Inst_GetSource(pDefInst, j);
-                                if (VIR_Operand_GetPrecision(src) != VIR_PRECISION_HIGH)
+                                if (src && VIR_Operand_GetPrecision(src) != VIR_PRECISION_HIGH)
                                 {
                                     _Inst_ChangeOpnd2HP(pDefInst, src, gcvFALSE, skipLowP, gcvTRUE, pDuInfo);
                                 }
                             }
-                    }
+                        }
                     }
 
                     /* change def's uses to highp */
