@@ -266,7 +266,7 @@ gctSTRING gcLibATAN2_Funcs =
 "         if (y == 0.0)  return  3.14159265358979323846f;\n"
 "         if (y == -0.0) return -3.14159265358979323846f;\n"
 "         if (y < 0.0)   return -1.5707963267948966f;\n"
-"         return 1.5707963267948966ff;\n"
+"         return 1.5707963267948966f;\n"
 "    }\n"
 "    else if (x == 0.0)\n"
 "    {\n"
