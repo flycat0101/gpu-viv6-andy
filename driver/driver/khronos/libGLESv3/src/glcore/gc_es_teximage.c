@@ -4359,7 +4359,7 @@ GLvoid __glTexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsize
     }
 
     /* Init the mipmap info which will be queried by app */
-    __glSetMipmapLevelInfo(gc, tex, face, 0, format, format, GL_NONE, width, height, 1);
+    __glSetMipmapLevelInfo(gc, tex, face, 0, GL_RGBA8, format, GL_NONE, width, height, 1);
 
     if (!(*gc->dp.texDirectVIVMap)(gc, tex, target, width, height, format, logical, physical, tiled))
     {
