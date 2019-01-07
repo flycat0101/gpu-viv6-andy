@@ -4748,12 +4748,12 @@ static gctBOOL _vscVIR_DefBBInBetween(
                 meetReDefBB = gcvTRUE;
             }
             result[idx] = _vscVIR_DefBBInBetween(pNextBB,
-                                                  pEndBB,
-                                                  pReDefBB,
-                                                  pFlowMask,
-                                                  pCheckStatusMask,
-                                                  pCheckValueMask,
-                                                  &meetReDefBB);
+                                                 pEndBB,
+                                                 pReDefBB,
+                                                 pFlowMask,
+                                                 pCheckStatusMask,
+                                                 pCheckValueMask,
+                                                 &meetReDefBB);
         }
     }
 
@@ -4820,22 +4820,35 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     IN VIR_DEF_USAGE_INFO       *duInfo,
     IN VIR_Instruction          *startInst,
     IN VIR_Instruction          *endInst,
-    IN VIR_Operand              *srcOpnd,
+    IN VIR_Operand              *srcOpndOfStartInst,
     OUT VIR_Instruction         **redefInst
     )
 {
     gctBOOL         retValue = gcvFALSE;
     VIR_Instruction *pDefInst = gcvNULL;
+    VIR_Instruction *pIndexInst = gcvNULL;
     VSC_HASH_TABLE  *visitSet = gcvNULL;
 
     VIR_OperandInfo srcInfo;
-    VIR_Enable      enableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd));
+    VIR_Enable      enableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpndOfStartInst));
 
     gctUINT         firstRegNo, regNoRange, regNo, defIdx;
     gctUINT8        channel;
     VIR_DEF         *pDef;
+    gctBOOL         bIsStartEndInSameBB = gcvFALSE;
 
-    VIR_Operand_GetOperandInfo(startInst, srcOpnd, &srcInfo);
+    if (VIR_Inst_GetBasicBlock(startInst) == VIR_Inst_GetBasicBlock(endInst))
+    {
+        bIsStartEndInSameBB = gcvTRUE;
+    }
+
+    /* If there is no other instruction between start and end, just return. */
+    if (bIsStartEndInSameBB && VIR_Inst_GetNext(startInst) == endInst)
+    {
+        return retValue;
+    }
+
+    VIR_Operand_GetOperandInfo(startInst, srcOpndOfStartInst, &srcInfo);
     firstRegNo = srcInfo.u1.virRegInfo.virReg;
     regNoRange = srcInfo.u1.virRegInfo.virRegCount;
 
@@ -4856,73 +4869,105 @@ gctBOOL vscVIR_RedefineBetweenInsts(
             {
                 pDef = GET_DEF_BY_IDX(&duInfo->defTable, defIdx);
                 gcmASSERT(pDef);
+                pDefInst = pDef->defKey.pDefInst;
 
-                if (pDef->defKey.channel == channel)
+                /* Skip unmatch def. */
+                if (pDef->defKey.channel != channel || VIR_IS_SPECIAL_INST(pDefInst))
                 {
-                    pDefInst = pDef->defKey.pDefInst;
+                    /* Get the next def. */
+                    defIdx = pDef->nextDefIdxOfSameRegNo;
+                    continue;
+                }
 
-                    if (pDefInst == endInst ||
-                        pDefInst == startInst)
-                    {
-                        retValue = gcvTRUE;
-                        *redefInst = pDefInst;
-                        break;
-                    }
+                /* Get a refined match. */
+                if (pDefInst == endInst || pDefInst == startInst)
+                {
+                    retValue = gcvTRUE;
+                    *redefInst = pDefInst;
+                    break;
+                }
 
-                    if (pDefInst != VIR_INPUT_DEF_INST &&
-                        pDefInst != VIR_UNDEF_INST)
+                /* Start to check this def. */
+                /*
+                ** If start/end/def instruction are in the same BB, the check would be more easier because
+                ** we don't need to check the back-jmp situation, we only need to check if this def instruction is within
+                ** this instruction fragment.
+                */
+                if (bIsStartEndInSameBB && VIR_Inst_GetBasicBlock(pDefInst) == VIR_Inst_GetBasicBlock(startInst))
+                {
+                    pIndexInst = startInst;
+
+                    while (pIndexInst && pIndexInst != endInst && VIR_Inst_GetBasicBlock(pIndexInst) == VIR_Inst_GetBasicBlock(startInst))
                     {
-                        vscHTBL_Reset(visitSet);
-                        /* If any of the instructions in the workSet, that is between
-                            endInst and startInst, return gcvTURE.*/
-                        if (_vscVIR_DefInstInBetween(startInst, endInst,
-                                        pDef->defKey.pDefInst, visitSet))
+                        if (pIndexInst == pDefInst)
                         {
                             retValue = gcvTRUE;
                             *redefInst = pDefInst;
                             break;
                         }
-                        else
-                        {
-                            if (VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(endInst)
-                                &&
-                                VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(pDefInst)
-                                )
-                            {
-                                VIR_BB* pStartBB = VIR_Inst_GetBasicBlock(startInst);
-                                VIR_BB* pEndBB = VIR_Inst_GetBasicBlock(endInst);
-                                VIR_BB* pReDefBB = VIR_Inst_GetBasicBlock(pDefInst);
-                                gctBOOL meetReDefBB = gcvFALSE;
-                                gctUINT bbCount;
-                                VSC_BIT_VECTOR bbFlowMask;
-                                VSC_BIT_VECTOR bbCheckStatusMask;
-                                VSC_BIT_VECTOR bbCheckValueMask;
+                        pIndexInst = VIR_Inst_GetNext(pIndexInst);
+                    }
 
-                                bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(VIR_Inst_GetFunction(startInst))->pOwnerCG);
-                                vscBV_Initialize(&bbFlowMask, pMM, bbCount);
-                                vscBV_Initialize(&bbCheckStatusMask, pMM, bbCount);
-                                vscBV_Initialize(&bbCheckValueMask, pMM, bbCount);
-
-                                if (_vscVIR_DefBBInBetween(pStartBB,
-                                                            pEndBB,
-                                                            pReDefBB,
-                                                            &bbFlowMask,
-                                                            &bbCheckStatusMask,
-                                                            &bbCheckValueMask,
-                                                            &meetReDefBB))
-                                {
-                                    retValue = gcvTRUE;
-                                    *redefInst = pDefInst;
-                                    break;
-                                }
-
-                                vscBV_Finalize(&bbFlowMask);
-                                vscBV_Finalize(&bbCheckStatusMask);
-                                vscBV_Finalize(&bbCheckValueMask);
-                            }
-                        }
+                    if (retValue)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        defIdx = pDef->nextDefIdxOfSameRegNo;
+                        continue;
                     }
                 }
+
+                vscHTBL_Reset(visitSet);
+                /* If any of the instructions in the workSet, that is between
+                    endInst and startInst, return gcvTURE.*/
+                if (_vscVIR_DefInstInBetween(startInst, endInst, pDef->defKey.pDefInst, visitSet))
+                {
+                    retValue = gcvTRUE;
+                    *redefInst = pDefInst;
+                    break;
+                }
+                else
+                {
+                    if (VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(endInst)
+                        &&
+                        VIR_Inst_GetFunction(startInst) == VIR_Inst_GetFunction(pDefInst))
+                    {
+                        VIR_BB* pStartBB = VIR_Inst_GetBasicBlock(startInst);
+                        VIR_BB* pEndBB = VIR_Inst_GetBasicBlock(endInst);
+                        VIR_BB* pReDefBB = VIR_Inst_GetBasicBlock(pDefInst);
+                        gctBOOL meetReDefBB = gcvFALSE;
+                        gctUINT bbCount;
+                        VSC_BIT_VECTOR bbFlowMask;
+                        VSC_BIT_VECTOR bbCheckStatusMask;
+                        VSC_BIT_VECTOR bbCheckValueMask;
+
+                        bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(VIR_Inst_GetFunction(startInst))->pOwnerCG);
+                        vscBV_Initialize(&bbFlowMask, pMM, bbCount);
+                        vscBV_Initialize(&bbCheckStatusMask, pMM, bbCount);
+                        vscBV_Initialize(&bbCheckValueMask, pMM, bbCount);
+
+                        if (_vscVIR_DefBBInBetween(pStartBB,
+                                                   pEndBB,
+                                                   pReDefBB,
+                                                   &bbFlowMask,
+                                                   &bbCheckStatusMask,
+                                                   &bbCheckValueMask,
+                                                   &meetReDefBB))
+                        {
+                            retValue = gcvTRUE;
+                            *redefInst = pDefInst;
+                            break;
+                        }
+
+                        vscBV_Finalize(&bbFlowMask);
+                        vscBV_Finalize(&bbCheckStatusMask);
+                        vscBV_Finalize(&bbCheckValueMask);
+                    }
+                }
+
+                /* Get the next def. */
                 defIdx = pDef->nextDefIdxOfSameRegNo;
             }
 

@@ -806,7 +806,7 @@ gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_MM                   *pMM,
                                     IN VIR_DEF_USAGE_INFO       *duInfo,
                                     IN VIR_Instruction          *startInst,
                                     IN VIR_Instruction          *endInst,
-                                    IN VIR_Operand              *srcOpnd,
+                                    IN VIR_Operand              *srcOpndOfStartInst,
                                     OUT VIR_Instruction         **redefInst);
 
 /*
