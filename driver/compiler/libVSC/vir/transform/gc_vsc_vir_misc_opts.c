@@ -8003,7 +8003,7 @@ static VSC_ErrCode _vscVIR_GenerateStoreBoundCheck(
 
 DEF_QUERY_PASS_PROP(vscVIR_GenRobustBoundCheck)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
 }
