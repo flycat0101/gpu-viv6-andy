@@ -326,6 +326,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     devCtx->chipInfo = &phyDev->pInst->chipInfo;
     devCtx->database = phyDev->phyDevConfig.database;
 
+    if (devCtx->database->ROBUSTNESS)
+    {
+        devCtx->enabledFeatures.robustBufferAccess = VK_TRUE;
+    }
+
 #if __VK_RESOURCE_INFO
     __VK_ONERROR(gcoOS_AtomConstruct(gcvNULL, &devCtx->atom_id));
 #endif
