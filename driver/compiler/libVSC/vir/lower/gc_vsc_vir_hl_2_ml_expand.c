@@ -433,6 +433,20 @@ _dup2ndParmSwizzleY(
     return gcvTRUE;
 }
 
+static gctBOOL
+_dup2ndParmSwizzleZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _dup2ndParm(Context, Inst, Opnd);
+
+    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_Z));
+
+    return gcvTRUE;
+}
+
 /* duplicate 3rd parameter and set it to this source. */
 static gctBOOL
 _dup3rdParm(
@@ -549,6 +563,22 @@ _setEnableZFloat(
 }
 
 static gctBOOL
+_setEnableWFloat(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand           *destOperand= VIR_Inst_GetDest(Inst);
+
+    /* Change enable and type. */
+    VIR_Operand_SetEnable(destOperand, VIR_ENABLE_W);
+    VIR_Operand_SetTypeId(destOperand, VIR_TYPE_FLOAT32);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 _setSwizzleXInt(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -628,6 +658,29 @@ _setSwizzleXYZ(
 
     /* Change swizzle and type. */
     VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_XYZZ);
+    VIR_Operand_SetTypeId(srcOperand, vectorTypeId);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setSwizzleXYZW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gctUINT                srcIdx = VIR_Inst_GetSourceIndex(Inst, Opnd);
+    VIR_Operand           *srcOperand = VIR_Inst_GetSource(Inst, srcIdx);
+    VIR_TypeId             opndTypeId = VIR_Operand_GetTypeId(Opnd);
+    VIR_TypeId             vectorTypeId;
+
+    gcmASSERT(srcIdx < VIR_MAX_SRC_NUM);
+
+    vectorTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(opndTypeId), 4, 1);
+
+    /* Change swizzle and type. */
+    VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_XYZW);
     VIR_Operand_SetTypeId(srcOperand, vectorTypeId);
 
     return gcvTRUE;
@@ -1738,10 +1791,25 @@ static VIR_Pattern _intrinTexldPattern[] = {
 
 /* texlpcf intrinsic function. */
 static VIR_PatternMatchInst _intrinTexldpcfPatInst0[] = {
-    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinSamplerArray, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinSampler1DArray, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _intrinTexldpcfRepInst0[] = {
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableXFloat, _dup2ndParmSwizzleX } },
+    { VIR_OP_MOV, 0, 0, { -1, 0, 0, 0 }, { _setEnableYFloat, _constf_zero } },
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableZFloat, _dup2ndParmSwizzleY } },
+    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { _setEnableWFloat, _dup2ndParmSwizzleZ } },
+    { VIR_OP_ADD, 0, 0, { -1, -1, 0, 0 }, { _setEnableZFloat, _setSwizzleZ, _constf_o_point_five } },
+    { VIR_OP_FLOOR, 0, 0, { -1, -1, 0, 0 }, { _setEnableZFloat } },
+    { VIR_OP_MAX, 0, 0, { -1, -1, 0, 0 }, { _setEnableZFloat, 0, _constf_zero } },
+    { VIR_OP_TEXLDPCF, 0, 0, { 1, 3, -1, 3 }, { 0, _dup1stParm, _setSwizzleXYZW, _dupTexldModifierFrom3rdParm } },
+};
+
+static VIR_PatternMatchInst _intrinTexldpcfPatInst1[] = {
+    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinSamplerArray, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _intrinTexldpcfRepInst1[] = {
     { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParmAndSetDestTypeFromSrc0 } },
     { VIR_OP_ADD, 0, 0, { -1, -1, 0, 0 }, { _setEnableZFloat, _setSwizzleZ, _constf_o_point_five } },
     { VIR_OP_FLOOR, 0, 0, { -1, -1, 0, 0 }, { _setEnableZFloat } },
@@ -1751,6 +1819,7 @@ static VIR_PatternReplaceInst _intrinTexldpcfRepInst0[] = {
 
 static VIR_Pattern _intrinTexldpcfPattern[] = {
     { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_intrinTexldpcf, 0) },
+    { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_intrinTexldpcf, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
