@@ -27,7 +27,7 @@ VIVANTE_MAKEFILES := $(LOCAL_PATH)/hal/kernel/Android.mk \
 
 ifeq ($(DRM_GRALLOC),1)
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc_drm/Android.mk
-  VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc_helper/Android.mk
+  VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gpuhelper/Android.mk
 else
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc/Android.mk
 endif
