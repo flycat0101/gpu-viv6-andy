@@ -417,8 +417,7 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
                     status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
                 }
 
-                gcmVERIFY_OK(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, rpara));
-                gcmVERIFY_OK(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, lpara));
+                /* disable the below code to skip "()" in the stream */
 
                 gcmVERIFY_OK(ppoTOKEN_Destroy(PP,rpara));
                 rpara = gcvNULL;
