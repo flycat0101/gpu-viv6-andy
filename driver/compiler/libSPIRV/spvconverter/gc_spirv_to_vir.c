@@ -440,7 +440,7 @@
 
 #define VIR_OPINFO(OPCODE, OPNDNUM, FLAGS, WRITE2DEST, LEVEL)    {VIR_OP_##OPCODE, OPNDNUM, WRITE2DEST, LEVEL, FLAGS}
 
-const VIR_Opcode_Info VIR_OpcodeInfo[] =
+static const VIR_Opcode_Info VIR_OpcodeInfo[] =
 {
 #include "vir/ir/gc_vsc_vir_opcode.def.h"
 };

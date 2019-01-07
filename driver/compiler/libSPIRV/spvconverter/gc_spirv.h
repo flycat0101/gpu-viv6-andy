@@ -14,6 +14,7 @@
 #ifndef __gc_spirv_h_
 #define __gc_spirv_h_
 
+#define VIV_SPIRV_CONVERTER         1         /* flag to specify headers below are included for spirv converter */
 #include "utils/gc_vsc_utils_base.h"
 #include "utils/gc_vsc_err.h"
 #include "utils/gc_vsc_utils_list.h"

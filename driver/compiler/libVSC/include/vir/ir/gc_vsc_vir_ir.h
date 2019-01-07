@@ -2199,7 +2199,9 @@ typedef struct _VIR_OPCODE_INFO
     VIR_OpFlag          flags;
 } VIR_Opcode_Info;
 
+#if !defined(VIV_SPIRV_CONVERTER) || !VIV_SPIRV_CONVERTER
 extern const VIR_Opcode_Info VIR_OpcodeInfo[];
+#endif
 
 extern const gctSTRING VIR_OpName[];
 extern const gctSTRING VIR_CondOpName[];
