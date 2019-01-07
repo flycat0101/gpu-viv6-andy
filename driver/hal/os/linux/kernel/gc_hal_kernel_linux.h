@@ -218,7 +218,7 @@ struct _gckOS
     /* Signal management. */
 
     /* Lock. */
-    struct mutex                signalMutex;
+    spinlock_t                  signalLock;
 
     /* signal id database. */
     gcsINTEGER_DB               signalDB;

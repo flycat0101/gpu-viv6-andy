@@ -549,8 +549,8 @@ gckOS_Construct(
      * Initialize the signal manager.
      */
 
-    /* Initialize mutex. */
-    mutex_init(&os->signalMutex);
+    /* Initialize spinlock. */
+    spin_lock_init(&os->signalLock);
 
     /* Initialize signal id database lock. */
     spin_lock_init(&os->signalDB.lock);
@@ -5682,6 +5682,7 @@ gckOS_DestroySignal(
     gceSTATUS status;
     gcsSIGNAL_PTR signal;
     gctBOOL acquired = gcvFALSE;
+    unsigned long flags = 0;
 
     gcmkHEADER_ARG("Os=0x%X Signal=0x%X", Os, Signal);
 
@@ -5689,7 +5690,11 @@ gckOS_DestroySignal(
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
     gcmkVERIFY_ARGUMENT(Signal != gcvNULL);
 
-    mutex_lock(&Os->signalMutex);
+    if(in_irq()){
+        spin_lock(&Os->signalLock);
+    }else{
+        spin_lock_irqsave(&Os->signalLock, flags);
+    }
     acquired = gcvTRUE;
 
     gcmkONERROR(_QueryIntegerId(&Os->signalDB, (gctUINT32)(gctUINTPTR_T)Signal, (gctPOINTER)&signal));
@@ -5704,7 +5709,12 @@ gckOS_DestroySignal(
         kfree(signal);
     }
 
-    mutex_unlock(&Os->signalMutex);
+    if(in_irq()){
+        spin_unlock(&Os->signalLock);
+    }else{
+        spin_unlock_irqrestore(&Os->signalLock, flags);
+    }
+
     acquired = gcvFALSE;
 
     /* Success. */
@@ -5715,7 +5725,12 @@ OnError:
     if (acquired)
     {
         /* Release the mutex. */
-        mutex_unlock(&Os->signalMutex);
+        if(in_irq()){
+            spin_unlock(&Os->signalLock);
+        }else{
+            spin_unlock_irqrestore(&Os->signalLock, flags);
+        }
+
     }
 
     gcmkFOOTER();
@@ -5760,6 +5775,7 @@ gckOS_Signal(
     struct dma_fence * fence = gcvNULL;
 #  endif
 #endif
+    unsigned long flags = 0;
 
     gcmkHEADER_ARG("Os=0x%X Signal=0x%X State=%d", Os, Signal, State);
 
@@ -5767,7 +5783,7 @@ gckOS_Signal(
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
     gcmkVERIFY_ARGUMENT(Signal != gcvNULL);
 
-    mutex_lock(&Os->signalMutex);
+    spin_lock_irqsave(&Os->signalLock, flags);
 
     status = _QueryIntegerId(&Os->signalDB,
                              (gctUINT32)(gctUINTPTR_T)Signal,
@@ -5775,7 +5791,7 @@ gckOS_Signal(
 
     if (gcmIS_ERROR(status))
     {
-        mutex_unlock(&Os->signalMutex);
+        spin_unlock_irqrestore(&Os->signalLock, flags);
         gcmkONERROR(status);
     }
 
@@ -5786,7 +5802,7 @@ gckOS_Signal(
      */
     atomic_inc(&signal->ref);
 
-    mutex_unlock(&Os->signalMutex);
+    spin_unlock_irqrestore(&Os->signalLock, flags);
 
     gcmkONERROR(status);
 
@@ -5832,7 +5848,7 @@ gckOS_Signal(
 #  endif
 #endif
 
-    mutex_lock(&Os->signalMutex);
+    spin_lock_irqsave(&Os->signalLock, flags);
 
     if (atomic_dec_and_test(&signal->ref))
     {
@@ -5842,7 +5858,7 @@ gckOS_Signal(
         kfree(signal);
     }
 
-    mutex_unlock(&Os->signalMutex);
+    spin_unlock_irqrestore(&Os->signalLock, flags);
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -6067,12 +6083,13 @@ gckOS_MapSignal(
 {
     gceSTATUS status;
     gcsSIGNAL_PTR signal = gcvNULL;
+    unsigned long flags = 0;
     gcmkHEADER_ARG("Os=0x%X Signal=0x%X Process=0x%X", Os, Signal, Process);
 
     gcmkVERIFY_ARGUMENT(Signal != gcvNULL);
     gcmkVERIFY_ARGUMENT(MappedSignal != gcvNULL);
 
-    mutex_lock(&Os->signalMutex);
+    spin_lock_irqsave(&Os->signalLock, flags);
 
     gcmkONERROR(_QueryIntegerId(&Os->signalDB, (gctUINT32)(gctUINTPTR_T)Signal, (gctPOINTER)&signal));
 
@@ -6084,14 +6101,14 @@ gckOS_MapSignal(
 
     *MappedSignal = (gctSIGNAL) Signal;
 
-    mutex_unlock(&Os->signalMutex);
+    spin_unlock_irqrestore(&Os->signalLock, flags);
 
     /* Success. */
     gcmkFOOTER_ARG("*MappedSignal=0x%X", *MappedSignal);
     return gcvSTATUS_OK;
 
 OnError:
-    mutex_unlock(&Os->signalMutex);
+    spin_unlock_irqrestore(&Os->signalLock, flags);
 
     gcmkFOOTER_NO();
     return status;
