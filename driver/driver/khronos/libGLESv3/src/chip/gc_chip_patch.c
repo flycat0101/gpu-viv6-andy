@@ -16239,6 +16239,27 @@ gcChipPatchDEQP_WideLerpFix(
     }
 }
 
+static void
+gcChipPatchDEQP_Synthetic(
+    __GLcontext *gc,
+    __GLprogramObject *progObj,
+    const gctCHAR **patchedSrcs,
+    gctINT* index
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    /* Just disable loop unrolling and compile again. */
+    if (chipCtx->patchId == gcvPATCH_DEQP ||
+        chipCtx->patchId == gcvPATCH_OESCTS ||
+        chipCtx->patchId == gcvPATCH_GTFES30)
+    {
+        __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
+        program->progFlags.disableLoopUnrolling = gcvTRUE;
+        patchedSrcs[__GLSL_STAGE_FS] = progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    }
+}
+
 #define GLchipPatch_Shader          0x1
 #define GLchipPatch_Hardware        0x2
 
@@ -29422,6 +29443,33 @@ static __GLchipPatch gcChipPatches[] =
         },
 
         gcChipPatchDEQP_WideLerpFix,
+    },
+
+    {
+        GC_CHIP_PATCH_DEQP_SYNTHETIC,
+        "dEQP-GLES3.functional.shaders.metamorphic.synthetic, disable loop unrolling.",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+            gcvNULL,    /* VS  */
+            gcvNULL,    /* TCS */
+            gcvNULL,    /* TES */
+            gcvNULL,    /* GS  */
+
+            /* FS */
+            "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb7\x87\xb7\xbd\xb7\x98\xb7"
+            "\x97\xd4\xbb\xcb\xb2\xc0\xa9\xce\xa6\xd2\xf2\xb3\xdf\xbe\xcd\xb9"
+            "\xd8\xb1\xc3\xe3\xa5\x8b\xab\xef\x80\xee\x8f\xe3\x87\xf4\x9b\xf5"
+            "\xd5\xb4\xda\xbe\x9e\xd6\xa3\xc4\xb1\xd4\xa7\x87\xc2\xb4\xc6\xa7"
+            "\xd5\xb1\x9d\xbd\xf4\x99\xe9\x8c\xfe\x97\xf6\x9a\xba\xf9\x96\xfa"
+            "\x96\xf3\x94\xf1\xd1\x9d\xf2\x9c\xf8\x97\xf9\xd5\xf5\xc7\xf7\xc6"
+            "\xf1\xfb"
+            ,
+            gcvNULL,    /* CS  */
+        },
+
+        gcChipPatchDEQP_Synthetic,
     },
 
     {GC_CHIP_PATCH_LAST, gcvNULL, 0, gcvFALSE, {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL}, gcvNULL}

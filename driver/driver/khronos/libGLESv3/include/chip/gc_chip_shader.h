@@ -536,7 +536,9 @@ typedef struct __GLchipProgramFlagsRec
     gctUINT helperInvocationCheck   : 1;
     gctUINT wideLineFix             : 1;
 
-    gctUINT reserved                : 9;
+    gctUINT disableLoopUnrolling    : 1;
+
+    gctUINT reserved                : 8;
 
 
 } __GLchipProgramFlags;

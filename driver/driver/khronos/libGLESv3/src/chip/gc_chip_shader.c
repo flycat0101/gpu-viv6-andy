@@ -7454,6 +7454,11 @@ __glChipLinkProgram(
             gcSHADER_TYPE_COMPUTE,
         };
 
+        if (program->progFlags.disableLoopUnrolling)
+        {
+            gcOPT_SetFeature(FB_DISABLE_GL_LOOP_UNROLLING);
+        }
+
         if (patchedSrcs[stage])
         {
             __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage];
@@ -7464,6 +7469,11 @@ __glChipLinkProgram(
                                   patchedSrcs[stage],
                                   (gcSHADER*)&shaderObj->shaderInfo.hBinary,
                                   (gctSTRING*)&shaderObj->shaderInfo.compiledLog);
+        }
+
+        if (program->progFlags.disableLoopUnrolling)
+        {
+            gcOPT_ResetFeature(FB_DISABLE_GL_LOOP_UNROLLING);
         }
     }
 #endif
