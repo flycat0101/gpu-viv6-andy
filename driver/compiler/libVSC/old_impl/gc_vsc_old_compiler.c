@@ -6607,6 +6607,7 @@ gcSHADER_Load(
 #endif
     gctUINT32           allocBytes;
     gctINT32            hasNotStagesRelatedLinkError = 0;
+    gcBINARY_TFBVarying binaryTfbVarying;
 
     gcmHEADER_ARG("Shader=0x%x Buffer=0x%x BufferSize=%lu",
                   Shader, Buffer, BufferSize);
@@ -8734,6 +8735,79 @@ gcSHADER_Load(
     bytes -= sizeof(gctINT32);
 
     /************************************************************************/
+    /*                         transform feedback                           */
+    /************************************************************************/
+    /* Get the tfb varying count. */
+    count = (gctUINT16 *) curPos;
+    Shader->transformFeedback.varyingCount = *count;
+    curPos += sizeof(gctUINT16);
+    bytes -= sizeof(gctUINT16);
+
+    Shader->transformFeedback.bufferMode = *(gctUINT16 *) curPos;
+    curPos += sizeof(gctUINT16);
+    bytes -= sizeof(gctUINT16);
+
+    if (Shader->transformFeedback.varyingCount > 0)
+    {
+        /* Point to the first varying */
+        binaryTfbVarying = (gcBINARY_TFBVarying) curPos;
+
+        /* Allocate a new array of varying object */
+        status = gcoOS_Allocate(gcvNULL,
+                                gcmSIZEOF(gcsTFBVarying) * Shader->transformFeedback.varyingCount,
+                                (gctPOINTER*)&Shader->transformFeedback.varyings);
+        gcoOS_ZeroMemory(Shader->transformFeedback.varyings, gcmSIZEOF(gcsTFBVarying) * Shader->transformFeedback.varyingCount);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFATAL("gcSHADER_Load: gcoOS_Allocate failed status=%d(%s)", status, gcoOS_DebugStatus2Name(status));
+            gcmFOOTER();
+            return status;
+        }
+
+        /* Parse all varyings. */
+        for (i = 0; i < Shader->transformFeedback.varyingCount; i++)
+        {
+            /* Get the length of the varying name. */
+            length = binaryTfbVarying->nameLength;
+
+            if (length > 0)
+            {
+                gctSTRING s;
+                gcoOS_Allocate(gcvNULL,
+                               length + 1,
+                               (gctPOINTER*)&s);
+                Shader->transformFeedback.varyings[i].name = s;
+                gcoOS_MemCopy(Shader->transformFeedback.varyings[i].name,
+                              binaryTfbVarying->name,
+                              length);
+                Shader->transformFeedback.varyings[i].name[length] = '\0';
+            }
+
+            Shader->transformFeedback.varyings[i].arraySize = binaryTfbVarying->arraySize;
+            Shader->transformFeedback.varyings[i].isWholeTFBed = binaryTfbVarying->isWholeTFBed;
+            Shader->transformFeedback.varyings[i].isArray = binaryTfbVarying->isArray;
+            Shader->transformFeedback.varyings[i].arraySize = binaryTfbVarying->arraySize;
+            for (j = 0; j < Shader->outputCount; j++)
+            {
+                if (Shader->outputs[j]->index == binaryTfbVarying->outputIndex)
+                {
+                    Shader->transformFeedback.varyings[i].output = Shader->outputs[j];
+                    break;
+                }
+            }
+
+            /* Compute the number of bytes required. */
+            binarySize = gcmALIGN(gcmOFFSETOF(_gcBINARY_TFBVarying, name) + length, 2);
+
+            /* Point to next varying. */
+            binaryTfbVarying = (gcBINARY_TFBVarying)((gctUINT8 *) binaryTfbVarying + binarySize);
+            curPos += binarySize;
+            bytes -= binarySize;
+        }
+    }
+
+    /************************************************************************/
     /*                                  code                                */
     /************************************************************************/
 
@@ -9064,6 +9138,7 @@ gcSHADER_Save(
     gctUINT32   inputLocationCount   = 0;
     gctUINT32   outputLocationCount   = 0;
     gctINT32    tempValue = 0;
+    gctUINT32   tfbVaryingCount = 0;
 
 #if gcdUSE_WCLIP_PATCH
     gctUINT32   wclipListCount1 = 0, wclipListCount2 = 0;
@@ -9363,6 +9438,17 @@ gcSHADER_Save(
 
     /* hasNotStagesRelatedLinkError. */
     bytes += sizeof(gctINT32);
+
+    /* Transform feedback. */
+    bytes += gcmSIZEOF(gctUINT16);
+    bytes += gcmSIZEOF(gctUINT16);
+    for (i = 0; i < Shader->transformFeedback.varyingCount; i++)
+    {
+        if (Shader->transformFeedback.varyings[i].name == gcvNULL) continue;
+        tfbVaryingCount++;
+        nameLength = gcoOS_StrLen(Shader->transformFeedback.varyings[i].name, gcvNULL);
+        bytes += gcmOFFSETOF(_gcBINARY_TFBVarying, name) + gcmALIGN(nameLength, 2);
+    }
 
     /* Code. */
     bytes += sizeof(gctUINT32);
@@ -10136,6 +10222,40 @@ gcSHADER_Save(
     tempValue = (gctINT32)Shader->hasNotStagesRelatedLinkError;
     gcoOS_MemCopy(buffer, &tempValue, sizeof(gctINT32));
     buffer += sizeof(gctINT32);
+
+    /* transform feedback */
+    *(gctUINT16 *) buffer = (gctUINT16) tfbVaryingCount;
+    buffer += sizeof(gctUINT16);
+    *(gctUINT16 *) buffer = (gctUINT16) Shader->transformFeedback.bufferMode;
+    buffer += sizeof(gctUINT16);
+    /* transform feedback varyings */
+    for (i = 0; i < tfbVaryingCount; i++)
+    {
+        gcBINARY_TFBVarying binary;
+
+        if (Shader->transformFeedback.varyings[i].name == gcvNULL) continue;
+        binary = (gcBINARY_TFBVarying) buffer;
+
+        /* Fill in binary tfb varying. */
+        binary->outputIndex = (gctUINT16) Shader->transformFeedback.varyings[i].output->index;
+        binary->arraySize = (gctINT16) Shader->transformFeedback.varyings[i].arraySize;
+        binary->isWholeTFBed = (gctINT16) Shader->transformFeedback.varyings[i].isWholeTFBed;
+        binary->isArray = (gctINT16) Shader->transformFeedback.varyings[i].isArray;
+        binary->nameLength = (gctINT16) gcoOS_StrLen(Shader->transformFeedback.varyings[i].name, gcvNULL);
+        if (binary->nameLength > 0)
+        {
+            /* Compute number of bytes to copy. */
+            bytes = gcmALIGN(binary->nameLength, 2);
+            /* Copy name. */
+            gcoOS_MemCopy(binary->name, Shader->transformFeedback.varyings[i].name, bytes);
+        }
+        else
+        {
+            bytes = 0;
+        }
+        /* Adjust buffer pointer. */
+        buffer += gcmOFFSETOF(_gcBINARY_TFBVarying, name) + bytes;
+    }
 
     /* Code count. */
     gcoOS_MemCopy(buffer, &Shader->codeCount, sizeof(gctUINT32));

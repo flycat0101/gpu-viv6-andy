@@ -100,11 +100,13 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.20 for new header with chipModel and chpRevision on 11/30/2017 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVEING_CHIPMODEL gcmCC(0, 0, 1, 20)
 
-/* bump up version to 1.21 for 6.2.4 relase on 8/22/2018 */
+/* bump up version to 1.22 for 6.2.4 relase on 8/22/2018 */
+
+/* bump up version to 1.23 for saving transform feedback information on 8/28/2018 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 22)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 22)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 23)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 23)
 
 typedef union _gcsValue
 {
@@ -3966,6 +3968,17 @@ typedef struct _gcsTFBVarying
     gctBOOL   isArray;
     gcOUTPUT  output;
 } gcsTFBVarying;
+
+typedef struct _gcBINARY_TFBVarying
+{
+    gctUINT16                       outputIndex;
+    gctINT16                        arraySize;
+    gctINT16                        isWholeTFBed;
+    gctINT16                        isArray;
+    gctINT16                        nameLength;
+    char                            name[1];
+}
+* gcBINARY_TFBVarying;
 
 typedef struct _gcsTRANSFORM_FEEDBACK
 {
