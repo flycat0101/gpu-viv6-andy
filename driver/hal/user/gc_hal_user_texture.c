@@ -5416,7 +5416,7 @@ OnError:
                 blitArgs.xReverse           = gcvFALSE;
                 blitArgs.yReverse           = gcvFALSE;
                 blitArgs.scissorTest        = gcvFALSE;
-                blitArgs.srcNumSlice        = 1;
+                blitArgs.srcNumSlice        = srcSurface->requestD;
                 blitArgs.dstNumSlice        = 1;
                 blitArgs.needDecode         = sRGBDecodeEnable;
                 status = gcoSURF_BlitCPU(&blitArgs);

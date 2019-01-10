@@ -740,7 +740,7 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
         {
         case GL_UNSIGNED_BYTE:
             invalid = (GL_RGB8 != internalFormat && GL_RGB565 != internalFormat &&
-                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat);
+                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat && __GL_RGBX8 != internalFormat);
             break;
         case GL_BYTE:
             invalid = (GL_RGB8_SNORM != internalFormat);
