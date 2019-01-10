@@ -12546,24 +12546,39 @@ VIR_Operand_NegateOperand(
     IN  VIR_Operand *       Operand
     )
 {
+    /* HW takes absolute values first, then takes negative, we need to follow this order. */
+    gctBOOL                 bHasAbs = VIR_Operand_GetModifier(Operand) & VIR_MOD_ABS;
+
     switch(VIR_Operand_GetOpKind(Operand))
     {
     case VIR_OPND_IMMEDIATE:
         {
             VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(Operand);
-            VIR_ScalarConstVal_GetNeg(type, (VIR_ScalarConstVal*)&(Operand->u.n.u1), (VIR_ScalarConstVal*)&(Operand->u.n.u1));
+            if (bHasAbs)
+            {
+                VIR_ScalarConstVal_GetAbs(type, (VIR_ScalarConstVal*)&(Operand->u.n.u1), (VIR_ScalarConstVal*)&(Operand->u.n.u1));
+                VIR_Operand_SetModifier(Operand, VIR_MOD_ABS ^ VIR_Operand_GetModifier(Operand));
+            }
+            VIR_ScalarConstVal_GetNeg(type,(VIR_ScalarConstVal*)&(Operand->u.n.u1), (VIR_ScalarConstVal*)&(Operand->u.n.u1));
             break;
         }
+
     case VIR_OPND_SYMBOL:
         if(VIR_Operand_GetModifier(Operand) & VIR_MOD_NEG)
         {
             VIR_Operand_SetModifier(Operand, VIR_MOD_NEG ^ VIR_Operand_GetModifier(Operand));
+            VIR_Operand_SetModOrder(Operand, VIR_MODORDER_NONE);
         }
         else
         {
             VIR_Operand_SetModifier(Operand, VIR_MOD_NEG | VIR_Operand_GetModifier(Operand));
+            if (bHasAbs)
+            {
+                VIR_Operand_SetModOrder(Operand, VIR_MODORDER_ABS_NEG);
+            }
         }
         break;
+
     case VIR_OPND_CONST:
         {
             VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetConstFromId(Shader,
@@ -12573,11 +12588,21 @@ VIR_Operand_NegateOperand(
 
             memset(&new_const, 0, sizeof(VIR_ConstVal));
 
-            VIR_VecConstVal_GetNeg(cur_const->type, &cur_const->value.vecVal, &new_const.vecVal);
+            if (bHasAbs)
+            {
+                VIR_VecConstVal_GetAbs(cur_const->type, &cur_const->value.vecVal, &new_const.vecVal);
+                VIR_VecConstVal_GetNeg(cur_const->type, &new_const.vecVal, &new_const.vecVal);
+                VIR_Operand_SetModifier(Operand, VIR_MOD_ABS ^ VIR_Operand_GetModifier(Operand));
+            }
+            else
+            {
+                VIR_VecConstVal_GetNeg(cur_const->type, &cur_const->value.vecVal, &new_const.vecVal);
+            }
             VIR_Shader_AddConstant(Shader, cur_const->type, &new_const, &new_const_id);
             VIR_Operand_SetConstId(Operand, new_const_id);
             break;
         }
+
     default:
         gcmASSERT(gcvFALSE);
     }
@@ -14904,7 +14929,44 @@ VIR_ScalarConstVal_GetNeg(
     }
 }
 
+void
+VIR_ScalarConstVal_GetAbs(
+    IN  VIR_PrimitiveTypeId type,
+    IN  VIR_ScalarConstVal* in_imm,
+    OUT VIR_ScalarConstVal* out_imm
+    )
+{
+    switch(type)
+    {
+    case VIR_TYPE_FLOAT32:
+        out_imm->fValue = gcoMATH_Absolute(in_imm->fValue);
+        break;
 
+    case VIR_TYPE_INT64:
+    case VIR_TYPE_INT32:
+    case VIR_TYPE_INT16:
+    case VIR_TYPE_INT8:
+        if (in_imm->iValue > 0)
+        {
+            out_imm->iValue = in_imm->iValue;
+        }
+        else
+        {
+            out_imm->iValue = -in_imm->iValue;
+        }
+        break;
+
+    case VIR_TYPE_UINT64:
+    case VIR_TYPE_UINT32:
+    case VIR_TYPE_UINT16:
+    case VIR_TYPE_UINT8:
+        out_imm->iValue = in_imm->iValue;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+    }
+}
 
 void
 VIR_ScalarConstVal_AddScalarConstVal(
@@ -15072,6 +15134,113 @@ VIR_VecConstVal_GetNeg(
             for(i = 0; i < constCount; i++)
             {
                 out[i] = -in[i];
+            }
+            break;
+        }
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+}
+
+void
+VIR_VecConstVal_GetAbs(
+    IN  VIR_PrimitiveTypeId type,
+    IN  VIR_VecConstVal* in_const,
+    OUT VIR_VecConstVal* out_const
+    )
+{
+    gctINT  componentCount = VIR_GetTypeComponents(type);
+    gctINT  rowCount = VIR_GetTypeRows(type);
+    gctINT  constCount = componentCount * rowCount;
+    gctINT  i;
+
+    switch (type)
+    {
+    case VIR_TYPE_FLOAT_X2:
+    case VIR_TYPE_FLOAT_X3:
+    case VIR_TYPE_FLOAT_X4:
+        {
+            gctFLOAT* in = &in_const->f32Value[0];
+            gctFLOAT* out = &out_const->f32Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = gcoMATH_Absolute(in[i]);
+            }
+            break;
+        }
+
+    case VIR_TYPE_UINT_X2:
+    case VIR_TYPE_UINT_X3:
+    case VIR_TYPE_UINT_X4:
+        {
+            gctINT* in = &in_const->i32Value[0];
+            gctINT* out = &out_const->i32Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i];
+            }
+            break;
+        }
+
+    case VIR_TYPE_INTEGER_X2:
+    case VIR_TYPE_INTEGER_X3:
+    case VIR_TYPE_INTEGER_X4:
+        {
+            gctINT* in = &in_const->i32Value[0];
+            gctINT* out = &out_const->i32Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i] > 0 ? in[i] : -in[i];
+            }
+            break;
+        }
+
+    case VIR_TYPE_UINT16_X8:
+        {
+            int i;
+            gctINT16* in = &in_const->i16Value[0];
+            gctINT16* out = &out_const->i16Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i];
+            }
+            break;
+        }
+
+    case VIR_TYPE_INT16_X8:
+        {
+            int i;
+            gctINT16* in = &in_const->i16Value[0];
+            gctINT16* out = &out_const->i16Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i] > 0 ? in[i] : -in[i];
+            }
+            break;
+        }
+
+    case VIR_TYPE_UINT8_X16:
+        {
+            int i;
+            gctINT8* in = &in_const->i8Value[0];
+            gctINT8* out = &out_const->i8Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i];
+            }
+            break;
+        }
+
+    case VIR_TYPE_INT8_X16:
+        {
+            int i;
+            gctINT8* in = &in_const->i8Value[0];
+            gctINT8* out = &out_const->i8Value[0];
+            for(i = 0; i < constCount; i++)
+            {
+                out[i] = in[i] > 0 ? in[i] : -in[i];
             }
             break;
         }

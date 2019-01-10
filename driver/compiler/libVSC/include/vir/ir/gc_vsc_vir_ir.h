@@ -609,6 +609,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_GetSwizzle(Opnd)        ((VIR_Swizzle)(Opnd)->u.n._swizzleOrEnable)
 #define VIR_Operand_GetFinalAccessType(Opnd) ((Opnd)->u.n._opndType)
 #define VIR_Operand_isBigEndian(Opnd)       ((Opnd)->u.n._bigEndian)
+#define VIR_Operand_GetModOrder(Opnd)       ((Opnd)->u.n._modOrder)
 
 #define VIR_Operand_GetSymbol(Opnd)         ((Opnd)->u.n.u1.sym)
 #define VIR_Operand_GetSymbolId_(Opnd)      VIR_Symbol_GetIndex(VIR_Operand_GetSymbol(Opnd))
@@ -674,6 +675,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_SetHIHwShift(Opnd, Val)     do { (Opnd)->u.n._HIhwShift = (gctUINT) (Val); } while (0)
 #define VIR_Operand_SetLShift(Opnd, lshift)     do { (Opnd)->u.n._lshift = (gctUINT)(lshift); } while (0)
 #define VIR_Operand_SetBigEndian(Opnd, Val)     do { (Opnd)->u.n._bigEndian = (gctUINT) (Val); } while (0)
+#define VIR_Operand_SetModOrder(Opnd, Val)      do { (Opnd)->u.n._modOrder = (gctUINT) (Val); } while (0)
 
 #define VIR_Operand_SetRoundMode(Opnd, Round)   do { (Opnd)->header._roundMode = (gctUINT)(Round); } while (0)
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
@@ -2028,6 +2030,13 @@ typedef enum _VIR_MODIFIER
     VIR_MOD_ABS             = 0x02, /* source absolute modfier */
     VIR_MOD_X3              = 0x04  /* source X3 modfier */
 } VIR_Modifier;
+
+typedef enum _VIR_MODIFIER_ORDER
+{
+    VIR_MODORDER_NONE       = 0,
+    VIR_MODORDER_ABS_NEG    = 1,
+    VIR_MODORDER_NEG_ABS    = 2,
+} VIR_ModifierOrder;
 
 /* Possible indices. */
 typedef enum _VIR_INDEXED
@@ -3482,7 +3491,9 @@ struct _VIR_OPERAND
             gctUINT                 _bigEndian      : 1;   /* point to big endian data, it is propagated
                                                             * from big endian host pointer variable */
 
-            gctUINT                 _reserved1      : 20;
+            gctUINT                 _modOrder       : 2;   /* operand modifier order. */
+
+            gctUINT                 _reserved1      : 18;
 
             /* Word 3. */
             /* hardware register info */
@@ -6682,6 +6693,13 @@ VIR_ScalarConstVal_GetNeg(
     );
 
 void
+VIR_ScalarConstVal_GetAbs(
+    IN  VIR_PrimitiveTypeId type,
+    IN  VIR_ScalarConstVal* in_imm,
+    OUT VIR_ScalarConstVal* out_imm
+    );
+
+void
 VIR_ScalarConstVal_AddScalarConstVal(
     IN  VIR_PrimitiveTypeId type,
     IN  VIR_ScalarConstVal* in_imm0,
@@ -6705,6 +6723,13 @@ VIR_ScalarConstVal_One(
 
 void
 VIR_VecConstVal_GetNeg(
+    IN  VIR_PrimitiveTypeId type,
+    IN  VIR_VecConstVal* in_const,
+    OUT VIR_VecConstVal* out_const
+    );
+
+void
+VIR_VecConstVal_GetAbs(
     IN  VIR_PrimitiveTypeId type,
     IN  VIR_VecConstVal* in_const,
     OUT VIR_VecConstVal* out_const

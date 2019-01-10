@@ -29,9 +29,9 @@
 /* 0.0.1.5 implement lib function nmin, nmax and nclamp, Oct. 24, 2018 */
 /* 0.0.1.6 add imageFetch for sampler, Nov. 2, 2018 */
 /* 0.0.1.7 modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 7)
-
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 7)
+/* 0.0.1.12 Add VIR_ModifierOrder in VIR_Operand on 01/03/2019 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 12)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 12)
 
 #define gcdSUPPORT_COMPUTE_SHADER   1
 #define gcdSUPPORT_TESS_GS_SHADER   1

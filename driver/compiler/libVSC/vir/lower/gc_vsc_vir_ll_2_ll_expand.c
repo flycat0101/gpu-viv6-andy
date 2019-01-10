@@ -368,9 +368,13 @@ _set_ABS(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
-)
+    )
 {
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS);
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
+    {
+        VIR_Operand_SetModOrder(Opnd, VIR_MODORDER_NEG_ABS);
+    }
     return gcvTRUE;
 }
 

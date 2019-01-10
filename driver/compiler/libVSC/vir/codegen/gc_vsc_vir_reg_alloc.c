@@ -1661,6 +1661,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
     VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
     VIR_USAGE               *pUsage;
     VIR_Instruction         *pUseInst;
+    VIR_Operand             *pUseOperand;
     VIR_Operand             *pBaseOpnd = VIR_Inst_GetSource(pInst, 0);
     VIR_Operand             *pDest = VIR_Inst_GetDest(pInst);
 
@@ -1724,6 +1725,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
 
             pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
             pUseInst = pUsage->usageKey.pUsageInst;
+            pUseOperand = pUsage->usageKey.pOperand;
 
             if(VIR_IS_OUTPUT_USAGE_INST(pUseInst))
             {
@@ -1751,17 +1753,17 @@ gctBOOL _VIR_RA_LS_removableLDARR(
             }
 
             /* already replaced*/
-            if (VIR_Operand_GetRelAddrMode(pUsage->usageKey.pOperand) != VIR_INDEXED_NONE)
+            if (VIR_Operand_GetRelAddrMode(pUseOperand) != VIR_INDEXED_NONE)
             {
                 continue;
             }
 
-            VIR_Operand_GetOperandInfo(pUseInst, pUsage->usageKey.pOperand, &srcInfo);
+            VIR_Operand_GetOperandInfo(pUseInst, pUseOperand, &srcInfo);
 
             if(!vscVIR_IsUniqueDefInstOfUsageInst(
                         pLvInfo->pDuInfo,
                         pUseInst,
-                        pUsage->usageKey.pOperand,
+                        pUseOperand,
                         pUsage->usageKey.bIsIndexingRegUsage,
                         pInst,
                         gcvNULL))
@@ -1770,7 +1772,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
                 continue;
             }
 
-            srcIndex = VIR_Inst_GetSourceIndex(pUseInst, pUsage->usageKey.pOperand);
+            srcIndex = VIR_Inst_GetSourceIndex(pUseInst, pUseOperand);
             gcmASSERT(srcIndex < VIR_MAX_SRC_NUM);
 
             /* An instruction can not hold two different uniforms access (indexing
@@ -1822,12 +1824,16 @@ gctBOOL _VIR_RA_LS_removableLDARR(
                                        VIR_Swizzle_ApplyMappingSwizzle(useSwizzle, mappingSwizzle));
                 VIR_Operand_SetTypeId(newOpnd, VIR_Operand_GetTypeId(pUseInst->src[srcIndex]));
 
+                /* We need to copy the modifier and the order from the usage operand. */
+                VIR_Operand_SetModifier(newOpnd, VIR_Operand_GetModifier(pUseOperand));
+                VIR_Operand_SetModOrder(newOpnd, VIR_Operand_GetModOrder(pUseOperand));
+
                 /* update the du - not complete yet
                    only delete the usage of t1, not add usage for base and offset */
                 vscVIR_DeleteUsage(pLvInfo->pDuInfo,
                         pInst,
                         pUseInst,
-                        pUsage->usageKey.pOperand,
+                        pUseOperand,
                         pUsage->usageKey.bIsIndexingRegUsage,
                         srcInfo.u1.virRegInfo.virReg,
                         1,
