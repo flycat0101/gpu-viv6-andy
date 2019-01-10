@@ -251,7 +251,7 @@ typedef struct __GLchipDirtyRec
 
 #define __GL_DEFAULT_LOOP 0
 
-#define __GL_CHIP_NAME_LEN 23
+#define __GL_CHIP_NAME_LEN 32
 
 
 /*
