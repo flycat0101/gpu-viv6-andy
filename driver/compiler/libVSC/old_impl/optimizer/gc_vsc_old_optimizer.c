@@ -2123,6 +2123,51 @@ gctBOOL isChannelOfEnableEqualSwizzle(
     return gcvTRUE;
 }
 
+static gctBOOL
+_NoAssignmentBetweenDepAndUser(
+    IN gcOPT_CODE   DepCode,
+    IN gcOPT_CODE   UserCode
+    )
+{
+    gcOPT_CODE      codeIter;
+
+    /*
+    ** This is just a rough check, no need to consider the back jump or cross-function usage.
+    ** The only thing we need to make sure that the depCode and the userCode are in the same BB.
+    */
+    if (DepCode->function != UserCode->function || DepCode->id > UserCode->id)
+    {
+        return gcvFALSE;
+    }
+
+    for (codeIter = DepCode->next; codeIter && codeIter != UserCode; codeIter = codeIter->next)
+    {
+        gcSL_OPCODE opCode = (gcSL_OPCODE)gcmSL_OPCODE_GET(codeIter->instruction.opcode, Opcode);
+
+        if (opCode == gcSL_JMP || opCode == gcSL_JMP_ANY || opCode == gcSL_CALL)
+        {
+            return gcvFALSE;
+        }
+
+        if (codeIter->callers != gcvNULL)
+        {
+            return gcvFALSE;
+        }
+
+        if (gcSL_isOpcodeHaveNoTarget(opCode))
+        {
+            continue;
+        }
+
+        if (codeIter->instruction.tempIndex == UserCode->instruction.tempIndex)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
 gceSTATUS
 gcOpt_OptimizeConstantAssignment(
     IN gcOPTIMIZER Optimizer
@@ -2141,6 +2186,7 @@ gcOpt_OptimizeConstantAssignment(
         gcmFOOTER();
         return status;
     }
+
     {
         gctBOOL     useFullNewLinker = gcvFALSE;
         gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
@@ -2154,6 +2200,7 @@ gcOpt_OptimizeConstantAssignment(
             return status;
         }
     }
+
     if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
         Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
     {
@@ -2225,7 +2272,7 @@ gcOpt_OptimizeConstantAssignment(
         }
 
         /* User has multiple dep, skip it now. */
-        if (depCount != vectorCount)
+        if (depCount != vectorCount || !_NoAssignmentBetweenDepAndUser(endCode, userCode))
         {
             code = endCode;
             continue;
