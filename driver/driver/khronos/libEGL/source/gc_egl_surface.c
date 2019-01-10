@@ -589,6 +589,7 @@ _DestroySurfaceObjects(
             {
                 gcmOS_SAFE_FREE(gcvNULL, Surface->damage[i].rects);
                 Surface->damage[i].numRects = 0;
+                Surface->damage[i].maxNumRects = 0;
             }
         }
 
