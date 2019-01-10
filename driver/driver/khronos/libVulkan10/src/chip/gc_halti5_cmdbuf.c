@@ -6560,6 +6560,15 @@ VkResult halti5_bindDescriptors(
          if (srcAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
          {
              flushColorCache = VK_TRUE;
+             if (dstAccessMask & (VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+                                | VK_ACCESS_INDEX_READ_BIT
+                                | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+                                | VK_ACCESS_UNIFORM_READ_BIT
+                                | VK_ACCESS_SHADER_READ_BIT
+                                | VK_ACCESS_TRANSFER_READ_BIT))
+             {
+                 stallFE = VK_TRUE;
+             }
          }
          if (srcAccessMask & VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
          {
