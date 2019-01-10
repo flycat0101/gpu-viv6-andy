@@ -6511,6 +6511,7 @@ VkResult halti5_bindDescriptors(
      VkBool32 flushSHL1Cache = VK_FALSE;
      VkBool32 stallRA = VK_FALSE;
      VkBool32 stallFE = VK_FALSE;
+     VkBool32 multiGpuSync = VK_FALSE;
      uint32_t requestSize = 0;
      uint32_t *states;
      uint32_t hwFlushState = 0;
@@ -6560,11 +6561,7 @@ VkResult halti5_bindDescriptors(
          if (srcAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
          {
              flushColorCache = VK_TRUE;
-             if (dstAccessMask & (VK_ACCESS_INDIRECT_COMMAND_READ_BIT
-                                | VK_ACCESS_INDEX_READ_BIT
-                                | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
-                                | VK_ACCESS_UNIFORM_READ_BIT
-                                | VK_ACCESS_SHADER_READ_BIT
+             if (dstAccessMask & (VK_ACCESS_SHADER_READ_BIT
                                 | VK_ACCESS_TRANSFER_READ_BIT))
              {
                  stallFE = VK_TRUE;
@@ -6573,6 +6570,13 @@ VkResult halti5_bindDescriptors(
          if (srcAccessMask & VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
          {
              flushZCache = VK_TRUE;
+         }
+         if ((devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) &&
+             (((srcAccessMask & VK_ACCESS_SHADER_READ_BIT) && (dstAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)) ||
+             ((srcAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) && (dstAccessMask & VK_ACCESS_SHADER_READ_BIT)) ||
+             ((srcAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT) && (dstAccessMask & VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))))
+         {
+             multiGpuSync = VK_TRUE;
          }
      }
 
@@ -6665,12 +6669,27 @@ VkResult halti5_bindDescriptors(
         }
     }
 
-    if (stallFE || stallRA)
+    if (multiGpuSync)
+    {
+        if (devCtx->database->REG_BltEngine)
+        {
+            requestSize += 4;
+        }
+        if (devCtx->database->MultiCoreSemaphoreStallV2)
+        {
+            requestSize += devCtx->chipInfo->gpuCoreCount * 10 - 2;
+        }
+        else
+        {
+            requestSize += 18;
+        }
+    }
+    else if (stallFE || stallRA)
     {
         requestSize += 4;
         if (devCtx->database->REG_BltEngine)
         {
-           requestSize += 4;
+            requestSize += 4;
         }
     }
 
@@ -6688,7 +6707,12 @@ VkResult halti5_bindDescriptors(
             __vkCmdLoadSingleHWState(&states, 0x0E03, VK_FALSE, hwFlushVST);
         }
 
-        if (stallFE || stallRA)
+        /* Sync between GPUs */
+        if (multiGpuSync)
+        {
+            halti5_setMultiGpuSync((VkDevice)devCtx, &states, VK_NULL_HANDLE);
+        }
+        else if (stallFE || stallRA)
         {
             uint32_t stallDestination;
             VkBool32 needLockBlt = VK_FALSE;
@@ -6778,7 +6802,7 @@ VkResult halti5_bindDescriptors(
         __vk_CmdReleaseBuffer(commandBuffer, requestSize);
     }
 
-     return;
+    return;
  }
 
  void halti5_setEvent(
