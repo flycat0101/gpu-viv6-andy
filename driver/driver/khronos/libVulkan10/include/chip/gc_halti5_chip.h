@@ -722,6 +722,7 @@ typedef struct
     enum HwCacheMode hwCacheMode;
 
     uint32_t regDepthConfig;
+    uint32_t regRAControl;
     uint32_t vsAllInputCount;
 
     uint32_t psOutCntl4to7;

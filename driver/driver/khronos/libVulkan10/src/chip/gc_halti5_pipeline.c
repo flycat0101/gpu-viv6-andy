@@ -2535,6 +2535,7 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0382, VK_FALSE, regRAControl);
 
     chipGfxPipeline->regDepthConfig = regDepthConfig;
+    chipGfxPipeline->regRAControl = regRAControl;
     chipGfxPipeline->stencilMode = stencilMode;
 
     chipPipeline->curCmdIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);

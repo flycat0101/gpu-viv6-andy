@@ -3722,6 +3722,64 @@ VkResult halti5_setRenderTargets(
  27:27) - (0 ? 27:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:27) - (0 ?
  27:27) + 1))))))) << (0 ? 27:27))));
 
+        if (dsImage->halTiling == gcvLINEAR)
+        {
+            chipGfxPipeline->regDepthConfig &= (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:17) - (0 ?
+ 17:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:17) - (0 ?
+ 17:17) + 1))))))) << (0 ?
+ 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 17:17) - (0 ?
+ 17:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:17) - (0 ? 17:17) + 1))))))) << (0 ? 17:17))));
+            chipGfxPipeline->regDepthConfig &= (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ?
+ 12:12))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ?
+ 12:12))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1))))))) << (0 ?
+ 13:13))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:13) - (0 ? 13:13) + 1))))))) << (0 ? 13:13))));
+            chipGfxPipeline->regRAControl |= ((((gctUINT32) (chipGfxPipeline->regRAControl)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)));
+        }
+
         baseAddresses[0] = baseAddresses[1] = rtBaseAddr;
 
         if (database->NumPixelPipes == 1)
@@ -3734,6 +3792,7 @@ VkResult halti5_setRenderTargets(
         }
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0505, VK_FALSE, (uint32_t)pLevel->stride);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0500, VK_FALSE, chipGfxPipeline->regDepthConfig);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0382, VK_FALSE, chipGfxPipeline->regRAControl);
 
         if (database->REG_GeometryShader)
         {
